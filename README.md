@@ -2,6 +2,12 @@
 
 Inhouse Photos is the Inhouse-branded Android client for a private Immich server. This fork is pinned to Immich **3.1.0**, uses the original Immich API and data model, and therefore connects to an existing server without migration or downtime.
 
+## Direct Android download
+
+[Download Inhouse Photos APK](https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/Inhouse-Photos.apk)
+
+This APK is the signed ARM64 build for modern Android phones. Android may ask you to allow installation from your browser or file manager.
+
 - Android application ID: `com.inhousesoftware.photos`
 - Default server: `https://fotos.miguelcoxcaballero.com`
 - Brand palette: Inhouse Copper `#D97736`, Black `#000000`, Cream `#F5F5F0`
