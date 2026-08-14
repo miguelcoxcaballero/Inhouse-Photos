@@ -14,6 +14,22 @@ void main() {
     });
   });
 
+  group('download progress', () {
+    test('calculates and clamps determinate progress', () {
+      expect(calculateInhouseDownloadProgress(downloadedBytes: 25, totalBytes: 100), 0.25);
+      expect(calculateInhouseDownloadProgress(downloadedBytes: 120, totalBytes: 100), 1.0);
+    });
+
+    test('uses indeterminate progress without a valid content length', () {
+      expect(calculateInhouseDownloadProgress(downloadedBytes: 25, totalBytes: null), isNull);
+      expect(calculateInhouseDownloadProgress(downloadedBytes: 25, totalBytes: 0), isNull);
+    });
+
+    test('formats downloaded bytes in megabytes', () {
+      expect(formatInhouseDownloadBytes(1572864), '1.5 MB');
+    });
+  });
+
   group('InhouseUpdateManifest', () {
     test('accepts a required update from an approved GitHub host', () {
       final manifest = InhouseUpdateManifest.fromJson({
