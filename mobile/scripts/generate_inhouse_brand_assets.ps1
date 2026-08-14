@@ -68,4 +68,4 @@ New-InhouseIcon (Join-Path $assets 'inhouse-photos-icon-foreground.png') $true $
 New-InhouseIcon (Join-Path $assets 'inhouse-photos-icon-foreground-light.png') $true $true
 New-InhouseIcon (Join-Path $assets 'inhouse-photos-splash.png') $true $false 768
 New-InhouseIcon (Join-Path $assets 'inhouse-photos-splash-light.png') $true $true 768
-Copy-Item (Join-Path $assets 'inhouse-photos-icon.png') (Join-Path $assets 'immich-logo.png') -Force
+Copy-Item (Join-Path $assets 'inhouse-photos-icon-light.png') (Join-Path $assets 'immich-logo.png') -Force

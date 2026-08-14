@@ -26,11 +26,11 @@ class AppBarProfileInfoBox extends HookConsumerWidget {
 
     buildUserProfileImage() {
       if (user == null) {
-        final logoAsset = Theme.of(context).brightness == Brightness.dark
-            ? 'assets/inhouse-photos-icon.png'
-            : 'assets/inhouse-photos-icon-light.png';
-
-        return CircleAvatar(radius: 20, backgroundImage: AssetImage(logoAsset), backgroundColor: Colors.transparent);
+        return const CircleAvatar(
+          radius: 20,
+          backgroundImage: AssetImage('assets/inhouse-photos-icon-light.png'),
+          backgroundColor: Colors.transparent,
+        );
       }
 
       final userImage = UserCircleAvatar(size: 44, user: user, hasBorder: true);
