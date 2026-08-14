@@ -18,6 +18,7 @@ import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -35,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -69,19 +71,22 @@ class BackupMediaProcessorPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
 
     val sourcePath = call.argument<String>("sourcePath")
     val originalFileName = call.argument<String>("originalFileName")
+    val operationId = call.argument<String>("operationId")
     val isVideo = call.argument<Boolean>("isVideo") ?: false
-    if (sourcePath.isNullOrBlank() || originalFileName.isNullOrBlank()) {
-      result.error("invalid_arguments", "sourcePath and originalFileName are required", null)
+    if (sourcePath.isNullOrBlank() || originalFileName.isNullOrBlank() || operationId.isNullOrBlank()) {
+      result.error("invalid_arguments", "sourcePath, originalFileName and operationId are required", null)
       return
     }
 
     scope.launch {
       try {
+        emitProgress(operationId, 0.02)
         val prepared = if (isVideo) {
-          prepareVideo(File(sourcePath), originalFileName)
+          prepareVideo(File(sourcePath), originalFileName, operationId)
         } else {
-          preparePhoto(File(sourcePath), originalFileName)
+          preparePhoto(File(sourcePath), originalFileName, operationId)
         }
+        emitProgress(operationId, 1.0)
         result.success(prepared)
       } catch (error: Throwable) {
         result.error("storage_saver_failed", error.message ?: error.javaClass.simpleName, null)
@@ -89,13 +94,14 @@ class BackupMediaProcessorPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
     }
   }
 
-  private suspend fun preparePhoto(source: File, originalFileName: String): Map<String, Any>? =
+  private suspend fun preparePhoto(source: File, originalFileName: String, operationId: String): Map<String, Any>? =
     withContext(Dispatchers.IO) {
       require(source.isFile) { "Photo source does not exist" }
 
       val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
       BitmapFactory.decodeFile(source.path, bounds)
       require(bounds.outWidth > 0 && bounds.outHeight > 0) { "Unsupported photo format" }
+      emitProgressFromWorker(operationId, 0.15)
 
       val targetScale = min(1.0, sqrt(MAX_PHOTO_PIXELS.toDouble() / (bounds.outWidth.toLong() * bounds.outHeight)))
       val targetWidth = (bounds.outWidth * targetScale).roundToInt().coerceAtLeast(1)
@@ -112,6 +118,7 @@ class BackupMediaProcessorPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
           inPreferredConfig = Bitmap.Config.ARGB_8888
         },
       ) ?: error("Unable to decode photo")
+      emitProgressFromWorker(operationId, 0.45)
 
       val scaled = if (decoded.width != targetWidth || decoded.height != targetHeight) {
         Bitmap.createScaledBitmap(decoded, targetWidth, targetHeight, true).also { if (it !== decoded) decoded.recycle() }
@@ -121,6 +128,7 @@ class BackupMediaProcessorPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
 
       val sourceExif = runCatching { ExifInterface(source.path) }.getOrNull()
       val rotated = rotateFromExif(scaled, sourceExif)
+      emitProgressFromWorker(operationId, 0.65)
       val hasAlpha = rotated.hasAlpha()
       val outputWidth = rotated.width
       val outputHeight = rotated.height
@@ -132,12 +140,14 @@ class BackupMediaProcessorPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
           val format = if (hasAlpha) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
           check(rotated.compress(format, PHOTO_JPEG_QUALITY, stream)) { "Unable to encode photo" }
         }
+        emitProgressFromWorker(operationId, 0.9)
         if (rotated !== scaled) scaled.recycle()
         rotated.recycle()
 
         if (!hasAlpha && sourceExif != null) {
           copyExif(sourceExif, output, outputWidth, outputHeight)
         }
+        emitProgressFromWorker(operationId, 0.97)
         useOnlyWhenSmaller(source, output, replaceExtension(originalFileName, extension))
       } catch (error: Throwable) {
         output.delete()
@@ -145,7 +155,7 @@ class BackupMediaProcessorPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
       }
     }
 
-  private suspend fun prepareVideo(source: File, originalFileName: String): Map<String, Any>? {
+  private suspend fun prepareVideo(source: File, originalFileName: String, operationId: String): Map<String, Any>? {
     require(source.isFile) { "Video source does not exist" }
     val retriever = MediaMetadataRetriever()
     val (width, height) = try {
@@ -169,15 +179,19 @@ class BackupMediaProcessorPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
 
     return suspendCancellableCoroutine { continuation ->
       lateinit var transformer: Transformer
+      var progressJob: Job? = null
       val listener = object : Transformer.Listener {
         override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+          progressJob?.cancel()
           transformers.remove(transformer)
+          emitProgress(operationId, 0.98)
           if (continuation.isActive) {
             continuation.resume(useOnlyWhenSmaller(source, output, replaceExtension(originalFileName, ".mp4")))
           }
         }
 
         override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
+          progressJob?.cancel()
           transformers.remove(transformer)
           output.delete()
           if (continuation.isActive) {
@@ -194,12 +208,33 @@ class BackupMediaProcessorPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
         .build()
       transformers.add(transformer)
       continuation.invokeOnCancellation {
+        progressJob?.cancel()
         transformer.cancel()
         transformers.remove(transformer)
         output.delete()
       }
       transformer.start(editedMedia, output.path)
+      progressJob = scope.launch {
+        val holder = ProgressHolder()
+        while (continuation.isActive) {
+          if (transformer.getProgress(holder) == Transformer.PROGRESS_STATE_AVAILABLE) {
+            emitProgress(operationId, 0.02 + (holder.progress.coerceIn(0, 100) / 100.0 * 0.94))
+          }
+          delay(200)
+        }
+      }
     }
+  }
+
+  private fun emitProgress(operationId: String, progress: Double) {
+    channel.invokeMethod(
+      "progress",
+      mapOf("operationId" to operationId, "progress" to progress.coerceIn(0.0, 1.0)),
+    )
+  }
+
+  private suspend fun emitProgressFromWorker(operationId: String, progress: Double) {
+    withContext(Dispatchers.Main.immediate) { emitProgress(operationId, progress) }
   }
 
   private fun rotateFromExif(bitmap: Bitmap, exif: ExifInterface?): Bitmap {

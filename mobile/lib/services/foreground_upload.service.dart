@@ -28,11 +28,19 @@ import 'package:photo_manager/photo_manager.dart' show PMProgressHandler;
 /// Callbacks for upload progress and status updates
 class UploadCallbacks {
   final void Function(String id, String filename, int bytes, int totalBytes)? onProgress;
+  final void Function(String id, String filename, double progress, int originalBytes, int? preparedBytes)?
+  onPreparationProgress;
   final void Function(String localId, String remoteId)? onSuccess;
   final void Function(String id, String errorMessage)? onError;
   final void Function(String id, double progress)? onICloudProgress;
 
-  const UploadCallbacks({this.onProgress, this.onSuccess, this.onError, this.onICloudProgress});
+  const UploadCallbacks({
+    this.onProgress,
+    this.onPreparationProgress,
+    this.onSuccess,
+    this.onError,
+    this.onICloudProgress,
+  });
 }
 
 final foregroundUploadServiceProvider = Provider((ref) {
@@ -324,7 +332,18 @@ class ForegroundUploadService {
       final extension = p.extension(file.path).isNotEmpty ? p.extension(file.path) : p.extension(asset.name);
       var originalFileName = p.setExtension(fileName, extension);
 
-      final prepared = await _mediaPreprocessor.prepare(file, asset, originalFileName);
+      final prepared = await _mediaPreprocessor.prepare(
+        file,
+        asset,
+        originalFileName,
+        onProgress: (progress, originalBytes, preparedBytes) => callbacks.onPreparationProgress?.call(
+          asset.localId!,
+          originalFileName,
+          progress,
+          originalBytes,
+          preparedBytes,
+        ),
+      );
       file = prepared.file;
       originalFileName = prepared.uploadFileName;
       if (prepared.isTemporary) {
@@ -338,6 +357,13 @@ class ForegroundUploadService {
           asset,
           livePhotoTitle,
           isVideoOverride: true,
+          onProgress: (progress, originalBytes, preparedBytes) => callbacks.onPreparationProgress?.call(
+            asset.localId!,
+            livePhotoTitle,
+            progress,
+            originalBytes,
+            preparedBytes,
+          ),
         );
         livePhotoFile = preparedMotion.file;
         if (preparedMotion.isTemporary) {

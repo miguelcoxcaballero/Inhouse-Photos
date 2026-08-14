@@ -46,14 +46,32 @@ void main() {
   test('backup quality labels are bundled instead of exposing translation keys', () {
     for (final locale in ['en', 'es']) {
       final translations = CodegenLoader.mapLocales[locale]!;
-      expect(translations['backup_quality'], isNot('backup_quality'), reason: locale);
-      expect(translations['backup_quality_storage_saver'], isNot('backup_quality_storage_saver'), reason: locale);
-      expect(
-        translations['backup_quality_estimated_savings'],
-        isNot('backup_quality_estimated_savings'),
-        reason: locale,
-      );
+      for (final key in [
+        'backup_quality',
+        'backup_quality_storage_saver',
+        'backup_quality_estimated_savings',
+        'backup_original_size',
+        'backup_compressed_size',
+        'backup_compression_stage',
+        'backup_upload_stage',
+      ]) {
+        expect(translations[key], isNot(key), reason: '$locale: $key');
+      }
     }
     expect(File('lib/main.dart').readAsStringSync(), contains('useFallbackTranslations: true'));
+  });
+
+  test('upload details expose separate compression and upload progress', () {
+    final details = File('lib/pages/backup/drift_upload_detail.page.dart').readAsStringSync();
+    final processor = File(
+      'android/app/src/main/kotlin/app/alextran/immich/BackupMediaProcessorPlugin.kt',
+    ).readAsStringSync();
+
+    expect(details, contains('item.preparationProgress'));
+    expect(details, contains('item.originalFileSize'));
+    expect(details, contains('backup_compressed_size'));
+    expect(details, contains('backup_upload_stage'));
+    expect(processor, contains('ProgressHolder'));
+    expect(processor, contains('emitProgress(operationId'));
   });
 }

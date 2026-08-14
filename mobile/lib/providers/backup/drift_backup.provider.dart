@@ -30,7 +30,9 @@ class EnqueueStatus {
 class DriftUploadStatus {
   final String taskId;
   final String filename;
+  final double preparationProgress;
   final double progress;
+  final int originalFileSize;
   final int fileSize;
   final String networkSpeedAsString;
   final bool? isFailed;
@@ -39,7 +41,9 @@ class DriftUploadStatus {
   const DriftUploadStatus({
     required this.taskId,
     required this.filename,
+    required this.preparationProgress,
     required this.progress,
+    required this.originalFileSize,
     required this.fileSize,
     required this.networkSpeedAsString,
     this.isFailed,
@@ -49,7 +53,9 @@ class DriftUploadStatus {
   DriftUploadStatus copyWith({
     String? taskId,
     String? filename,
+    double? preparationProgress,
     double? progress,
+    int? originalFileSize,
     int? fileSize,
     String? networkSpeedAsString,
     bool? isFailed,
@@ -58,7 +64,9 @@ class DriftUploadStatus {
     return DriftUploadStatus(
       taskId: taskId ?? this.taskId,
       filename: filename ?? this.filename,
+      preparationProgress: preparationProgress ?? this.preparationProgress,
       progress: progress ?? this.progress,
+      originalFileSize: originalFileSize ?? this.originalFileSize,
       fileSize: fileSize ?? this.fileSize,
       networkSpeedAsString: networkSpeedAsString ?? this.networkSpeedAsString,
       isFailed: isFailed ?? this.isFailed,
@@ -68,7 +76,7 @@ class DriftUploadStatus {
 
   @override
   String toString() {
-    return 'DriftUploadStatus(taskId: $taskId, filename: $filename, progress: $progress, fileSize: $fileSize, networkSpeedAsString: $networkSpeedAsString, isFailed: $isFailed, error: $error)';
+    return 'DriftUploadStatus(taskId: $taskId, filename: $filename, preparationProgress: $preparationProgress, progress: $progress, originalFileSize: $originalFileSize, fileSize: $fileSize, networkSpeedAsString: $networkSpeedAsString, isFailed: $isFailed, error: $error)';
   }
 
   @override
@@ -79,7 +87,9 @@ class DriftUploadStatus {
 
     return other.taskId == taskId &&
         other.filename == filename &&
+        other.preparationProgress == preparationProgress &&
         other.progress == progress &&
+        other.originalFileSize == originalFileSize &&
         other.fileSize == fileSize &&
         other.networkSpeedAsString == networkSpeedAsString &&
         other.isFailed == isFailed &&
@@ -90,7 +100,9 @@ class DriftUploadStatus {
   int get hashCode {
     return taskId.hashCode ^
         filename.hashCode ^
+        preparationProgress.hashCode ^
         progress.hashCode ^
+        originalFileSize.hashCode ^
         fileSize.hashCode ^
         networkSpeedAsString.hashCode ^
         isFailed.hashCode ^
@@ -271,6 +283,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
       _cancelToken!,
       callbacks: UploadCallbacks(
         onProgress: _handleForegroundBackupProgress,
+        onPreparationProgress: _handleForegroundPreparationProgress,
         onSuccess: _handleForegroundBackupSuccess,
         onError: _handleForegroundBackupError,
         onICloudProgress: _handleICloudProgress,
@@ -324,13 +337,47 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
           localAssetId: DriftUploadStatus(
             taskId: localAssetId,
             filename: filename,
+            preparationProgress: 1,
             progress: progress,
+            originalFileSize: totalBytes,
             fileSize: totalBytes,
             networkSpeedAsString: networkSpeedAsString,
           ),
         },
       );
     }
+  }
+
+  void _handleForegroundPreparationProgress(
+    String localAssetId,
+    String filename,
+    double progress,
+    int originalBytes,
+    int? preparedBytes,
+  ) {
+    if (_cancelToken == null) {
+      return;
+    }
+
+    final currentItem = state.uploadItems[localAssetId];
+    final preparedSize = preparedBytes ?? currentItem?.fileSize ?? 0;
+    final item =
+        currentItem?.copyWith(
+          filename: filename,
+          preparationProgress: progress,
+          originalFileSize: originalBytes,
+          fileSize: preparedSize,
+        ) ??
+        DriftUploadStatus(
+          taskId: localAssetId,
+          filename: filename,
+          preparationProgress: progress,
+          progress: 0,
+          originalFileSize: originalBytes,
+          fileSize: preparedSize,
+          networkSpeedAsString: '',
+        );
+    state = state.copyWith(uploadItems: {...state.uploadItems, localAssetId: item});
   }
 
   void _handleForegroundBackupSuccess(String localAssetId, String remoteAssetId) {
@@ -360,7 +407,9 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
           localAssetId: DriftUploadStatus(
             taskId: localAssetId,
             filename: 'Unknown',
+            preparationProgress: 0,
             progress: 0,
+            originalFileSize: 0,
             fileSize: 0,
             networkSpeedAsString: '',
             isFailed: true,

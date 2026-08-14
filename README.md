@@ -8,7 +8,7 @@ Inhouse Photos is the Inhouse-branded Android client for a private Immich server
 
 [Direct APK download](https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/Inhouse-Photos.apk) is also available. Both contain the same signed ARM64 build for modern Android phones.
 
-Current Android build: **3.1.14 (5073)**. This build includes on-device Storage saver backup quality, the corrected native JNI bridge, and the mandatory Inhouse update gate.
+Current Android build: **3.1.15 (5074)**. This build includes on-device Storage saver backup quality, separate compression/upload progress, the corrected native JNI bridge, and the mandatory Inhouse update gate.
 
 Storage saver prepares disposable copies before upload: photos are limited to 16 MP and videos to 1080p while the device originals remain unchanged. It applies only to new uploads, keeps the existing three-item upload concurrency, and never recompresses assets already present on the server.
 
