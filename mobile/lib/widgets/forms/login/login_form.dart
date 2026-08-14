@@ -506,7 +506,13 @@ class LoginForm extends HookConsumerWidget {
                         onLongPress: () => populateTestLoginInfo1(),
                         child: const ImmichLogo(heroTag: 'logo'),
                       ),
-                      const Padding(padding: EdgeInsets.only(top: 8.0, bottom: 16), child: ImmichTitleText()),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0, bottom: 16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: FittedBox(fit: BoxFit.scaleDown, child: ImmichTitleText()),
+                        ),
+                      ),
                     ],
                   ),
 

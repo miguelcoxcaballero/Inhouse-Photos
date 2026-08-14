@@ -33,4 +33,12 @@ void main() {
     expect(timeline, contains('loadingWidget: const SizedBox.expand()'));
     expect(login, isNot(contains('logoAnimationController')));
   });
+
+  test('login title scales the complete Inhouse Photos name into the form', () {
+    final login = File('lib/widgets/forms/login/login_form.dart').readAsStringSync();
+    final title = File('lib/widgets/common/immich_title_text.dart').readAsStringSync();
+
+    expect(title, contains("'inhouse photos'"));
+    expect(login, contains('FittedBox(fit: BoxFit.scaleDown, child: ImmichTitleText())'));
+  });
 }
