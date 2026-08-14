@@ -30,6 +30,13 @@ import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/selection_sliver_app_bar.dart';
 
+double calculateTimelineLayoutTransitionScale({required int previousColumns, required int nextColumns}) {
+  if (previousColumns <= 0 || nextColumns <= 0) {
+    return 1;
+  }
+  return (nextColumns / previousColumns).clamp(0.86, 1.14);
+}
+
 class Timeline extends ConsumerWidget {
   const Timeline({
     super.key,
@@ -155,6 +162,10 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
   double _scaleFactor = 3.0;
   double _baseScaleFactor = 3.0;
   int? _restoreAssetIndex;
+  int _renderedPerRow = 4;
+  int _layoutAnimationGeneration = 0;
+  double _layoutAnimationStartScale = 1.0;
+  Alignment _layoutAnimationAlignment = Alignment.center;
 
   @override
   void initState() {
@@ -165,10 +176,52 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
 
     final currentTilesPerRow = ref.read(appConfigProvider.select((config) => config.timeline.tilesPerRow));
     _perRow = currentTilesPerRow;
+    _renderedPerRow = currentTilesPerRow;
     _scaleFactor = 7.0 - _perRow;
     _baseScaleFactor = _scaleFactor;
 
     ref.listenManual(multiSelectProvider.select((s) => s.isEnabled), _onMultiSelectionToggled);
+    ref.listenManual(timelineArgsProvider.select((args) => args.columnCount), _onColumnCountChanged);
+  }
+
+  void _onColumnCountChanged(int? previous, int next) {
+    if (next == _renderedPerRow) {
+      return;
+    }
+
+    final previousCount = previous ?? _renderedPerRow;
+    setState(() {
+      _layoutAnimationStartScale = calculateTimelineLayoutTransitionScale(
+        previousColumns: previousCount,
+        nextColumns: next,
+      );
+      _renderedPerRow = next;
+      _layoutAnimationGeneration++;
+    });
+    WidgetsBinding.instance.addPostFrameCallback(_restoreAssetPosition);
+  }
+
+  Widget _buildLayoutTransition(Widget child) {
+    if (_layoutAnimationGeneration == 0) {
+      return child;
+    }
+
+    final startScale = _layoutAnimationStartScale;
+    final alignment = _layoutAnimationAlignment;
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(_layoutAnimationGeneration),
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      child: child,
+      builder: (_, progress, animatedChild) {
+        final scale = startScale + ((1 - startScale) * progress);
+        return Opacity(
+          opacity: 0.82 + (0.18 * progress),
+          child: Transform.scale(scale: scale, alignment: alignment, child: animatedChild),
+        );
+      },
+    );
   }
 
   @override
@@ -384,7 +437,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
   }
 
   @override
-  Widget build(BuildContext _) {
+  Widget build(BuildContext context) {
     final asyncSegments = ref.watch(timelineSegmentProvider);
     final maxHeight = ref.watch(timelineArgsProvider.select((args) => args.maxHeight));
     final isSelectionMode = ref.watch(multiSelectProvider.select((s) => s.forceEnable));
@@ -474,22 +527,31 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                     (CustomScaleGestureRecognizer scale) {
                       scale.onStart = (details) {
                         _baseScaleFactor = _scaleFactor;
+                        final size = context.size;
+                        if (size != null && size.width > 0 && size.height > 0) {
+                          _layoutAnimationAlignment = Alignment(
+                            ((details.localFocalPoint.dx / size.width) * 2 - 1).clamp(-1.0, 1.0),
+                            ((details.localFocalPoint.dy / size.height) * 2 - 1).clamp(-1.0, 1.0),
+                          );
+                        }
                       };
 
                       scale.onUpdate = (details) {
                         final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 1.0);
                         final newPerRow = 7 - newScaleFactor.toInt();
+                        _scaleFactor = newScaleFactor;
 
                         if (newPerRow != _perRow) {
                           final targetAssetIndex = _getCurrentAssetIndex(segments);
-                          setState(() {
-                            _scaleFactor = newScaleFactor;
-                            _perRow = newPerRow;
-                            _restoreAssetIndex = targetAssetIndex;
-                          });
+                          _perRow = newPerRow;
+                          _restoreAssetIndex = targetAssetIndex;
 
                           ref.read(settingsProvider).write(.timelineTilesPerRow, _perRow);
                         }
+                      };
+                      scale.onEnd = (_) {
+                        _scaleFactor = 7.0 - _perRow;
+                        _baseScaleFactor = _scaleFactor;
                       };
                     },
                   ),
@@ -506,7 +568,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      timeline,
+                      _buildLayoutTransition(timeline),
                       if (isBottomWidgetVisible)
                         Positioned(
                           top: MediaQuery.paddingOf(context).top,

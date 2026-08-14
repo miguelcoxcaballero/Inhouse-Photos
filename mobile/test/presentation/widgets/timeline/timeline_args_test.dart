@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
+import 'package:immich_mobile/domain/models/config/timeline_config.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
@@ -42,6 +43,8 @@ class _CountingBucketService implements TimelineService {
   int watchCount = 0;
   final _ctrl = StreamController<List<Bucket>>.broadcast();
 
+  void emit(List<Bucket> buckets) => _ctrl.add(buckets);
+
   @override
   Stream<List<Bucket>> Function() get watchBuckets => () {
     watchCount++;
@@ -53,6 +56,12 @@ class _CountingBucketService implements TimelineService {
 }
 
 void main() {
+  test('grid transition scale follows zoom direction with a restrained professional range', () {
+    expect(calculateTimelineLayoutTransitionScale(previousColumns: 4, nextColumns: 3), 0.86);
+    expect(calculateTimelineLayoutTransitionScale(previousColumns: 3, nextColumns: 4), 1.14);
+    expect(calculateTimelineLayoutTransitionScale(previousColumns: 4, nextColumns: 4), 1.0);
+  });
+
   testWidgets('timeline args follow constraints after a zero-sized first frame while buckets are still loading', (
     tester,
   ) async {
@@ -136,9 +145,7 @@ void main() {
     expect(probed!.maxWidth, 402.0);
   });
 
-  testWidgets('a height-only relayout (multiselect app bar toggle) keeps the timeline, a width change refreshes it', (
-    tester,
-  ) async {
+  testWidgets('layout-only changes reuse the active photo bucket stream', (tester) async {
     final service = _CountingBucketService();
     tester.view.devicePixelRatio = 3.0;
     tester.view.physicalSize = const Size(1206, 2622);
@@ -181,12 +188,58 @@ void main() {
       reason: 'a height-only change must not re-run the bucket query for an input the segments do not use',
     );
 
-    // a real width change (rotation, fold, split screen) should refresh the tiles
+    // A real width change must recompute tile geometry without restarting the photo query.
     tester.view.physicalSize = const Size(1000, 2000);
     await tester.pump();
     await tester.pump();
 
     expect(probed!.maxWidth, lessThan(initialWidth));
-    expect(service.watchCount, greaterThan(initialSubscriptions));
+    expect(service.watchCount, initialSubscriptions);
+  });
+
+  testWidgets('changing the grid column count keeps photos visible without showing the loading screen', (tester) async {
+    final service = _CountingBucketService();
+    final columnsProvider = StateProvider<int>((_) => 4);
+    tester.view.devicePixelRatio = 3.0;
+    tester.view.physicalSize = const Size(1206, 2622);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          timelineServiceProvider.overrideWithValue(service),
+          appConfigProvider.overrideWith(
+            (ref) => AppConfig(timeline: TimelineConfig(tilesPerRow: ref.watch(columnsProvider))),
+          ),
+        ],
+        child: const MaterialApp(
+          home: Timeline(
+            withScrubber: false,
+            readOnly: true,
+            appBar: SliverToBoxAdapter(child: SizedBox.shrink()),
+            loadingWidget: SizedBox(key: Key('timeline-loading')),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('timeline-loading')), findsOneWidget);
+
+    service.emit(const []);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('timeline-loading')), findsNothing);
+    final subscriptionsBeforeZoom = service.watchCount;
+
+    final container = ProviderScope.containerOf(tester.element(find.byType(Timeline)));
+    container.read(columnsProvider.notifier).state = 3;
+    await tester.pump();
+
+    expect(find.byKey(const Key('timeline-loading')), findsNothing);
+    expect(service.watchCount, subscriptionsBeforeZoom);
+    expect(find.byType(TweenAnimationBuilder<double>), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('timeline-loading')), findsNothing);
   });
 }

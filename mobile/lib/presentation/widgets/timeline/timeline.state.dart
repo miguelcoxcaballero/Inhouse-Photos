@@ -83,10 +83,17 @@ class TimelineStateNotifier extends Notifier<TimelineState> {
   TimelineState build() => const TimelineState(isScrubbing: false, isScrolling: false);
 }
 
-// This provider watches the buckets from the timeline service & args and serves the segments.
-// It should be used only after the timeline service and timeline args provider is overridden
-final timelineSegmentProvider = StreamProvider.autoDispose<List<Segment>>((ref) async* {
-  // maxHeight is left out on purpose, a height-only change must not restart the bucket stream
+// Keep the photo bucket subscription independent from grid geometry. Column-count
+// and width changes can then relayout existing data without entering a loading state.
+final timelineBucketProvider = StreamProvider.autoDispose<List<Bucket>>(
+  (ref) => ref.watch(timelineServiceProvider).watchBuckets(),
+  dependencies: [timelineServiceProvider],
+);
+
+// This provider synchronously derives layout segments from the latest buckets.
+// It should be used only after the timeline service and timeline args provider are overridden.
+final timelineSegmentProvider = Provider.autoDispose<AsyncValue<List<Segment>>>((ref) {
+  // maxHeight is left out on purpose, a height-only change must not relayout the segments
   final (maxWidth, columnCount, spacing, groupByArg) = ref.watch(
     timelineArgsProvider.select((args) => (args.maxWidth, args.columnCount, args.spacing, args.groupBy)),
   );
@@ -94,9 +101,7 @@ final timelineSegmentProvider = StreamProvider.autoDispose<List<Segment>>((ref) 
   final tileExtent = math.max(0, availableTileWidth) / columnCount;
 
   final groupBy = groupByArg ?? ref.watch(appConfigProvider.select((config) => config.timeline.groupAssetsBy));
-
-  final timelineService = ref.watch(timelineServiceProvider);
-  yield* timelineService.watchBuckets().map((buckets) {
+  return ref.watch(timelineBucketProvider).whenData((buckets) {
     return FixedSegmentBuilder(
       buckets: buckets,
       tileHeight: tileExtent,
@@ -105,6 +110,6 @@ final timelineSegmentProvider = StreamProvider.autoDispose<List<Segment>>((ref) 
       groupBy: groupBy!,
     ).generate();
   });
-}, dependencies: [timelineServiceProvider, timelineArgsProvider]);
+}, dependencies: [timelineBucketProvider, timelineArgsProvider]);
 
 final timelineStateProvider = NotifierProvider<TimelineStateNotifier, TimelineState>(TimelineStateNotifier.new);
