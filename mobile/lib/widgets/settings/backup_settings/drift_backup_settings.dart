@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/album/local_album.model.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/config/backup_config.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
@@ -13,9 +14,11 @@ import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/backup/backup_album.provider.dart';
+import 'package:immich_mobile/providers/backup/drift_backup.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/utils/bytes_units.dart';
 import 'package:immich_mobile/widgets/settings/setting_group_title.dart';
 import 'package:immich_mobile/widgets/settings/setting_list_tile.dart';
 import 'package:immich_mobile/widgets/settings/settings_sub_page_scaffold.dart';
@@ -77,40 +80,60 @@ class _BackupQualityButton extends ConsumerWidget {
             ? "backup_quality_storage_saver_description".t(context: context)
             : "backup_quality_original_description".t(context: context),
         trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: () => _showQualityPicker(context, ref, quality),
+        onTap: () => _showQualityPicker(context, quality),
       ),
     );
   }
 
-  Future<void> _showQualityPicker(BuildContext context, WidgetRef ref, BackupQuality selected) {
+  Future<void> _showQualityPicker(BuildContext context, BackupQuality selected) {
     return showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
+      isScrollControlled: true,
+      builder: (_) => _BackupQualitySheet(selected: selected),
+    );
+  }
+}
+
+class _BackupQualitySheet extends ConsumerWidget {
+  final BackupQuality selected;
+
+  const _BackupQualitySheet({required this.selected});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pendingAssets = ref.watch(driftBackupCandidateProvider);
+
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24),
               title: Text(
-                "backup_quality".t(context: context),
+                context.t.backup_quality,
                 style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
               ),
-              subtitle: Text("backup_quality_new_items_only".t(context: context)),
+              subtitle: Text(context.t.backup_quality_new_items_only),
             ),
+            _StorageSavingsVisual(pendingAssets: pendingAssets),
+            const SizedBox(height: 8),
             RadioGroup<BackupQuality>(
               groupValue: selected,
-              onChanged: (value) => _selectQuality(sheetContext, ref, value),
+              onChanged: (value) => _selectQuality(context, ref, value),
               child: Column(
                 children: [
                   RadioListTile<BackupQuality>(
                     value: BackupQuality.original,
-                    title: Text("backup_quality_original".t(context: context)),
-                    subtitle: Text("backup_quality_original_description".t(context: context)),
+                    title: Text(context.t.backup_quality_original),
+                    subtitle: Text(context.t.backup_quality_original_description),
                   ),
                   RadioListTile<BackupQuality>(
                     value: BackupQuality.storageSaver,
-                    title: Text("backup_quality_storage_saver".t(context: context)),
-                    subtitle: Text("backup_quality_storage_saver_description".t(context: context)),
+                    title: Text(context.t.backup_quality_storage_saver),
+                    subtitle: Text(context.t.backup_quality_storage_saver_description),
                   ),
                 ],
               ),
@@ -129,6 +152,234 @@ class _BackupQualityButton extends ConsumerWidget {
     if (context.mounted) {
       Navigator.pop(context);
     }
+  }
+}
+
+class _StorageSavingsVisual extends StatelessWidget {
+  final AsyncValue<List<LocalAsset>> pendingAssets;
+
+  const _StorageSavingsVisual({required this.pendingAssets});
+
+  @override
+  Widget build(BuildContext context) {
+    return pendingAssets.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: LinearProgressIndicator(borderRadius: BorderRadius.all(Radius.circular(99))),
+      ),
+      error: (_, _) => _SavingsCard.empty(context),
+      data: (assets) {
+        if (assets.isEmpty) {
+          return _SavingsCard.empty(context);
+        }
+        return _SavingsCard(estimate: _BackupStorageEstimate.fromAssets(assets));
+      },
+    );
+  }
+}
+
+class _SavingsCard extends StatelessWidget {
+  final _BackupStorageEstimate? estimate;
+
+  const _SavingsCard({this.estimate});
+
+  factory _SavingsCard.empty(BuildContext context) => const _SavingsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final estimate = this.estimate;
+    final hasEstimate = estimate != null && estimate.originalBytes > 0;
+    final savedFraction = hasEstimate ? estimate.savedFraction : 0.48;
+    final headline = hasEstimate
+        ? '≈ ${formatBytes(estimate.savedBytes)} ${context.t.backup_quality_saved}'
+        : context.t.backup_quality_future_savings;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            context.colorScheme.primary.withValues(alpha: 0.24),
+            context.colorScheme.primaryContainer.withValues(alpha: 0.42),
+            context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: context.colorScheme.primary.withValues(alpha: 0.34)),
+        boxShadow: [
+          BoxShadow(
+            color: context.colorScheme.primary.withValues(alpha: 0.12),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(color: context.colorScheme.primary, borderRadius: BorderRadius.circular(14)),
+                child: Icon(Icons.auto_awesome_rounded, color: context.colorScheme.onPrimary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.t.backup_quality_estimated_savings,
+                      style: context.textTheme.labelLarge?.copyWith(color: context.colorScheme.onSurfaceVariant),
+                    ),
+                    Text(
+                      headline,
+                      style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, height: 1.15),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: context.colorScheme.primary.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  '≈ ${(savedFraction * 100).round()}%',
+                  style: context.textTheme.labelLarge?.copyWith(
+                    color: context.colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          if (hasEstimate) ...[
+            _EstimateBar(
+              label: context.t.backup_quality_original,
+              value: formatBytes(estimate.originalBytes),
+              fraction: 1,
+              color: context.colorScheme.onSurface.withValues(alpha: 0.38),
+            ),
+            const SizedBox(height: 12),
+            _EstimateBar(
+              label: context.t.backup_quality_storage_saver,
+              value: formatBytes(estimate.saverBytes),
+              fraction: 1 - savedFraction,
+              color: context.colorScheme.primary,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              context.t.backup_quality_pending_items(count: estimate.itemCount),
+              style: context.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              context.t.backup_quality_estimate_note,
+              style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
+            ),
+          ] else
+            Text(
+              context.t.backup_quality_no_pending,
+              style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.onSurfaceVariant),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EstimateBar extends StatelessWidget {
+  final String label;
+  final String value;
+  final double fraction;
+  final Color color;
+
+  const _EstimateBar({required this.label, required this.value, required this.fraction, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(label, style: context.textTheme.bodyMedium)),
+            Text(value, style: context.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        LayoutBuilder(
+          builder: (context, constraints) => Container(
+            height: 8,
+            decoration: BoxDecoration(
+              color: context.colorScheme.onSurface.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            alignment: Alignment.centerLeft,
+            child: TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 650),
+              curve: Curves.easeOutCubic,
+              tween: Tween(begin: 0, end: fraction.clamp(0.06, 1)),
+              builder: (_, animatedFraction, _) => Container(
+                width: constraints.maxWidth * animatedFraction,
+                decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(99)),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BackupStorageEstimate {
+  final int originalBytes;
+  final int saverBytes;
+  final int itemCount;
+
+  const _BackupStorageEstimate({required this.originalBytes, required this.saverBytes, required this.itemCount});
+
+  int get savedBytes => (originalBytes - saverBytes).clamp(0, originalBytes);
+  double get savedFraction => originalBytes == 0 ? 0 : (savedBytes / originalBytes).clamp(0, 1);
+
+  factory _BackupStorageEstimate.fromAssets(Iterable<BaseAsset> assets) {
+    var original = 0.0;
+    var saver = 0.0;
+    var count = 0;
+
+    for (final asset in assets) {
+      count++;
+      final pixels = ((asset.width ?? 0) * (asset.height ?? 0)).toDouble();
+      if (asset.isVideo) {
+        final durationSeconds = ((asset.durationMs ?? 1000) / 1000).clamp(1, double.infinity);
+        final effectivePixels = pixels > 0 ? pixels : 1920 * 1080;
+        final originalBitrate = switch (effectivePixels) {
+          >= 8000000 => 35000000.0,
+          >= 3300000 => 18000000.0,
+          >= 1900000 => 10000000.0,
+          >= 800000 => 6000000.0,
+          _ => 3000000.0,
+        };
+        final saverBitrate = originalBitrate.clamp(0, 5128000.0);
+        original += originalBitrate * durationSeconds / 8;
+        saver += saverBitrate * durationSeconds / 8;
+      } else {
+        final effectivePixels = pixels > 0 ? pixels : 12000000.0;
+        final originalSize = effectivePixels * 0.34;
+        final compressedSize = effectivePixels.clamp(0, 16000000.0) * 0.22;
+        original += originalSize;
+        saver += compressedSize.clamp(0, originalSize);
+      }
+    }
+
+    return _BackupStorageEstimate(originalBytes: original.round(), saverBytes: saver.round(), itemCount: count);
   }
 }
 

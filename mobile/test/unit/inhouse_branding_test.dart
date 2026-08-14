@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/generated/codegen_loader.g.dart';
 
 void main() {
   test('light and dark runtime SVG logos use the orange brand mark only', () {
@@ -40,5 +41,19 @@ void main() {
 
     expect(title, contains("'inhouse photos'"));
     expect(login, contains('FittedBox(fit: BoxFit.scaleDown, child: ImmichTitleText())'));
+  });
+
+  test('backup quality labels are bundled instead of exposing translation keys', () {
+    for (final locale in ['en', 'es']) {
+      final translations = CodegenLoader.mapLocales[locale]!;
+      expect(translations['backup_quality'], isNot('backup_quality'), reason: locale);
+      expect(translations['backup_quality_storage_saver'], isNot('backup_quality_storage_saver'), reason: locale);
+      expect(
+        translations['backup_quality_estimated_savings'],
+        isNot('backup_quality_estimated_savings'),
+        reason: locale,
+      );
+    }
+    expect(File('lib/main.dart').readAsStringSync(), contains('useFallbackTranslations: true'));
   });
 }
