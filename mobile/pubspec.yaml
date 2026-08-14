@@ -2,7 +2,7 @@ name: immich_mobile
 description: Inhouse Photos - private self-hosted photo backup for mobile
 
 publish_to: 'none'
-version: 3.1.2+3061
+version: 3.1.3+3062
 
 environment:
   sdk: '>=3.12.0 <4.0.0'
@@ -153,10 +153,10 @@ flutter:
         - asset: fonts/Comfortaa/Comfortaa-Bold.ttf
           weight: 700
 flutter_launcher_icons:
-  image_path_android: 'assets/inhouse-photos-icon.png'
-  adaptive_icon_background: '#000000'
-  adaptive_icon_foreground: 'assets/inhouse-photos-icon-foreground.png'
-  image_path_ios: 'assets/inhouse-photos-icon.png'
+  image_path_android: 'assets/inhouse-photos-icon-light.png'
+  adaptive_icon_background: '#F5F5F0'
+  adaptive_icon_foreground: 'assets/inhouse-photos-icon-foreground-light.png'
+  image_path_ios: 'assets/inhouse-photos-icon-light.png'
   android: 'ic_launcher'
   ios: false
   remove_alpha_ios: true
