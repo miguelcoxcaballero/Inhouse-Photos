@@ -5,6 +5,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.plugin.common.BinaryMessenger
@@ -125,7 +126,10 @@ class UpdateInstaller(
           throw IllegalStateException("Update download failed ($responseCode).")
         }
 
-        var totalBytes = 0L
+        var downloadedBytes = 0L
+        val expectedBytes = connection.contentLengthLong.takeIf { it > 0L }
+        var lastProgressUpdate = 0L
+        publishDownloadProgress(0L, expectedBytes)
         BufferedInputStream(connection.inputStream).use { input ->
           FileOutputStream(destination, false).use { output ->
             val buffer = ByteArray(32 * 1024)
@@ -133,18 +137,37 @@ class UpdateInstaller(
               val count = input.read(buffer)
               if (count < 0) break
               output.write(buffer, 0, count)
-              totalBytes += count
+              downloadedBytes += count
+
+              val now = SystemClock.elapsedRealtime()
+              if (now - lastProgressUpdate >= PROGRESS_UPDATE_INTERVAL_MS || downloadedBytes == expectedBytes) {
+                lastProgressUpdate = now
+                publishDownloadProgress(downloadedBytes, expectedBytes)
+              }
             }
             output.fd.sync()
           }
         }
-        if (totalBytes < MINIMUM_APK_BYTES) {
+        if (downloadedBytes < MINIMUM_APK_BYTES) {
           throw IllegalStateException("The downloaded update is incomplete.")
         }
+        publishDownloadProgress(downloadedBytes, expectedBytes ?: downloadedBytes)
         return
       } finally {
         connection.disconnect()
       }
+    }
+  }
+
+  private fun publishDownloadProgress(downloadedBytes: Long, totalBytes: Long?) {
+    activity.runOnUiThread {
+      channel.invokeMethod(
+        "downloadProgress",
+        mapOf(
+          "downloadedBytes" to downloadedBytes,
+          "totalBytes" to totalBytes,
+        ),
+      )
     }
   }
 
@@ -230,6 +253,7 @@ class UpdateInstaller(
     private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
     private const val MINIMUM_APK_BYTES = 100_000L
     private const val MAX_REDIRECTS = 5
+    private const val PROGRESS_UPDATE_INTERVAL_MS = 200L
     private val ALLOWED_HOSTS = setOf(
       "github.com",
       "raw.githubusercontent.com",

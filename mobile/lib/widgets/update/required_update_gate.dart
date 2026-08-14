@@ -12,6 +12,18 @@ const _updateManifestUrl =
     'https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/android-update.json';
 const _updateChannel = MethodChannel('com.inhousesoftware.photos/updates');
 
+double? calculateInhouseDownloadProgress({required int downloadedBytes, required int? totalBytes}) {
+  if (totalBytes == null || totalBytes <= 0) {
+    return null;
+  }
+  return (downloadedBytes / totalBytes).clamp(0.0, 1.0);
+}
+
+String formatInhouseDownloadBytes(int bytes) {
+  const bytesPerMegabyte = 1024 * 1024;
+  return '${(bytes / bytesPerMegabyte).toStringAsFixed(1)} MB';
+}
+
 int compareInhouseVersions(String left, String right) {
   final leftParts = left.split('.').map((part) => int.tryParse(part) ?? 0).toList();
   final rightParts = right.split('.').map((part) => int.tryParse(part) ?? 0).toList();
@@ -89,11 +101,15 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
   String _installedVersion = '';
   _InstallState _installState = _InstallState.idle;
   String _status = '';
+  double? _downloadProgress;
+  int _downloadedBytes = 0;
+  int? _downloadTotalBytes;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _updateChannel.setMethodCallHandler(_handleUpdateChannelCall);
     WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_checkForUpdate()));
     _timer = Timer.periodic(const Duration(minutes: 15), (_) => unawaited(_checkForUpdate()));
   }
@@ -108,8 +124,24 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
   @override
   void dispose() {
     _timer?.cancel();
+    _updateChannel.setMethodCallHandler(null);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  Future<void> _handleUpdateChannelCall(MethodCall call) async {
+    if (call.method != 'downloadProgress' || !mounted || call.arguments is! Map) {
+      return;
+    }
+
+    final arguments = Map<Object?, Object?>.from(call.arguments as Map);
+    final downloadedBytes = (arguments['downloadedBytes'] as num?)?.toInt() ?? 0;
+    final totalBytes = (arguments['totalBytes'] as num?)?.toInt();
+    setState(() {
+      _downloadedBytes = downloadedBytes;
+      _downloadTotalBytes = totalBytes;
+      _downloadProgress = calculateInhouseDownloadProgress(downloadedBytes: downloadedBytes, totalBytes: totalBytes);
+    });
   }
 
   Future<void> _checkForUpdate() async {
@@ -159,6 +191,9 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     setState(() {
       _installState = _InstallState.downloading;
       _status = 'Downloading the update securely inside Inhouse Photos…';
+      _downloadProgress = 0;
+      _downloadedBytes = 0;
+      _downloadTotalBytes = null;
     });
 
     try {
@@ -172,6 +207,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
           _status = 'Allow installs from this source, return here, then tap Continue.';
         } else {
           _installState = _InstallState.ready;
+          _downloadProgress = 1;
           _status = 'Update downloaded and verified. Confirm installation in Android.';
         }
       });
@@ -232,6 +268,30 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                   ).textTheme.bodyLarge?.copyWith(color: const Color(0xFFD7D0CA), height: 1.45),
                                 ),
                                 const SizedBox(height: 24),
+                                if (_installState == _InstallState.downloading) ...[
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(999),
+                                    child: LinearProgressIndicator(
+                                      value: _downloadProgress,
+                                      minHeight: 9,
+                                      backgroundColor: const Color(0xFF3A302A),
+                                      valueColor: const AlwaysStoppedAnimation(Color(0xFFD97736)),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 9),
+                                  Text(
+                                    _downloadTotalBytes == null
+                                        ? formatInhouseDownloadBytes(_downloadedBytes)
+                                        : '${(_downloadProgress! * 100).round()}%  ·  '
+                                              '${formatInhouseDownloadBytes(_downloadedBytes)} / '
+                                              '${formatInhouseDownloadBytes(_downloadTotalBytes!)}',
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelMedium?.copyWith(color: const Color(0xFFD7D0CA)),
+                                  ),
+                                  const SizedBox(height: 18),
+                                ],
                                 SizedBox(
                                   width: double.infinity,
                                   child: FilledButton(
