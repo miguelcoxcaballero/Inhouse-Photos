@@ -29,8 +29,9 @@ class TimelineDragRegion extends StatefulWidget {
 }
 
 class _TimelineDragRegionState extends State<TimelineDragRegion> {
-  late TimelineAssetIndex? assetUnderPointer;
-  late TimelineAssetIndex? anchorAsset;
+  TimelineAssetIndex? assetUnderPointer;
+  TimelineAssetIndex? anchorAsset;
+  bool _longPressActivated = false;
 
   // Scroll related state
   static const double scrollOffset = 0.10;
@@ -42,8 +43,6 @@ class _TimelineDragRegionState extends State<TimelineDragRegion> {
   @override
   void initState() {
     super.initState();
-    assetUnderPointer = null;
-    anchorAsset = null;
     scrollNotified = false;
   }
 
@@ -64,8 +63,8 @@ class _TimelineDragRegionState extends State<TimelineDragRegion> {
   Widget build(BuildContext context) {
     return RawGestureDetector(
       gestures: {
-        _CustomLongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<_CustomLongPressGestureRecognizer>(
-          () => _CustomLongPressGestureRecognizer(),
+        LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+          LongPressGestureRecognizer.new,
           _registerCallbacks,
         ),
       },
@@ -73,10 +72,11 @@ class _TimelineDragRegionState extends State<TimelineDragRegion> {
     );
   }
 
-  void _registerCallbacks(_CustomLongPressGestureRecognizer recognizer) {
+  void _registerCallbacks(LongPressGestureRecognizer recognizer) {
     recognizer.onLongPressMoveUpdate = (details) => _onLongPressMove(details);
     recognizer.onLongPressStart = (details) => _onLongPressStart(details);
     recognizer.onLongPressUp = _onLongPressEnd;
+    recognizer.onLongPressCancel = _onLongPressEnd;
   }
 
   TimelineAssetIndex? _getValueKeyAtPosition(Offset position) {
@@ -106,24 +106,30 @@ class _TimelineDragRegionState extends State<TimelineDragRegion> {
     }
 
     final initialHit = _getValueKeyAtPosition(event.globalPosition);
-    anchorAsset = initialHit;
-    if (initialHit == null) {
+    if (initialHit == null || widget.onStart == null) {
       return;
     }
 
-    if (anchorAsset != null) {
-      widget.onStart?.call(anchorAsset!);
-    }
+    anchorAsset = initialHit;
+    _longPressActivated = true;
+    widget.onStart!(initialHit);
   }
 
   void _onLongPressEnd() {
+    final wasActivated = _longPressActivated;
+    _longPressActivated = false;
+    anchorAsset = null;
+    assetUnderPointer = null;
     scrollNotified = false;
     scrollTimer?.cancel();
-    widget.onEnd?.call();
+    scrollTimer = null;
+    if (wasActivated) {
+      widget.onEnd?.call();
+    }
   }
 
   void _onLongPressMove(LongPressMoveUpdateDetails event) {
-    if (anchorAsset == null) {
+    if (!_longPressActivated || anchorAsset == null) {
       return;
     }
     if (topScrollOffset == null || bottomScrollOffset == null) {
@@ -161,13 +167,6 @@ class _TimelineDragRegionState extends State<TimelineDragRegion> {
       widget.onAssetEnter?.call(currentlyTouchingAsset);
       assetUnderPointer = currentlyTouchingAsset;
     }
-  }
-}
-
-class _CustomLongPressGestureRecognizer extends LongPressGestureRecognizer {
-  @override
-  void rejectGesture(int pointer) {
-    acceptGesture(pointer);
   }
 }
 

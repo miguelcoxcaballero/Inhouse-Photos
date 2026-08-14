@@ -26,6 +26,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/timeline_layout_tran
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
+import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
@@ -423,10 +424,27 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
 
   // Drag selection methods
   void _setDragStartIndex(TimelineAssetIndex index) {
+    final timelineService = ref.read(timelineServiceProvider);
+    if (!timelineService.hasRange(index.assetIndex, 1)) {
+      return;
+    }
+
+    final asset = timelineService.getAssets(index.assetIndex, 1).first;
+    final multiSelectState = ref.read(multiSelectProvider);
+    final isLocked = multiSelectState.lockedSelectionAssets.any((lockedAsset) => lockedAsset == asset);
+    if (isLocked) {
+      return;
+    }
+
+    ref.read(hapticFeedbackProvider.notifier).heavyImpact();
+    ref.read(multiSelectProvider.notifier).selectAsset(asset);
     setState(() {
       _scrollPhysics = const ClampingScrollPhysics();
       _dragAnchorIndex = index;
       _dragging = true;
+      _draggedAssets
+        ..clear()
+        ..add(asset);
     });
   }
 
@@ -441,6 +459,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     });
     setState(() {
       _dragging = false;
+      _dragAnchorIndex = null;
       _draggedAssets.clear();
     });
     final timelineState = ref.read(timelineStateProvider.notifier);
