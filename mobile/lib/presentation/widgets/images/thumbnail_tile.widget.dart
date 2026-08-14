@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -157,29 +159,13 @@ class _ThumbnailTileState extends ConsumerState<ThumbnailTile> {
                   AnimatedOpacity(
                     opacity: _hideIndicators ? 0.0 : 1.0,
                     duration: Durations.short4,
-                    child: switch (asset.storage) {
-                      AssetState.local => const Align(
-                        alignment: Alignment.bottomRight,
-                        child: Padding(
-                          padding: EdgeInsets.only(right: 10.0, bottom: 6.0),
-                          child: _TileOverlayIcon(Icons.cloud_off_outlined),
-                        ),
+                    child: Align(
+                      alignment: Alignment.bottomRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 8.0, bottom: 5.0),
+                        child: ThumbnailStorageIndicator(storage: asset.storage),
                       ),
-                      AssetState.remote => const Align(
-                        alignment: Alignment.bottomRight,
-                        child: Padding(
-                          padding: EdgeInsets.only(right: 10.0, bottom: 6.0),
-                          child: _TileOverlayIcon(Icons.cloud_outlined),
-                        ),
-                      ),
-                      AssetState.merged => const Align(
-                        alignment: Alignment.bottomRight,
-                        child: Padding(
-                          padding: EdgeInsets.only(right: 10.0, bottom: 6.0),
-                          child: _TileOverlayIcon(Icons.cloud_done_outlined),
-                        ),
-                      ),
-                    },
+                    ),
                   ),
 
                 if (asset != null && asset.isFavorite)
@@ -222,6 +208,67 @@ class _ThumbnailTileState extends ConsumerState<ThumbnailTile> {
       ],
     );
   }
+}
+
+const pendingUploadIndicatorKey = ValueKey('pending-upload-indicator');
+
+class ThumbnailStorageIndicator extends StatelessWidget {
+  const ThumbnailStorageIndicator({required this.storage, super.key});
+
+  final AssetState storage;
+
+  @override
+  Widget build(BuildContext context) {
+    if (storage != AssetState.local) {
+      return const SizedBox.shrink();
+    }
+
+    return const Opacity(
+      key: pendingUploadIndicatorKey,
+      opacity: 0.7,
+      child: CustomPaint(size: Size.square(24), painter: _PendingUploadIndicatorPainter()),
+    );
+  }
+}
+
+class _PendingUploadIndicatorPainter extends CustomPainter {
+  const _PendingUploadIndicatorPainter();
+
+  static const _dotCount = 10;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final dotPaint = Paint()..color = Colors.white;
+    final ringRadius = size.shortestSide * 0.394;
+    final dotRadius = size.shortestSide * 0.028;
+
+    for (var index = 0; index < _dotCount; index++) {
+      final angle = (-math.pi / 2) + (index * 2 * math.pi / _dotCount);
+      canvas.drawCircle(
+        center + Offset(math.cos(angle) * ringRadius, math.sin(angle) * ringRadius),
+        dotRadius,
+        dotPaint,
+      );
+    }
+
+    final arrowPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.shortestSide * 0.078
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final arrow = Path()
+      ..moveTo(center.dx, size.height * 0.71)
+      ..lineTo(center.dx, size.height * 0.32)
+      ..moveTo(size.width * 0.33, size.height * 0.48)
+      ..lineTo(center.dx, size.height * 0.315)
+      ..lineTo(size.width * 0.67, size.height * 0.48);
+    canvas.drawPath(arrow, arrowPaint);
+  }
+
+  @override
+  bool shouldRepaint(_PendingUploadIndicatorPainter oldDelegate) => false;
 }
 
 class _SelectionIndicator extends StatelessWidget {
