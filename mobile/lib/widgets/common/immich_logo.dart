@@ -9,6 +9,10 @@ class ImmichLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SvgPicture.asset('assets/inhouse-photos-logo.svg', width: size, height: size);
+    final asset = Theme.of(context).brightness == Brightness.dark
+        ? 'assets/inhouse-photos-logo.svg'
+        : 'assets/inhouse-photos-logo-light.svg';
+
+    return SvgPicture.asset(asset, width: size, height: size, semanticsLabel: 'Inhouse Photos');
   }
 }
