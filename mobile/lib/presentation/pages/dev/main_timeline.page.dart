@@ -44,6 +44,8 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
       topSliverWidget: const SliverToBoxAdapter(child: DriftMemoryLane()),
       topSliverWidgetHeight: hasMemories ? 200 : 0,
       showStorageIndicator: true,
+      // Avoid showing the animated logo between the native splash and the grid.
+      loadingWidget: const SizedBox.expand(),
     );
   }
 }

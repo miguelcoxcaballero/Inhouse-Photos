@@ -2,7 +2,7 @@ name: immich_mobile
 description: Inhouse Photos - private self-hosted photo backup for mobile
 
 publish_to: 'none'
-version: 3.1.6+3065
+version: 3.1.7+3066
 
 environment:
   sdk: '>=3.12.0 <4.0.0'
@@ -169,8 +169,8 @@ flutter_native_splash:
   android_12:
     color: '#F5F5F0'
     color_dark: '#000000'
-    image: 'assets/inhouse-photos-icon-foreground-light.png'
-    image_dark: 'assets/inhouse-photos-icon-foreground.png'
+    image: 'assets/inhouse-photos-splash-android12.png'
+    image_dark: 'assets/inhouse-photos-splash-android12.png'
 
 analyzer:
   exclude:
