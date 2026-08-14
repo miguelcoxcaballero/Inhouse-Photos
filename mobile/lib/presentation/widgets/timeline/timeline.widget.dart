@@ -31,7 +31,13 @@ import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/selection_sliver_app_bar.dart';
 
-int calculateTimelineColumnCount(double scaleFactor) => 7 - scaleFactor.round().clamp(1, 5);
+const double kTimelinePinchSensitivity = 1.25;
+
+int calculateTimelineColumnCount({required double scaleFactor, required double gestureStartScaleFactor}) {
+  final sensitiveScaleFactor =
+      gestureStartScaleFactor + ((scaleFactor - gestureStartScaleFactor) * kTimelinePinchSensitivity);
+  return 7 - sensitiveScaleFactor.round().clamp(1, 5);
+}
 
 class Timeline extends ConsumerStatefulWidget {
   const Timeline({
@@ -577,7 +583,10 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
 
                       scale.onUpdate = (details) {
                         final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 1.0);
-                        final newPerRow = calculateTimelineColumnCount(newScaleFactor);
+                        final newPerRow = calculateTimelineColumnCount(
+                          scaleFactor: newScaleFactor,
+                          gestureStartScaleFactor: _baseScaleFactor,
+                        );
                         _scaleFactor = newScaleFactor;
 
                         if (newPerRow != _perRow) {

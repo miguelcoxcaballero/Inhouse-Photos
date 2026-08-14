@@ -57,11 +57,12 @@ class _CountingBucketService implements TimelineService {
 }
 
 void main() {
-  test('pinch thresholds are symmetrical and deliberate around the active column count', () {
-    expect(calculateTimelineColumnCount(3.49), 4);
-    expect(calculateTimelineColumnCount(3.51), 3);
-    expect(calculateTimelineColumnCount(2.51), 4);
-    expect(calculateTimelineColumnCount(2.49), 5);
+  test('pinch thresholds are symmetrical and more responsive around the active column count', () {
+    expect(calculateTimelineColumnCount(scaleFactor: 3.39, gestureStartScaleFactor: 3), 4);
+    expect(calculateTimelineColumnCount(scaleFactor: 3.41, gestureStartScaleFactor: 3), 3);
+    expect(calculateTimelineColumnCount(scaleFactor: 2.61, gestureStartScaleFactor: 3), 4);
+    expect(calculateTimelineColumnCount(scaleFactor: 2.59, gestureStartScaleFactor: 3), 5);
+    expect(kTimelinePinchSensitivity, 1.25);
   });
 
   test('asset transition moves and resizes a tile into its new grid rectangle', () {
