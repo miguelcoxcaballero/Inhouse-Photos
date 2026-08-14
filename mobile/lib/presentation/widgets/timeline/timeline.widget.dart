@@ -30,14 +30,19 @@ import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/selection_sliver_app_bar.dart';
 
-double calculateTimelineLayoutTransitionScale({required int previousColumns, required int nextColumns}) {
-  if (previousColumns <= 0 || nextColumns <= 0) {
+double calculateTimelineInteractiveScale({
+  required double gestureScale,
+  required int gestureStartColumns,
+  required int renderedColumns,
+}) {
+  if (gestureStartColumns <= 0 || renderedColumns <= 0) {
     return 1;
   }
-  return (nextColumns / previousColumns).clamp(0.86, 1.14);
+
+  return gestureScale * renderedColumns / gestureStartColumns;
 }
 
-class Timeline extends ConsumerWidget {
+class Timeline extends ConsumerStatefulWidget {
   const Timeline({
     super.key,
     this.topSliverWidget,
@@ -70,8 +75,33 @@ class Timeline extends ConsumerWidget {
   final Widget? loadingWidget;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final columnCount = ref.watch(appConfigProvider.select((config) => config.timeline.tilesPerRow));
+  ConsumerState<Timeline> createState() => _TimelineState();
+}
+
+class _TimelineState extends ConsumerState<Timeline> {
+  int? _interactiveColumnCount;
+
+  void _setInteractiveColumnCount(int value) {
+    if (_interactiveColumnCount == value) {
+      return;
+    }
+    setState(() => _interactiveColumnCount = value);
+  }
+
+  Future<void> _persistColumnCount(int value) async {
+    await ref.read(settingsProvider).write(.timelineTilesPerRow, value);
+    if (!mounted || _interactiveColumnCount != value) {
+      return;
+    }
+
+    setState(() => _interactiveColumnCount = null);
+    ref.invalidate(appConfigProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final savedColumnCount = ref.watch(appConfigProvider.select((config) => config.timeline.tilesPerRow));
+    final columnCount = _interactiveColumnCount ?? savedColumnCount;
     return LayoutBuilder(
       builder: (_, constraints) {
         return ProviderScope(
@@ -83,24 +113,26 @@ class Timeline extends ConsumerWidget {
                 maxWidth: constraints.maxWidth,
                 maxHeight: constraints.maxHeight,
                 columnCount: columnCount,
-                showStorageIndicator: showStorageIndicator,
-                withStack: withStack,
-                groupBy: groupBy,
+                showStorageIndicator: widget.showStorageIndicator,
+                withStack: widget.withStack,
+                groupBy: widget.groupBy,
               ),
             ),
-            if (readOnly) readonlyModeProvider.overrideWith(() => _AlwaysReadOnlyNotifier()),
+            if (widget.readOnly) readonlyModeProvider.overrideWith(() => _AlwaysReadOnlyNotifier()),
           ],
           child: _SliverTimeline(
-            topSliverWidget: topSliverWidget,
-            topSliverWidgetHeight: topSliverWidgetHeight,
-            bottomSliverWidget: bottomSliverWidget,
-            appBar: appBar,
-            bottomSheet: bottomSheet,
-            withScrubber: withScrubber,
-            persistentBottomBar: persistentBottomBar,
-            snapToMonth: snapToMonth,
+            topSliverWidget: widget.topSliverWidget,
+            topSliverWidgetHeight: widget.topSliverWidgetHeight,
+            bottomSliverWidget: widget.bottomSliverWidget,
+            appBar: widget.appBar,
+            bottomSheet: widget.bottomSheet,
+            withScrubber: widget.withScrubber,
+            persistentBottomBar: widget.persistentBottomBar,
+            snapToMonth: widget.snapToMonth,
             maxWidth: constraints.maxWidth,
-            loadingWidget: loadingWidget,
+            loadingWidget: widget.loadingWidget,
+            onInteractiveColumnCountChanged: _setInteractiveColumnCount,
+            onInteractiveColumnCountSettled: _persistColumnCount,
           ),
         );
       },
@@ -131,6 +163,8 @@ class _SliverTimeline extends ConsumerStatefulWidget {
     this.snapToMonth = true,
     this.maxWidth,
     this.loadingWidget,
+    required this.onInteractiveColumnCountChanged,
+    required this.onInteractiveColumnCountSettled,
   });
 
   final Widget? topSliverWidget;
@@ -143,12 +177,15 @@ class _SliverTimeline extends ConsumerStatefulWidget {
   final bool snapToMonth;
   final double? maxWidth;
   final Widget? loadingWidget;
+  final ValueChanged<int> onInteractiveColumnCountChanged;
+  final ValueChanged<int> onInteractiveColumnCountSettled;
 
   @override
   ConsumerState createState() => _SliverTimelineState();
 }
 
-class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBindingObserver {
+class _SliverTimelineState extends ConsumerState<_SliverTimeline>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   late final ScrollController _scrollController;
   StreamSubscription? _eventSubscription;
 
@@ -163,20 +200,30 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
   double _baseScaleFactor = 3.0;
   int? _restoreAssetIndex;
   int _renderedPerRow = 4;
-  int _layoutAnimationGeneration = 0;
-  double _layoutAnimationStartScale = 1.0;
+  int _gestureStartPerRow = 4;
+  double _gestureScale = 1.0;
+  bool _isPinching = false;
   Alignment _layoutAnimationAlignment = Alignment.center;
+  final ValueNotifier<double> _interactiveScale = ValueNotifier(1.0);
+  late final AnimationController _scaleSettleController;
+  double _scaleSettleStart = 1.0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _scrollController = ScrollController(onAttach: _restoreAssetPosition);
+    _scaleSettleController = AnimationController(vsync: this, duration: const Duration(milliseconds: 180))
+      ..addListener(() {
+        final progress = Curves.easeOutCubic.transform(_scaleSettleController.value);
+        _interactiveScale.value = _scaleSettleStart + ((1 - _scaleSettleStart) * progress);
+      });
     _eventSubscription = EventStream.shared.listen(_onEvent);
 
     final currentTilesPerRow = ref.read(appConfigProvider.select((config) => config.timeline.tilesPerRow));
     _perRow = currentTilesPerRow;
     _renderedPerRow = currentTilesPerRow;
+    _gestureStartPerRow = currentTilesPerRow;
     _scaleFactor = 7.0 - _perRow;
     _baseScaleFactor = _scaleFactor;
 
@@ -189,38 +236,41 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
       return;
     }
 
-    final previousCount = previous ?? _renderedPerRow;
-    setState(() {
-      _layoutAnimationStartScale = calculateTimelineLayoutTransitionScale(
-        previousColumns: previousCount,
-        nextColumns: next,
-      );
-      _renderedPerRow = next;
-      _layoutAnimationGeneration++;
-    });
+    _renderedPerRow = next;
+    if (_isPinching) {
+      _updateInteractiveScale();
+    }
     WidgetsBinding.instance.addPostFrameCallback(_restoreAssetPosition);
   }
 
-  Widget _buildLayoutTransition(Widget child) {
-    if (_layoutAnimationGeneration == 0) {
-      return child;
-    }
+  void _updateInteractiveScale() {
+    _interactiveScale.value = calculateTimelineInteractiveScale(
+      gestureScale: _gestureScale,
+      gestureStartColumns: _gestureStartPerRow,
+      renderedColumns: _renderedPerRow,
+    );
+  }
 
-    final startScale = _layoutAnimationStartScale;
-    final alignment = _layoutAnimationAlignment;
-    return TweenAnimationBuilder<double>(
-      key: ValueKey(_layoutAnimationGeneration),
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-      child: child,
-      builder: (_, progress, animatedChild) {
-        final scale = startScale + ((1 - startScale) * progress);
-        return Opacity(
-          opacity: 0.82 + (0.18 * progress),
-          child: Transform.scale(scale: scale, alignment: alignment, child: animatedChild),
-        );
-      },
+  void _settleInteractiveScale() {
+    _scaleSettleController.stop();
+    _scaleSettleStart = _interactiveScale.value;
+    if ((_scaleSettleStart - 1).abs() < 0.001) {
+      _interactiveScale.value = 1;
+      return;
+    }
+    _scaleSettleController.forward(from: 0);
+  }
+
+  Widget _buildInteractiveScale(Widget child) {
+    return ValueListenableBuilder<double>(
+      valueListenable: _interactiveScale,
+      child: RepaintBoundary(child: child),
+      builder: (_, scale, animatedChild) => Transform.scale(
+        scale: scale,
+        alignment: _layoutAnimationAlignment,
+        filterQuality: FilterQuality.low,
+        child: animatedChild,
+      ),
     );
   }
 
@@ -310,6 +360,8 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _scaleSettleController.dispose();
+    _interactiveScale.dispose();
     _scrollController.dispose();
     _eventSubscription?.cancel();
     super.dispose();
@@ -526,7 +578,12 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                     () => CustomScaleGestureRecognizer(),
                     (CustomScaleGestureRecognizer scale) {
                       scale.onStart = (details) {
+                        _scaleSettleController.stop();
+                        _isPinching = true;
                         _baseScaleFactor = _scaleFactor;
+                        _gestureStartPerRow = _perRow;
+                        _gestureScale = 1;
+                        _interactiveScale.value = 1;
                         final size = context.size;
                         if (size != null && size.width > 0 && size.height > 0) {
                           _layoutAnimationAlignment = Alignment(
@@ -540,18 +597,23 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                         final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 1.0);
                         final newPerRow = 7 - newScaleFactor.toInt();
                         _scaleFactor = newScaleFactor;
+                        _gestureScale = newScaleFactor / _baseScaleFactor;
+                        _updateInteractiveScale();
 
                         if (newPerRow != _perRow) {
                           final targetAssetIndex = _getCurrentAssetIndex(segments);
                           _perRow = newPerRow;
                           _restoreAssetIndex = targetAssetIndex;
 
-                          ref.read(settingsProvider).write(.timelineTilesPerRow, _perRow);
+                          widget.onInteractiveColumnCountChanged(_perRow);
                         }
                       };
                       scale.onEnd = (_) {
+                        _isPinching = false;
                         _scaleFactor = 7.0 - _perRow;
                         _baseScaleFactor = _scaleFactor;
+                        _settleInteractiveScale();
+                        widget.onInteractiveColumnCountSettled(_perRow);
                       };
                     },
                   ),
@@ -568,7 +630,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      _buildLayoutTransition(timeline),
+                      _buildInteractiveScale(timeline),
                       if (isBottomWidgetVisible)
                         Positioned(
                           top: MediaQuery.paddingOf(context).top,
