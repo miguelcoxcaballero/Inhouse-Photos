@@ -41,7 +41,17 @@ class DriftBackupRepository extends DriftDatabaseRepository {
         SELECT
         COUNT(*) AS total_count,
         COUNT(*) FILTER (WHERE lae.checksum IS NULL) AS processing_count,
-        COUNT(*) FILTER (WHERE rae.id IS NULL) AS remainder_count
+        COUNT(*) FILTER (
+          WHERE rae.id IS NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM remote_asset_cloud_id_entity source_identity
+            INNER JOIN remote_asset_entity source_remote
+              ON source_remote.id = source_identity.asset_id
+            WHERE source_identity.cloud_id = lae.checksum
+              AND source_remote.owner_id = ?1
+          )
+        ) AS remainder_count
         FROM local_asset_entity lae
         LEFT JOIN main.remote_asset_entity rae
             ON lae.checksum = rae.checksum AND rae.owner_id = ?1
@@ -102,6 +112,21 @@ class DriftBackupRepository extends DriftDatabaseRepository {
                 ..addColumns([_db.remoteAssetEntity.checksum])
                 ..where(
                   _db.remoteAssetEntity.checksum.equalsExp(lae.checksum) & _db.remoteAssetEntity.ownerId.equals(userId),
+                ),
+            ) &
+            notExistsQuery(
+              _db.remoteAssetCloudIdEntity.selectOnly()
+                ..addColumns([_db.remoteAssetCloudIdEntity.assetId])
+                ..join([
+                  innerJoin(
+                    _db.remoteAssetEntity,
+                    _db.remoteAssetCloudIdEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
+                    useColumns: false,
+                  ),
+                ])
+                ..where(
+                  _db.remoteAssetCloudIdEntity.cloudId.equalsExp(lae.checksum) &
+                      _db.remoteAssetEntity.ownerId.equals(userId),
                 ),
             ) &
             lae.id.isNotInQuery(_getExcludedSubquery()),

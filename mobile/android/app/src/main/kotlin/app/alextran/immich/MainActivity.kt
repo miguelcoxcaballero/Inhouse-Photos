@@ -52,6 +52,7 @@ class MainActivity : FlutterFragmentActivity() {
       HttpClientManager.initialize(ctx)
       NativeVideoPlayerPlugin.dataSourceFactory = HttpClientManager::createDataSourceFactory
       flutterEngine.plugins.add(NetworkApiPlugin())
+      flutterEngine.plugins.add(BackupMediaProcessorPlugin())
 
       val messenger = flutterEngine.dartExecutor.binaryMessenger
       val backgroundEngineLockImpl = BackgroundEngineLock(ctx)

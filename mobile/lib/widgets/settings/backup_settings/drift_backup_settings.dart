@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/album/local_album.model.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
+import 'package:immich_mobile/domain/models/config/backup_config.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/services/sync_linked_album.service.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
@@ -27,6 +28,12 @@ class DriftBackupSettings extends ConsumerWidget {
     return SettingsSubPageScaffold(
       settings: [
         SettingGroupTitle(
+          title: "backup_quality".t(context: context),
+          icon: Icons.high_quality_rounded,
+        ),
+        const _BackupQualityButton(),
+        const Divider(),
+        SettingGroupTitle(
           title: "network_requirements".t(context: context),
           icon: Icons.cell_tower,
         ),
@@ -49,6 +56,79 @@ class DriftBackupSettings extends ConsumerWidget {
         const _AlbumSyncActionButton(),
       ],
     );
+  }
+}
+
+class _BackupQualityButton extends ConsumerWidget {
+  const _BackupQualityButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final quality = ref.watch(appConfigProvider.select((config) => config.backup.quality));
+    final isStorageSaver = quality == BackupQuality.storageSaver;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 8.0),
+      child: SettingListTile(
+        title: isStorageSaver
+            ? "backup_quality_storage_saver".t(context: context)
+            : "backup_quality_original".t(context: context),
+        subtitle: isStorageSaver
+            ? "backup_quality_storage_saver_description".t(context: context)
+            : "backup_quality_original_description".t(context: context),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => _showQualityPicker(context, ref, quality),
+      ),
+    );
+  }
+
+  Future<void> _showQualityPicker(BuildContext context, WidgetRef ref, BackupQuality selected) {
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                "backup_quality".t(context: context),
+                style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text("backup_quality_new_items_only".t(context: context)),
+            ),
+            RadioGroup<BackupQuality>(
+              groupValue: selected,
+              onChanged: (value) => _selectQuality(sheetContext, ref, value),
+              child: Column(
+                children: [
+                  RadioListTile<BackupQuality>(
+                    value: BackupQuality.original,
+                    title: Text("backup_quality_original".t(context: context)),
+                    subtitle: Text("backup_quality_original_description".t(context: context)),
+                  ),
+                  RadioListTile<BackupQuality>(
+                    value: BackupQuality.storageSaver,
+                    title: Text("backup_quality_storage_saver".t(context: context)),
+                    subtitle: Text("backup_quality_storage_saver_description".t(context: context)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectQuality(BuildContext context, WidgetRef ref, BackupQuality? value) async {
+    if (value == null) {
+      return;
+    }
+    await ref.read(settingsProvider).write(SettingsKey.backupQuality, value);
+    if (context.mounted) {
+      Navigator.pop(context);
+    }
   }
 }
 

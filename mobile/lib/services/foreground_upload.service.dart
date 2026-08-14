@@ -19,6 +19,7 @@ import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/storage.provider.dart';
 import 'package:immich_mobile/repositories/asset_media.repository.dart';
 import 'package:immich_mobile/repositories/upload.repository.dart';
+import 'package:immich_mobile/services/backup_media_preprocessor.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
 import 'package:path/path.dart' as p;
@@ -55,14 +56,16 @@ class ForegroundUploadService {
     this._storageRepository,
     this._backupRepository,
     this._connectivityApi,
-    this._assetMediaRepository,
-  );
+    this._assetMediaRepository, {
+    this._mediaPreprocessor = const BackupMediaPreprocessor(),
+  });
 
   final UploadRepository _uploadRepository;
   final StorageRepository _storageRepository;
   final DriftBackupRepository _backupRepository;
   final ConnectivityApi _connectivityApi;
   final AssetMediaRepository _assetMediaRepository;
+  final BackupMediaPreprocessor _mediaPreprocessor;
   final Logger _logger = Logger('ForegroundUploadService');
 
   bool shouldAbortUpload = false;
@@ -242,6 +245,10 @@ class ForegroundUploadService {
   }) async {
     File? file;
     File? livePhotoFile;
+    File? sourceFile;
+    File? sourceLivePhotoFile;
+    File? temporaryFile;
+    File? temporaryLivePhotoFile;
 
     try {
       final entity = await _storageRepository.getAssetEntityForAsset(asset);
@@ -309,10 +316,34 @@ class ForegroundUploadService {
         return;
       }
 
+      sourceFile = file;
+      sourceLivePhotoFile = livePhotoFile;
+
       final fileName = await _assetMediaRepository.getOriginalFilename(asset.id) ?? asset.name;
       // Some apps (e.g. DJI/Fusion) return names without an extension; fall back to the asset name for those.
       final extension = p.extension(file.path).isNotEmpty ? p.extension(file.path) : p.extension(asset.name);
-      final originalFileName = p.setExtension(fileName, extension);
+      var originalFileName = p.setExtension(fileName, extension);
+
+      final prepared = await _mediaPreprocessor.prepare(file, asset, originalFileName);
+      file = prepared.file;
+      originalFileName = prepared.uploadFileName;
+      if (prepared.isTemporary) {
+        temporaryFile = prepared.file;
+      }
+
+      if (entity.isLivePhoto && livePhotoFile != null) {
+        final livePhotoTitle = p.setExtension(originalFileName, p.extension(livePhotoFile.path));
+        final preparedMotion = await _mediaPreprocessor.prepare(
+          livePhotoFile,
+          asset,
+          livePhotoTitle,
+          isVideoOverride: true,
+        );
+        livePhotoFile = preparedMotion.file;
+        if (preparedMotion.isTemporary) {
+          temporaryLivePhotoFile = preparedMotion.file;
+        }
+      }
       final deviceId = Store.get(StoreKey.deviceId);
 
       final fields = {
@@ -353,12 +384,16 @@ class ForegroundUploadService {
       }
 
       // Add cloudId metadata only to the still image, not the motion video, becasue when the sync id happens, the motion video can get associated with the wrong still image.
-      if (CurrentPlatform.isIOS && asset.cloudId != null) {
+      final sourceChecksum = prepared.isTemporary ? asset.checksum : null;
+      if ((CurrentPlatform.isIOS && asset.cloudId != null) || sourceChecksum != null) {
         fields['metadata'] = jsonEncode([
           RemoteAssetMetadataItem(
             key: RemoteAssetMetadataKey.mobileApp,
             value: RemoteAssetMobileAppMetadata(
-              cloudId: asset.cloudId,
+              // For Storage saver uploads the server checksum belongs to the
+              // compressed copy. Persist the original local checksum here so
+              // future syncs still recognize the source as already backed up.
+              cloudId: CurrentPlatform.isIOS ? asset.cloudId : sourceChecksum,
               createdAt: asset.createdAt.toIso8601String(),
               adjustmentTime: asset.adjustmentTime?.toIso8601String(),
               latitude: asset.latitude?.toString(),
@@ -401,13 +436,15 @@ class ForegroundUploadService {
       _logger.severe(() => "Error backup asset: ${error.toString()}", stackTrace);
       callbacks.onError?.call(asset.localId!, error.toString());
     } finally {
-      if (Platform.isIOS) {
-        try {
-          await file?.delete();
-          await livePhotoFile?.delete();
-        } catch (error, stackTrace) {
-          _logger.severe(() => "ERROR deleting file: ${error.toString()}", stackTrace);
+      try {
+        await temporaryFile?.delete();
+        await temporaryLivePhotoFile?.delete();
+        if (Platform.isIOS) {
+          await sourceFile?.delete();
+          await sourceLivePhotoFile?.delete();
         }
+      } catch (error, stackTrace) {
+        _logger.severe(() => "ERROR deleting prepared upload file: ${error.toString()}", stackTrace);
       }
     }
   }

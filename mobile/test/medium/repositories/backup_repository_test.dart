@@ -67,6 +67,19 @@ void main() {
       expect(result.processing, 0);
     });
 
+    test('Storage saver source checksum metadata reduces remainder', () async {
+      final album = await ctx.newLocalAlbum(backupSelection: BackupSelection.selected);
+      final local = await ctx.newLocalAsset();
+      final remote = await ctx.newRemoteAsset(ownerId: userId);
+      await ctx.newRemoteAssetCloudId(id: remote.id, cloudId: local.checksum);
+      await ctx.newLocalAlbumAsset(albumId: album.id, assetId: local.id);
+
+      final result = await sut.getAllCounts(userId);
+      expect(result.total, 1);
+      expect(result.remainder, 0);
+      expect(result.processing, 0);
+    });
+
     test('asset with null checksum is counted as processing', () async {
       final album = await ctx.newLocalAlbum(backupSelection: BackupSelection.selected);
       final asset = await ctx.newLocalAsset(checksumOption: const Option.none());
@@ -168,6 +181,17 @@ void main() {
       final album = await ctx.newLocalAlbum(backupSelection: BackupSelection.selected);
       final remote = await ctx.newRemoteAsset(ownerId: userId);
       final local = await ctx.newLocalAsset(checksum: remote.checksum);
+      await ctx.newLocalAlbumAsset(albumId: album.id, assetId: local.id);
+
+      final result = await sut.getCandidates(userId);
+      expect(result, isEmpty);
+    });
+
+    test('excludes Storage saver asset matched by its source checksum metadata', () async {
+      final album = await ctx.newLocalAlbum(backupSelection: BackupSelection.selected);
+      final local = await ctx.newLocalAsset();
+      final remote = await ctx.newRemoteAsset(ownerId: userId);
+      await ctx.newRemoteAssetCloudId(id: remote.id, cloudId: local.checksum);
       await ctx.newLocalAlbumAsset(albumId: album.id, assetId: local.id);
 
       final result = await sut.getCandidates(userId);
