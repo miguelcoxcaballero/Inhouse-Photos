@@ -18,9 +18,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart'
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_drag_region.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_layout_transition.dart';
 import 'package:immich_mobile/providers/asset_viewer/is_motion_video_playing.provider.dart';
-import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/current_album.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
@@ -187,14 +185,12 @@ class _FixedSegmentRow extends ConsumerWidget {
       }
     }
 
-    return TimelineDragRegion(
-      child: TimelineRow(
-        height: tileHeight,
-        widths: widths,
-        spacing: spacing,
-        textDirection: Directionality.of(context),
-        children: children,
-      ),
+    return TimelineRow(
+      height: tileHeight,
+      widths: widths,
+      spacing: spacing,
+      textDirection: Directionality.of(context),
+      children: children,
     );
   }
 }
@@ -227,16 +223,6 @@ class _AssetTileWidget extends ConsumerWidget {
     }
   }
 
-  void _handleOnLongPress(WidgetRef ref, BaseAsset asset) {
-    final multiSelectState = ref.read(multiSelectProvider);
-    if (multiSelectState.isEnabled || multiSelectState.forceEnable) {
-      return;
-    }
-
-    ref.read(hapticFeedbackProvider.notifier).heavyImpact();
-    ref.read(multiSelectProvider.notifier).toggleAssetSelection(asset);
-  }
-
   bool _getLockSelectionStatus(WidgetRef ref) {
     final lockSelectionAssets = ref.read(multiSelectProvider.select((state) => state.lockedSelectionAssets));
 
@@ -257,7 +243,6 @@ class _AssetTileWidget extends ConsumerWidget {
 
     final lockSelection = _getLockSelectionStatus(ref);
     final showStorageIndicator = ref.watch(timelineArgsProvider.select((args) => args.showStorageIndicator));
-    final isReadonlyModeEnabled = ref.watch(readonlyModeProvider);
     final showStackIndicator = ref.read(timelineServiceProvider).origin != TimelineOrigin.trash;
 
     return TimelineAssetLayoutTransition(
@@ -265,7 +250,6 @@ class _AssetTileWidget extends ConsumerWidget {
       child: RepaintBoundary(
         child: GestureDetector(
           onTap: () => lockSelection ? null : _handleOnTap(context, ref, assetIndex, asset, heroOffset),
-          onLongPress: () => lockSelection || isReadonlyModeEnabled ? null : _handleOnLongPress(ref, asset),
           child: ThumbnailTile(
             asset,
             lockSelection: lockSelection,
