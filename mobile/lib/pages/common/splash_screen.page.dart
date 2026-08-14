@@ -378,10 +378,6 @@ class SplashScreenPageState extends ConsumerState<SplashScreenPage> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Image(image: AssetImage('assets/immich-logo.png'), width: 80, filterQuality: FilterQuality.high),
-      ),
-    );
+    return const Scaffold(body: Center(child: ImmichLogo(size: 80)));
   }
 }
