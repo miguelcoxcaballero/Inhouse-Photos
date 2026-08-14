@@ -119,18 +119,19 @@ class _BackupQualitySheet extends ConsumerWidget {
               subtitle: Text(context.t.backup_quality_new_items_only),
             ),
             _StorageSavingsVisual(pendingAssets: pendingAssets),
-            const SizedBox(height: 8),
             RadioGroup<BackupQuality>(
               groupValue: selected,
               onChanged: (value) => _selectQuality(context, ref, value),
               child: Column(
                 children: [
                   RadioListTile<BackupQuality>(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                     value: BackupQuality.original,
                     title: Text(context.t.backup_quality_original),
                     subtitle: Text(context.t.backup_quality_original_description),
                   ),
                   RadioListTile<BackupQuality>(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                     value: BackupQuality.storageSaver,
                     title: Text(context.t.backup_quality_storage_saver),
                     subtitle: Text(context.t.backup_quality_storage_saver_description),
@@ -167,23 +168,21 @@ class _StorageSavingsVisual extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: LinearProgressIndicator(borderRadius: BorderRadius.all(Radius.circular(99))),
       ),
-      error: (_, _) => _SavingsCard.empty(context),
+      error: (_, _) => const _SavingsSummary(),
       data: (assets) {
         if (assets.isEmpty) {
-          return _SavingsCard.empty(context);
+          return const _SavingsSummary();
         }
-        return _SavingsCard(estimate: _BackupStorageEstimate.fromAssets(assets));
+        return _SavingsSummary(estimate: _BackupStorageEstimate.fromAssets(assets));
       },
     );
   }
 }
 
-class _SavingsCard extends StatelessWidget {
+class _SavingsSummary extends StatelessWidget {
   final _BackupStorageEstimate? estimate;
 
-  const _SavingsCard({this.estimate});
-
-  factory _SavingsCard.empty(BuildContext context) => const _SavingsCard();
+  const _SavingsSummary({this.estimate});
 
   @override
   Widget build(BuildContext context) {
@@ -191,68 +190,30 @@ class _SavingsCard extends StatelessWidget {
     final hasEstimate = estimate != null && estimate.originalBytes > 0;
     final savedFraction = hasEstimate ? estimate.savedFraction : 0.48;
     final headline = hasEstimate
-        ? '≈ ${formatBytes(estimate.savedBytes)} ${context.t.backup_quality_saved}'
+        ? '≈ ${formatBytes(estimate.savedBytes)} · ${(savedFraction * 100).round()}%'
         : context.t.backup_quality_future_savings;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            context.colorScheme.primary.withValues(alpha: 0.24),
-            context.colorScheme.primaryContainer.withValues(alpha: 0.42),
-            context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: context.colorScheme.primary.withValues(alpha: 0.34)),
-        boxShadow: [
-          BoxShadow(
-            color: context.colorScheme.primary.withValues(alpha: 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 14, 24, 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(color: context.colorScheme.primary, borderRadius: BorderRadius.circular(14)),
-                child: Icon(Icons.auto_awesome_rounded, color: context.colorScheme.onPrimary, size: 22),
+              Expanded(
+                child: Text(
+                  context.t.backup_quality_estimated_savings,
+                  style: context.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                ),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.t.backup_quality_estimated_savings,
-                      style: context.textTheme.labelLarge?.copyWith(color: context.colorScheme.onSurfaceVariant),
-                    ),
-                    Text(
-                      headline,
-                      style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, height: 1.15),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: context.colorScheme.primary.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(99),
-                ),
+              Flexible(
                 child: Text(
-                  '≈ ${(savedFraction * 100).round()}%',
-                  style: context.textTheme.labelLarge?.copyWith(
+                  headline,
+                  textAlign: TextAlign.right,
+                  style: context.textTheme.titleMedium?.copyWith(
                     color: context.colorScheme.primary,
                     fontWeight: FontWeight.w700,
                   ),
@@ -260,29 +221,55 @@ class _SavingsCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           if (hasEstimate) ...[
-            _EstimateBar(
-              label: context.t.backup_quality_original,
-              value: formatBytes(estimate.originalBytes),
-              fraction: 1,
-              color: context.colorScheme.onSurface.withValues(alpha: 0.38),
+            LayoutBuilder(
+              builder: (context, constraints) => Container(
+                height: 6,
+                decoration: BoxDecoration(
+                  color: context.colorScheme.onSurface.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                alignment: Alignment.centerLeft,
+                child: TweenAnimationBuilder<double>(
+                  duration: const Duration(milliseconds: 450),
+                  curve: Curves.easeOutCubic,
+                  tween: Tween(begin: 0, end: (1 - savedFraction).clamp(0.06, 1)),
+                  builder: (_, fraction, _) => Container(
+                    width: constraints.maxWidth * fraction,
+                    decoration: BoxDecoration(
+                      color: context.colorScheme.primary,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${context.t.backup_quality_original}  ${formatBytes(estimate.originalBytes)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    '${context.t.backup_quality_storage_saver}  ${formatBytes(estimate.saverBytes)}',
+                    textAlign: TextAlign.right,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
-            _EstimateBar(
-              label: context.t.backup_quality_storage_saver,
-              value: formatBytes(estimate.saverBytes),
-              fraction: 1 - savedFraction,
-              color: context.colorScheme.primary,
-            ),
-            const SizedBox(height: 14),
             Text(
               context.t.backup_quality_pending_items(count: estimate.itemCount),
-              style: context.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              context.t.backup_quality_estimate_note,
               style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
             ),
           ] else
@@ -290,51 +277,10 @@ class _SavingsCard extends StatelessWidget {
               context.t.backup_quality_no_pending,
               style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.onSurfaceVariant),
             ),
+          const SizedBox(height: 18),
+          const Divider(height: 1),
         ],
       ),
-    );
-  }
-}
-
-class _EstimateBar extends StatelessWidget {
-  final String label;
-  final String value;
-  final double fraction;
-  final Color color;
-
-  const _EstimateBar({required this.label, required this.value, required this.fraction, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(child: Text(label, style: context.textTheme.bodyMedium)),
-            Text(value, style: context.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-          ],
-        ),
-        const SizedBox(height: 6),
-        LayoutBuilder(
-          builder: (context, constraints) => Container(
-            height: 8,
-            decoration: BoxDecoration(
-              color: context.colorScheme.onSurface.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(99),
-            ),
-            alignment: Alignment.centerLeft,
-            child: TweenAnimationBuilder<double>(
-              duration: const Duration(milliseconds: 650),
-              curve: Curves.easeOutCubic,
-              tween: Tween(begin: 0, end: fraction.clamp(0.06, 1)),
-              builder: (_, animatedFraction, _) => Container(
-                width: constraints.maxWidth * animatedFraction,
-                decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(99)),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

@@ -74,4 +74,18 @@ void main() {
     expect(processor, contains('ProgressHolder'));
     expect(processor, contains('emitProgress(operationId'));
   });
+
+  test('backup quality savings uses a flat settings layout', () {
+    final settings = File('lib/widgets/settings/backup_settings/drift_backup_settings.dart').readAsStringSync();
+    final summary = settings.substring(
+      settings.indexOf('class _SavingsSummary'),
+      settings.indexOf('class _BackupStorageEstimate'),
+    );
+
+    expect(summary, isNot(contains('LinearGradient')));
+    expect(summary, isNot(contains('boxShadow')));
+    expect(summary, isNot(contains('auto_awesome')));
+    expect(summary, isNot(contains('Border.all')));
+    expect(summary, contains('const Divider(height: 1)'));
+  });
 }
