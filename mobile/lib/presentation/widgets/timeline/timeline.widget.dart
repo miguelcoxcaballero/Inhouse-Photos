@@ -22,6 +22,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/scrubber.widget.dart
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_drag_region.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_layout_transition.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -30,17 +31,7 @@ import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/selection_sliver_app_bar.dart';
 
-double calculateTimelineInteractiveScale({
-  required double gestureScale,
-  required int gestureStartColumns,
-  required int renderedColumns,
-}) {
-  if (gestureStartColumns <= 0 || renderedColumns <= 0) {
-    return 1;
-  }
-
-  return gestureScale * renderedColumns / gestureStartColumns;
-}
+int calculateTimelineColumnCount(double scaleFactor) => 7 - scaleFactor.round().clamp(1, 5);
 
 class Timeline extends ConsumerStatefulWidget {
   const Timeline({
@@ -200,30 +191,25 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   double _baseScaleFactor = 3.0;
   int? _restoreAssetIndex;
   int _renderedPerRow = 4;
-  int _gestureStartPerRow = 4;
-  double _gestureScale = 1.0;
-  bool _isPinching = false;
-  Alignment _layoutAnimationAlignment = Alignment.center;
-  final ValueNotifier<double> _interactiveScale = ValueNotifier(1.0);
-  late final AnimationController _scaleSettleController;
-  double _scaleSettleStart = 1.0;
+  late final AnimationController _layoutTransitionController;
+  Map<Object, Rect> _previousTileRects = const {};
+  int _layoutTransitionGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _scrollController = ScrollController(onAttach: _restoreAssetPosition);
-    _scaleSettleController = AnimationController(vsync: this, duration: const Duration(milliseconds: 180))
-      ..addListener(() {
-        final progress = Curves.easeOutCubic.transform(_scaleSettleController.value);
-        _interactiveScale.value = _scaleSettleStart + ((1 - _scaleSettleStart) * progress);
-      });
+    _layoutTransitionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 190),
+      value: 1,
+    );
     _eventSubscription = EventStream.shared.listen(_onEvent);
 
     final currentTilesPerRow = ref.read(appConfigProvider.select((config) => config.timeline.tilesPerRow));
     _perRow = currentTilesPerRow;
     _renderedPerRow = currentTilesPerRow;
-    _gestureStartPerRow = currentTilesPerRow;
     _scaleFactor = 7.0 - _perRow;
     _baseScaleFactor = _scaleFactor;
 
@@ -237,41 +223,50 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     }
 
     _renderedPerRow = next;
-    if (_isPinching) {
-      _updateInteractiveScale();
-    }
     WidgetsBinding.instance.addPostFrameCallback(_restoreAssetPosition);
   }
 
-  void _updateInteractiveScale() {
-    _interactiveScale.value = calculateTimelineInteractiveScale(
-      gestureScale: _gestureScale,
-      gestureStartColumns: _gestureStartPerRow,
-      renderedColumns: _renderedPerRow,
-    );
+  Map<Object, Rect> _captureVisibleTileRects() {
+    final root = context.findRenderObject();
+    if (root == null || !root.attached) {
+      return const {};
+    }
+
+    final visibleBounds = Offset.zero & MediaQuery.sizeOf(context);
+    final rects = <Object, Rect>{};
+
+    void visit(RenderObject renderObject) {
+      if (renderObject case RenderTimelineAssetLayoutTransition tile when tile.attached && tile.hasSize) {
+        final rect = tile.currentVisualGlobalRect;
+        if (rect.overlaps(visibleBounds)) {
+          rects[tile.assetKey] = rect;
+        }
+      }
+      renderObject.visitChildren(visit);
+    }
+
+    root.visitChildren(visit);
+    return rects;
   }
 
-  void _settleInteractiveScale() {
-    _scaleSettleController.stop();
-    _scaleSettleStart = _interactiveScale.value;
-    if ((_scaleSettleStart - 1).abs() < 0.001) {
-      _interactiveScale.value = 1;
+  void _prepareLayoutTransition() {
+    final rects = _captureVisibleTileRects();
+    if (rects.isEmpty) {
       return;
     }
-    _scaleSettleController.forward(from: 0);
-  }
 
-  Widget _buildInteractiveScale(Widget child) {
-    return ValueListenableBuilder<double>(
-      valueListenable: _interactiveScale,
-      child: RepaintBoundary(child: child),
-      builder: (_, scale, animatedChild) => Transform.scale(
-        scale: scale,
-        alignment: _layoutAnimationAlignment,
-        filterQuality: FilterQuality.low,
-        child: animatedChild,
-      ),
-    );
+    _layoutTransitionController.stop();
+    _layoutTransitionController.value = 0;
+    final generation = ++_layoutTransitionGeneration;
+    setState(() => _previousTileRects = Map.unmodifiable(rects));
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && generation == _layoutTransitionGeneration) {
+          _layoutTransitionController.forward(from: 0);
+        }
+      });
+    });
   }
 
   @override
@@ -360,8 +355,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _scaleSettleController.dispose();
-    _interactiveScale.dispose();
+    _layoutTransitionController.dispose();
     _scrollController.dispose();
     _eventSubscription?.cancel();
     super.dispose();
@@ -578,30 +572,17 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                     () => CustomScaleGestureRecognizer(),
                     (CustomScaleGestureRecognizer scale) {
                       scale.onStart = (details) {
-                        _scaleSettleController.stop();
-                        _isPinching = true;
                         _baseScaleFactor = _scaleFactor;
-                        _gestureStartPerRow = _perRow;
-                        _gestureScale = 1;
-                        _interactiveScale.value = 1;
-                        final size = context.size;
-                        if (size != null && size.width > 0 && size.height > 0) {
-                          _layoutAnimationAlignment = Alignment(
-                            ((details.localFocalPoint.dx / size.width) * 2 - 1).clamp(-1.0, 1.0),
-                            ((details.localFocalPoint.dy / size.height) * 2 - 1).clamp(-1.0, 1.0),
-                          );
-                        }
                       };
 
                       scale.onUpdate = (details) {
                         final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 1.0);
-                        final newPerRow = 7 - newScaleFactor.toInt();
+                        final newPerRow = calculateTimelineColumnCount(newScaleFactor);
                         _scaleFactor = newScaleFactor;
-                        _gestureScale = newScaleFactor / _baseScaleFactor;
-                        _updateInteractiveScale();
 
                         if (newPerRow != _perRow) {
                           final targetAssetIndex = _getCurrentAssetIndex(segments);
+                          _prepareLayoutTransition();
                           _perRow = newPerRow;
                           _restoreAssetIndex = targetAssetIndex;
 
@@ -609,10 +590,8 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                         }
                       };
                       scale.onEnd = (_) {
-                        _isPinching = false;
                         _scaleFactor = 7.0 - _perRow;
                         _baseScaleFactor = _scaleFactor;
-                        _settleInteractiveScale();
                         widget.onInteractiveColumnCountSettled(_perRow);
                       };
                     },
@@ -630,7 +609,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      _buildInteractiveScale(timeline),
+                      TimelineLayoutTransitionScope(
+                        animation: _layoutTransitionController,
+                        previousRects: _previousTileRects,
+                        child: timeline,
+                      ),
                       if (isBottomWidgetVisible)
                         Positioned(
                           top: MediaQuery.paddingOf(context).top,
