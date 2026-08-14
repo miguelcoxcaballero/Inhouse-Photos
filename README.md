@@ -8,7 +8,9 @@ Inhouse Photos is the Inhouse-branded Android client for a private Immich server
 
 [Direct APK download](https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/Inhouse-Photos.apk) is also available. Both contain the same signed ARM64 build for modern Android phones.
 
-Current Android build: **3.1.0 (5059)**. This build includes the corrected native JNI bridge for the Inhouse application namespace.
+Current Android build: **3.1.1 (5060)**. This build includes the corrected native JNI bridge and the mandatory Inhouse update gate.
+
+The Android app checks `android-update.json` on launch, whenever it returns to the foreground, and every 15 minutes. A required newer semantic version blocks the app until its signed APK has been downloaded, package-checked, signature-verified, and handed to Android's installer.
 
 - Android application ID: `com.inhousesoftware.photos`
 - Default server: `https://fotos.miguelcoxcaballero.com`

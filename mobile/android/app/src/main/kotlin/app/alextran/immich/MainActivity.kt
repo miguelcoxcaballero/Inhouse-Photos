@@ -28,14 +28,23 @@ import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 
 class MainActivity : FlutterFragmentActivity() {
+  private var updateInstaller: UpdateInstaller? = null
+
   override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
     registerPlugins(this, flutterEngine)
+    updateInstaller = UpdateInstaller(this, flutterEngine.dartExecutor.binaryMessenger)
   }
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
+  }
+
+  override fun onDestroy() {
+    updateInstaller?.dispose()
+    updateInstaller = null
+    super.onDestroy()
   }
 
   companion object {
