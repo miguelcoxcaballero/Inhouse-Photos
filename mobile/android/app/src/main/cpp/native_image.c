@@ -65,7 +65,7 @@ static void rotate_tiled(const uint8_t *src, int srcStride, uint32_t *dst,
 // via NativeBuffer.free). Fills outInfo with {width, height, rowBytes} and returns the buffer
 // address, or 0 if the bitmap can't be handled (e.g. a non-8888 format) so the caller can fall back.
 JNIEXPORT jlong JNICALL
-Java_app_alextran_immich_NativeImage_rotate(
+Java_com_inhousesoftware_photos_NativeImage_rotate(
     JNIEnv *env, jclass clazz, jobject bitmap, jint orientation, jintArray outInfo) {
   AndroidBitmapInfo info;
   if (AndroidBitmap_getInfo(env, bitmap, &info) != ANDROID_BITMAP_RESULT_SUCCESS) {
@@ -135,7 +135,7 @@ static void convert_1010102(const uint8_t *src, int srcStride, uint32_t *dst, in
 // address, or 0 (so the caller falls back to a Skia copy) if the bitmap isn't 1010102 or can't be
 // locked. Same ownership contract as rotate: free the returned buffer via NativeBuffer.free.
 JNIEXPORT jlong JNICALL
-Java_app_alextran_immich_NativeImage_convert1010102(
+Java_com_inhousesoftware_photos_NativeImage_convert1010102(
     JNIEnv *env, jclass clazz, jobject bitmap, jintArray outInfo) {
   AndroidBitmapInfo info;
   if (AndroidBitmap_getInfo(env, bitmap, &info) != ANDROID_BITMAP_RESULT_SUCCESS) {
