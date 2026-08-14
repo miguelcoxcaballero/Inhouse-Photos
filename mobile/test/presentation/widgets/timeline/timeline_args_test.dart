@@ -56,10 +56,14 @@ class _CountingBucketService implements TimelineService {
 }
 
 void main() {
-  test('grid transition scale follows zoom direction with a restrained professional range', () {
-    expect(calculateTimelineLayoutTransitionScale(previousColumns: 4, nextColumns: 3), 0.86);
-    expect(calculateTimelineLayoutTransitionScale(previousColumns: 3, nextColumns: 4), 1.14);
-    expect(calculateTimelineLayoutTransitionScale(previousColumns: 4, nextColumns: 4), 1.0);
+  test('interactive grid scale stays visually continuous when the column count changes', () {
+    expect(calculateTimelineInteractiveScale(gestureScale: 1.2, gestureStartColumns: 4, renderedColumns: 4), 1.2);
+    expect(
+      calculateTimelineInteractiveScale(gestureScale: 4 / 3, gestureStartColumns: 4, renderedColumns: 3),
+      closeTo(1, 0.0001),
+    );
+    expect(calculateTimelineInteractiveScale(gestureScale: 0.75, gestureStartColumns: 3, renderedColumns: 4), 1);
+    expect(calculateTimelineInteractiveScale(gestureScale: 2, gestureStartColumns: 0, renderedColumns: 4), 1);
   });
 
   testWidgets('timeline args follow constraints after a zero-sized first frame while buckets are still loading', (
@@ -237,7 +241,7 @@ void main() {
 
     expect(find.byKey(const Key('timeline-loading')), findsNothing);
     expect(service.watchCount, subscriptionsBeforeZoom);
-    expect(find.byType(TweenAnimationBuilder<double>), findsOneWidget);
+    expect(find.byType(ValueListenableBuilder<double>), findsOneWidget);
 
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('timeline-loading')), findsNothing);
