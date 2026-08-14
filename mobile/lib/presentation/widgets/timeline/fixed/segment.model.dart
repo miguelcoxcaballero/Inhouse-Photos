@@ -16,6 +16,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment_builder.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_drag_region.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_layout_transition.dart';
 import 'package:immich_mobile/providers/asset_viewer/is_motion_video_playing.provider.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/current_album.provider.dart';
@@ -259,16 +260,19 @@ class _AssetTileWidget extends ConsumerWidget {
     final isReadonlyModeEnabled = ref.watch(readonlyModeProvider);
     final showStackIndicator = ref.read(timelineServiceProvider).origin != TimelineOrigin.trash;
 
-    return RepaintBoundary(
-      child: GestureDetector(
-        onTap: () => lockSelection ? null : _handleOnTap(context, ref, assetIndex, asset, heroOffset),
-        onLongPress: () => lockSelection || isReadonlyModeEnabled ? null : _handleOnLongPress(ref, asset),
-        child: ThumbnailTile(
-          asset,
-          lockSelection: lockSelection,
-          showStorageIndicator: showStorageIndicator,
-          showStackIndicator: showStackIndicator,
-          heroOffset: heroOffset,
+    return TimelineAssetLayoutTransition(
+      assetKey: asset.heroTag,
+      child: RepaintBoundary(
+        child: GestureDetector(
+          onTap: () => lockSelection ? null : _handleOnTap(context, ref, assetIndex, asset, heroOffset),
+          onLongPress: () => lockSelection || isReadonlyModeEnabled ? null : _handleOnLongPress(ref, asset),
+          child: ThumbnailTile(
+            asset,
+            lockSelection: lockSelection,
+            showStorageIndicator: showStorageIndicator,
+            showStackIndicator: showStackIndicator,
+            heroOffset: heroOffset,
+          ),
         ),
       ),
     );

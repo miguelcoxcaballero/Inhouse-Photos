@@ -9,6 +9,7 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_layout_transition.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 
@@ -56,14 +57,19 @@ class _CountingBucketService implements TimelineService {
 }
 
 void main() {
-  test('interactive grid scale stays visually continuous when the column count changes', () {
-    expect(calculateTimelineInteractiveScale(gestureScale: 1.2, gestureStartColumns: 4, renderedColumns: 4), 1.2);
-    expect(
-      calculateTimelineInteractiveScale(gestureScale: 4 / 3, gestureStartColumns: 4, renderedColumns: 3),
-      closeTo(1, 0.0001),
-    );
-    expect(calculateTimelineInteractiveScale(gestureScale: 0.75, gestureStartColumns: 3, renderedColumns: 4), 1);
-    expect(calculateTimelineInteractiveScale(gestureScale: 2, gestureStartColumns: 0, renderedColumns: 4), 1);
+  test('pinch thresholds are symmetrical and deliberate around the active column count', () {
+    expect(calculateTimelineColumnCount(3.49), 4);
+    expect(calculateTimelineColumnCount(3.51), 3);
+    expect(calculateTimelineColumnCount(2.51), 4);
+    expect(calculateTimelineColumnCount(2.49), 5);
+  });
+
+  test('asset transition moves and resizes a tile into its new grid rectangle', () {
+    const previous = Rect.fromLTWH(0, 100, 100, 100);
+    const current = Rect.fromLTWH(120, 220, 80, 80);
+
+    expect(calculateTimelineAssetTransitionRect(previousRect: previous, currentRect: current, progress: 0), previous);
+    expect(calculateTimelineAssetTransitionRect(previousRect: previous, currentRect: current, progress: 1), current);
   });
 
   testWidgets('timeline args follow constraints after a zero-sized first frame while buckets are still loading', (
@@ -241,7 +247,7 @@ void main() {
 
     expect(find.byKey(const Key('timeline-loading')), findsNothing);
     expect(service.watchCount, subscriptionsBeforeZoom);
-    expect(find.byType(ValueListenableBuilder<double>), findsOneWidget);
+    expect(find.byType(TimelineLayoutTransitionScope), findsOneWidget);
 
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('timeline-loading')), findsNothing);
