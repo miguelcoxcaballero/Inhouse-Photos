@@ -378,6 +378,8 @@ class SplashScreenPageState extends ConsumerState<SplashScreenPage> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: ImmichLogo(size: 80)));
+    // The native splash remains visible until Flutter draws its first frame.
+    // Keep this handoff blank so startup never flashes a second brand mark.
+    return const Scaffold(body: SizedBox.expand());
   }
 }
