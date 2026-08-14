@@ -112,4 +112,77 @@ void main() {
     expect(buckets, hasLength(1));
     expect(buckets.single.assetCount, 1);
   });
+
+  test('Storage saver merge remains responsive for a large library', () async {
+    const userId = 'large-library-user';
+    const albumId = 'large-library-camera';
+    const assetCount = 10000;
+    final createdAt = DateTime(2024, 3, 1, 12);
+
+    await db
+        .into(db.userEntity)
+        .insert(UserEntityCompanion.insert(id: userId, email: 'large-library@test.dev', name: 'Large Library'));
+    await db
+        .into(db.localAlbumEntity)
+        .insert(
+          LocalAlbumEntityCompanion.insert(id: albumId, name: 'Camera', backupSelection: BackupSelection.selected),
+        );
+
+    await db.batch((batch) {
+      for (var index = 0; index < assetCount; index++) {
+        final localId = 'local-$index';
+        final remoteId = 'remote-$index';
+        final sourceChecksum = 'source-checksum-$index';
+
+        batch.insert(
+          db.localAssetEntity,
+          LocalAssetEntityCompanion.insert(
+            id: localId,
+            name: 'original-$index.jpg',
+            type: AssetType.image,
+            checksum: Value(sourceChecksum),
+            createdAt: Value(createdAt.add(Duration(seconds: index))),
+          ),
+        );
+        batch.insert(
+          db.localAlbumAssetEntity,
+          LocalAlbumAssetEntityCompanion.insert(albumId: albumId, assetId: localId),
+        );
+        batch.insert(
+          db.remoteAssetEntity,
+          RemoteAssetEntityCompanion.insert(
+            id: remoteId,
+            name: 'compressed-$index.jpg',
+            type: AssetType.image,
+            checksum: 'compressed-checksum-$index',
+            ownerId: userId,
+            visibility: AssetVisibility.timeline,
+            createdAt: Value(createdAt.add(Duration(seconds: index))),
+            updatedAt: Value(createdAt),
+            uploadedAt: Value(createdAt),
+          ),
+        );
+        batch.insert(
+          db.remoteAssetCloudIdEntity,
+          RemoteAssetCloudIdEntityCompanion.insert(assetId: remoteId, cloudId: Value(sourceChecksum)),
+        );
+      }
+    });
+
+    final stopwatch = Stopwatch()..start();
+    final assets = await db.mergedAssetDrift
+        .mergedAsset(userIds: [userId], limit: (_) => Limit(100, 0))
+        .get()
+        .timeout(const Duration(seconds: 5));
+    final buckets = await db.mergedAssetDrift
+        .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: [userId])
+        .get()
+        .timeout(const Duration(seconds: 5));
+    stopwatch.stop();
+
+    expect(assets, hasLength(100));
+    expect(assets.every((asset) => asset.localId != null && asset.remoteId != null), isTrue);
+    expect(buckets.fold<int>(0, (total, bucket) => total + bucket.assetCount), assetCount);
+    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 5)));
+  }, timeout: const Timeout(Duration(seconds: 30)));
 }
