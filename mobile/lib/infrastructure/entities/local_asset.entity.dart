@@ -13,6 +13,13 @@ class LocalAssetEntity extends Table with DriftDefaultsMixin, AssetEntityMixin {
   TextColumn get id => text()();
   TextColumn get checksum => text().nullable()();
 
+  /// The capture time expressed as a timezone-independent wall-clock value.
+  ///
+  /// [createdAt] remains the real UTC instant. This value mirrors the server's
+  /// `localDateTime` so a device asset stays in the same timeline position when
+  /// its local row is replaced by the uploaded remote row.
+  DateTimeColumn get localDateTime => dateTime().nullable()();
+
   // Only used during backup to mirror the favorite status of the asset in the server
   BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
 
@@ -30,6 +37,20 @@ class LocalAssetEntity extends Table with DriftDefaultsMixin, AssetEntityMixin {
 
   @override
   Set<Column> get primaryKey => {id};
+}
+
+DateTime timelineLocalDateTime(DateTime instant) {
+  final local = instant.toLocal();
+  return DateTime.utc(
+    local.year,
+    local.month,
+    local.day,
+    local.hour,
+    local.minute,
+    local.second,
+    local.millisecond,
+    local.microsecond,
+  );
 }
 
 extension LocalAssetEntityDataDomainExtension on LocalAssetEntityData {

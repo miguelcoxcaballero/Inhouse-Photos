@@ -119,8 +119,64 @@ class Drift extends $Drift {
     }
   }
 
+  Future<void> _backfillLocalDateTimes(GeneratedDatabase database) async {
+    const pageSize = 250;
+    String? lastId;
+
+    while (true) {
+      final rows = await database
+          .customSelect(
+            lastId == null
+                ? '''
+          SELECT id, created_at
+          FROM local_asset_entity
+          WHERE local_date_time IS NULL
+          ORDER BY id
+          LIMIT $pageSize
+        '''
+                : '''
+          SELECT id, created_at
+          FROM local_asset_entity
+          WHERE local_date_time IS NULL AND id > ?
+          ORDER BY id
+          LIMIT $pageSize
+        ''',
+            variables: lastId == null ? const [] : [Variable(lastId)],
+          )
+          .get();
+      if (rows.isEmpty) {
+        return;
+      }
+
+      final cases = StringBuffer();
+      final ids = StringBuffer();
+      final arguments = <Object?>[];
+      for (final row in rows) {
+        final id = row.read<String>('id');
+        final createdAt = DateTime.parse(row.read<String>('created_at'));
+        cases.write(' WHEN ? THEN ?');
+        arguments
+          ..add(id)
+          ..add(timelineLocalDateTime(createdAt).toIso8601String());
+      }
+      for (final row in rows) {
+        if (ids.isNotEmpty) {
+          ids.write(', ');
+        }
+        ids.write('?');
+        arguments.add(row.read<String>('id'));
+      }
+
+      await database.customStatement(
+        'UPDATE local_asset_entity SET local_date_time = CASE id$cases END WHERE id IN ($ids)',
+        arguments,
+      );
+      lastId = rows.last.read<String>('id');
+    }
+  }
+
   @override
-  int get schemaVersion => 31;
+  int get schemaVersion => 32;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -317,6 +373,10 @@ class Drift extends $Drift {
               },
               from30To31: (m, v31) async {
                 await m.createIndex(v31.idxRemoteAssetUploaded);
+              },
+              from31To32: (m, v32) async {
+                await m.addColumn(v32.localAssetEntity, v32.localAssetEntity.localDateTime);
+                await _backfillLocalDateTimes(m.database);
               },
             ),
           ),

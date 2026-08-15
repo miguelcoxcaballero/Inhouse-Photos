@@ -19,6 +19,7 @@ typedef $$LocalAssetEntityTableCreateCompanionBuilder =
       i0.Value<int?> durationMs,
       required String id,
       i0.Value<String?> checksum,
+      i0.Value<DateTime?> localDateTime,
       i0.Value<bool> isFavorite,
       i0.Value<int> orientation,
       i0.Value<String?> iCloudId,
@@ -38,6 +39,7 @@ typedef $$LocalAssetEntityTableUpdateCompanionBuilder =
       i0.Value<int?> durationMs,
       i0.Value<String> id,
       i0.Value<String?> checksum,
+      i0.Value<DateTime?> localDateTime,
       i0.Value<bool> isFavorite,
       i0.Value<int> orientation,
       i0.Value<String?> iCloudId,
@@ -99,6 +101,11 @@ class $$LocalAssetEntityTableFilterComposer
 
   i0.ColumnFilters<String> get checksum => $composableBuilder(
     column: $table.checksum,
+    builder: (column) => i0.ColumnFilters(column),
+  );
+
+  i0.ColumnFilters<DateTime> get localDateTime => $composableBuilder(
+    column: $table.localDateTime,
     builder: (column) => i0.ColumnFilters(column),
   );
 
@@ -197,6 +204,11 @@ class $$LocalAssetEntityTableOrderingComposer
     builder: (column) => i0.ColumnOrderings(column),
   );
 
+  i0.ColumnOrderings<DateTime> get localDateTime => $composableBuilder(
+    column: $table.localDateTime,
+    builder: (column) => i0.ColumnOrderings(column),
+  );
+
   i0.ColumnOrderings<bool> get isFavorite => $composableBuilder(
     column: $table.isFavorite,
     builder: (column) => i0.ColumnOrderings(column),
@@ -270,6 +282,11 @@ class $$LocalAssetEntityTableAnnotationComposer
 
   i0.GeneratedColumn<String> get checksum =>
       $composableBuilder(column: $table.checksum, builder: (column) => column);
+
+  i0.GeneratedColumn<DateTime> get localDateTime => $composableBuilder(
+    column: $table.localDateTime,
+    builder: (column) => column,
+  );
 
   i0.GeneratedColumn<bool> get isFavorite => $composableBuilder(
     column: $table.isFavorite,
@@ -351,6 +368,7 @@ class $$LocalAssetEntityTableTableManager
                 i0.Value<int?> durationMs = const i0.Value.absent(),
                 i0.Value<String> id = const i0.Value.absent(),
                 i0.Value<String?> checksum = const i0.Value.absent(),
+                i0.Value<DateTime?> localDateTime = const i0.Value.absent(),
                 i0.Value<bool> isFavorite = const i0.Value.absent(),
                 i0.Value<int> orientation = const i0.Value.absent(),
                 i0.Value<String?> iCloudId = const i0.Value.absent(),
@@ -369,6 +387,7 @@ class $$LocalAssetEntityTableTableManager
                 durationMs: durationMs,
                 id: id,
                 checksum: checksum,
+                localDateTime: localDateTime,
                 isFavorite: isFavorite,
                 orientation: orientation,
                 iCloudId: iCloudId,
@@ -388,6 +407,7 @@ class $$LocalAssetEntityTableTableManager
                 i0.Value<int?> durationMs = const i0.Value.absent(),
                 required String id,
                 i0.Value<String?> checksum = const i0.Value.absent(),
+                i0.Value<DateTime?> localDateTime = const i0.Value.absent(),
                 i0.Value<bool> isFavorite = const i0.Value.absent(),
                 i0.Value<int> orientation = const i0.Value.absent(),
                 i0.Value<String?> iCloudId = const i0.Value.absent(),
@@ -406,6 +426,7 @@ class $$LocalAssetEntityTableTableManager
                 durationMs: durationMs,
                 id: id,
                 checksum: checksum,
+                localDateTime: localDateTime,
                 isFavorite: isFavorite,
                 orientation: orientation,
                 iCloudId: iCloudId,
@@ -553,6 +574,17 @@ class $LocalAssetEntityTable extends i3.LocalAssetEntity
     type: i0.DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const i0.VerificationMeta _localDateTimeMeta =
+      const i0.VerificationMeta('localDateTime');
+  @override
+  late final i0.GeneratedColumn<DateTime> localDateTime =
+      i0.GeneratedColumn<DateTime>(
+        'local_date_time',
+        aliasedName,
+        true,
+        type: i0.DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const i0.VerificationMeta _isFavoriteMeta = const i0.VerificationMeta(
     'isFavorite',
   );
@@ -648,6 +680,7 @@ class $LocalAssetEntityTable extends i3.LocalAssetEntity
     durationMs,
     id,
     checksum,
+    localDateTime,
     isFavorite,
     orientation,
     iCloudId,
@@ -715,6 +748,15 @@ class $LocalAssetEntityTable extends i3.LocalAssetEntity
       context.handle(
         _checksumMeta,
         checksum.isAcceptableOrUnknown(data['checksum']!, _checksumMeta),
+      );
+    }
+    if (data.containsKey('local_date_time')) {
+      context.handle(
+        _localDateTimeMeta,
+        localDateTime.isAcceptableOrUnknown(
+          data['local_date_time']!,
+          _localDateTimeMeta,
+        ),
       );
     }
     if (data.containsKey('is_favorite')) {
@@ -809,6 +851,10 @@ class $LocalAssetEntityTable extends i3.LocalAssetEntity
         i0.DriftSqlType.string,
         data['${effectivePrefix}checksum'],
       ),
+      localDateTime: attachedDatabase.typeMapping.read(
+        i0.DriftSqlType.dateTime,
+        data['${effectivePrefix}local_date_time'],
+      ),
       isFavorite: attachedDatabase.typeMapping.read(
         i0.DriftSqlType.bool,
         data['${effectivePrefix}is_favorite'],
@@ -870,6 +916,13 @@ class LocalAssetEntityData extends i0.DataClass
   final int? durationMs;
   final String id;
   final String? checksum;
+
+  /// The capture time expressed as a timezone-independent wall-clock value.
+  ///
+  /// [createdAt] remains the real UTC instant. This value mirrors the server's
+  /// `localDateTime` so a device asset stays in the same timeline position when
+  /// its local row is replaced by the uploaded remote row.
+  final DateTime? localDateTime;
   final bool isFavorite;
   final int orientation;
   final String? iCloudId;
@@ -887,6 +940,7 @@ class LocalAssetEntityData extends i0.DataClass
     this.durationMs,
     required this.id,
     this.checksum,
+    this.localDateTime,
     required this.isFavorite,
     required this.orientation,
     this.iCloudId,
@@ -918,6 +972,9 @@ class LocalAssetEntityData extends i0.DataClass
     map['id'] = i0.Variable<String>(id);
     if (!nullToAbsent || checksum != null) {
       map['checksum'] = i0.Variable<String>(checksum);
+    }
+    if (!nullToAbsent || localDateTime != null) {
+      map['local_date_time'] = i0.Variable<DateTime>(localDateTime);
     }
     map['is_favorite'] = i0.Variable<bool>(isFavorite);
     map['orientation'] = i0.Variable<int>(orientation);
@@ -958,6 +1015,7 @@ class LocalAssetEntityData extends i0.DataClass
       durationMs: serializer.fromJson<int?>(json['durationMs']),
       id: serializer.fromJson<String>(json['id']),
       checksum: serializer.fromJson<String?>(json['checksum']),
+      localDateTime: serializer.fromJson<DateTime?>(json['localDateTime']),
       isFavorite: serializer.fromJson<bool>(json['isFavorite']),
       orientation: serializer.fromJson<int>(json['orientation']),
       iCloudId: serializer.fromJson<String?>(json['iCloudId']),
@@ -984,6 +1042,7 @@ class LocalAssetEntityData extends i0.DataClass
       'durationMs': serializer.toJson<int?>(durationMs),
       'id': serializer.toJson<String>(id),
       'checksum': serializer.toJson<String?>(checksum),
+      'localDateTime': serializer.toJson<DateTime?>(localDateTime),
       'isFavorite': serializer.toJson<bool>(isFavorite),
       'orientation': serializer.toJson<int>(orientation),
       'iCloudId': serializer.toJson<String?>(iCloudId),
@@ -1006,6 +1065,7 @@ class LocalAssetEntityData extends i0.DataClass
     i0.Value<int?> durationMs = const i0.Value.absent(),
     String? id,
     i0.Value<String?> checksum = const i0.Value.absent(),
+    i0.Value<DateTime?> localDateTime = const i0.Value.absent(),
     bool? isFavorite,
     int? orientation,
     i0.Value<String?> iCloudId = const i0.Value.absent(),
@@ -1023,6 +1083,9 @@ class LocalAssetEntityData extends i0.DataClass
     durationMs: durationMs.present ? durationMs.value : this.durationMs,
     id: id ?? this.id,
     checksum: checksum.present ? checksum.value : this.checksum,
+    localDateTime: localDateTime.present
+        ? localDateTime.value
+        : this.localDateTime,
     isFavorite: isFavorite ?? this.isFavorite,
     orientation: orientation ?? this.orientation,
     iCloudId: iCloudId.present ? iCloudId.value : this.iCloudId,
@@ -1046,6 +1109,9 @@ class LocalAssetEntityData extends i0.DataClass
           : this.durationMs,
       id: data.id.present ? data.id.value : this.id,
       checksum: data.checksum.present ? data.checksum.value : this.checksum,
+      localDateTime: data.localDateTime.present
+          ? data.localDateTime.value
+          : this.localDateTime,
       isFavorite: data.isFavorite.present
           ? data.isFavorite.value
           : this.isFavorite,
@@ -1076,6 +1142,7 @@ class LocalAssetEntityData extends i0.DataClass
           ..write('durationMs: $durationMs, ')
           ..write('id: $id, ')
           ..write('checksum: $checksum, ')
+          ..write('localDateTime: $localDateTime, ')
           ..write('isFavorite: $isFavorite, ')
           ..write('orientation: $orientation, ')
           ..write('iCloudId: $iCloudId, ')
@@ -1098,6 +1165,7 @@ class LocalAssetEntityData extends i0.DataClass
     durationMs,
     id,
     checksum,
+    localDateTime,
     isFavorite,
     orientation,
     iCloudId,
@@ -1119,6 +1187,7 @@ class LocalAssetEntityData extends i0.DataClass
           other.durationMs == this.durationMs &&
           other.id == this.id &&
           other.checksum == this.checksum &&
+          other.localDateTime == this.localDateTime &&
           other.isFavorite == this.isFavorite &&
           other.orientation == this.orientation &&
           other.iCloudId == this.iCloudId &&
@@ -1139,6 +1208,7 @@ class LocalAssetEntityCompanion
   final i0.Value<int?> durationMs;
   final i0.Value<String> id;
   final i0.Value<String?> checksum;
+  final i0.Value<DateTime?> localDateTime;
   final i0.Value<bool> isFavorite;
   final i0.Value<int> orientation;
   final i0.Value<String?> iCloudId;
@@ -1156,6 +1226,7 @@ class LocalAssetEntityCompanion
     this.durationMs = const i0.Value.absent(),
     this.id = const i0.Value.absent(),
     this.checksum = const i0.Value.absent(),
+    this.localDateTime = const i0.Value.absent(),
     this.isFavorite = const i0.Value.absent(),
     this.orientation = const i0.Value.absent(),
     this.iCloudId = const i0.Value.absent(),
@@ -1174,6 +1245,7 @@ class LocalAssetEntityCompanion
     this.durationMs = const i0.Value.absent(),
     required String id,
     this.checksum = const i0.Value.absent(),
+    this.localDateTime = const i0.Value.absent(),
     this.isFavorite = const i0.Value.absent(),
     this.orientation = const i0.Value.absent(),
     this.iCloudId = const i0.Value.absent(),
@@ -1194,6 +1266,7 @@ class LocalAssetEntityCompanion
     i0.Expression<int>? durationMs,
     i0.Expression<String>? id,
     i0.Expression<String>? checksum,
+    i0.Expression<DateTime>? localDateTime,
     i0.Expression<bool>? isFavorite,
     i0.Expression<int>? orientation,
     i0.Expression<String>? iCloudId,
@@ -1212,6 +1285,7 @@ class LocalAssetEntityCompanion
       if (durationMs != null) 'duration_ms': durationMs,
       if (id != null) 'id': id,
       if (checksum != null) 'checksum': checksum,
+      if (localDateTime != null) 'local_date_time': localDateTime,
       if (isFavorite != null) 'is_favorite': isFavorite,
       if (orientation != null) 'orientation': orientation,
       if (iCloudId != null) 'i_cloud_id': iCloudId,
@@ -1232,6 +1306,7 @@ class LocalAssetEntityCompanion
     i0.Value<int?>? durationMs,
     i0.Value<String>? id,
     i0.Value<String?>? checksum,
+    i0.Value<DateTime?>? localDateTime,
     i0.Value<bool>? isFavorite,
     i0.Value<int>? orientation,
     i0.Value<String?>? iCloudId,
@@ -1250,6 +1325,7 @@ class LocalAssetEntityCompanion
       durationMs: durationMs ?? this.durationMs,
       id: id ?? this.id,
       checksum: checksum ?? this.checksum,
+      localDateTime: localDateTime ?? this.localDateTime,
       isFavorite: isFavorite ?? this.isFavorite,
       orientation: orientation ?? this.orientation,
       iCloudId: iCloudId ?? this.iCloudId,
@@ -1292,6 +1368,9 @@ class LocalAssetEntityCompanion
     if (checksum.present) {
       map['checksum'] = i0.Variable<String>(checksum.value);
     }
+    if (localDateTime.present) {
+      map['local_date_time'] = i0.Variable<DateTime>(localDateTime.value);
+    }
     if (isFavorite.present) {
       map['is_favorite'] = i0.Variable<bool>(isFavorite.value);
     }
@@ -1332,6 +1411,7 @@ class LocalAssetEntityCompanion
           ..write('durationMs: $durationMs, ')
           ..write('id: $id, ')
           ..write('checksum: $checksum, ')
+          ..write('localDateTime: $localDateTime, ')
           ..write('isFavorite: $isFavorite, ')
           ..write('orientation: $orientation, ')
           ..write('iCloudId: $iCloudId, ')

@@ -55,6 +55,81 @@ void main() {
     expect(buckets.single.bucketDate, isNotEmpty);
   });
 
+  test('local asset keeps its wall-clock bucket and order after upload', () async {
+    const userId = 'timezone-user';
+    const localId = 'timezone-local';
+    const checksum = 'timezone-checksum';
+    final capturedAt = DateTime.utc(2024, 1, 1, 22, 30);
+    // A floating UTC value intentionally represents the device wall clock,
+    // matching the server's localDateTime convention.
+    final timelineAt = DateTime.utc(2024, 1, 2, 1, 30);
+
+    await db
+        .into(db.userEntity)
+        .insert(UserEntityCompanion.insert(id: userId, email: 'timezone@test.dev', name: 'Timezone'));
+    await db
+        .into(db.localAlbumEntity)
+        .insert(
+          LocalAlbumEntityCompanion.insert(
+            id: 'timezone-camera',
+            name: 'Camera',
+            backupSelection: BackupSelection.selected,
+          ),
+        );
+    await db
+        .into(db.localAssetEntity)
+        .insert(
+          LocalAssetEntityCompanion.insert(
+            id: localId,
+            name: 'timezone.jpg',
+            type: AssetType.image,
+            checksum: const Value(checksum),
+            createdAt: Value(capturedAt),
+            localDateTime: Value(timelineAt),
+          ),
+        );
+    await db
+        .into(db.localAlbumAssetEntity)
+        .insert(LocalAlbumAssetEntityCompanion.insert(albumId: 'timezone-camera', assetId: localId));
+
+    final localAssets = await db.mergedAssetDrift.mergedAsset(userIds: [userId], limit: (_) => Limit(20, 0)).get();
+    final localBuckets = await db.mergedAssetDrift
+        .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: [userId])
+        .get();
+
+    expect(localAssets.single.localId, localId);
+    expect(localAssets.single.timelineAt, timelineAt);
+    expect(localBuckets.single.bucketDate, '2024-01-02');
+
+    await db
+        .into(db.remoteAssetEntity)
+        .insert(
+          RemoteAssetEntityCompanion.insert(
+            id: 'timezone-remote',
+            name: 'timezone.jpg',
+            type: AssetType.image,
+            checksum: checksum,
+            ownerId: userId,
+            visibility: AssetVisibility.timeline,
+            createdAt: Value(capturedAt),
+            updatedAt: Value(capturedAt),
+            uploadedAt: Value(capturedAt),
+            localDateTime: Value(timelineAt),
+          ),
+        );
+
+    final remoteAssets = await db.mergedAssetDrift.mergedAsset(userIds: [userId], limit: (_) => Limit(20, 0)).get();
+    final remoteBuckets = await db.mergedAssetDrift
+        .mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: [userId])
+        .get();
+
+    expect(remoteAssets, hasLength(1));
+    expect(remoteAssets.single.remoteId, 'timezone-remote');
+    expect(remoteAssets.single.localId, localId);
+    expect(remoteAssets.single.timelineAt, timelineAt);
+    expect(remoteBuckets.single.bucketDate, '2024-01-02');
+  });
+
   test('Storage saver metadata merges the local original with its compressed remote copy', () async {
     const userId = 'storage-saver-user';
     const sourceChecksum = 'source-checksum';

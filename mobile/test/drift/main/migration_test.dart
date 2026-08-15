@@ -35,4 +35,34 @@ void main() {
       });
     }
   });
+
+  test('v31 migration backfills local timeline wall-clock times', () async {
+    final schema = await verifier.schemaAt(31);
+    schema.rawDatabase.execute(
+      '''
+      INSERT INTO local_asset_entity (id, name, type, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    ''',
+      [
+        'local-timezone-asset',
+        'photo.jpg',
+        1,
+        '2024-01-01T22:30:00.000Z',
+        '2024-01-01T22:30:00.000Z',
+      ],
+    );
+    final db = Drift(schema.newConnection());
+
+    await verifier.migrateAndValidate(db, 32);
+
+    final row = await db
+        .customSelect(
+          'SELECT created_at, local_date_time FROM local_asset_entity WHERE id = ?',
+          variables: [const Variable('local-timezone-asset')],
+        )
+        .getSingle();
+    expect(row.read<String>('created_at'), '2024-01-01T22:30:00.000Z');
+    expect(row.read<String?>('local_date_time'), isA<String>());
+    await db.close();
+  });
 }
