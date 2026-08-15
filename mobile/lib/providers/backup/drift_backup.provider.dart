@@ -7,6 +7,8 @@ import 'package:logging/logging.dart';
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/domain/models/album/local_album.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/infrastructure/repositories/local_asset.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
 import 'package:immich_mobile/utils/upload_speed_calculator.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
@@ -200,12 +202,19 @@ final driftBackupProvider = StateNotifierProvider<DriftBackupNotifier, DriftBack
     ref.watch(foregroundUploadServiceProvider),
     ref.watch(backgroundUploadServiceProvider),
     UploadSpeedManager(),
+    ref.watch(localAssetRepository),
+    ref.watch(remoteAssetRepositoryProvider),
   );
 });
 
 class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
-  DriftBackupNotifier(this._foregroundUploadService, this._backgroundUploadService, this._uploadSpeedManager)
-    : super(
+  DriftBackupNotifier(
+    this._foregroundUploadService,
+    this._backgroundUploadService,
+    this._uploadSpeedManager,
+    this._localAssetRepository,
+    this._remoteAssetRepository,
+  ) : super(
         const DriftBackupState(
           totalCount: 0,
           backupCount: 0,
@@ -220,6 +229,8 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   final ForegroundUploadService _foregroundUploadService;
   final BackgroundUploadService _backgroundUploadService;
   final UploadSpeedManager _uploadSpeedManager;
+  final DriftLocalAssetRepository _localAssetRepository;
+  final RemoteAssetRepository _remoteAssetRepository;
   Completer<void>? _cancelToken;
 
   final _logger = Logger("DriftBackupNotifier");
@@ -284,7 +295,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
       callbacks: UploadCallbacks(
         onProgress: _handleForegroundBackupProgress,
         onPreparationProgress: _handleForegroundPreparationProgress,
-        onSuccess: _handleForegroundBackupSuccess,
+        onSuccess: (localId, remoteId) => _handleForegroundBackupSuccess(userId, localId, remoteId),
         onError: _handleForegroundBackupError,
         onICloudProgress: _handleICloudProgress,
       ),
@@ -380,7 +391,20 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     state = state.copyWith(uploadItems: {...state.uploadItems, localAssetId: item});
   }
 
-  void _handleForegroundBackupSuccess(String localAssetId, String remoteAssetId) {
+  Future<void> _handleForegroundBackupSuccess(String userId, String localAssetId, String remoteAssetId) async {
+    try {
+      final source = await _localAssetRepository.getById(localAssetId);
+      if (source == null) {
+        _logger.warning('Uploaded local asset $localAssetId is no longer in the device database');
+      } else {
+        await _remoteAssetRepository.registerCompletedUpload(remoteId: remoteAssetId, ownerId: userId, source: source);
+      }
+    } catch (error, stackTrace) {
+      // The upload itself succeeded. A later server sync can still reconcile
+      // the asset, so never turn this local UI update into an upload failure.
+      _logger.warning('Unable to register completed upload $remoteAssetId locally', error, stackTrace);
+    }
+
     state = state.copyWith(backupCount: state.backupCount + 1, remainderCount: state.remainderCount - 1);
     _uploadSpeedManager.removeTask(localAssetId);
 

@@ -30,7 +30,7 @@ class UploadCallbacks {
   final void Function(String id, String filename, int bytes, int totalBytes)? onProgress;
   final void Function(String id, String filename, double progress, int originalBytes, int? preparedBytes)?
   onPreparationProgress;
-  final void Function(String localId, String remoteId)? onSuccess;
+  final FutureOr<void> Function(String localId, String remoteId)? onSuccess;
   final void Function(String id, String errorMessage)? onError;
   final void Function(String id, double progress)? onICloudProgress;
 
@@ -442,7 +442,10 @@ class ForegroundUploadService {
       );
 
       if (result.isSuccess && result.remoteAssetId != null) {
-        callbacks.onSuccess?.call(asset.localId!, result.remoteAssetId!);
+        final onSuccess = callbacks.onSuccess;
+        if (onSuccess != null) {
+          await Future<void>.value(onSuccess(asset.localId!, result.remoteAssetId!));
+        }
       } else if (result.isCancelled) {
         _logger.warning(() => "Backup was cancelled by the user");
         shouldAbortUpload = true;

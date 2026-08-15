@@ -12,6 +12,8 @@ import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.
 import 'package:immich_mobile/infrastructure/entities/remote_asset_cloud_id.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/user.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/local_asset.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
 
 void main() {
   late Drift db;
@@ -193,6 +195,62 @@ void main() {
     expect(remoteBuckets.single.assetCount, 1);
     expect(remoteBuckets.single.remoteAssetCount, 1);
     await queue.cancel();
+  });
+
+  test('completed upload immediately replaces its local tile without a refresh', () async {
+    const userId = 'completed-upload-user';
+    const localId = 'completed-upload-local';
+    const remoteId = 'completed-upload-remote';
+    const checksum = 'completed-upload-checksum';
+    final capturedAt = DateTime.utc(2024, 2, 3, 14);
+
+    await db
+        .into(db.userEntity)
+        .insert(UserEntityCompanion.insert(id: userId, email: 'upload@test.dev', name: 'Upload'));
+    await db
+        .into(db.localAlbumEntity)
+        .insert(
+          LocalAlbumEntityCompanion.insert(
+            id: 'completed-camera',
+            name: 'Camera',
+            backupSelection: BackupSelection.selected,
+          ),
+        );
+    await db
+        .into(db.localAssetEntity)
+        .insert(
+          LocalAssetEntityCompanion.insert(
+            id: localId,
+            name: 'completed.jpg',
+            type: AssetType.image,
+            checksum: const Value(checksum),
+            createdAt: Value(capturedAt),
+            localDateTime: Value(capturedAt),
+          ),
+        );
+    await db
+        .into(db.localAlbumAssetEntity)
+        .insert(LocalAlbumAssetEntityCompanion.insert(albumId: 'completed-camera', assetId: localId));
+
+    final bucketQueue = StreamQueue(
+      db.mergedAssetDrift.mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: [userId]).watch(),
+    );
+    expect((await bucketQueue.next).single.remoteAssetCount, 0);
+
+    final source = await DriftLocalAssetRepository(db).getById(localId);
+    await RemoteAssetRepository(db).registerCompletedUpload(remoteId: remoteId, ownerId: userId, source: source!);
+
+    final updatedBuckets = await bucketQueue.next.timeout(const Duration(seconds: 2));
+    final assets = await db.mergedAssetDrift.mergedAsset(userIds: [userId], limit: (_) => Limit(20, 0)).get();
+    final mapping = await (db.remoteAssetCloudIdEntity.select()..where((row) => row.assetId.equals(remoteId)))
+        .getSingle();
+
+    expect(updatedBuckets.single.remoteAssetCount, 1);
+    expect(assets, hasLength(1));
+    expect(assets.single.localId, localId);
+    expect(assets.single.remoteId, remoteId);
+    expect(mapping.cloudId, checksum);
+    await bucketQueue.cancel();
   });
 
   test('Storage saver metadata merges the local original with its compressed remote copy', () async {

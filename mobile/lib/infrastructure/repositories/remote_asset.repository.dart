@@ -6,8 +6,10 @@ import 'package:immich_mobile/domain/models/stack.model.dart';
 import 'package:immich_mobile/infrastructure/entities/asset_edit.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/exif.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/exif.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/local_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/remote_asset_cloud_id.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/stack.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/utils/option.dart';
@@ -63,6 +65,54 @@ class RemoteAssetRepository extends DriftDatabaseRepository {
     final query = _db.remoteAssetEntity.select()..where((row) => row.checksum.equals(checksum));
 
     return query.map((row) => row.toDto()).getSingleOrNull();
+  }
+
+  /// Makes a completed upload visible as a merged local/remote asset without
+  /// waiting for the next server synchronization cycle.
+  ///
+  /// The server remains authoritative: its sync event replaces this minimal
+  /// row. Keeping the original checksum as a cloud-id mapping is important for
+  /// Storage Saver uploads because their server checksum belongs to the
+  /// compressed file rather than to the local original.
+  Future<void> registerCompletedUpload({
+    required String remoteId,
+    required String ownerId,
+    required LocalAsset source,
+  }) async {
+    await _db.transaction(() async {
+      await _db
+          .into(_db.remoteAssetEntity)
+          .insert(
+            RemoteAssetEntityCompanion(
+              id: Value(remoteId),
+              ownerId: Value(ownerId),
+              checksum: Value(source.checksum ?? remoteId),
+              name: Value(source.name),
+              type: Value(source.type),
+              createdAt: Value(source.createdAt),
+              localDateTime: Value(timelineLocalDateTime(source.createdAt)),
+              updatedAt: Value(source.updatedAt),
+              uploadedAt: Value(DateTime.now().toUtc()),
+              width: Value(source.width),
+              height: Value(source.height),
+              durationMs: Value(source.durationMs),
+              isFavorite: Value(source.isFavorite),
+              visibility: const Value(AssetVisibility.timeline),
+              isEdited: Value(source.isEdited),
+            ),
+            mode: InsertMode.insertOrIgnore,
+          );
+
+      final checksum = source.checksum;
+      if (checksum != null) {
+        await _db
+            .into(_db.remoteAssetCloudIdEntity)
+            .insert(
+              RemoteAssetCloudIdEntityCompanion.insert(assetId: remoteId, cloudId: Value(checksum)),
+              mode: InsertMode.insertOrIgnore,
+            );
+      }
+    });
   }
 
   Future<List<RemoteAsset>> getStackChildren(RemoteAsset asset) {
