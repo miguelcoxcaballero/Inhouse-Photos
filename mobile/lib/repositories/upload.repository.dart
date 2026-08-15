@@ -153,6 +153,8 @@ class UploadRepository {
 class ProgressMultipartRequest extends MultipartRequest with Abortable {
   ProgressMultipartRequest(super.method, super.url, {this.abortTrigger, this.onProgress});
 
+  static const progressUpdateInterval = Duration(milliseconds: 200);
+
   @override
   final Future<void>? abortTrigger;
 
@@ -167,11 +169,17 @@ class ProgressMultipartRequest extends MultipartRequest with Abortable {
 
     final total = contentLength;
     var bytes = 0;
+    var lastProgressUpdateMs = -progressUpdateInterval.inMilliseconds;
+    final progressClock = Stopwatch()..start();
     final stream = byteStream.transform(
       StreamTransformer.fromHandlers(
         handleData: (List<int> data, EventSink<List<int>> sink) {
           bytes += data.length;
-          onProgress!(bytes, total);
+          final elapsedMs = progressClock.elapsedMilliseconds;
+          if (bytes >= total || elapsedMs - lastProgressUpdateMs >= progressUpdateInterval.inMilliseconds) {
+            lastProgressUpdateMs = elapsedMs;
+            onProgress!(bytes, total);
+          }
           sink.add(data);
         },
       ),

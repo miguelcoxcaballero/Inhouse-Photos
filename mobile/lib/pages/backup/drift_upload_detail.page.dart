@@ -19,6 +19,7 @@ class DriftUploadDetailPage extends ConsumerStatefulWidget {
 }
 
 class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
+  static const double _uploadCardContentHeight = 176;
   final Set<String> _seenTaskIds = {};
   final Set<String> _failedTaskIds = {};
 
@@ -298,55 +299,58 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
         borderRadius: const BorderRadius.all(Radius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  _CurrentUploadThumbnail(taskId: item.taskId),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      path.basename(item.filename),
-                      style: context.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (isFailed) ...[
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: _uploadCardContentHeight),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _CurrentUploadThumbnail(taskId: item.taskId),
                     const SizedBox(width: 12),
-                    Icon(Icons.error_rounded, color: context.colorScheme.error, size: 28),
+                    Expanded(
+                      child: Text(
+                        path.basename(item.filename),
+                        style: context.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isFailed) ...[
+                      const SizedBox(width: 12),
+                      Icon(Icons.error_rounded, color: context.colorScheme.error, size: 28),
+                    ],
                   ],
+                ),
+                if (isFailed) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    item.error ?? "unable_to_upload_file".t(context: context),
+                    style: context.textTheme.labelLarge?.copyWith(color: context.colorScheme.error),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  _buildSizeSummary(context, item),
+                  const SizedBox(height: 12),
+                  _buildStageProgress(
+                    context,
+                    label: "backup_compression_stage".t(context: context),
+                    progress: item.preparationProgress,
+                    color: context.colorScheme.tertiary,
+                  ),
+                  const SizedBox(height: 10),
+                  _buildStageProgress(
+                    context,
+                    label: "backup_upload_stage".t(context: context),
+                    detail: item.networkSpeedAsString,
+                    progress: item.progress,
+                    color: context.colorScheme.primary,
+                  ),
                 ],
-              ),
-              if (isFailed) ...[
-                const SizedBox(height: 8),
-                Text(
-                  item.error ?? "unable_to_upload_file".t(context: context),
-                  style: context.textTheme.labelLarge?.copyWith(color: context.colorScheme.error),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ] else ...[
-                const SizedBox(height: 12),
-                _buildSizeSummary(context, item),
-                const SizedBox(height: 12),
-                _buildStageProgress(
-                  context,
-                  label: "backup_compression_stage".t(context: context),
-                  progress: item.preparationProgress,
-                  color: context.colorScheme.tertiary,
-                ),
-                const SizedBox(height: 10),
-                _buildStageProgress(
-                  context,
-                  label: "backup_upload_stage".t(context: context),
-                  detail: item.networkSpeedAsString,
-                  progress: item.progress,
-                  color: context.colorScheme.primary,
-                ),
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -510,94 +514,77 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: SizedBox(
-          height: 104,
-          child: Row(
+          height: _uploadCardContentHeight,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                width: 48,
-                height: 48,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: context.colorScheme.outline.withValues(alpha: 0.1),
-                    borderRadius: const BorderRadius.all(Radius.circular(8)),
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: context.colorScheme.outline.withValues(alpha: 0.1),
+                      borderRadius: const BorderRadius.all(Radius.circular(8)),
+                    ),
+                    child: Icon(
+                      Icons.hourglass_empty_rounded,
+                      size: 24,
+                      color: context.colorScheme.outline.withValues(alpha: 0.3),
+                    ),
                   ),
-                  child: Icon(
-                    Icons.hourglass_empty_rounded,
-                    size: 24,
-                    color: context.colorScheme.outline.withValues(alpha: 0.3),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildPlaceholderLine(context, height: 14, width: 160)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildPlaceholderLine(context, height: 10, width: 64, alpha: 0.08),
+                        const SizedBox(height: 4),
+                        _buildPlaceholderLine(context, height: 16, width: 88),
+                      ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 40),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        _buildPlaceholderLine(context, height: 10, width: 72, alpha: 0.08),
+                        const SizedBox(height: 4),
+                        _buildPlaceholderLine(context, height: 16, width: 88),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      height: 14,
-                      width: 120,
-                      decoration: BoxDecoration(
-                        color: context.colorScheme.outline.withValues(alpha: 0.1),
-                        borderRadius: const BorderRadius.all(Radius.circular(4)),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      height: 10,
-                      width: 80,
-                      decoration: BoxDecoration(
-                        color: context.colorScheme.outline.withValues(alpha: 0.08),
-                        borderRadius: const BorderRadius.all(Radius.circular(4)),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: context.colorScheme.outline.withValues(alpha: 0.1),
-                        borderRadius: const BorderRadius.all(Radius.circular(99)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: context.colorScheme.outline.withValues(alpha: 0.1),
-                        borderRadius: const BorderRadius.all(Radius.circular(99)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 48,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      "0%",
-                      textAlign: TextAlign.right,
-                      style: context.textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: context.colorScheme.outline.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      "0%",
-                      textAlign: TextAlign.right,
-                      style: context.textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: context.colorScheme.outline.withValues(alpha: 0.3),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 12),
+              _buildPlaceholderLine(context, height: 10, width: 96, alpha: 0.08),
+              const SizedBox(height: 5),
+              _buildPlaceholderLine(context, height: 5),
+              const SizedBox(height: 10),
+              _buildPlaceholderLine(context, height: 10, width: 112, alpha: 0.08),
+              const SizedBox(height: 5),
+              _buildPlaceholderLine(context, height: 5),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderLine(BuildContext context, {required double height, double? width, double alpha = 0.1}) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: context.colorScheme.outline.withValues(alpha: alpha),
+        borderRadius: const BorderRadius.all(Radius.circular(99)),
       ),
     );
   }

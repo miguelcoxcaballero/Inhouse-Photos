@@ -312,9 +312,11 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
           return _ref?.read(driftBackupProvider.notifier).startBackupWithURLSession(currentUser.id);
         }
 
-        return _ref
-            ?.read(foregroundUploadServiceProvider)
-            .uploadCandidates(currentUser.id, _cancellationToken, useSequentialUpload: true);
+        // Keep the same three-upload worker pool used in the foreground. The
+        // shared native OkHttp client supports concurrent requests, and using
+        // one worker here unnecessarily leaves bandwidth idle for large
+        // Android libraries.
+        return _ref?.read(foregroundUploadServiceProvider).uploadCandidates(currentUser.id, _cancellationToken);
       },
       (error, stack) {
         dPrint(() => "Error in backup zone $error, $stack");

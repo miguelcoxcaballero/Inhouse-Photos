@@ -75,6 +75,13 @@ void main() {
     expect(processor, contains('emitProgress(operationId'));
   });
 
+  test('empty upload slots keep the same height as active slots', () {
+    final details = File('lib/pages/backup/drift_upload_detail.page.dart').readAsStringSync();
+
+    expect(details, contains('static const double _uploadCardContentHeight'));
+    expect(RegExp('_uploadCardContentHeight').allMatches(details).length, greaterThanOrEqualTo(3));
+  });
+
   test('backup quality savings uses a flat settings layout', () {
     final settings = File('lib/widgets/settings/backup_settings/drift_backup_settings.dart').readAsStringSync();
     final summary = settings.substring(
