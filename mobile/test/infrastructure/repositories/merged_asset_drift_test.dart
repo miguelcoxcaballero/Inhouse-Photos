@@ -1,3 +1,4 @@
+import 'package:async/async.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -128,6 +129,70 @@ void main() {
     expect(remoteAssets.single.localId, localId);
     expect(remoteAssets.single.timelineAt, timelineAt);
     expect(remoteBuckets.single.bucketDate, '2024-01-02');
+  });
+
+  test('mergedBucket emits when a local asset is replaced by its remote copy', () async {
+    const userId = 'timeline-refresh-user';
+    const localId = 'timeline-refresh-local';
+    const checksum = 'timeline-refresh-checksum';
+    final capturedAt = DateTime.utc(2024, 2, 1, 12);
+
+    await db
+        .into(db.userEntity)
+        .insert(UserEntityCompanion.insert(id: userId, email: 'refresh@test.dev', name: 'Refresh'));
+    await db
+        .into(db.localAlbumEntity)
+        .insert(
+          LocalAlbumEntityCompanion.insert(
+            id: 'timeline-refresh-camera',
+            name: 'Camera',
+            backupSelection: BackupSelection.selected,
+          ),
+        );
+    await db
+        .into(db.localAssetEntity)
+        .insert(
+          LocalAssetEntityCompanion.insert(
+            id: localId,
+            name: 'refresh.jpg',
+            type: AssetType.image,
+            checksum: const Value(checksum),
+            createdAt: Value(capturedAt),
+            localDateTime: Value(capturedAt),
+          ),
+        );
+    await db
+        .into(db.localAlbumAssetEntity)
+        .insert(LocalAlbumAssetEntityCompanion.insert(albumId: 'timeline-refresh-camera', assetId: localId));
+
+    final queue = StreamQueue(
+      db.mergedAssetDrift.mergedBucket(groupBy: GroupAssetsBy.day.index, userIds: [userId]).watch(),
+    );
+    final localBuckets = await queue.next;
+    expect(localBuckets.single.assetCount, 1);
+    expect(localBuckets.single.remoteAssetCount, 0);
+
+    await db
+        .into(db.remoteAssetEntity)
+        .insert(
+          RemoteAssetEntityCompanion.insert(
+            id: 'timeline-refresh-remote',
+            name: 'refresh.jpg',
+            type: AssetType.image,
+            checksum: checksum,
+            ownerId: userId,
+            visibility: AssetVisibility.timeline,
+            createdAt: Value(capturedAt),
+            updatedAt: Value(capturedAt),
+            uploadedAt: Value(capturedAt),
+            localDateTime: Value(capturedAt),
+          ),
+        );
+
+    final remoteBuckets = await queue.next.timeout(const Duration(seconds: 2));
+    expect(remoteBuckets.single.assetCount, 1);
+    expect(remoteBuckets.single.remoteAssetCount, 1);
+    await queue.cancel();
   });
 
   test('Storage saver metadata merges the local original with its compressed remote copy', () async {

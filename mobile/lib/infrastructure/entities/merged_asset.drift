@@ -113,10 +113,12 @@ LIMIT $limit;
 mergedBucket(:group_by AS INTEGER):
 SELECT
 	COUNT(*) as asset_count,
+	SUM(is_remote) as remote_asset_count,
 	bucket_date
 FROM
 (
 	SELECT
+		1 as is_remote,
 		CASE
 			WHEN :group_by = 0 THEN COALESCE(
 				STRFTIME('%Y-%m-%d', rae.local_date_time),
@@ -141,6 +143,7 @@ FROM
 		)
 	UNION ALL
 	SELECT
+		0 as is_remote,
 		CASE
 			WHEN :group_by = 0 THEN COALESCE(
 				STRFTIME('%Y-%m-%d', lae.local_date_time),
