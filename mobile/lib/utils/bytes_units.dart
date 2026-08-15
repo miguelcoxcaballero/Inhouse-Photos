@@ -25,3 +25,12 @@ String formatHumanReadableBytes(int bytes, int decimals) {
   var i = (log(bytes) / log(1024)).floor();
   return '${(bytes / pow(1024, i)).toStringAsFixed(decimals)} ${suffixes[i]}';
 }
+
+int? calculateStorageSavingsPercent(int originalBytes, int preparedBytes) {
+  if (originalBytes <= 0 || preparedBytes <= 0) {
+    return null;
+  }
+
+  final savedBytes = (originalBytes - preparedBytes).clamp(0, originalBytes);
+  return (savedBytes / originalBytes * 100).round();
+}
