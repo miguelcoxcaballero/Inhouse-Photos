@@ -196,6 +196,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   int _perRow = 4;
   double _scaleFactor = 3.0;
   double _baseScaleFactor = 3.0;
+  bool _didChangeColumnCount = false;
   int? _restoreAssetIndex;
   int _renderedPerRow = 4;
   late final AnimationController _layoutTransitionController;
@@ -550,7 +551,10 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
               final grid = CustomScrollView(
                 primary: true,
                 physics: _scrollPhysics,
-                scrollCacheExtent: .pixels(maxHeight * 2),
+                // One viewport is enough to keep the next rows ready without
+                // decoding and compositing several screens of thumbnails while
+                // the user is actively scrolling.
+                scrollCacheExtent: .pixels(maxHeight),
                 slivers: [
                   if (isSelectionMode) const SelectionSliverAppBar() else if (widget.appBar != null) widget.appBar!,
                   if (widget.topSliverWidget != null) widget.topSliverWidget!,
@@ -598,6 +602,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                     (CustomScaleGestureRecognizer scale) {
                       scale.onStart = (details) {
                         _baseScaleFactor = _scaleFactor;
+                        _didChangeColumnCount = false;
                       };
 
                       scale.onUpdate = (details) {
@@ -609,6 +614,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                         _scaleFactor = newScaleFactor;
 
                         if (newPerRow != _perRow) {
+                          _didChangeColumnCount = true;
                           final targetAssetIndex = _getCurrentAssetIndex(segments);
                           _prepareLayoutTransition();
                           _perRow = newPerRow;
@@ -620,7 +626,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                       scale.onEnd = (_) {
                         _scaleFactor = 7.0 - _perRow;
                         _baseScaleFactor = _scaleFactor;
-                        widget.onInteractiveColumnCountSettled(_perRow);
+                        if (_didChangeColumnCount) {
+                          widget.onInteractiveColumnCountSettled(_perRow);
+                        }
                       };
                     },
                   ),

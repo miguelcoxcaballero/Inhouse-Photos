@@ -201,13 +201,16 @@ class _AssetTileWidget extends ConsumerWidget {
 
   const _AssetTileWidget({super.key, required this.asset, required this.assetIndex});
 
-  Future _handleOnTap(BuildContext ctx, WidgetRef ref, int assetIndex, BaseAsset asset, int? heroOffset) async {
+  void _handleOnTap(BuildContext ctx, WidgetRef ref, int assetIndex, BaseAsset asset, int? heroOffset) {
     final multiSelectState = ref.read(multiSelectProvider);
 
     if (multiSelectState.forceEnable || multiSelectState.isEnabled) {
       ref.read(multiSelectProvider.notifier).toggleAssetSelection(asset);
     } else {
-      await ref.read(timelineServiceProvider).loadAssets(assetIndex, 1);
+      // The tile could only be built because this asset was already loaded.
+      // Waiting on TimelineService here can queue navigation behind an
+      // unrelated 1,024-row scroll-buffer fetch, making taps feel unresponsive.
+      // The viewer preloads neighbors after its first frame, so open it now.
       ref.read(isPlayingMotionVideoProvider.notifier).playing = false;
       AssetViewer.setAsset(ref, asset);
       unawaited(
