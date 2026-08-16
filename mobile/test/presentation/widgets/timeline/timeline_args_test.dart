@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +17,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_layout_transition.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
+import 'package:thumbhash/thumbhash.dart' as thumbhash;
 
 // A first fetch that never delivers - the state a suspended or storm-starved
 // bucket watch is stuck in when the timeline mounts on a zero-sized first frame
@@ -98,6 +101,30 @@ void main() {
     expect(denseTimelineAssetChunkSize(columnCount: 12, viewportHeight: 0, tileExtent: 32), 1024);
     expect(denseTimelineTargetPixels(tileExtent: 8.34, devicePixelRatio: 3), 32);
     expect(denseTimelineTargetPixels(tileExtent: 18, devicePixelRatio: 3), 54);
+  });
+
+  test('extreme year levels use immediate metadata atlases', () {
+    expect(usesInstantDenseTimelineAtlas(24), isFalse);
+    expect(usesInstantDenseTimelineAtlas(36), isTrue);
+    expect(usesInstantDenseTimelineAtlas(48), isTrue);
+  });
+
+  test('dense metadata atlas produces a complete tile and leaves missing hashes transparent', () {
+    final source = Uint8List.fromList([
+      for (var index = 0; index < 16; index++) ...[index * 12, 180 - index * 7, 60 + index * 5, 255],
+    ]);
+    final hash = base64Encode(thumbhash.rgbaToThumbHash(4, 4, source));
+    final atlas = buildDenseThumbhashAtlasPixels([hash, null], 8);
+
+    expect(atlas, hasLength(8 * 16 * 4));
+    expect([
+      for (var y = 0; y < 8; y++)
+        for (var x = 0; x < 8; x++) atlas[(y * 16 + x) * 4 + 3],
+    ], everyElement(255));
+    expect([
+      for (var y = 0; y < 8; y++)
+        for (var x = 8; x < 16; x++) atlas[(y * 16 + x) * 4 + 3],
+    ], everyElement(0));
   });
 
   testWidgets('dense year overview exposes zero-gap metadata-free timeline args', (tester) async {

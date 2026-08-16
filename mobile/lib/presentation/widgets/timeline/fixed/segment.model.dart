@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
+import 'dart:isolate';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:auto_route/auto_route.dart';
@@ -29,6 +32,7 @@ import 'package:immich_mobile/providers/infrastructure/current_album.provider.da
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:thumbhash/thumbhash.dart' as thumbhash;
 
 int denseTimelineAssetChunkSize({
   required int columnCount,
@@ -49,6 +53,46 @@ int denseTimelineAssetChunkSize({
 
 int denseTimelineTargetPixels({required double tileExtent, required double devicePixelRatio}) =>
     math.max(32, (tileExtent * devicePixelRatio).ceil());
+
+bool usesInstantDenseTimelineAtlas(int columnCount) => columnCount >= 36;
+
+Uint8List buildDenseThumbhashAtlasPixels(List<String?> hashes, int targetPixels) {
+  final atlasWidth = hashes.length * targetPixels;
+  final atlas = Uint8List(atlasWidth * targetPixels * 4);
+
+  for (var index = 0; index < hashes.length; index++) {
+    final hash = hashes[index];
+    if (hash == null || hash.isEmpty) {
+      continue;
+    }
+
+    try {
+      final source = thumbhash.thumbHashToRGBA(base64Decode(hash));
+      final scale = math.max(targetPixels / source.width, targetPixels / source.height);
+      final visibleSourceWidth = targetPixels / scale;
+      final visibleSourceHeight = targetPixels / scale;
+      final sourceLeft = (source.width - visibleSourceWidth) / 2;
+      final sourceTop = (source.height - visibleSourceHeight) / 2;
+
+      for (var y = 0; y < targetPixels; y++) {
+        final sourceY = (sourceTop + (y + 0.5) / scale).floor().clamp(0, source.height - 1);
+        for (var x = 0; x < targetPixels; x++) {
+          final sourceX = (sourceLeft + (x + 0.5) / scale).floor().clamp(0, source.width - 1);
+          final sourceOffset = (sourceY * source.width + sourceX) * 4;
+          final destinationOffset = (y * atlasWidth + index * targetPixels + x) * 4;
+          atlas[destinationOffset] = source.rgba[sourceOffset];
+          atlas[destinationOffset + 1] = source.rgba[sourceOffset + 1];
+          atlas[destinationOffset + 2] = source.rgba[sourceOffset + 2];
+          atlas[destinationOffset + 3] = source.rgba[sourceOffset + 3];
+        }
+      }
+    } catch (_) {
+      // A missing or malformed hash is filled later by the normal thumbnail path.
+    }
+  }
+
+  return atlas;
+}
 
 final Expando<_DenseAssetChunkStore> _denseAssetStores = Expando<_DenseAssetChunkStore>();
 
@@ -234,6 +278,7 @@ class _FixedSegmentRow extends ConsumerWidget {
         assets: assets,
         firstAssetIndex: assetIndex,
         tileExtent: tileHeight,
+        columnCount: columnCount,
         onAssetTap: (index, asset) => _openAsset(context, ref, index, asset),
       );
     }
@@ -383,8 +428,10 @@ class _AssetTileWidget extends ConsumerWidget {
 typedef _DenseAssetTap = void Function(int index, BaseAsset asset);
 
 const int _denseThumbnailConcurrency = 32;
+const int _denseMetadataAtlasConcurrency = 4;
 const int _denseAtlasCacheBytes = 48 * 1024 * 1024;
 final _DenseThumbnailQueue _denseThumbnailQueue = _DenseThumbnailQueue();
+final _DenseAsyncQueue _denseMetadataAtlasQueue = _DenseAsyncQueue(_denseMetadataAtlasConcurrency);
 final _DenseRowAtlasCache _denseRowAtlasCache = _DenseRowAtlasCache();
 
 class _DenseLoadCancelled implements Exception {
@@ -406,6 +453,40 @@ class _DenseThumbnailQueue {
       _active++;
       unawaited(
         Future<void>.sync(task).then<void>((_) {}, onError: (_, __) {}).whenComplete(() {
+          _active--;
+          _drain();
+        }),
+      );
+    }
+  }
+}
+
+class _DenseAsyncQueue {
+  final int concurrency;
+  final Queue<Future<void> Function()> _pending = Queue();
+  int _active = 0;
+
+  _DenseAsyncQueue(this.concurrency);
+
+  Future<T> schedule<T>(Future<T> Function() task) {
+    final completer = Completer<T>();
+    _pending.add(() async {
+      try {
+        completer.complete(await task());
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    _drain();
+    return completer.future;
+  }
+
+  void _drain() {
+    while (_active < concurrency && _pending.isNotEmpty) {
+      final task = _pending.removeFirst();
+      _active++;
+      unawaited(
+        Future<void>.sync(task).whenComplete(() {
           _active--;
           _drain();
         }),
@@ -454,6 +535,7 @@ class _DenseAssetRow extends StatefulWidget {
   final List<BaseAsset> assets;
   final int firstAssetIndex;
   final double tileExtent;
+  final int columnCount;
   final _DenseAssetTap onAssetTap;
 
   const _DenseAssetRow({
@@ -461,6 +543,7 @@ class _DenseAssetRow extends StatefulWidget {
     required this.assets,
     required this.firstAssetIndex,
     required this.tileExtent,
+    required this.columnCount,
     required this.onAssetTap,
   });
 
@@ -478,6 +561,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   double? _devicePixelRatio;
   bool _repaintScheduled = false;
   bool _atlasBuilding = false;
+  bool _instantOverview = false;
   int _loadedCount = 0;
   int _generation = 0;
 
@@ -494,7 +578,9 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   @override
   void didUpdateWidget(covariant _DenseAssetRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.tileExtent != widget.tileExtent || !_sameAssets(oldWidget.assets, widget.assets)) {
+    if (oldWidget.tileExtent != widget.tileExtent ||
+        oldWidget.columnCount != widget.columnCount ||
+        !_sameAssets(oldWidget.assets, widget.assets)) {
       _subscribeToImages();
     }
   }
@@ -524,22 +610,87 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _completers = List<Completer<ImageInfo>?>.filled(widget.assets.length, null);
     _loadedCount = 0;
     _atlasBuilding = false;
+    _instantOverview = usesInstantDenseTimelineAtlas(widget.columnCount);
 
-    final atlasKey = Object.hash(targetPixels, Object.hashAll(widget.assets.map((asset) => asset.heroTag)));
+    final atlasKey = Object.hash(
+      _instantOverview ? 'thumbhash' : 'thumbnail',
+      targetPixels,
+      Object.hashAll(widget.assets.map((asset) => asset.heroTag)),
+    );
     final cachedAtlas = _denseRowAtlasCache.get(atlasKey);
     if (cachedAtlas != null) {
       _atlas = cachedAtlas;
       _scheduleRepaint();
-      return;
+    } else if (_instantOverview) {
+      unawaited(_buildThumbhashAtlas(targetPixels, atlasKey, generation));
     }
 
     for (var index = 0; index < widget.assets.length; index++) {
+      if (_instantOverview && _thumbHashFor(widget.assets[index]) != null) {
+        continue;
+      }
       _denseThumbnailQueue.schedule(() => _loadAssetImage(index, targetPixels, atlasKey, generation));
     }
   }
 
+  String? _thumbHashFor(BaseAsset asset) => switch (asset) {
+    RemoteAsset(thumbHash: final hash?) when hash.isNotEmpty => hash,
+    _ => null,
+  };
+
+  Future<void> _buildThumbhashAtlas(int targetPixels, int atlasKey, int generation) async {
+    final hashes = widget.assets.map(_thumbHashFor).toList(growable: false);
+    try {
+      final pixels = await _denseMetadataAtlasQueue.schedule(() {
+        if (!mounted || generation != _generation) {
+          throw const _DenseLoadCancelled();
+        }
+        return Isolate.run(() => buildDenseThumbhashAtlasPixels(hashes, targetPixels));
+      });
+      if (!mounted || generation != _generation) {
+        return;
+      }
+
+      final buffer = await ui.ImmutableBuffer.fromUint8List(pixels);
+      final descriptor = ui.ImageDescriptor.raw(
+        buffer,
+        width: targetPixels * hashes.length,
+        height: targetPixels,
+        rowBytes: targetPixels * hashes.length * 4,
+        pixelFormat: ui.PixelFormat.rgba8888,
+      );
+      buffer.dispose();
+      final codec = await descriptor.instantiateCodec();
+      final frame = await codec.getNextFrame();
+      descriptor.dispose();
+      codec.dispose();
+      final atlas = frame.image;
+      if (!mounted || generation != _generation) {
+        atlas.dispose();
+        return;
+      }
+
+      _denseRowAtlasCache.put(atlasKey, atlas);
+      setState(() {
+        _atlas?.dispose();
+        _atlas = atlas;
+      });
+    } on _DenseLoadCancelled {
+      return;
+    } catch (_) {
+      if (!mounted || generation != _generation) {
+        return;
+      }
+      for (var index = 0; index < hashes.length; index++) {
+        if (hashes[index] != null) {
+          _denseThumbnailQueue.schedule(() => _loadAssetImage(index, targetPixels, atlasKey, generation));
+        }
+      }
+    }
+  }
+
   Future<void> _loadAssetImage(int index, int targetPixels, int atlasKey, int generation) async {
-    if (!mounted || generation != _generation || _atlas != null) {
+    if (!mounted || generation != _generation || (!_instantOverview && _atlas != null)) {
       return;
     }
     final asset = widget.assets[index];
@@ -582,7 +733,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _images[index] = image;
     _loadedCount++;
     _scheduleRepaint();
-    if (_loadedCount == widget.assets.length) {
+    if (!_instantOverview && _loadedCount == widget.assets.length) {
       unawaited(_buildAtlas(targetPixels, atlasKey, generation));
     }
   }
@@ -676,13 +827,14 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       return;
     }
     _denseRowAtlasCache.put(atlasKey, atlas);
-    _atlas?.dispose();
-    _atlas = atlas;
-    for (var index = 0; index < _images.length; index++) {
-      _images[index]?.dispose();
-      _images[index] = null;
-    }
-    _scheduleRepaint();
+    setState(() {
+      _atlas?.dispose();
+      _atlas = atlas;
+      for (var index = 0; index < _images.length; index++) {
+        _images[index]?.dispose();
+        _images[index] = null;
+      }
+    });
   }
 
   void _scheduleRepaint() {
@@ -798,7 +950,6 @@ class _DenseAssetRowPainter extends CustomPainter {
         Rect.fromLTWH(left, 0, itemCount * tileExtent, tileExtent),
         Paint()..filterQuality = FilterQuality.none,
       );
-      return;
     }
     for (var index = 0; index < images.length; index++) {
       final image = images[index]?.image;
