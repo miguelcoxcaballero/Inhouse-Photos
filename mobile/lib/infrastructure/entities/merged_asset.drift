@@ -107,7 +107,11 @@ AND NOT EXISTS (
     INNER JOIN local_album_entity la on laa.album_id = la.id
     WHERE laa.asset_id = lae.id AND la.backup_selection = 2 -- excluded
 )
-ORDER BY timeline_at DESC, created_at DESC
+-- `timeline_at` is a floating wall-clock value used for display buckets. It
+-- deliberately has no offset, so comparing it across time zones can place an
+-- older instant ahead of a newer one. Always sort by the real capture instant;
+-- keep the wall clock only as a deterministic tie-breaker.
+ORDER BY created_at DESC, timeline_at DESC
 LIMIT $limit;
 
 mergedBucket(:group_by AS INTEGER):

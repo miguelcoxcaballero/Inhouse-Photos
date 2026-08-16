@@ -58,7 +58,7 @@ void main() {
     expect(buckets.single.bucketDate, isNotEmpty);
   });
 
-  test('local asset keeps its wall-clock bucket and order after upload', () async {
+  test('local asset keeps its wall-clock bucket and identity after upload', () async {
     const userId = 'timezone-user';
     const localId = 'timezone-local';
     const checksum = 'timezone-checksum';
@@ -131,6 +131,59 @@ void main() {
     expect(remoteAssets.single.localId, localId);
     expect(remoteAssets.single.timelineAt, timelineAt);
     expect(remoteBuckets.single.bucketDate, '2024-01-02');
+  });
+
+  test('mergedAsset orders different time zones by their real capture instant', () async {
+    const userId = 'cross-timezone-user';
+    final olderInstant = DateTime.parse('2024-01-01T10:00:00+02:00');
+    final newerInstant = DateTime.parse('2024-01-01T09:30:00Z');
+
+    // These are floating wall-clock values, as supplied by the server. The
+    // older photo has the numerically later local hour (10:00 vs 09:30), even
+    // though its offset means it was captured 90 minutes earlier.
+    final olderWallClock = DateTime.utc(2024, 1, 1, 10);
+    final newerWallClock = DateTime.utc(2024, 1, 1, 9, 30);
+
+    await db
+        .into(db.userEntity)
+        .insert(UserEntityCompanion.insert(id: userId, email: 'zones@test.dev', name: 'Zones'));
+    await db.batch((batch) {
+      batch.insert(
+        db.remoteAssetEntity,
+        RemoteAssetEntityCompanion.insert(
+          id: 'older-at-10',
+          name: 'older-at-10.jpg',
+          type: AssetType.image,
+          checksum: 'older-at-10-checksum',
+          ownerId: userId,
+          visibility: AssetVisibility.timeline,
+          createdAt: Value(olderInstant),
+          updatedAt: Value(olderInstant),
+          uploadedAt: Value(olderInstant),
+          localDateTime: Value(olderWallClock),
+        ),
+      );
+      batch.insert(
+        db.remoteAssetEntity,
+        RemoteAssetEntityCompanion.insert(
+          id: 'newer-at-09-30',
+          name: 'newer-at-09-30.jpg',
+          type: AssetType.image,
+          checksum: 'newer-at-09-30-checksum',
+          ownerId: userId,
+          visibility: AssetVisibility.timeline,
+          createdAt: Value(newerInstant),
+          updatedAt: Value(newerInstant),
+          uploadedAt: Value(newerInstant),
+          localDateTime: Value(newerWallClock),
+        ),
+      );
+    });
+
+    final assets = await db.mergedAssetDrift.mergedAsset(userIds: [userId], limit: (_) => Limit(20, 0)).get();
+
+    expect(assets.map((asset) => asset.remoteId), ['newer-at-09-30', 'older-at-10']);
+    expect(assets.first.createdAt.isAfter(assets.last.createdAt), isTrue);
   });
 
   test('mergedBucket emits when a local asset is replaced by its remote copy', () async {
