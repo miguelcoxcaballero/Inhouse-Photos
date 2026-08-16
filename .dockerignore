@@ -12,6 +12,8 @@
 **/dist/
 **/coverage/
 **/build/
+!web/build/
+!web/build/**
 
 design/
 docker/

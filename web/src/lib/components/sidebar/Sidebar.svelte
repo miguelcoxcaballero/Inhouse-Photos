@@ -31,11 +31,22 @@
   };
 </script>
 
+{#if isExpanded}
+  <button
+    type="button"
+    class="inhouse-sidebar-scrim hidden max-md:block"
+    aria-label="Close library"
+    onclick={closeSidebar}
+  ></button>
+{/if}
+
 <nav
   id="sidebar"
   aria-label={ariaLabel}
   tabindex="-1"
   class="inhouse-sidebar relative z-1 w-0 immich-scrollbar overflow-x-hidden overflow-y-auto bg-light pt-8 transition-all duration-200 sidebar:w-64"
+  class:inhouse-sidebar-open={sidebarStore.isOpen}
+  class:inhouse-sidebar-closed={!sidebarStore.isOpen}
   class:shadow-2xl={isExpanded}
   class:dark:border-e-immich-dark-gray={isExpanded}
   class:border-r={isExpanded}

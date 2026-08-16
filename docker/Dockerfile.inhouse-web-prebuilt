@@ -1,0 +1,3 @@
+FROM ghcr.io/immich-app/immich-server:v3
+
+COPY web/build /build/www

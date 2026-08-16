@@ -4,13 +4,7 @@
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { sidebarStore } from '$lib/stores/sidebar.svelte';
   import { Icon } from '@immich/ui';
-  import {
-    mdiImageAlbum,
-    mdiImageMultiple,
-    mdiImageMultipleOutline,
-    mdiMagnify,
-    mdiViewGridOutline,
-  } from '@mdi/js';
+  import { mdiImageAlbum, mdiImageMultiple, mdiImageMultipleOutline, mdiMagnify, mdiViewGridOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
   const isPhotos = $derived(page.url.pathname === Route.photos() || page.url.pathname.startsWith('/photos/'));
@@ -18,7 +12,7 @@
   const isAlbums = $derived(page.url.pathname.startsWith(Route.albums()));
 </script>
 
-<nav class="mobile-glass-nav" aria-label={$t('primary')}>
+<nav class="mobile-glass-nav" class:drawer-open={sidebarStore.isOpen} aria-label={$t('primary')}>
   <a class:active={isPhotos} href={Route.photos()} data-sveltekit-preload-data="hover">
     <Icon icon={isPhotos ? mdiImageMultiple : mdiImageMultipleOutline} size="24" />
     <span>{$t('photos')}</span>
@@ -46,26 +40,24 @@
   .mobile-glass-nav {
     position: fixed;
     z-index: 40;
-    right: 0.65rem;
-    bottom: calc(0.55rem + env(safe-area-inset-bottom));
-    left: 0.65rem;
+    right: 0.75rem;
+    bottom: calc(0.35rem + env(safe-area-inset-bottom));
+    left: 0.75rem;
     display: none;
-    min-height: 4.25rem;
+    min-height: 3.75rem;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     align-items: center;
     overflow: hidden;
-    padding: 0.32rem 0.25rem;
-    border: 1px solid color-mix(in srgb, white 42%, transparent);
-    border-radius: 1.65rem;
-    background:
-      linear-gradient(180deg, color-mix(in srgb, white 25%, transparent), transparent 48%),
-      color-mix(in srgb, rgb(var(--immich-bg)) 66%, transparent);
+    padding: 0.25rem;
+    border: 1px solid rgb(255 255 255 / 48%);
+    border-radius: 1.35rem;
+    background: linear-gradient(180deg, rgb(255 255 255 / 22%), transparent 55%), rgb(250 248 245 / 78%);
     box-shadow:
-      0 12px 36px rgb(20 10 5 / 20%),
-      inset 0 1px 0 rgb(255 255 255 / 52%),
+      0 10px 32px rgb(20 10 5 / 16%),
+      inset 0 1px 0 rgb(255 255 255 / 58%),
       inset 0 -1px 0 rgb(255 255 255 / 12%);
-    -webkit-backdrop-filter: saturate(185%) blur(24px);
-    backdrop-filter: saturate(185%) blur(24px);
+    -webkit-backdrop-filter: saturate(165%) blur(30px);
+    backdrop-filter: saturate(165%) blur(30px);
     isolation: isolate;
   }
 
@@ -84,18 +76,18 @@
     position: relative;
     display: flex;
     min-width: 0;
-    min-height: 3.55rem;
+    min-height: 3.2rem;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.15rem;
+    gap: 0.08rem;
     border: 0;
-    border-radius: 1.28rem;
+    border-radius: 1.05rem;
     background: transparent;
     color: color-mix(in srgb, rgb(var(--immich-fg)) 72%, transparent);
     font: inherit;
-    font-size: 0.69rem;
-    font-weight: 520;
+    font-size: 0.64rem;
+    font-weight: 560;
     letter-spacing: -0.01em;
     transition:
       color 180ms ease,
@@ -109,19 +101,33 @@
     color: rgb(var(--immich-dark-fg) / 72%);
   }
 
+  :global(.dark) .mobile-glass-nav {
+    border-color: rgb(255 255 255 / 15%);
+    background: linear-gradient(180deg, rgb(255 255 255 / 9%), transparent 55%), rgb(27 21 17 / 82%);
+    box-shadow:
+      0 12px 36px rgb(0 0 0 / 32%),
+      inset 0 1px 0 rgb(255 255 255 / 16%);
+  }
+
   a:active,
   button:active {
     transform: scale(0.94);
   }
 
   .active {
-    background: color-mix(in srgb, rgb(var(--immich-primary)) 18%, transparent);
+    background: color-mix(in srgb, rgb(var(--immich-primary)) 14%, transparent);
     color: rgb(var(--immich-primary));
   }
 
   @media (max-width: 767px) {
     .mobile-glass-nav {
       display: grid;
+    }
+
+    .mobile-glass-nav.drawer-open {
+      transform: translateY(calc(120% + env(safe-area-inset-bottom)));
+      opacity: 0;
+      pointer-events: none;
     }
   }
 
