@@ -18,6 +18,7 @@ import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/download_status_floating_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/general_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/scrubber.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
@@ -42,7 +43,7 @@ bool shouldAnimateTimelineColumnTransition({required int currentColumns, require
     currentColumns < kTimelineYearOverviewMinColumns && nextColumns < kTimelineYearOverviewMinColumns;
 
 double timelineScrollCacheExtent({required double maxHeight, required bool yearOverview}) =>
-    yearOverview ? maxHeight * 0.35 : maxHeight;
+    yearOverview ? maxHeight * 1.5 : maxHeight;
 
 double timelineScaleFactorForColumnCount(int columnCount) => switch (columnCount) {
   <= 2 => 5.0,
@@ -367,9 +368,10 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
       if (targetSegment != null) {
         final assetIndexInSegment = _restoreAssetIndex! - targetSegment.firstAssetIndex;
         final newColumnCount = ref.read(timelineArgsProvider).columnCount;
-        final rowIndexInSegment = (assetIndexInSegment / newColumnCount).floor();
-        final targetRowIndex = targetSegment.firstIndex + 1 + rowIndexInSegment;
-        final targetOffset = targetSegment.indexToLayoutOffset(targetRowIndex);
+        final rowsPerChild = targetSegment is FixedSegment ? targetSegment.rowsPerChild : 1;
+        final childIndexInSegment = (assetIndexInSegment / (newColumnCount * rowsPerChild)).floor();
+        final targetChildIndex = targetSegment.firstIndex + 1 + childIndexInSegment;
+        final targetOffset = targetSegment.indexToLayoutOffset(targetChildIndex);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             _scrollController.jumpTo(targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent));
@@ -391,9 +393,10 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     if (segment != null) {
       final rowIndex = segment.getMinChildIndexForScrollOffset(currentOffset);
       if (rowIndex > segment.firstIndex) {
-        final rowIndexInSegment = rowIndex - (segment.firstIndex + 1);
+        final childIndexInSegment = rowIndex - (segment.firstIndex + 1);
         final assetsPerRow = ref.read(timelineArgsProvider).columnCount;
-        final assetIndexInSegment = rowIndexInSegment * assetsPerRow;
+        final rowsPerChild = segment is FixedSegment ? segment.rowsPerChild : 1;
+        final assetIndexInSegment = childIndexInSegment * assetsPerRow * rowsPerChild;
         targetAssetIndex = segment.firstAssetIndex + assetIndexInSegment;
       } else {
         targetAssetIndex = segment.firstAssetIndex;

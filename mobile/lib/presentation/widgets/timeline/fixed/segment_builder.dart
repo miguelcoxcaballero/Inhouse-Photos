@@ -64,7 +64,9 @@ class FixedSegmentBuilder extends SegmentBuilder {
 
       final assetCount = bucket.assetCount;
       final numberOfRows = (assetCount / columnCount).ceil();
-      final segmentCount = numberOfRows + 1;
+      final rowsPerChild = denseTimelineRowsPerChild(columnCount);
+      final numberOfChildren = (numberOfRows / rowsPerChild).ceil();
+      final segmentCount = numberOfChildren + 1;
 
       final segmentFirstIndex = firstIndex;
       firstIndex += segmentCount;
@@ -96,6 +98,7 @@ class FixedSegmentBuilder extends SegmentBuilder {
           bucket: bucket,
           tileHeight: tileHeight,
           columnCount: columnCount,
+          rowsPerChild: rowsPerChild,
           headerExtent: headerExtent,
           spacing: spacing,
           header: timelineHeader,

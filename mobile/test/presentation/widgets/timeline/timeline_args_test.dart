@@ -91,22 +91,43 @@ void main() {
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 6, nextColumns: 12), isFalse);
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 12, nextColumns: 18), isFalse);
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 4, nextColumns: 5), isTrue);
-    expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: true), 280);
+    expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: true), 1200);
     expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: false), 800);
   });
 
   test('year overview preloads enough assets for the complete viewport in one shared chunk', () {
     expect(denseTimelineAssetChunkSize(columnCount: 48, viewportHeight: 800, tileExtent: 8.34), 8192);
-    expect(denseTimelineAssetChunkSize(columnCount: 24, viewportHeight: 800, tileExtent: 16.67), 2048);
+    expect(denseTimelineAssetChunkSize(columnCount: 24, viewportHeight: 800, tileExtent: 16.67), 8192);
     expect(denseTimelineAssetChunkSize(columnCount: 12, viewportHeight: 0, tileExtent: 32), 1024);
     expect(denseTimelineTargetPixels(tileExtent: 8.34, devicePixelRatio: 3), 32);
     expect(denseTimelineTargetPixels(tileExtent: 18, devicePixelRatio: 3), 54);
   });
 
   test('extreme year levels use immediate metadata atlases', () {
-    expect(usesInstantDenseTimelineAtlas(24), isFalse);
+    expect(usesInstantDenseTimelineAtlas(12), isTrue);
+    expect(usesInstantDenseTimelineAtlas(24), isTrue);
     expect(usesInstantDenseTimelineAtlas(36), isTrue);
     expect(usesInstantDenseTimelineAtlas(48), isTrue);
+    expect(denseTimelineRowsPerChild(12), 12);
+    expect(denseTimelineRowsPerChild(24), 16);
+    expect(denseTimelineRowsPerChild(36), 24);
+    expect(denseTimelineRowsPerChild(48), 16);
+  });
+
+  test('ultra-dense layout virtualizes many photo rows into each sliver child', () {
+    final segment =
+        FixedSegmentBuilder(
+              buckets: [TimeBucket(date: DateTime(2026), assetCount: 5000)],
+              tileHeight: 8,
+              columnCount: 48,
+              spacing: 0,
+              yearOverview: true,
+            ).generate().single
+            as FixedSegment;
+
+    expect(segment.rowsPerChild, 16);
+    expect(segment.lastIndex - segment.firstIndex, 7);
+    expect(segment.endOffset - segment.gridOffset, 105 * 8);
   });
 
   test('dense metadata atlas produces a complete tile and leaves missing hashes transparent', () {
@@ -125,6 +146,9 @@ void main() {
       for (var y = 0; y < 8; y++)
         for (var x = 8; x < 16; x++) atlas[(y * 16 + x) * 4 + 3],
     ], everyElement(0));
+
+    final twoRowAtlas = buildDenseThumbhashAtlasPixels([hash, hash, hash], 4, columnCount: 2);
+    expect(twoRowAtlas, hasLength(8 * 8 * 4));
   });
 
   testWidgets('dense year overview exposes zero-gap metadata-free timeline args', (tester) async {
