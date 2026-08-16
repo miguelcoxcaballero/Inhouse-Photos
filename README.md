@@ -1,6 +1,6 @@
 # Inhouse Photos
 
-Inhouse Photos is the Inhouse-branded Android client for a private Immich server. This fork is pinned to Immich **3.1.0**, uses the original Immich API and data model, and therefore connects to an existing server without migration or downtime.
+Inhouse Photos is the Inhouse-branded Android and iOS client for a private Immich server. This fork is pinned to Immich **3.1.0**, uses the original Immich API and data model, and therefore connects to an existing server without migration or downtime.
 
 ## Android download
 
@@ -8,13 +8,28 @@ Inhouse Photos is the Inhouse-branded Android client for a private Immich server
 
 [Direct APK download](https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/Inhouse-Photos.apk) is also available. Both contain the same signed ARM64 build for modern Android phones.
 
-Current Android build: **3.1.20 (5079)**. This build includes faster three-at-a-time foreground and Android background uploads, lightweight progress reporting, stable upload-detail card spacing, on-device Storage saver backup quality, clear original/compressed sizes and savings, fast deduplicated timelines, and the mandatory Inhouse update gate.
+Current Android build: **3.1.24 (5083)**. This build includes faster three-at-a-time foreground and Android background uploads, lightweight progress reporting, stable upload-detail card spacing, on-device Storage saver backup quality, clear original/compressed sizes and savings, fast deduplicated timelines, and the mandatory Inhouse update gate.
 
 Storage saver prepares disposable copies before upload: photos are limited to 16 MP and videos to 1080p while the device originals remain unchanged. It applies only to new uploads, keeps the existing three-item upload concurrency, and never recompresses assets already present on the server.
 
 The Android app checks `android-update.json` on launch, whenever it returns to the foreground, and every 15 minutes. A required newer semantic version blocks the app until its signed APK has been downloaded, package-checked, signature-verified, and handed to Android's installer.
 
+## iOS download without a paid Apple membership
+
+[Download the unsigned Inhouse Photos IPA](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.24-inhouse-ios.1/Inhouse-Photos.ipa). It is installed and signed on the phone with a free Apple Account through [SideStore](https://docs.sidestore.io/docs/installation/prerequisites).
+
+After SideStore's one-time computer setup, add this source in SideStore:
+
+```text
+https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/altstore-source.json
+```
+
+SideStore can then install Inhouse Photos and receive later GitHub updates from the same source. With a free Apple Account, Apple limits signing to seven days at a time and three simultaneously installed sideloaded apps (including SideStore). SideStore refreshes the signature periodically; keep LocalDevVPN available for install/update/refresh operations. That local VPN only lets SideStore communicate with iOS installation services and does not route the app's connection to the photo server.
+
+Current iOS build: **3.1.24 (3083)**. It uses the same Flutter interface and server API as Android, plus native iOS Storage saver processing for new photos (up to 16 MP) and videos (up to 1080p). Existing server assets and device originals are never recompressed or modified.
+
 - Android application ID: `com.inhousesoftware.photos`
+- iOS bundle ID: `com.inhousesoftware.photos`
 - Default server: `https://fotos.miguelcoxcaballero.com`
 - Brand palette: Inhouse Copper `#D97736`, Black `#000000`, Cream `#F5F5F0`
 - Upstream: [immich-app/immich](https://github.com/immich-app/immich), tag `v3.1.0`
@@ -30,6 +45,10 @@ dart run easy_localization:generate -S ../i18n
 dart run bin/generate_keys.dart
 flutter build apk --release
 ```
+
+## iOS unsigned build
+
+Run the `Build Inhouse Photos iOS (unsigned)` GitHub Action. It compiles on a macOS runner and publishes a SideStore/AltStore-compatible IPA artifact without using an Apple distribution certificate.
 
 ---
 

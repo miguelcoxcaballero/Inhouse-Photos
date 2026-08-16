@@ -1,0 +1,28 @@
+{
+  "name": "Inhouse Photos",
+  "identifier": "com.inhousesoftware.photos.source",
+  "sourceURL": "https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/altstore-source.json",
+  "subtitle": "Private, self-hosted photo backup",
+  "description": "The Inhouse-branded iOS client for Miguel's existing Immich server.",
+  "iconURL": "https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/1024.png",
+  "website": "https://github.com/miguelcoxcaballero/Inhouse-Photos",
+  "apps": [
+    {
+      "name": "Inhouse Photos",
+      "bundleIdentifier": "com.inhousesoftware.photos",
+      "developerName": "Inhouse Software",
+      "subtitle": "Private photo and video backup",
+      "localizedDescription": "Connects to the existing Inhouse Photos server without migration or downtime. Includes the Inhouse design, three-at-a-time uploads, smooth timeline, upload status, required updates, and optional on-device Storage saver compression for new photos and videos.",
+      "iconURL": "https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/1024.png",
+      "tintColor": "#D97736",
+      "category": "utilities",
+      "version": "3.1.24",
+      "versionDate": "2026-08-16T01:18:50Z",
+      "versionDescription": "First Inhouse Photos iOS release, including the current Android feature set and native iOS Storage saver compression.",
+      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.24-inhouse-ios.1/Inhouse-Photos.ipa",
+      "size": 32570613,
+      "minOSVersion": "15.0"
+    }
+  ],
+  "news": []
+}
