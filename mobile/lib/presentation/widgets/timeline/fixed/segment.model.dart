@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:collection';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:auto_route/auto_route.dart';
@@ -9,6 +11,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/asset_viewer/asset_viewer.page.dart';
 import 'package:immich_mobile/presentation/widgets/images/image_provider.dart';
@@ -25,6 +28,58 @@ import 'package:immich_mobile/providers/infrastructure/current_album.provider.da
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:thumbhash/thumbhash.dart' as thumbhash;
+
+int denseTimelineAssetChunkSize({
+  required int columnCount,
+  required double viewportHeight,
+  required double tileExtent,
+}) {
+  if (tileExtent <= 0 || viewportHeight <= 0) {
+    return kTimelineAssetLoadBatchSize;
+  }
+  final visibleRows = (viewportHeight / tileExtent).ceil();
+  final requestedAssets = (visibleRows + 16) * columnCount;
+  var chunkSize = kTimelineAssetLoadBatchSize;
+  while (chunkSize < requestedAssets && chunkSize < 8192) {
+    chunkSize *= 2;
+  }
+  return chunkSize;
+}
+
+final Expando<_DenseAssetChunkStore> _denseAssetStores = Expando<_DenseAssetChunkStore>();
+
+class _DenseAssetChunkStore {
+  final LinkedHashMap<(int, int), Future<List<BaseAsset>>> _chunks = LinkedHashMap();
+  int _revision = -1;
+
+  Future<List<BaseAsset>> loadRow(
+    TimelineService service, {
+    required int index,
+    required int count,
+    required int chunkSize,
+  }) {
+    if (_revision != service.revision) {
+      _revision = service.revision;
+      _chunks.clear();
+    }
+
+    final chunkStart = (index ~/ chunkSize) * chunkSize;
+    final chunkCount = math.min(chunkSize, service.totalAssets - chunkStart);
+    final key = (chunkStart, chunkCount);
+    var chunk = _chunks.remove(key);
+    chunk ??= service.loadAssets(chunkStart, chunkCount);
+    _chunks[key] = chunk;
+    while (_chunks.length > 2) {
+      _chunks.remove(_chunks.keys.first);
+    }
+
+    return chunk.then((assets) {
+      final localIndex = index - chunkStart;
+      return assets.sublist(localIndex, localIndex + count);
+    });
+  }
+}
 
 class FixedSegment extends Segment {
   final double tileHeight;
@@ -127,6 +182,25 @@ class _FixedSegmentRow extends ConsumerWidget {
 
     if (isScrubbing) {
       return _buildPlaceholder(context);
+    }
+
+    if (denseOverview) {
+      final viewportHeight = ref.read(timelineArgsProvider).maxHeight;
+      final chunkSize = denseTimelineAssetChunkSize(
+        columnCount: columnCount,
+        viewportHeight: viewportHeight,
+        tileExtent: tileHeight,
+      );
+      final store = _denseAssetStores[timelineService] ??= _DenseAssetChunkStore();
+      return FutureBuilder<List<BaseAsset>>(
+        future: store.loadRow(timelineService, index: assetIndex, count: assetCount, chunkSize: chunkSize),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return _buildPlaceholder(context);
+          }
+          return _buildAssetRow(context, ref, snapshot.requireData, timelineService, false);
+        },
+      );
     }
 
     return FutureBuilder<List<BaseAsset>>(
@@ -331,6 +405,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   List<ImageInfo?> _images = const [];
   List<ImageStream?> _streams = const [];
   List<ImageStreamListener?> _listeners = const [];
+  List<Color?> _placeholderColors = const [];
   double? _devicePixelRatio;
   bool _repaintScheduled = false;
   int _generation = 0;
@@ -372,29 +447,69 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _images = List<ImageInfo?>.filled(widget.assets.length, null);
     _streams = List<ImageStream?>.filled(widget.assets.length, null);
     _listeners = List<ImageStreamListener?>.filled(widget.assets.length, null);
+    _placeholderColors = widget.assets.map(_averageColor).toList(growable: false);
 
     for (var index = 0; index < widget.assets.length; index++) {
-      final provider = getThumbnailImageProvider(widget.assets[index], size: Size.square(targetPixels.toDouble()));
-      if (provider == null) {
-        continue;
-      }
-
-      final resizedProvider = ResizeImage.resizeIfNeeded(targetPixels, targetPixels, provider);
-      final stream = resizedProvider.resolve(const ImageConfiguration());
-      late final ImageStreamListener listener;
-      listener = ImageStreamListener((image, _) {
-        if (!mounted || generation != _generation) {
-          image.dispose();
-          return;
-        }
-        _images[index]?.dispose();
-        _images[index] = image;
-        _scheduleRepaint();
-      }, onError: (_, __) {});
-      _streams[index] = stream;
-      _listeners[index] = listener;
-      stream.addListener(listener);
+      unawaited(_subscribeAssetImage(index, targetPixels, generation));
     }
+  }
+
+  Color? _averageColor(BaseAsset asset) {
+    if (asset case RemoteAsset(thumbHash: final hash?) when hash.isNotEmpty) {
+      try {
+        final rgba = thumbhash.thumbHashToAverageRGBA(base64Decode(hash));
+        return Color.fromRGBO((rgba.r * 255).round(), (rgba.g * 255).round(), (rgba.b * 255).round(), 1);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _subscribeAssetImage(int index, int targetPixels, int generation) async {
+    final asset = widget.assets[index];
+    final cachedProvider = getThumbnailImageProvider(asset);
+    if (cachedProvider == null) {
+      return;
+    }
+
+    var reuseCachedImage = false;
+    try {
+      final key = await cachedProvider.obtainKey(const ImageConfiguration());
+      reuseCachedImage = PaintingBinding.instance.imageCache.containsKey(key);
+    } catch (_) {}
+    if (!mounted || generation != _generation) {
+      return;
+    }
+
+    final ImageProvider provider;
+    if (reuseCachedImage) {
+      provider = cachedProvider;
+    } else {
+      final denseProvider = getThumbnailImageProvider(asset, size: Size.square(targetPixels.toDouble()));
+      if (denseProvider == null) {
+        return;
+      }
+      provider = ResizeImage.resizeIfNeeded(targetPixels, targetPixels, denseProvider);
+    }
+
+    final stream = provider.resolve(const ImageConfiguration());
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener((image, _) {
+      if (!mounted || generation != _generation) {
+        image.dispose();
+        return;
+      }
+      stream.removeListener(listener);
+      _streams[index] = null;
+      _listeners[index] = null;
+      _images[index]?.dispose();
+      _images[index] = image;
+      _scheduleRepaint();
+    }, onError: (_, __) {});
+    _streams[index] = stream;
+    _listeners[index] = listener;
+    stream.addListener(listener);
   }
 
   void _scheduleRepaint() {
@@ -425,6 +540,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _images = const [];
     _streams = const [];
     _listeners = const [];
+    _placeholderColors = const [];
   }
 
   void _handleTap(TapUpDetails details, TextDirection textDirection) {
@@ -451,6 +567,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
           willChange: false,
           painter: _DenseAssetRowPainter(
             images: _images,
+            placeholderColors: _placeholderColors,
             tileExtent: widget.tileExtent,
             textDirection: textDirection,
             placeholderColor: Theme.of(context).colorScheme.surfaceContainer,
@@ -471,12 +588,14 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
 
 class _DenseAssetRowPainter extends CustomPainter {
   final List<ImageInfo?> images;
+  final List<Color?> placeholderColors;
   final double tileExtent;
   final TextDirection textDirection;
   final Color placeholderColor;
 
   _DenseAssetRowPainter({
     required this.images,
+    required this.placeholderColors,
     required this.tileExtent,
     required this.textDirection,
     required this.placeholderColor,
@@ -486,6 +605,15 @@ class _DenseAssetRowPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..color = placeholderColor);
+    final placeholderPaint = Paint();
+    for (var index = 0; index < placeholderColors.length; index++) {
+      final color = placeholderColors[index];
+      if (color == null) {
+        continue;
+      }
+      final left = textDirection == TextDirection.rtl ? size.width - ((index + 1) * tileExtent) : index * tileExtent;
+      canvas.drawRect(Rect.fromLTWH(left, 0, tileExtent, tileExtent), placeholderPaint..color = color);
+    }
     for (var index = 0; index < images.length; index++) {
       final image = images[index]?.image;
       if (image == null) {
@@ -505,6 +633,7 @@ class _DenseAssetRowPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DenseAssetRowPainter oldDelegate) =>
       oldDelegate.images != images ||
+      oldDelegate.placeholderColors != placeholderColors ||
       oldDelegate.tileExtent != tileExtent ||
       oldDelegate.textDirection != textDirection ||
       oldDelegate.placeholderColor != placeholderColor;

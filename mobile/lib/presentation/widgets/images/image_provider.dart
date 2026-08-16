@@ -192,7 +192,9 @@ ImageProvider? getThumbnailImageProvider(BaseAsset asset, {Size size = kThumbnai
 
   final assetId = asset is RemoteAsset ? asset.id : (asset as LocalAsset).remoteId;
   final thumbhash = asset is RemoteAsset ? asset.thumbHash ?? "" : "";
-  return assetId != null ? RemoteImageProvider.thumbnail(assetId: assetId, thumbhash: thumbhash, edited: edited) : null;
+  return assetId != null
+      ? RemoteImageProvider.thumbnail(assetId: assetId, thumbhash: thumbhash, edited: edited, size: size)
+      : null;
 }
 
 bool _shouldUseLocalAsset(BaseAsset asset) =>

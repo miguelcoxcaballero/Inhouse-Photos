@@ -8,6 +8,7 @@ import 'package:immich_mobile/domain/models/config/timeline_config.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment_builder.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
@@ -89,6 +90,12 @@ void main() {
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 4, nextColumns: 5), isTrue);
     expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: true), 64);
     expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: false), 800);
+  });
+
+  test('year overview preloads enough assets for the complete viewport in one shared chunk', () {
+    expect(denseTimelineAssetChunkSize(columnCount: 48, viewportHeight: 800, tileExtent: 8.34), 8192);
+    expect(denseTimelineAssetChunkSize(columnCount: 24, viewportHeight: 800, tileExtent: 16.67), 2048);
+    expect(denseTimelineAssetChunkSize(columnCount: 12, viewportHeight: 0, tileExtent: 32), 1024);
   });
 
   testWidgets('dense year overview exposes zero-gap metadata-free timeline args', (tester) async {

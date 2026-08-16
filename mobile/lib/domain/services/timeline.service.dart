@@ -100,6 +100,8 @@ class TimelineService {
 
   int _totalAssets = 0;
   int get totalAssets => _totalAssets;
+  int _revision = 0;
+  int get revision => _revision;
 
   TimelineService(TimelineQuery query)
     : this._(assetSource: query.assetSource, bucketSource: query.bucketSource, origin: query.origin);
@@ -130,6 +132,7 @@ class TimelineService {
 
         // change the state's total assets count only after the buffer is reloaded
         _totalAssets = totalAssets;
+        _revision++;
         EventStream.shared.emit(const TimelineReloadEvent());
       });
     });

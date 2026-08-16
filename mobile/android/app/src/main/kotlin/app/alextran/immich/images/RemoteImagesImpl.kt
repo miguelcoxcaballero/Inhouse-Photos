@@ -5,6 +5,7 @@ import android.graphics.ImageDecoder
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.OperationCanceledException
+import android.util.Size
 import androidx.exifinterface.media.ExifInterface
 import com.inhousesoftware.photos.INITIAL_BUFFER_SIZE
 import com.inhousesoftware.photos.NativeBuffer
@@ -72,13 +73,17 @@ class RemoteImagesImpl(context: Context) : RemoteImageApi {
 
     // Shared, process-lifetime pool: RemoteImagesImpl is re-created per FlutterEngine, so a
     // per-instance pool would leak threads across engine restarts.
-    private val decodeExecutor = Executors.newFixedThreadPool(2)
+    private val decodeExecutor = Executors.newFixedThreadPool(
+      Runtime.getRuntime().availableProcessors().coerceIn(4, 6)
+    )
   }
 
   override fun requestImage(
     url: String,
     requestId: Long,
     preferEncoded: Boolean,
+    targetWidth: Long,
+    targetHeight: Long,
     callback: (Result<Map<String, Long>?>) -> Unit
   ) {
     val signal = CancellationSignal()
@@ -102,7 +107,9 @@ class RemoteImagesImpl(context: Context) : RemoteImageApi {
         if (!preferEncoded && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
           decodeExecutor.execute {
             val res = if (signal.isCanceled) null else try {
-              val bitmap = ImageDecoder.createSource(NativeBuffer.wrap(buffer.pointer, buffer.offset)).decodeBitmap()
+              val bitmap = ImageDecoder.createSource(NativeBuffer.wrap(buffer.pointer, buffer.offset)).decodeBitmap(
+                Size(targetWidth.toInt(), targetHeight.toInt())
+              )
               // The embedded preview a raw decodes to has no orientation, so read the container's.
               val orientation = if (isRawMime(contentType)) {
                 readRawOrientation(NativeBuffer.wrap(buffer.pointer, buffer.offset), buffer.offset)

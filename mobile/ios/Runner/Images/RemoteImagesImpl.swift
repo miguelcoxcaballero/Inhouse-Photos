@@ -34,14 +34,22 @@ class RemoteImageApiImpl: NSObject, RemoteImageApi {
     kCGImageSourceCreateThumbnailFromImageAlways: true
   ] as CFDictionary
 
-  func requestImage(url: String, requestId: Int64, preferEncoded: Bool, completion: @escaping (Result<[String : Int64]?, any Error>) -> Void) {
+  func requestImage(url: String, requestId: Int64, preferEncoded: Bool, targetWidth: Int64, targetHeight: Int64, completion: @escaping (Result<[String : Int64]?, any Error>) -> Void) {
     var urlRequest = URLRequest(url: URL(string: url)!)
     urlRequest.cachePolicy = .returnCacheDataElseLoad
 
     let request = RemoteImageRequest(id: requestId, completion: completion)
 
     let task = URLSessionManager.shared.session.dataTask(with: urlRequest) { data, response, error in
-      Self.handleCompletion(request: request, encoded: preferEncoded, data: data, response: response, error: error)
+      Self.handleCompletion(
+        request: request,
+        encoded: preferEncoded,
+        targetWidth: targetWidth,
+        targetHeight: targetHeight,
+        data: data,
+        response: response,
+        error: error
+      )
     }
 
     request.task = task
@@ -49,7 +57,7 @@ class RemoteImageApiImpl: NSObject, RemoteImageApi {
     task.resume()
   }
 
-  private static func handleCompletion(request: RemoteImageRequest, encoded: Bool, data: Data?, response: URLResponse?, error: Error?) {
+  private static func handleCompletion(request: RemoteImageRequest, encoded: Bool, targetWidth: Int64, targetHeight: Int64, data: Data?, response: URLResponse?, error: Error?) {
     if request.isCancelled {
       return request.completion(ImageProcessing.cancelledResult)
     }
@@ -87,8 +95,21 @@ class RemoteImageApiImpl: NSObject, RemoteImageApi {
         return request.completion(ImageProcessing.cancelledResult)
       }
 
-      guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
-            let cgImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, decodeOptions) else {
+      guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil) else {
+        registry.remove(requestId: request.id)
+        return request.completion(.failure(PigeonError(code: "", message: "Failed to open image for request", details: nil)))
+      }
+
+      var options = decodeOptions as! [CFString: Any]
+      if targetWidth > 0, targetHeight > 0,
+         let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any],
+         let sourceWidth = properties[kCGImagePropertyPixelWidth] as? Double,
+         let sourceHeight = properties[kCGImagePropertyPixelHeight] as? Double {
+        let scale = max(Double(targetWidth) / sourceWidth, Double(targetHeight) / sourceHeight)
+        options[kCGImageSourceThumbnailMaxPixelSize] = Int(ceil(max(sourceWidth * scale, sourceHeight * scale)))
+      }
+
+      guard let cgImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) else {
         registry.remove(requestId: request.id)
         return request.completion(.failure(PigeonError(code: "", message: "Failed to decode image for request", details: nil)))
       }
