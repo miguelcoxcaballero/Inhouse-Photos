@@ -58,7 +58,7 @@ final class BackupMediaProcessorPlugin: ImmichPlugin, FlutterPlugin {
     }
   }
 
-  func detachFromEngine() {
+  override func detachFromEngine() {
     super.detachFromEngine()
     channel?.setMethodCallHandler(nil)
     channel = nil

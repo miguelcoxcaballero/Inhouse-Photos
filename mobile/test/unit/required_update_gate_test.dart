@@ -44,6 +44,20 @@ void main() {
       expect(manifest.required, isTrue);
     });
 
+    test('accepts an iOS update from an approved GitHub release', () {
+      final manifest = InhouseUpdateManifest.fromJson({
+        'version': '3.1.24',
+        'versionCode': 3083,
+        'required': true,
+        'ipaUrl':
+            'https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.24-inhouse-ios.1/Inhouse-Photos.ipa',
+      }, assetKey: 'ipaUrl');
+
+      expect(manifest.version, '3.1.24');
+      expect(manifest.versionCode, 3083);
+      expect(manifest.required, isTrue);
+    });
+
     test('rejects a download hosted outside the approved GitHub hosts', () {
       expect(
         () => InhouseUpdateManifest.fromJson({

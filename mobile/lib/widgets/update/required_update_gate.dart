@@ -7,9 +7,14 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:immich_mobile/widgets/common/immich_logo.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-const _updateManifestUrl =
+const _androidUpdateManifestUrl =
     'https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/android-update.json';
+const _iosUpdateManifestUrl =
+    'https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/ios-update.json';
+const _sideStoreSourceUrl =
+    'https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/altstore-source.json';
 const _updateChannel = MethodChannel('com.inhousesoftware.photos/updates');
 
 double? calculateInhouseDownloadProgress({required int downloadedBytes, required int? totalBytes}) {
@@ -52,7 +57,7 @@ class InhouseUpdateManifest {
   final bool required;
   final Uri apkUrl;
 
-  factory InhouseUpdateManifest.fromJson(Map<String, dynamic> json) {
+  factory InhouseUpdateManifest.fromJson(Map<String, dynamic> json, {String assetKey = 'apkUrl'}) {
     final version = json['version']?.toString() ?? '';
     if (!RegExp(r'^\d+\.\d+\.\d+$').hasMatch(version)) {
       throw const FormatException('Invalid update version');
@@ -63,7 +68,7 @@ class InhouseUpdateManifest {
       throw const FormatException('Invalid update build number');
     }
 
-    final apkUrl = Uri.tryParse(json['apkUrl']?.toString() ?? '');
+    final apkUrl = Uri.tryParse(json[assetKey]?.toString() ?? '');
     const allowedHosts = {
       'github.com',
       'raw.githubusercontent.com',
@@ -145,14 +150,14 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
   }
 
   Future<void> _checkForUpdate() async {
-    if (!Platform.isAndroid || _checking) {
+    if ((!Platform.isAndroid && !Platform.isIOS) || _checking) {
       return;
     }
     _checking = true;
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final manifestUri = Uri.parse(
-        _updateManifestUrl,
+        Platform.isIOS ? _iosUpdateManifestUrl : _androidUpdateManifestUrl,
       ).replace(queryParameters: {'check': DateTime.now().millisecondsSinceEpoch.toString()});
       final response = await http
           .get(manifestUri, headers: const {'Cache-Control': 'no-cache'})
@@ -160,7 +165,10 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw HttpException('Update check failed (${response.statusCode})');
       }
-      final manifest = InhouseUpdateManifest.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+      final manifest = InhouseUpdateManifest.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+        assetKey: Platform.isIOS ? 'ipaUrl' : 'apkUrl',
+      );
       final needsUpdate = manifest.required && compareInhouseVersions(manifest.version, packageInfo.version) > 0;
 
       if (!mounted) {
@@ -185,6 +193,26 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
   Future<void> _installUpdate() async {
     final update = _update;
     if (update == null) {
+      return;
+    }
+
+    if (Platform.isIOS) {
+      final sourceUri = Uri(scheme: 'sidestore', host: 'source', queryParameters: {'url': _sideStoreSourceUrl});
+      var opened = false;
+      try {
+        opened = await launchUrl(sourceUri, mode: LaunchMode.externalApplication);
+      } catch (_) {
+        opened = false;
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _installState = opened ? _InstallState.idle : _InstallState.error;
+        _status = opened
+            ? 'Update Inhouse Photos from its source in SideStore, then reopen the app.'
+            : 'SideStore is not installed yet. Install it first, then try again.';
+      });
       return;
     }
 
@@ -309,7 +337,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                       _InstallState.downloading => 'Downloading…',
                                       _InstallState.permissionRequired => 'Continue installation',
                                       _InstallState.error => 'Try again',
-                                      _ => 'Install update',
+                                      _ => Platform.isIOS ? 'Open SideStore' : 'Install update',
                                     }),
                                   ),
                                 ),
