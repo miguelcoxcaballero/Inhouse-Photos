@@ -33,10 +33,31 @@ import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/selection_sliver_app_bar.dart';
 
 const double kTimelinePinchSensitivity = 1.25;
+const int kTimelineYearOverviewMinColumns = 9;
+
+double timelineScaleFactorForColumnCount(int columnCount) => switch (columnCount) {
+  <= 2 => 5.0,
+  3 => 4.0,
+  4 => 3.0,
+  5 => 2.0,
+  6 => 1.0,
+  9 => 0.72,
+  12 => 0.48,
+  _ => 0.30,
+};
 
 int calculateTimelineColumnCount({required double scaleFactor, required double gestureStartScaleFactor}) {
   final sensitiveScaleFactor =
       gestureStartScaleFactor + ((scaleFactor - gestureStartScaleFactor) * kTimelinePinchSensitivity);
+  if (sensitiveScaleFactor < 0.39) {
+    return 16;
+  }
+  if (sensitiveScaleFactor < 0.60) {
+    return 12;
+  }
+  if (sensitiveScaleFactor < 0.86) {
+    return 9;
+  }
   return 7 - sensitiveScaleFactor.round().clamp(1, 5);
 }
 
@@ -114,6 +135,7 @@ class _TimelineState extends ConsumerState<Timeline> {
                 showStorageIndicator: widget.showStorageIndicator,
                 withStack: widget.withStack,
                 groupBy: widget.groupBy,
+                yearOverview: columnCount >= kTimelineYearOverviewMinColumns && widget.groupBy != GroupAssetsBy.none,
               ),
             ),
             if (widget.readOnly) readonlyModeProvider.overrideWith(() => _AlwaysReadOnlyNotifier()),
@@ -218,7 +240,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     final currentTilesPerRow = ref.read(appConfigProvider.select((config) => config.timeline.tilesPerRow));
     _perRow = currentTilesPerRow;
     _renderedPerRow = currentTilesPerRow;
-    _scaleFactor = 7.0 - _perRow;
+    _scaleFactor = timelineScaleFactorForColumnCount(_perRow);
     _baseScaleFactor = _scaleFactor;
 
     ref.listenManual(multiSelectProvider.select((s) => s.isEnabled), _onMultiSelectionToggled);
@@ -406,9 +428,18 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
             return false;
           });
 
-      if (fallbackSegment != null) {
+      final yearFallbackSegment =
+          fallbackSegment ??
+          segments.firstWhereOrNull((segment) {
+            if (segment.bucket is TimeBucket) {
+              return (segment.bucket as TimeBucket).date.year == date.year;
+            }
+            return false;
+          });
+
+      if (yearFallbackSegment != null) {
         // Scroll to the segment with a small offset to show the header
-        final targetOffset = fallbackSegment.startOffset - 50;
+        final targetOffset = yearFallbackSegment.startOffset - 50;
         timelineState.setScrubbing(true);
         _scrollController
             .animateTo(
@@ -512,6 +543,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   Widget build(BuildContext context) {
     final asyncSegments = ref.watch(timelineSegmentProvider);
     final maxHeight = ref.watch(timelineArgsProvider.select((args) => args.maxHeight));
+    final yearOverview = ref.watch(timelineArgsProvider.select((args) => args.yearOverview));
     final isSelectionMode = ref.watch(multiSelectProvider.select((s) => s.forceEnable));
     final isMultiSelectEnabled = ref.watch(multiSelectProvider.select((s) => s.isEnabled));
     final isReadonlyModeEnabled = ref.watch(readonlyModeProvider);
@@ -589,6 +621,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                   bottomPadding: scrubberBottomPadding,
                   monthSegmentSnappingOffset: widget.topSliverWidgetHeight ?? 0 + appBarExpandedHeight,
                   hasAppBar: widget.appBar != null,
+                  yearOverview: yearOverview,
                   child: grid,
                 );
               } else {
@@ -606,7 +639,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                       };
 
                       scale.onUpdate = (details) {
-                        final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 1.0);
+                        final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 0.25);
                         final newPerRow = calculateTimelineColumnCount(
                           scaleFactor: newScaleFactor,
                           gestureStartScaleFactor: _baseScaleFactor,
@@ -624,7 +657,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                         }
                       };
                       scale.onEnd = (_) {
-                        _scaleFactor = 7.0 - _perRow;
+                        _scaleFactor = timelineScaleFactorForColumnCount(_perRow);
                         _baseScaleFactor = _scaleFactor;
                         if (_didChangeColumnCount) {
                           widget.onInteractiveColumnCountSettled(_perRow);

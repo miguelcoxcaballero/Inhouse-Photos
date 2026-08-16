@@ -7,6 +7,7 @@ import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/config/timeline_config.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment_builder.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_layout_transition.dart';
@@ -63,6 +64,35 @@ void main() {
     expect(calculateTimelineColumnCount(scaleFactor: 2.61, gestureStartScaleFactor: 3), 4);
     expect(calculateTimelineColumnCount(scaleFactor: 2.59, gestureStartScaleFactor: 3), 5);
     expect(kTimelinePinchSensitivity, 1.25);
+  });
+
+  test('pinching farther out enters dense year overview levels', () {
+    expect(calculateTimelineColumnCount(scaleFactor: 0.80, gestureStartScaleFactor: 1), 9);
+    expect(calculateTimelineColumnCount(scaleFactor: 0.55, gestureStartScaleFactor: 1), 12);
+    expect(calculateTimelineColumnCount(scaleFactor: 0.30, gestureStartScaleFactor: 1), 16);
+    expect(timelineScaleFactorForColumnCount(9), 0.72);
+    expect(timelineScaleFactorForColumnCount(12), 0.48);
+    expect(timelineScaleFactorForColumnCount(16), 0.30);
+  });
+
+  test('year overview merges adjacent date buckets and preserves asset offsets', () {
+    final builder = FixedSegmentBuilder(
+      buckets: [
+        TimeBucket(date: DateTime(2026, 8, 14), assetCount: 2),
+        TimeBucket(date: DateTime(2026, 7, 3), assetCount: 3),
+        TimeBucket(date: DateTime(2025, 12, 1), assetCount: 1),
+      ],
+      tileHeight: 24,
+      columnCount: 12,
+      yearOverview: true,
+    );
+
+    final segments = builder.generate();
+    expect(segments, hasLength(2));
+    expect(segments.first.header, HeaderType.year);
+    expect(segments.first.bucket, TimeBucket(date: DateTime(2026), assetCount: 5));
+    expect(segments.last.firstAssetIndex, 5);
+    expect(segments.last.bucket, TimeBucket(date: DateTime(2025), assetCount: 1));
   });
 
   test('asset transition moves and resizes a tile into its new grid rectangle', () {

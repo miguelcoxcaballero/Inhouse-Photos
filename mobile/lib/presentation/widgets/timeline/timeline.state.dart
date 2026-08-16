@@ -16,6 +16,7 @@ class TimelineArgs {
   final bool showStorageIndicator;
   final bool withStack;
   final GroupAssetsBy? groupBy;
+  final bool yearOverview;
 
   const TimelineArgs({
     required this.maxWidth,
@@ -25,6 +26,7 @@ class TimelineArgs {
     this.showStorageIndicator = false,
     this.withStack = false,
     this.groupBy,
+    this.yearOverview = false,
   });
 
   @override
@@ -35,7 +37,8 @@ class TimelineArgs {
         columnCount == other.columnCount &&
         showStorageIndicator == other.showStorageIndicator &&
         withStack == other.withStack &&
-        groupBy == other.groupBy;
+        groupBy == other.groupBy &&
+        yearOverview == other.yearOverview;
   }
 
   @override
@@ -46,7 +49,8 @@ class TimelineArgs {
       columnCount.hashCode ^
       showStorageIndicator.hashCode ^
       withStack.hashCode ^
-      groupBy.hashCode;
+      groupBy.hashCode ^
+      yearOverview.hashCode;
 }
 
 class TimelineState {
@@ -94,8 +98,10 @@ final timelineBucketProvider = StreamProvider.autoDispose<List<Bucket>>(
 // It should be used only after the timeline service and timeline args provider are overridden.
 final timelineSegmentProvider = Provider.autoDispose<AsyncValue<List<Segment>>>((ref) {
   // maxHeight is left out on purpose, a height-only change must not relayout the segments
-  final (maxWidth, columnCount, spacing, groupByArg) = ref.watch(
-    timelineArgsProvider.select((args) => (args.maxWidth, args.columnCount, args.spacing, args.groupBy)),
+  final (maxWidth, columnCount, spacing, groupByArg, yearOverview) = ref.watch(
+    timelineArgsProvider.select(
+      (args) => (args.maxWidth, args.columnCount, args.spacing, args.groupBy, args.yearOverview),
+    ),
   );
   final availableTileWidth = maxWidth - (spacing * (columnCount - 1));
   final tileExtent = math.max(0, availableTileWidth) / columnCount;
@@ -108,6 +114,7 @@ final timelineSegmentProvider = Provider.autoDispose<AsyncValue<List<Segment>>>(
       columnCount: columnCount,
       spacing: spacing,
       groupBy: groupBy!,
+      yearOverview: yearOverview,
     ).generate();
   });
 }, dependencies: [timelineBucketProvider, timelineArgsProvider]);

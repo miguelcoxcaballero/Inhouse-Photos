@@ -44,7 +44,10 @@ class _NativeVideoViewerState extends ConsumerState<NativeVideoViewer> with Widg
   NativeVideoPlayerController? _controller;
   late final Future<VideoSource?> _videoSource;
   Timer? _loadTimer;
+  Timer? _firstFrameFallbackTimer;
   bool _isVideoReady = false;
+  bool _hasPresentedFirstFrame = false;
+  bool _firstFrameRevealPending = false;
   bool _shouldPlayOnForeground = true;
 
   VideoPlayerNotifier get _notifier => ref.read(videoPlayerProvider(widget.asset.heroTag).notifier);
@@ -66,6 +69,7 @@ class _NativeVideoViewerState extends ConsumerState<NativeVideoViewer> with Widg
 
     if (!widget.isCurrent) {
       _loadTimer?.cancel();
+      _firstFrameFallbackTimer?.cancel();
       _notifier.pause();
       return;
     }
@@ -78,6 +82,7 @@ class _NativeVideoViewerState extends ConsumerState<NativeVideoViewer> with Widg
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _loadTimer?.cancel();
+    _firstFrameFallbackTimer?.cancel();
     _removeListeners();
     super.dispose();
   }
@@ -241,6 +246,9 @@ class _NativeVideoViewerState extends ConsumerState<NativeVideoViewer> with Widg
       return;
     }
     _notifier.onNativePositionChanged();
+    if ((_controller?.playbackInfo?.position ?? 0) > 0) {
+      _revealFirstFrame();
+    }
   }
 
   void _onPlaybackStatusChanged() {
@@ -248,6 +256,40 @@ class _NativeVideoViewerState extends ConsumerState<NativeVideoViewer> with Widg
       return;
     }
     _notifier.onNativeStatusChanged();
+    if (_controller?.playbackInfo?.status == PlaybackStatus.playing) {
+      _scheduleFirstFrameFallback();
+    }
+  }
+
+  void _scheduleFirstFrameFallback() {
+    if (_hasPresentedFirstFrame || _firstFrameRevealPending || !widget.isCurrent) {
+      return;
+    }
+
+    // The native player reports `playing` before its platform surface has
+    // necessarily composited the first decoded frame. Keep the poster in place
+    // for a short grace period so that startup never exposes that blank surface.
+    _firstFrameFallbackTimer?.cancel();
+    _firstFrameFallbackTimer = Timer(const Duration(milliseconds: 240), _revealFirstFrame);
+  }
+
+  void _revealFirstFrame() {
+    if (_hasPresentedFirstFrame || _firstFrameRevealPending || !mounted || !widget.isCurrent) {
+      return;
+    }
+
+    _firstFrameFallbackTimer?.cancel();
+    _firstFrameRevealPending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.isCurrent) {
+        _firstFrameRevealPending = false;
+        return;
+      }
+      setState(() {
+        _hasPresentedFirstFrame = true;
+        _firstFrameRevealPending = false;
+      });
+    });
   }
 
   void _removeListeners() {
@@ -300,16 +342,26 @@ class _NativeVideoViewerState extends ConsumerState<NativeVideoViewer> with Widg
   Widget build(BuildContext context) {
     final isCasting = ref.watch(castProvider.select((c) => c.isCasting));
     final status = ref.watch(videoPlayerProvider(widget.asset.heroTag).select((v) => v.status));
+    final showPoster = !_hasPresentedFirstFrame || isCasting;
 
     return IgnorePointer(
       child: Stack(
         children: [
-          if (!_isVideoReady || widget.asset.isMotionPhoto || isCasting) Center(child: widget.image),
           if (!isCasting) ...[
             Visibility.maintain(
               visible: _isVideoReady,
               child: NativeVideoPlayerView(onViewReady: _initController),
             ),
+          ],
+          Positioned.fill(
+            child: AnimatedOpacity(
+              opacity: showPoster ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              child: Center(child: widget.image),
+            ),
+          ),
+          if (!isCasting)
             Center(
               child: AnimatedOpacity(
                 opacity: status == VideoPlaybackStatus.buffering ? 1.0 : 0.0,
@@ -317,7 +369,6 @@ class _NativeVideoViewerState extends ConsumerState<NativeVideoViewer> with Widg
                 child: const CircularProgressIndicator(),
               ),
             ),
-          ],
         ],
       ),
     );

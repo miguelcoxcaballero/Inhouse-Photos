@@ -6,6 +6,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/segment_builder.dart
 class FixedSegmentBuilder extends SegmentBuilder {
   final double tileHeight;
   final int columnCount;
+  final bool yearOverview;
 
   const FixedSegmentBuilder({
     required super.buckets,
@@ -13,7 +14,42 @@ class FixedSegmentBuilder extends SegmentBuilder {
     required this.columnCount,
     super.spacing,
     super.groupBy,
+    this.yearOverview = false,
   });
+
+  List<Bucket> _layoutBuckets() {
+    if (!yearOverview) {
+      return buckets;
+    }
+
+    final result = <Bucket>[];
+    DateTime? activeYear;
+    var activeCount = 0;
+
+    void flushYear() {
+      if (activeYear != null) {
+        result.add(TimeBucket(date: activeYear!, assetCount: activeCount));
+      }
+      activeYear = null;
+      activeCount = 0;
+    }
+
+    for (final bucket in buckets) {
+      if (bucket is! TimeBucket) {
+        flushYear();
+        result.add(bucket);
+        continue;
+      }
+
+      if (activeYear?.year != bucket.date.year) {
+        flushYear();
+        activeYear = DateTime(bucket.date.year);
+      }
+      activeCount += bucket.assetCount;
+    }
+    flushYear();
+    return result;
+  }
 
   List<Segment> generate() {
     final segments = <Segment>[];
@@ -22,8 +58,9 @@ class FixedSegmentBuilder extends SegmentBuilder {
     int assetIndex = 0;
     DateTime? previousDate;
 
-    for (int i = 0; i < buckets.length; i++) {
-      final bucket = buckets[i];
+    final layoutBuckets = _layoutBuckets();
+    for (int i = 0; i < layoutBuckets.length; i++) {
+      final bucket = layoutBuckets[i];
 
       final assetCount = bucket.assetCount;
       final numberOfRows = (assetCount / columnCount).ceil();
@@ -33,12 +70,16 @@ class FixedSegmentBuilder extends SegmentBuilder {
       firstIndex += segmentCount;
       final segmentLastIndex = firstIndex - 1;
 
-      final timelineHeader = switch (groupBy) {
-        GroupAssetsBy.month => HeaderType.month,
-        GroupAssetsBy.day || GroupAssetsBy.auto =>
-          bucket is TimeBucket && bucket.date.month != previousDate?.month ? HeaderType.monthAndDay : HeaderType.day,
-        GroupAssetsBy.none => HeaderType.none,
-      };
+      final timelineHeader = yearOverview
+          ? HeaderType.year
+          : switch (groupBy) {
+              GroupAssetsBy.month => HeaderType.month,
+              GroupAssetsBy.day || GroupAssetsBy.auto =>
+                bucket is TimeBucket && bucket.date.month != previousDate?.month
+                    ? HeaderType.monthAndDay
+                    : HeaderType.day,
+              GroupAssetsBy.none => HeaderType.none,
+            };
       final headerExtent = SegmentBuilder.headerExtent(timelineHeader);
 
       final segmentStartOffset = startOffset;
