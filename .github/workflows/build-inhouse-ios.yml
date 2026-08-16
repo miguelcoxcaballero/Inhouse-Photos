@@ -1,0 +1,60 @@
+name: Build Inhouse Photos iOS (unsigned)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inhouse-ios-unsigned-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    name: Build unsigned IPA for SideStore
+    runs-on: macos-26
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+
+      - name: Set up Mise and Flutter
+        uses: immich-app/devtools/actions/use-mise@3bca63ca3c15020293b36b51737a3ee2c773340b # use-mise-action-v3.1.0
+        with:
+          github_token: ${{ github.token }}
+          working_directory: ./mobile
+
+      - name: Install dependencies
+        run: mise //mobile:install:ci
+
+      - name: Generate translations
+        run: mise //mobile:codegen:translation
+
+      - name: Generate platform APIs
+        run: mise //mobile:codegen:pigeon
+
+      - name: Build iOS app without signing
+        working-directory: ./mobile
+        run: flutter build ios --release --no-codesign
+
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="$(find mobile/build/ios/iphoneos -maxdepth 1 -name '*.app' -type d | head -n 1)"
+          test -n "$app_path"
+          mkdir -p mobile/build/ios/unsigned/Payload
+          ditto "$app_path" mobile/build/ios/unsigned/Payload/"$(basename "$app_path")"
+          cd mobile/build/ios/unsigned
+          zip -qry ../Inhouse-Photos.ipa Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Inhouse-Photos-iOS-unsigned
+          path: mobile/build/ios/Inhouse-Photos.ipa
+          if-no-files-found: error
+          retention-days: 30

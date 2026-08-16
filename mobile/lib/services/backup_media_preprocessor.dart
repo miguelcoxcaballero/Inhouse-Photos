@@ -38,7 +38,8 @@ class BackupMediaPreprocessor {
     final isVideo = isVideoOverride ?? asset.isVideo;
     final sourceSize = await source.length().catchError((_) => 0);
 
-    if (quality != BackupQuality.storageSaver || !Platform.isAndroid || (!asset.isImage && !isVideo)) {
+    final supportsStorageSaver = Platform.isAndroid || Platform.isIOS;
+    if (quality != BackupQuality.storageSaver || !supportsStorageSaver || (!asset.isImage && !isVideo)) {
       onProgress?.call(1, sourceSize, sourceSize);
       return original;
     }
