@@ -7,6 +7,7 @@ import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/config/timeline_config.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment_builder.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
@@ -67,12 +68,58 @@ void main() {
   });
 
   test('pinching farther out enters dense year overview levels', () {
-    expect(calculateTimelineColumnCount(scaleFactor: 0.80, gestureStartScaleFactor: 1), 9);
-    expect(calculateTimelineColumnCount(scaleFactor: 0.55, gestureStartScaleFactor: 1), 12);
-    expect(calculateTimelineColumnCount(scaleFactor: 0.30, gestureStartScaleFactor: 1), 16);
-    expect(timelineScaleFactorForColumnCount(9), 0.72);
-    expect(timelineScaleFactorForColumnCount(12), 0.48);
-    expect(timelineScaleFactorForColumnCount(16), 0.30);
+    expect(calculateTimelineColumnCount(scaleFactor: 0.80, gestureStartScaleFactor: 1), 12);
+    expect(calculateTimelineColumnCount(scaleFactor: 0.55, gestureStartScaleFactor: 1), 18);
+    expect(calculateTimelineColumnCount(scaleFactor: 0.30, gestureStartScaleFactor: 1), 24);
+    expect(timelineScaleFactorForColumnCount(12), 0.72);
+    expect(timelineScaleFactorForColumnCount(18), 0.48);
+    expect(timelineScaleFactorForColumnCount(24), 0.30);
+  });
+
+  test('year overview removes gutters and expensive per-tile transitions', () {
+    expect(isTimelineYearOverview(columnCount: 12), isTrue);
+    expect(isTimelineYearOverview(columnCount: 24), isTrue);
+    expect(isTimelineYearOverview(columnCount: 24, groupBy: GroupAssetsBy.none), isFalse);
+    expect(shouldAnimateTimelineColumnTransition(currentColumns: 6, nextColumns: 12), isFalse);
+    expect(shouldAnimateTimelineColumnTransition(currentColumns: 12, nextColumns: 18), isFalse);
+    expect(shouldAnimateTimelineColumnTransition(currentColumns: 4, nextColumns: 5), isTrue);
+    expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: true), 200);
+    expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: false), 800);
+  });
+
+  testWidgets('dense year overview exposes zero-gap metadata-free timeline args', (tester) async {
+    TimelineArgs? probed;
+    final probe = Consumer(
+      builder: (_, ref, __) {
+        probed = ref.watch(timelineArgsProvider);
+        return const SizedBox.shrink();
+      },
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          timelineServiceProvider.overrideWithValue(_FrozenBucketService()),
+          appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 18))),
+        ],
+        child: MaterialApp(
+          home: Timeline(withScrubber: false, readOnly: true, showStorageIndicator: true, loadingWidget: probe),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(probed?.yearOverview, isTrue);
+    expect(probed?.spacing, 0);
+    expect(probed?.showStorageIndicator, isFalse);
+  });
+
+  testWidgets('dense thumbnails can share a row repaint layer', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: SizedBox.square(dimension: 24, child: Thumbnail(animate: false, repaintBoundary: false))),
+    );
+
+    expect(tester.renderObject(find.byType(Thumbnail)).isRepaintBoundary, isFalse);
   });
 
   test('year overview merges adjacent date buckets and preserves asset offsets', () {

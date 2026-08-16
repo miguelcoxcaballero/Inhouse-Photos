@@ -33,7 +33,16 @@ import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/selection_sliver_app_bar.dart';
 
 const double kTimelinePinchSensitivity = 1.25;
-const int kTimelineYearOverviewMinColumns = 9;
+const int kTimelineYearOverviewMinColumns = 12;
+
+bool isTimelineYearOverview({required int columnCount, GroupAssetsBy? groupBy}) =>
+    columnCount >= kTimelineYearOverviewMinColumns && groupBy != GroupAssetsBy.none;
+
+bool shouldAnimateTimelineColumnTransition({required int currentColumns, required int nextColumns}) =>
+    currentColumns < kTimelineYearOverviewMinColumns && nextColumns < kTimelineYearOverviewMinColumns;
+
+double timelineScrollCacheExtent({required double maxHeight, required bool yearOverview}) =>
+    yearOverview ? maxHeight * 0.25 : maxHeight;
 
 double timelineScaleFactorForColumnCount(int columnCount) => switch (columnCount) {
   <= 2 => 5.0,
@@ -41,8 +50,9 @@ double timelineScaleFactorForColumnCount(int columnCount) => switch (columnCount
   4 => 3.0,
   5 => 2.0,
   6 => 1.0,
-  9 => 0.72,
-  12 => 0.48,
+  12 => 0.72,
+  18 => 0.48,
+  24 => 0.30,
   _ => 0.30,
 };
 
@@ -50,13 +60,13 @@ int calculateTimelineColumnCount({required double scaleFactor, required double g
   final sensitiveScaleFactor =
       gestureStartScaleFactor + ((scaleFactor - gestureStartScaleFactor) * kTimelinePinchSensitivity);
   if (sensitiveScaleFactor < 0.39) {
-    return 16;
+    return 24;
   }
   if (sensitiveScaleFactor < 0.60) {
-    return 12;
+    return 18;
   }
   if (sensitiveScaleFactor < 0.86) {
-    return 9;
+    return 12;
   }
   return 7 - sensitiveScaleFactor.round().clamp(1, 5);
 }
@@ -121,6 +131,7 @@ class _TimelineState extends ConsumerState<Timeline> {
   Widget build(BuildContext context) {
     final savedColumnCount = ref.watch(appConfigProvider.select((config) => config.timeline.tilesPerRow));
     final columnCount = _interactiveColumnCount ?? savedColumnCount;
+    final yearOverview = isTimelineYearOverview(columnCount: columnCount, groupBy: widget.groupBy);
     return LayoutBuilder(
       builder: (_, constraints) {
         return ProviderScope(
@@ -131,11 +142,12 @@ class _TimelineState extends ConsumerState<Timeline> {
               TimelineArgs(
                 maxWidth: constraints.maxWidth,
                 maxHeight: constraints.maxHeight,
+                spacing: yearOverview ? 0 : kTimelineSpacing,
                 columnCount: columnCount,
-                showStorageIndicator: widget.showStorageIndicator,
+                showStorageIndicator: !yearOverview && widget.showStorageIndicator,
                 withStack: widget.withStack,
                 groupBy: widget.groupBy,
-                yearOverview: columnCount >= kTimelineYearOverviewMinColumns && widget.groupBy != GroupAssetsBy.none,
+                yearOverview: yearOverview,
               ),
             ),
             if (widget.readOnly) readonlyModeProvider.overrideWith(() => _AlwaysReadOnlyNotifier()),
@@ -586,7 +598,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                 // One viewport is enough to keep the next rows ready without
                 // decoding and compositing several screens of thumbnails while
                 // the user is actively scrolling.
-                scrollCacheExtent: .pixels(maxHeight),
+                scrollCacheExtent: .pixels(timelineScrollCacheExtent(maxHeight: maxHeight, yearOverview: yearOverview)),
                 slivers: [
                   if (isSelectionMode) const SelectionSliverAppBar() else if (widget.appBar != null) widget.appBar!,
                   if (widget.topSliverWidget != null) widget.topSliverWidget!,
@@ -649,7 +661,14 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                         if (newPerRow != _perRow) {
                           _didChangeColumnCount = true;
                           final targetAssetIndex = _getCurrentAssetIndex(segments);
-                          _prepareLayoutTransition();
+                          if (shouldAnimateTimelineColumnTransition(currentColumns: _perRow, nextColumns: newPerRow)) {
+                            _prepareLayoutTransition();
+                          } else {
+                            _layoutTransitionController
+                              ..stop()
+                              ..value = 1;
+                            _previousTileRects = const {};
+                          }
                           _perRow = newPerRow;
                           _restoreAssetIndex = targetAssetIndex;
 

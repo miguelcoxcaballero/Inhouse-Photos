@@ -6,10 +6,12 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/asset_viewer/asset_viewer.page.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail_tile.widget.dart';
+import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/row.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/header.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
@@ -84,6 +86,7 @@ class FixedSegment extends Segment {
       tileHeight: tileHeight,
       spacing: spacing,
       columnCount: columnCount,
+      denseOverview: header == HeaderType.year,
     );
   }
 }
@@ -94,6 +97,7 @@ class _FixedSegmentRow extends ConsumerWidget {
   final double tileHeight;
   final double spacing;
   final int columnCount;
+  final bool denseOverview;
 
   const _FixedSegmentRow({
     required this.assetIndex,
@@ -101,6 +105,7 @@ class _FixedSegmentRow extends ConsumerWidget {
     required this.tileHeight,
     required this.spacing,
     required this.columnCount,
+    required this.denseOverview,
   });
 
   @override
@@ -143,18 +148,21 @@ class _FixedSegmentRow extends ConsumerWidget {
     TimelineService timelineService,
     bool isDynamicLayout,
   ) {
-    final children = [
-      for (int i = 0; i < assets.length; i++)
-        TimelineAssetIndexWrapper(
-          assetIndex: assetIndex + i,
-          segmentIndex: 0, // For simplicity, using 0 for now
-          child: _AssetTileWidget(
-            key: ValueKey(Object.hash(assets[i].heroTag, assetIndex + i, timelineService.hashCode)),
-            asset: assets[i],
-            assetIndex: assetIndex + i,
-          ),
-        ),
-    ];
+    Widget buildTile(int index) {
+      final tile = _AssetTileWidget(
+        key: ValueKey(Object.hash(assets[index].heroTag, assetIndex + index, timelineService.hashCode)),
+        asset: assets[index],
+        assetIndex: assetIndex + index,
+        tileHeight: tileHeight,
+        denseOverview: denseOverview,
+      );
+      if (denseOverview) {
+        return tile;
+      }
+      return TimelineAssetIndexWrapper(assetIndex: assetIndex + index, segmentIndex: 0, child: tile);
+    }
+
+    final children = [for (int i = 0; i < assets.length; i++) buildTile(i)];
 
     final widths = List.filled(assets.length, tileHeight);
 
@@ -198,8 +206,16 @@ class _FixedSegmentRow extends ConsumerWidget {
 class _AssetTileWidget extends ConsumerWidget {
   final BaseAsset asset;
   final int assetIndex;
+  final double tileHeight;
+  final bool denseOverview;
 
-  const _AssetTileWidget({super.key, required this.asset, required this.assetIndex});
+  const _AssetTileWidget({
+    super.key,
+    required this.asset,
+    required this.assetIndex,
+    required this.tileHeight,
+    required this.denseOverview,
+  });
 
   void _handleOnTap(BuildContext ctx, WidgetRef ref, int assetIndex, BaseAsset asset, int? heroOffset) {
     final multiSelectState = ref.read(multiSelectProvider);
@@ -243,6 +259,21 @@ class _AssetTileWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final heroOffset = TabsRouterScope.of(context)?.controller.activeIndex ?? 0;
+
+    if (denseOverview) {
+      final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+      final thumbnailExtent = math.max(32.0, tileHeight * pixelRatio);
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _handleOnTap(context, ref, assetIndex, asset, heroOffset),
+        child: Thumbnail.fromAsset(
+          asset: asset,
+          size: Size.square(thumbnailExtent),
+          animate: false,
+          repaintBoundary: false,
+        ),
+      );
+    }
 
     final lockSelection = _getLockSelectionStatus(ref);
     final showStorageIndicator = ref.watch(timelineArgsProvider.select((args) => args.showStorageIndicator));

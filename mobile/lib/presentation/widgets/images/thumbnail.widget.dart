@@ -18,14 +18,25 @@ class Thumbnail extends StatefulWidget {
   final ImageProvider? imageProvider;
   final ImageProvider? thumbhashProvider;
   final BoxFit fit;
+  final bool animate;
+  final bool repaintBoundary;
 
-  const Thumbnail({this.imageProvider, this.fit = BoxFit.cover, this.thumbhashProvider, super.key});
+  const Thumbnail({
+    this.imageProvider,
+    this.fit = BoxFit.cover,
+    this.thumbhashProvider,
+    this.animate = true,
+    this.repaintBoundary = true,
+    super.key,
+  });
 
   Thumbnail.remote({
     required String remoteId,
     required String thumbhash,
     this.fit = BoxFit.cover,
     Size size = kThumbnailResolution,
+    this.animate = true,
+    this.repaintBoundary = true,
     super.key,
   }) : imageProvider = RemoteImageProvider.thumbnail(assetId: remoteId, thumbhash: thumbhash),
        thumbhashProvider = null;
@@ -36,6 +47,8 @@ class Thumbnail extends StatefulWidget {
 
     /// The logical UI size of the thumbnail. This is only used to determine the ideal image resolution and does not affect the widget size.
     Size size = kThumbnailResolution,
+    this.animate = true,
+    this.repaintBoundary = true,
     super.key,
   }) : thumbhashProvider = switch (asset) {
          RemoteAsset() when asset.thumbHash != null && asset.localId == null => ThumbHashProvider(
@@ -127,7 +140,7 @@ class _ThumbnailState extends State<Thumbnail> with SingleTickerProviderStateMix
           return;
         }
 
-        if ((synchronousCall && _providerImage == null) || !_isVisible()) {
+        if (!widget.animate || (synchronousCall && _providerImage == null) || !_isVisible()) {
           _fadeController.value = 1.0;
         } else if (_fadeController.isAnimating) {
           _fadeController.forward();
@@ -232,6 +245,7 @@ class _ThumbnailState extends State<Thumbnail> with SingleTickerProviderStateMix
           fadeValue: _fadeAnimation.value,
           fit: widget.fit,
           placeholderGradient: gradient,
+          repaintBoundary: widget.repaintBoundary,
         );
       },
     );
@@ -254,6 +268,7 @@ class _ThumbnailLeaf extends LeafRenderObjectWidget {
   final double fadeValue;
   final BoxFit fit;
   final Gradient placeholderGradient;
+  final bool repaintBoundary;
 
   const _ThumbnailLeaf({
     required this.image,
@@ -261,6 +276,7 @@ class _ThumbnailLeaf extends LeafRenderObjectWidget {
     required this.fadeValue,
     required this.fit,
     required this.placeholderGradient,
+    required this.repaintBoundary,
   });
 
   @override
@@ -271,6 +287,7 @@ class _ThumbnailLeaf extends LeafRenderObjectWidget {
       fadeValue: fadeValue,
       fit: fit,
       placeholderGradient: placeholderGradient,
+      repaintBoundary: repaintBoundary,
     );
   }
 
@@ -281,7 +298,8 @@ class _ThumbnailLeaf extends LeafRenderObjectWidget {
       ..previousImage = previousImage
       ..fadeValue = fadeValue
       ..fit = fit
-      ..placeholderGradient = placeholderGradient;
+      ..placeholderGradient = placeholderGradient
+      ..repaintBoundary = repaintBoundary;
   }
 }
 
@@ -291,9 +309,10 @@ class _ThumbnailRenderBox extends RenderBox {
   double _fadeValue;
   BoxFit _fit;
   Gradient _placeholderGradient;
+  bool _repaintBoundary;
 
   @override
-  bool isRepaintBoundary = true;
+  bool get isRepaintBoundary => _repaintBoundary;
 
   _ThumbnailRenderBox({
     required this._image,
@@ -301,6 +320,7 @@ class _ThumbnailRenderBox extends RenderBox {
     required this._fadeValue,
     required this._fit,
     required this._placeholderGradient,
+    required this._repaintBoundary,
   });
 
   @override
@@ -371,6 +391,13 @@ class _ThumbnailRenderBox extends RenderBox {
     if (_placeholderGradient != value) {
       _placeholderGradient = value;
       markNeedsPaint();
+    }
+  }
+
+  set repaintBoundary(bool value) {
+    if (_repaintBoundary != value) {
+      _repaintBoundary = value;
+      markNeedsCompositingBitsUpdate();
     }
   }
 }
