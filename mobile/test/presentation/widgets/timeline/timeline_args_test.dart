@@ -69,21 +69,25 @@ void main() {
 
   test('pinching farther out enters dense year overview levels', () {
     expect(calculateTimelineColumnCount(scaleFactor: 0.80, gestureStartScaleFactor: 1), 12);
-    expect(calculateTimelineColumnCount(scaleFactor: 0.55, gestureStartScaleFactor: 1), 18);
-    expect(calculateTimelineColumnCount(scaleFactor: 0.30, gestureStartScaleFactor: 1), 24);
-    expect(timelineScaleFactorForColumnCount(12), 0.72);
-    expect(timelineScaleFactorForColumnCount(18), 0.48);
-    expect(timelineScaleFactorForColumnCount(24), 0.30);
+    expect(calculateTimelineColumnCount(scaleFactor: 0.70, gestureStartScaleFactor: 1), 18);
+    expect(calculateTimelineColumnCount(scaleFactor: 0.55, gestureStartScaleFactor: 1), 24);
+    expect(calculateTimelineColumnCount(scaleFactor: 0.48, gestureStartScaleFactor: 1), 36);
+    expect(calculateTimelineColumnCount(scaleFactor: 0.40, gestureStartScaleFactor: 1), 48);
+    expect(timelineScaleFactorForColumnCount(12), 0.74);
+    expect(timelineScaleFactorForColumnCount(18), 0.62);
+    expect(timelineScaleFactorForColumnCount(24), 0.48);
+    expect(timelineScaleFactorForColumnCount(36), 0.34);
+    expect(timelineScaleFactorForColumnCount(48), 0.22);
   });
 
   test('year overview removes gutters and expensive per-tile transitions', () {
     expect(isTimelineYearOverview(columnCount: 12), isTrue);
-    expect(isTimelineYearOverview(columnCount: 24), isTrue);
+    expect(isTimelineYearOverview(columnCount: 48), isTrue);
     expect(isTimelineYearOverview(columnCount: 24, groupBy: GroupAssetsBy.none), isFalse);
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 6, nextColumns: 12), isFalse);
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 12, nextColumns: 18), isFalse);
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 4, nextColumns: 5), isTrue);
-    expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: true), 200);
+    expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: true), 64);
     expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: false), 800);
   });
 

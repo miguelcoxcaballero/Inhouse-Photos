@@ -42,7 +42,7 @@ bool shouldAnimateTimelineColumnTransition({required int currentColumns, require
     currentColumns < kTimelineYearOverviewMinColumns && nextColumns < kTimelineYearOverviewMinColumns;
 
 double timelineScrollCacheExtent({required double maxHeight, required bool yearOverview}) =>
-    yearOverview ? maxHeight * 0.25 : maxHeight;
+    yearOverview ? maxHeight * 0.08 : maxHeight;
 
 double timelineScaleFactorForColumnCount(int columnCount) => switch (columnCount) {
   <= 2 => 5.0,
@@ -50,22 +50,30 @@ double timelineScaleFactorForColumnCount(int columnCount) => switch (columnCount
   4 => 3.0,
   5 => 2.0,
   6 => 1.0,
-  12 => 0.72,
-  18 => 0.48,
-  24 => 0.30,
-  _ => 0.30,
+  12 => 0.74,
+  18 => 0.62,
+  24 => 0.48,
+  36 => 0.34,
+  48 => 0.22,
+  _ => 0.22,
 };
 
 int calculateTimelineColumnCount({required double scaleFactor, required double gestureStartScaleFactor}) {
   final sensitiveScaleFactor =
       gestureStartScaleFactor + ((scaleFactor - gestureStartScaleFactor) * kTimelinePinchSensitivity);
-  if (sensitiveScaleFactor < 0.39) {
+  if (sensitiveScaleFactor < 0.27) {
+    return 48;
+  }
+  if (sensitiveScaleFactor < 0.40) {
+    return 36;
+  }
+  if (sensitiveScaleFactor < 0.56) {
     return 24;
   }
-  if (sensitiveScaleFactor < 0.60) {
+  if (sensitiveScaleFactor < 0.68) {
     return 18;
   }
-  if (sensitiveScaleFactor < 0.86) {
+  if (sensitiveScaleFactor < 0.88) {
     return 12;
   }
   return 7 - sensitiveScaleFactor.round().clamp(1, 5);
@@ -651,7 +659,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                       };
 
                       scale.onUpdate = (details) {
-                        final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 0.25);
+                        final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 0.15);
                         final newPerRow = calculateTimelineColumnCount(
                           scaleFactor: newScaleFactor,
                           gestureStartScaleFactor: _baseScaleFactor,
