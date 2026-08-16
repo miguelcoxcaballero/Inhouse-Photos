@@ -88,7 +88,7 @@ void main() {
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 6, nextColumns: 12), isFalse);
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 12, nextColumns: 18), isFalse);
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 4, nextColumns: 5), isTrue);
-    expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: true), 64);
+    expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: true), 280);
     expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: false), 800);
   });
 
@@ -96,6 +96,8 @@ void main() {
     expect(denseTimelineAssetChunkSize(columnCount: 48, viewportHeight: 800, tileExtent: 8.34), 8192);
     expect(denseTimelineAssetChunkSize(columnCount: 24, viewportHeight: 800, tileExtent: 16.67), 2048);
     expect(denseTimelineAssetChunkSize(columnCount: 12, viewportHeight: 0, tileExtent: 32), 1024);
+    expect(denseTimelineTargetPixels(tileExtent: 8.34, devicePixelRatio: 3), 32);
+    expect(denseTimelineTargetPixels(tileExtent: 18, devicePixelRatio: 3), 54);
   });
 
   testWidgets('dense year overview exposes zero-gap metadata-free timeline args', (tester) async {

@@ -42,7 +42,7 @@ bool shouldAnimateTimelineColumnTransition({required int currentColumns, require
     currentColumns < kTimelineYearOverviewMinColumns && nextColumns < kTimelineYearOverviewMinColumns;
 
 double timelineScrollCacheExtent({required double maxHeight, required bool yearOverview}) =>
-    yearOverview ? maxHeight * 0.08 : maxHeight;
+    yearOverview ? maxHeight * 0.35 : maxHeight;
 
 double timelineScaleFactorForColumnCount(int columnCount) => switch (columnCount) {
   <= 2 => 5.0,
