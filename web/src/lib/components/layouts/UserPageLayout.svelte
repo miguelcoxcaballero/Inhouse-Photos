@@ -5,6 +5,7 @@
 <script lang="ts">
   import { useActions, type ActionArray } from '$lib/actions/use-actions';
   import NavigationBar from '$lib/components/shared-components/navigation-bar/NavigationBar.svelte';
+  import MobileGlassNavigation from '$lib/components/shared-components/navigation-bar/MobileGlassNavigation.svelte';
   import UserSidebar from '$lib/components/shared-components/side-bar/UserSidebar.svelte';
   import type { HeaderButtonActionItem } from '$lib/types';
   import { openFileUploadDialog } from '$lib/utils/file-uploader';
@@ -65,7 +66,7 @@
   {/if}
 
   <main class="relative">
-    <div class="{scrollbarClass} absolute {hasTitleClass} w-full overflow-y-auto p-2" use:useActions={use}>
+    <div class="inhouse-page-scroll {scrollbarClass} absolute {hasTitleClass} w-full overflow-y-auto p-2" use:useActions={use}>
       {@render children?.()}
     </div>
 
@@ -106,3 +107,7 @@
     {/if}
   </main>
 </div>
+
+{#if !hideNavbar}
+  <MobileGlassNavigation />
+{/if}

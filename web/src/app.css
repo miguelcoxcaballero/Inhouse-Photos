@@ -19,7 +19,7 @@
 }
 
 @theme {
-  --font-sans: 'GoogleSans', sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'GoogleSans', 'Segoe UI', sans-serif;
   --font-mono: 'GoogleSansCode', monospace;
 
   --spacing-18: 4.5rem;
@@ -67,15 +67,28 @@
 @layer base {
   :root {
     /* light */
-    --immich-primary: 66 80 175;
-    --immich-bg: 255 255 255;
-    --immich-fg: 0 0 0;
+    --immich-primary: 217 119 54;
+    --immich-bg: 250 248 245;
+    --immich-fg: 35 25 19;
 
     /* dark */
-    --immich-dark-primary: 172 203 250;
-    --immich-dark-bg: 10 10 10;
-    --immich-dark-fg: 229 231 235;
-    --immich-dark-gray: 33 33 33;
+    --immich-dark-primary: 236 143 82;
+    --immich-dark-bg: 18 12 8;
+    --immich-dark-fg: 244 236 230;
+    --immich-dark-gray: 39 29 23;
+
+    /* Inhouse copper scale used by the shared Immich UI component library. */
+    --immich-ui-primary-50: #fff8f2;
+    --immich-ui-primary-100: #ffead9;
+    --immich-ui-primary-200: #ffd0ad;
+    --immich-ui-primary-300: #f9ad78;
+    --immich-ui-primary-400: #ed8e4f;
+    --immich-ui-primary-500: #d97736;
+    --immich-ui-primary-600: #bd5d25;
+    --immich-ui-primary-700: #98451f;
+    --immich-ui-primary-800: #79391f;
+    --immich-ui-primary-900: #62311d;
+    --immich-ui-primary-950: #35170c;
   }
 
   button:not(:disabled),
@@ -107,7 +120,7 @@
 
     /* Used by layouts to ensure proper spacing between navbar and content */
     --navbar-height: calc(4.5rem + 4px);
-    --navbar-height-md: calc(4.5rem + 4px - 14px);
+    --navbar-height-md: calc(4.1rem + env(safe-area-inset-top));
   }
 
   :root.dark {
@@ -147,6 +160,58 @@
   body {
     margin: 0;
     color: var(--immich-ui-dark);
+    background: rgb(var(--immich-bg));
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .dark body {
+    background: rgb(var(--immich-dark-bg));
+  }
+
+  @media (max-width: 767px) {
+    button,
+    a {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .inhouse-page-scroll {
+      padding-bottom: calc(5.8rem + env(safe-area-inset-bottom)) !important;
+      scroll-padding-bottom: calc(5.8rem + env(safe-area-inset-bottom));
+    }
+
+    .inhouse-sidebar {
+      position: fixed !important;
+      z-index: 50 !important;
+      top: max(0.5rem, env(safe-area-inset-top));
+      bottom: calc(0.5rem + env(safe-area-inset-bottom));
+      left: 0.5rem;
+      height: auto;
+      max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 1rem);
+      padding-top: 1rem !important;
+      border: 1px solid rgb(255 255 255 / 34%) !important;
+      border-radius: 1.75rem;
+      background: color-mix(in srgb, rgb(var(--immich-bg)) 78%, transparent) !important;
+      box-shadow: 0 24px 70px rgb(24 12 5 / 28%);
+      -webkit-backdrop-filter: saturate(180%) blur(28px);
+      backdrop-filter: saturate(180%) blur(28px);
+    }
+
+    .dark .inhouse-sidebar {
+      background: color-mix(in srgb, rgb(var(--immich-dark-bg)) 76%, transparent) !important;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) and (max-width: 767px) {
+    .inhouse-sidebar {
+      background: rgb(var(--immich-bg)) !important;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    .dark .inhouse-sidebar {
+      background: rgb(var(--immich-dark-bg)) !important;
+    }
   }
 
   body.asset-viewer-open {

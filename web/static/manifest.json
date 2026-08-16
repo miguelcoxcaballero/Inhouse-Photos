@@ -1,8 +1,9 @@
 {
-  "background_color": "#ffffff",
-  "description": "Self-hosted photo and video backup solution directly from your mobile phone.",
+  "background_color": "#120c08",
+  "description": "Your private Inhouse photo and video library.",
   "dir": "auto",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "icons": [
     {
       "purpose": "any",
@@ -24,8 +25,8 @@
     }
   ],
   "lang": "en",
-  "name": "Immich",
-  "short_name": "Immich",
+  "name": "Inhouse Photos",
+  "short_name": "Photos",
   "shortcuts": [
     {
       "name": "Photos",
@@ -36,9 +37,10 @@
       "url": "/albums"
     },
     {
-      "name": "Map",
-      "url": "/map"
+      "name": "Search",
+      "url": "/search"
     }
   ],
-  "start_url": "/"
+  "start_url": "/photos",
+  "theme_color": "#120c08"
 }

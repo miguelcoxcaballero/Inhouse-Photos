@@ -7,16 +7,16 @@
   import { clickOutside } from '$lib/actions/click-outside';
   import NotificationPanel from '$lib/components/shared-components/navigation-bar/NotificationPanel.svelte';
   import SearchBar from '$lib/components/shared-components/search-bar/SearchBar.svelte';
+  import InhouseBrand from '$lib/components/shared-components/InhouseBrand.svelte';
   import SkipLink from '$lib/elements/SkipLink.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { Route } from '$lib/route';
   import { getGlobalActions } from '$lib/services/app.service';
-  import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
   import { notificationManager } from '$lib/stores/notification-manager.svelte';
   import { sidebarStore } from '$lib/stores/sidebar.svelte';
-  import { ActionButton, Button, IconButton, Logo } from '@immich/ui';
-  import { mdiBellBadge, mdiBellOutline, mdiMagnify, mdiMenu, mdiTrayArrowUp } from '@mdi/js';
+  import { ActionButton, Button, IconButton } from '@immich/ui';
+  import { mdiBellBadge, mdiBellOutline, mdiMenu, mdiTrayArrowUp } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import ThemeButton from '../ThemeButton.svelte';
@@ -49,14 +49,14 @@
 
 <svelte:window bind:innerWidth />
 
-<nav id="dashboard-navbar" class="h-(--navbar-height) w-dvw text-sm max-md:h-(--navbar-height-md)">
+<nav id="dashboard-navbar" class="inhouse-topbar h-(--navbar-height) w-dvw text-sm max-md:h-(--navbar-height-md)">
   <SkipLink text={$t('skip_to_content')} />
   <div
     class="grid h-full grid-cols-[--spacing(32)_auto] items-center py-2 sidebar:grid-cols-[--spacing(64)_auto] {noBorder
       ? ''
       : 'border-b'}"
   >
-    <div class="mx-4 flex flex-row items-center gap-1">
+    <div class="mx-4 flex flex-row items-center gap-1 max-md:mx-3">
       <IconButton
         id={menuButtonId}
         shape="round"
@@ -74,10 +74,10 @@
             event.stopPropagation();
           }
         }}
-        class="sidebar:hidden"
+        class="sidebar:hidden max-md:hidden"
       />
-      <a data-sveltekit-preload-data="hover" href={Route.photos()}>
-        <Logo variant={mediaQueryManager.isFullSidebar ? 'inline' : 'icon'} class="max-md:h-12" />
+      <a data-sveltekit-preload-data="hover" href={Route.photos()} aria-label="Inhouse Photos">
+        <InhouseBrand />
       </a>
     </div>
     <div class="flex justify-between gap-4 pe-6 lg:gap-8">
@@ -88,20 +88,6 @@
       </div>
 
       <section class="flex w-full place-items-center justify-end gap-1 sm:w-auto md:gap-2">
-        {#if featureFlagsManager.value.search}
-          <IconButton
-            color="secondary"
-            shape="round"
-            variant="ghost"
-            size="medium"
-            icon={mdiMagnify}
-            href={Route.search()}
-            id="search-button"
-            class="sm:hidden"
-            aria-label={$t('go_to_search')}
-          />
-        {/if}
-
         {#if !page.url.pathname.includes('/admin') && onUploadClick}
           <Button
             leadingIcon={mdiTrayArrowUp}
@@ -125,9 +111,9 @@
           />
         {/if}
 
-        <ThemeButton />
+        <div class="max-md:hidden"><ThemeButton /></div>
 
-        <div
+        <div class="max-md:hidden"
           use:clickOutside={{
             onOutclick: () => (shouldShowNotificationPanel = false),
             onEscape: () => (shouldShowNotificationPanel = false),
@@ -158,7 +144,7 @@
           {/if}
         </div>
 
-        <ActionButton action={Cast} />
+        <div class="max-md:hidden"><ActionButton action={Cast} /></div>
 
         <div
           use:clickOutside={{
@@ -185,3 +171,24 @@
     </div>
   </div>
 </nav>
+
+<style>
+  :global(.inhouse-topbar) {
+    position: relative;
+    z-index: 30;
+    background: color-mix(in srgb, rgb(var(--immich-bg)) 86%, transparent);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+  }
+
+  :global(.dark .inhouse-topbar) {
+    background: color-mix(in srgb, rgb(var(--immich-dark-bg)) 84%, transparent);
+  }
+
+  @media (max-width: 767px) {
+    :global(.inhouse-topbar > div) {
+      grid-template-columns: minmax(0, 1fr) auto;
+      padding-top: env(safe-area-inset-top);
+    }
+  }
+</style>

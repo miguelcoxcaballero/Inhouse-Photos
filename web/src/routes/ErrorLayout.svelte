@@ -1,5 +1,6 @@
 <script lang="ts">
   import { copyToClipboard } from '$lib/utils';
+  import InhouseBrand from '$lib/components/shared-components/InhouseBrand.svelte';
   import {
     Card,
     CardBody,
@@ -9,7 +10,6 @@
     Icon,
     IconButton,
     Link,
-    Logo,
     Text,
     VStack,
   } from '@immich/ui';
@@ -35,7 +35,7 @@
   <section>
     <div class="flex place-items-center border-b px-6 py-4 dark:border-b-immich-dark-gray">
       <Link href="/photos">
-        <Logo variant="inline" />
+        <InhouseBrand />
       </Link>
     </div>
   </section>

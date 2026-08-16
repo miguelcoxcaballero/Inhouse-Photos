@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Card, CardBody, CardHeader, Heading, immichLogo, Logo, VStack } from '@immich/ui';
+  import InhouseBrand from '$lib/components/shared-components/InhouseBrand.svelte';
+  import { Card, CardBody, CardHeader, Heading, VStack } from '@immich/ui';
   import type { Snippet } from 'svelte';
   interface Props {
     title?: string;
@@ -11,25 +12,16 @@
   let { title, children, withHeader = true, withBackdrop = true }: Props = $props();
 </script>
 
-<section class="relative isolate flex min-h-dvh min-w-dvw items-center justify-center">
+<section class="inhouse-auth relative isolate flex min-h-dvh min-w-dvw items-center justify-center">
   {#if withBackdrop}
-    <div class="absolute -z-10 flex size-full place-content-center place-items-center">
-      <img
-        src={immichLogo}
-        class="mx-auto mb-2 h-full max-w-(--breakpoint-md) overflow-hidden antialiased"
-        alt="Immich logo"
-      />
-      <div
-        class="absolute inset-s-0 top-0 h-[99%] w-full bg-transparent backdrop-blur-[200px] dark:bg-immich-dark-bg/20"
-      ></div>
-    </div>
+    <div class="inhouse-auth-backdrop absolute -z-10 size-full" aria-hidden="true"></div>
   {/if}
 
-  <Card color="secondary" class="m-2 w-full max-w-xl border">
+  <Card color="secondary" class="inhouse-auth-card m-4 w-full max-w-xl border">
     {#if withHeader}
       <CardHeader class="mt-6">
         <VStack>
-          <Logo variant="icon" size="giant" />
+          <InhouseBrand class="auth-brand" />
           <Heading size="large" class="font-semibold" color="primary" tag="h1">{title}</Heading>
         </VStack>
       </CardHeader>
@@ -40,3 +32,62 @@
     </CardBody>
   </Card>
 </section>
+
+<style>
+  .inhouse-auth {
+    padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+      max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  }
+
+  .inhouse-auth-backdrop {
+    background:
+      radial-gradient(circle at 18% 12%, rgb(217 119 54 / 24%), transparent 32rem),
+      radial-gradient(circle at 88% 86%, rgb(217 119 54 / 12%), transparent 28rem),
+      rgb(var(--immich-bg));
+  }
+
+  :global(.dark) .inhouse-auth-backdrop {
+    background:
+      radial-gradient(circle at 18% 12%, rgb(217 119 54 / 22%), transparent 32rem),
+      radial-gradient(circle at 88% 86%, rgb(217 119 54 / 10%), transparent 28rem),
+      rgb(var(--immich-dark-bg));
+  }
+
+  :global(.inhouse-auth-card) {
+    overflow: hidden;
+    border-color: rgb(255 255 255 / 30%) !important;
+    border-radius: 2rem !important;
+    background: color-mix(in srgb, rgb(var(--immich-bg)) 69%, transparent) !important;
+    box-shadow: 0 24px 80px rgb(33 17 8 / 18%), inset 0 1px 0 rgb(255 255 255 / 45%);
+    -webkit-backdrop-filter: saturate(180%) blur(30px);
+    backdrop-filter: saturate(180%) blur(30px);
+  }
+
+  :global(.dark .inhouse-auth-card) {
+    background: color-mix(in srgb, rgb(var(--immich-dark-bg)) 67%, transparent) !important;
+  }
+
+  :global(.auth-brand) {
+    font-size: clamp(1.8rem, 7vw, 2.6rem);
+  }
+
+  :global(.auth-brand img) {
+    width: clamp(3.25rem, 15vw, 5rem);
+    height: clamp(3.25rem, 15vw, 5rem);
+  }
+
+  :global(.inhouse-auth-card input) {
+    background: color-mix(in srgb, rgb(var(--immich-dark-fg)) 7%, transparent) !important;
+  }
+
+  :global(.inhouse-auth-card div:has(> input)) {
+    background: color-mix(in srgb, rgb(var(--immich-dark-fg)) 7%, transparent) !important;
+    border-color: rgb(255 255 255 / 12%) !important;
+  }
+
+  :global(.inhouse-auth-card button[type='submit']) {
+    background: rgb(var(--immich-primary)) !important;
+    color: white !important;
+    box-shadow: 0 9px 24px rgb(217 119 54 / 24%);
+  }
+</style>

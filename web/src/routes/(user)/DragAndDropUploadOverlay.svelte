@@ -1,11 +1,11 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import InhouseBrand from '$lib/components/shared-components/InhouseBrand.svelte';
   import { shouldIgnoreEvent } from '$lib/actions/shortcut';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { dragAndDropFilesStore } from '$lib/stores/drag-and-drop-files.store';
   import { fileUploadHandler } from '$lib/utils/file-uploader';
   import { isAlbumsRoute, isLockedFolderRoute } from '$lib/utils/navigation';
-  import { Logo } from '@immich/ui';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
 
@@ -185,7 +185,7 @@
     transition:fade={{ duration: 250 }}
     ondragover={onDragOver}
   >
-    <Logo variant="icon" size="giant" class="m-16 animate-bounce" />
+    <InhouseBrand class="m-16" />
     <div class="text-2xl">{$t('drop_files_to_upload')}</div>
   </div>
 {/if}
