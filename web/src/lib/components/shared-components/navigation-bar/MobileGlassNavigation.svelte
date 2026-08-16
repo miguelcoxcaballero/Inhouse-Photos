@@ -3,8 +3,16 @@
   import { Route } from '$lib/route';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { sidebarStore } from '$lib/stores/sidebar.svelte';
+  import { openFileUploadDialog } from '$lib/utils/file-uploader';
   import { Icon } from '@immich/ui';
-  import { mdiImageAlbum, mdiImageMultiple, mdiImageMultipleOutline, mdiMagnify, mdiViewGridOutline } from '@mdi/js';
+  import {
+    mdiCloudUploadOutline,
+    mdiImageAlbum,
+    mdiImageMultiple,
+    mdiImageMultipleOutline,
+    mdiMagnify,
+    mdiViewGridOutline,
+  } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
   const isPhotos = $derived(page.url.pathname === Route.photos() || page.url.pathname.startsWith('/photos/'));
@@ -24,6 +32,16 @@
       <span>{$t('search')}</span>
     </a>
   {/if}
+
+  <button
+    type="button"
+    class="backup-action"
+    aria-label="Backup local photos and videos"
+    onclick={() => void openFileUploadDialog({ mediaOnly: true })}
+  >
+    <span class="backup-icon"><Icon icon={mdiCloudUploadOutline} size="21" /></span>
+    <span>{$t('backup')}</span>
+  </button>
 
   <a class:active={isAlbums} href={Route.albums()} data-sveltekit-preload-data="hover">
     <Icon icon={mdiImageAlbum} size="24" />
@@ -45,7 +63,8 @@
     left: 0.75rem;
     display: none;
     min-height: 3.75rem;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     align-items: center;
     overflow: hidden;
     padding: 0.25rem;
@@ -117,6 +136,22 @@
   .active {
     background: color-mix(in srgb, rgb(var(--immich-primary)) 14%, transparent);
     color: rgb(var(--immich-primary));
+  }
+
+  .backup-action {
+    color: rgb(var(--immich-primary));
+  }
+
+  .backup-icon {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    margin-top: -0.2rem;
+    border-radius: 0.72rem;
+    background: rgb(var(--immich-primary));
+    color: white;
+    box-shadow: 0 5px 14px rgb(var(--immich-primary) / 28%);
   }
 
   @media (max-width: 767px) {

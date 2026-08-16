@@ -41,10 +41,10 @@ export const addDummyItems = () => {
 
 // addDummyItems();
 
-export const uploadExecutionQueue = new ExecutorQueue({ concurrency: 2 });
+export const uploadExecutionQueue = new ExecutorQueue({ concurrency: 3 });
 
 type FilePickerParam = { multiple?: boolean; extensions?: string[] };
-type FileUploadParam = { multiple?: boolean; albumId?: string };
+type FileUploadParam = { multiple?: boolean; albumId?: string; mediaOnly?: boolean };
 
 export const openFilePicker = async (options: FilePickerParam = {}) => {
   const { multiple = true, extensions } = options;
@@ -90,11 +90,11 @@ export const openFilePicker = async (options: FilePickerParam = {}) => {
 };
 
 export const openFileUploadDialog = async (options: FileUploadParam = {}) => {
-  const { albumId, multiple = true } = options;
+  const { albumId, multiple = true, mediaOnly = false } = options;
   const extensions = uploadManager.getExtensions();
   const files = await openFilePicker({
     multiple,
-    extensions,
+    extensions: mediaOnly ? ['image/*', 'video/*'] : extensions,
   });
 
   return fileUploadHandler({ files, albumId });

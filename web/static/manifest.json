@@ -8,25 +8,27 @@
     {
       "purpose": "any",
       "sizes": "192x192",
-      "src": "manifest-icon-192.maskable.png",
+      "src": "/inhouse-pwa-192.png",
       "type": "image/png"
     },
     {
       "purpose": "any",
       "sizes": "512x512",
-      "src": "manifest-icon-512.maskable.png",
+      "src": "/inhouse-pwa-512.png",
       "type": "image/png"
     },
     {
       "purpose": "maskable",
       "sizes": "512x512",
-      "src": "manifest-icon-512.maskable.png",
+      "src": "/inhouse-pwa-maskable-512.png",
       "type": "image/png"
     }
   ],
+  "id": "/photos",
   "lang": "en",
   "name": "Inhouse Photos",
-  "short_name": "Photos",
+  "scope": "/",
+  "short_name": "Inhouse",
   "shortcuts": [
     {
       "name": "Photos",

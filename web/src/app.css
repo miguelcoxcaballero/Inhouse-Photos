@@ -134,6 +134,10 @@
   html {
     height: 100%;
     width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   html::-webkit-scrollbar {
@@ -159,6 +163,9 @@
 
   body {
     margin: 0;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
     color: var(--immich-ui-dark);
     background: rgb(var(--immich-bg));
     overscroll-behavior-y: none;
@@ -170,14 +177,34 @@
   }
 
   @media (max-width: 767px) {
+    html {
+      scrollbar-width: none;
+    }
+
+    html::-webkit-scrollbar,
+    .inhouse-page-scroll::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+
     button,
     a {
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea,
+    select {
+      font-size: 16px !important;
     }
 
     .inhouse-page-scroll {
       padding-bottom: calc(5rem + env(safe-area-inset-bottom)) !important;
       scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
     }
 
     .inhouse-page-titlebar {

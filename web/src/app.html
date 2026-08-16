@@ -9,8 +9,12 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
-    <link rel="icon" type="image/svg+xml" href="/inhouse-photos-mark.svg" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Inhouse Photos" />
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/inhouse-photos-mark.svg?v=4" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/inhouse-pwa-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/inhouse-pwa-180.png" />
     <link rel="preload" as="font" type="font/ttf" href="%app.font%" crossorigin="anonymous" />
     <link rel="preload" as="font" type="font/ttf" href="%app.monofont%" crossorigin="anonymous" />
 
@@ -47,7 +51,9 @@
       }
 
       @keyframes reveal-stencil {
-        to { opacity: 1; }
+        to {
+          opacity: 1;
+        }
       }
 
       #stencil {
@@ -68,7 +74,9 @@
       }
 
       @media (prefers-reduced-motion: reduce) {
-        #stencil { animation-duration: 0ms; }
+        #stencil {
+          animation-duration: 0ms;
+        }
       }
     </style>
     <link rel="stylesheet" href="/custom.css" />

@@ -236,7 +236,7 @@
 
 <svelte:head>
   <title>{page.data.meta?.title || 'Photos'} · Inhouse Photos</title>
-  <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
+  <link rel="manifest" href="/manifest.json?v=4" crossorigin="use-credentials" />
   <meta name="theme-color" content="#faf8f5" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#120c08" media="(prefers-color-scheme: dark)" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
