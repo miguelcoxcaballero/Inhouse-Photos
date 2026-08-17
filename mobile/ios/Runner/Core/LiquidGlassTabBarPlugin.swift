@@ -21,7 +21,7 @@ private final class LiquidGlassTabBarFactory: NSObject, FlutterPlatformViewFacto
     super.init()
   }
 
-  func createArgsCodec() -> (any FlutterMessageCodec & NSObjectProtocol)? {
+  func createArgsCodec() -> any FlutterMessageCodec & NSObjectProtocol {
     FlutterStandardMessageCodec.sharedInstance()
   }
 
