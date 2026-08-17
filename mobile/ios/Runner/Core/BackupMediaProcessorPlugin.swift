@@ -26,6 +26,20 @@ final class BackupMediaProcessorPlugin: ImmichPlugin, FlutterPlugin {
   }
 
   func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    if call.method == "cancel" {
+      guard
+        let arguments = call.arguments as? [String: Any],
+        let operationId = arguments["operationId"] as? String,
+        !operationId.isEmpty
+      else {
+        result(FlutterError(code: "invalid_arguments", message: "operationId is required", details: nil))
+        return
+      }
+      cancelExport(operationId)
+      result(nil)
+      return
+    }
+
     guard call.method == "prepare" else {
       result(FlutterMethodNotImplemented)
       return
@@ -81,7 +95,14 @@ final class BackupMediaProcessorPlugin: ImmichPlugin, FlutterPlugin {
     result: @escaping FlutterResult
   ) {
     DispatchQueue.global(qos: .utility).async { [weak self] in
-      guard let self, !self.detached else { return }
+      guard let self else {
+        DispatchQueue.main.async { result(nil) }
+        return
+      }
+      guard !self.detached else {
+        DispatchQueue.main.async { result(nil) }
+        return
+      }
       guard let imageSource = CGImageSourceCreateWithURL(source as CFURL, nil) else {
         self.finishWithOriginal(operationId: operationId, result: result)
         return
@@ -182,7 +203,10 @@ final class BackupMediaProcessorPlugin: ImmichPlugin, FlutterPlugin {
     timer.resume()
 
     exporter.exportAsynchronously { [weak self, weak exporter] in
-      guard let self, let exporter else { return }
+      guard let self, let exporter else {
+        DispatchQueue.main.async { result(nil) }
+        return
+      }
       self.removeExport(operationId)
       switch exporter.status {
       case .completed:
@@ -251,6 +275,15 @@ final class BackupMediaProcessorPlugin: ImmichPlugin, FlutterPlugin {
     let timer = progressTimers.removeValue(forKey: operationId)
     exportLock.unlock()
     timer?.cancel()
+  }
+
+  private func cancelExport(_ operationId: String) {
+    exportLock.lock()
+    let exporter = activeExports.removeValue(forKey: operationId)
+    let timer = progressTimers.removeValue(forKey: operationId)
+    exportLock.unlock()
+    timer?.cancel()
+    exporter?.cancelExport()
   }
 
   private func newOutputFile(fileExtension: String) -> URL? {

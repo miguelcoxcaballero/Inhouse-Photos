@@ -29,6 +29,10 @@ String formatInhouseDownloadBytes(int bytes) {
   return '${(bytes / bytesPerMegabyte).toStringAsFixed(1)} MB';
 }
 
+Uri buildSideStoreInstallUri(Uri ipaUrl) {
+  return Uri(scheme: 'sidestore', host: 'install', queryParameters: {'url': ipaUrl.toString()});
+}
+
 int compareInhouseVersions(String left, String right) {
   final leftParts = left.split('.').map((part) => int.tryParse(part) ?? 0).toList();
   final rightParts = right.split('.').map((part) => int.tryParse(part) ?? 0).toList();
@@ -197,10 +201,13 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
 
     if (Platform.isIOS) {
-      final sourceUri = Uri(scheme: 'sidestore', host: 'source', queryParameters: {'url': _sideStoreSourceUrl});
+      // iOS does not permit an app to replace its own bundle. Hand the exact,
+      // versioned IPA to SideStore so it can sign and install the update. The
+      // AltSource remains registered for future version discovery.
+      final installUri = buildSideStoreInstallUri(update.apkUrl);
       var opened = false;
       try {
-        opened = await launchUrl(sourceUri, mode: LaunchMode.externalApplication);
+        opened = await launchUrl(installUri, mode: LaunchMode.externalApplication);
       } catch (_) {
         opened = false;
       }
@@ -210,8 +217,8 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
       setState(() {
         _installState = opened ? _InstallState.idle : _InstallState.error;
         _status = opened
-            ? 'Update Inhouse Photos from its source in SideStore, then reopen the app.'
-            : 'SideStore is not installed yet. Install it first, then try again.';
+            ? 'SideStore is preparing the update. Keep LocalDevVPN enabled, install it there, then reopen Inhouse Photos.'
+            : 'SideStore is not installed. Add the Inhouse Photos source there, then try again: $_sideStoreSourceUrl';
       });
       return;
     }

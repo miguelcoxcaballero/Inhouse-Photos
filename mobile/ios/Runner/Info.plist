@@ -111,6 +111,8 @@
 		<key>LSApplicationQueriesSchemes</key>
 		<array>
 			<string>https</string>
+			<string>sidestore</string>
+			<string>altstore</string>
 		</array>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>

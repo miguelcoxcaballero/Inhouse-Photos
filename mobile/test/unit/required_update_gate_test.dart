@@ -30,6 +30,18 @@ void main() {
     });
   });
 
+  test('builds a SideStore install link for the exact IPA release', () {
+    final ipa = Uri.parse(
+      'https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.35-inhouse-ios.1/Inhouse-Photos.ipa',
+    );
+
+    final uri = buildSideStoreInstallUri(ipa);
+
+    expect(uri.scheme, 'sidestore');
+    expect(uri.host, 'install');
+    expect(uri.queryParameters['url'], ipa.toString());
+  });
+
   group('InhouseUpdateManifest', () {
     test('accepts a required update from an approved GitHub host', () {
       final manifest = InhouseUpdateManifest.fromJson({

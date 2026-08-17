@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -24,7 +25,13 @@ class BackupMediaPreprocessor {
   static final Map<String, void Function(double progress)> _progressListeners = {};
   static bool _progressHandlerInstalled = false;
 
-  const BackupMediaPreprocessor();
+  final Duration photoTimeout;
+  final Duration videoTimeout;
+
+  const BackupMediaPreprocessor({
+    this.photoTimeout = const Duration(seconds: 20),
+    this.videoTimeout = const Duration(minutes: 8),
+  });
 
   Future<PreparedBackupMedia> prepare(
     File source,
@@ -56,14 +63,25 @@ class BackupMediaPreprocessor {
     onProgress?.call(0, sourceSize, null);
 
     try {
-      final response = await _channel.invokeMapMethod<String, Object?>('prepare', {
-        'sourcePath': source.path,
-        'isVideo': isVideo,
-        'width': asset.width,
-        'height': asset.height,
-        'originalFileName': originalFileName,
-        'operationId': operationId,
-      });
+      final response = await _channel
+          .invokeMapMethod<String, Object?>('prepare', {
+            'sourcePath': source.path,
+            'isVideo': isVideo,
+            'width': asset.width,
+            'height': asset.height,
+            'originalFileName': originalFileName,
+            'operationId': operationId,
+          })
+          .timeout(
+            isVideo ? videoTimeout : photoTimeout,
+            onTimeout: () {
+              // A native codec must never be allowed to occupy one of the
+              // three backup workers forever. Ask iOS/Android to release any
+              // active exporter, then let the caller upload the original.
+              unawaited(_cancelNativeOperation(operationId));
+              throw TimeoutException('Storage saver timed out for $operationId');
+            },
+          );
       final outputPath = response?['path'] as String?;
       final outputFileName = response?['fileName'] as String?;
       if (outputPath == null || outputFileName == null) {
@@ -119,5 +137,14 @@ class BackupMediaPreprocessor {
         _progressListeners[operationId]?.call(progress.clamp(0, 1));
       }
     });
+  }
+
+  static Future<void> _cancelNativeOperation(String operationId) async {
+    try {
+      await _channel.invokeMethod<void>('cancel', {'operationId': operationId});
+    } catch (_) {
+      // Cancellation is best effort. The Dart timeout has already released
+      // the upload worker and the native output lives only in the cache.
+    }
   }
 }

@@ -232,6 +232,8 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   final DriftLocalAssetRepository _localAssetRepository;
   final RemoteAssetRepository _remoteAssetRepository;
   Completer<void>? _cancelToken;
+  Future<void>? _activeForegroundBackup;
+  bool _restartForegroundBackup = false;
 
   final _logger = Logger("DriftBackupNotifier");
 
@@ -280,31 +282,60 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   }
 
   Future<void> startForegroundBackup(String userId) {
-    // Cancel any existing backup before starting a new one
-    if (_cancelToken != null) {
-      stopForegroundBackup();
+    final activeBackup = _activeForegroundBackup;
+    if (activeBackup != null) {
+      // Resume/sync notifications can arrive together on iOS. Cancelling the
+      // first worker pool here used to race its replacement and leave all
+      // three upload slots stuck. Finish the active pass, then scan once more
+      // for assets that became eligible while it was running.
+      _restartForegroundBackup = true;
+      return activeBackup;
     }
 
     state = state.copyWith(error: BackupError.none);
 
-    _cancelToken = Completer<void>();
+    final cancelToken = Completer<void>();
+    _cancelToken = cancelToken;
 
-    return _foregroundUploadService.uploadCandidates(
-      userId,
-      _cancelToken!,
-      callbacks: UploadCallbacks(
-        onProgress: _handleForegroundBackupProgress,
-        onPreparationProgress: _handleForegroundPreparationProgress,
-        onSuccess: (localId, remoteId) => _handleForegroundBackupSuccess(userId, localId, remoteId),
-        onError: _handleForegroundBackupError,
-        onICloudProgress: _handleICloudProgress,
-      ),
-    );
+    late final Future<void> backup;
+    backup = _foregroundUploadService
+        .uploadCandidates(
+          userId,
+          cancelToken,
+          callbacks: UploadCallbacks(
+            onProgress: _handleForegroundBackupProgress,
+            onPreparationProgress: _handleForegroundPreparationProgress,
+            onSuccess: (localId, remoteId) => _handleForegroundBackupSuccess(userId, localId, remoteId),
+            onError: _handleForegroundBackupError,
+            onICloudProgress: _handleICloudProgress,
+          ),
+        )
+        .whenComplete(() {
+          if (!identical(_activeForegroundBackup, backup)) {
+            return;
+          }
+
+          _activeForegroundBackup = null;
+          if (identical(_cancelToken, cancelToken)) {
+            _cancelToken = null;
+          }
+
+          final shouldRestart = _restartForegroundBackup && !cancelToken.isCompleted;
+          _restartForegroundBackup = false;
+          if (shouldRestart && mounted) {
+            unawaited(startForegroundBackup(userId));
+          }
+        });
+    _activeForegroundBackup = backup;
+    return backup;
   }
 
   void stopForegroundBackup() {
-    _cancelToken?.complete();
-    _cancelToken = null;
+    final cancelToken = _cancelToken;
+    if (cancelToken != null && !cancelToken.isCompleted) {
+      cancelToken.complete();
+    }
+    _restartForegroundBackup = false;
     _uploadSpeedManager.clear();
     state = state.copyWith(uploadItems: {}, iCloudDownloadProgress: {});
   }
@@ -322,7 +353,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   }
 
   void _handleForegroundBackupProgress(String localAssetId, String filename, int bytes, int totalBytes) {
-    if (_cancelToken == null) {
+    if (_cancelToken == null || _cancelToken!.isCompleted) {
       return;
     }
 
@@ -366,7 +397,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     int originalBytes,
     int? preparedBytes,
   ) {
-    if (_cancelToken == null) {
+    if (_cancelToken == null || _cancelToken!.isCompleted) {
       return;
     }
 
