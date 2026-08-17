@@ -42,8 +42,37 @@ jobs:
         run: mise //mobile:codegen:pigeon
 
       - name: Build iOS app without signing
-        working-directory: ./mobile
-        run: flutter build ios --release --no-codesign
+        id: build_ios
+        shell: bash
+        run: |
+          set -o pipefail
+          cd mobile
+          flutter build ios --release --no-codesign 2>&1 | tee ../ios-build.log
+
+      - name: Surface iOS compiler errors
+        if: failure() && steps.build_ios.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          errors="$(grep -E '(^|[[:space:]])error:|Swift Compiler Error|Could not build' ios-build.log | tail -40 || true)"
+          if [[ -z "$errors" ]]; then
+            errors="$(tail -80 ios-build.log)"
+          fi
+          while IFS= read -r line; do
+            escaped="${line//'%'/'%25'}"
+            escaped="${escaped//$'\r'/'%0D'}"
+            escaped="${escaped//$'\n'/'%0A'}"
+            echo "::error title=iOS compiler::$escaped"
+          done <<< "$errors"
+
+      - name: Upload iOS build log
+        if: failure() && steps.build_ios.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Inhouse-Photos-iOS-build-log
+          path: ios-build.log
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Package unsigned IPA
         shell: bash
