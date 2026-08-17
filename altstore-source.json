@@ -16,13 +16,22 @@
       "iconURL": "https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/1024.png",
       "tintColor": "#D97736",
       "category": "utilities",
-      "version": "3.1.35",
-      "versionDate": "2026-08-17T02:45:22Z",
-      "versionDescription": "Fixes stalled iOS backups by preventing duplicate worker pools and falling back to the original media if Storage saver cannot finish. Updates now open the exact release in SideStore.",
-      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.35-inhouse-ios.1/Inhouse-Photos.ipa",
-      "size": 32610702,
+      "version": "3.1.36",
+      "versionDate": "2026-08-17T03:44:03Z",
+      "versionDescription": "Adds a native floating Liquid Glass navigation island on iPhone, with iOS 26 glass effects, responsive selection animations, accessibility support, and a native-material fallback for earlier iOS versions.",
+      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.36-inhouse-ios.3/Inhouse-Photos.ipa",
+      "size": 32633551,
       "minOSVersion": "15.0",
       "versions": [
+        {
+          "version": "3.1.36",
+          "buildVersion": "3095",
+          "date": "2026-08-17T03:44:03Z",
+          "localizedDescription": "Adds the native floating Liquid Glass navigation island on iPhone.",
+          "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.36-inhouse-ios.3/Inhouse-Photos.ipa",
+          "size": 32633551,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "3.1.35",
           "buildVersion": "3094",

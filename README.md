@@ -8,7 +8,7 @@ Inhouse Photos is the Inhouse-branded Android and iOS client for a private Immic
 
 [Direct APK download](https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/Inhouse-Photos.apk) is also available. Both contain the same signed ARM64 build for modern Android phones.
 
-Current Android build: **3.1.35 (5094)**. This build includes reliable three-at-a-time uploads, lightweight progress reporting, stable upload-detail card spacing, on-device Storage saver backup quality, clear original/compressed sizes and savings, fast deduplicated timelines, and the mandatory Inhouse update gate.
+Current Android build: **3.1.36 (5095)**. This build includes reliable three-at-a-time uploads, lightweight progress reporting, stable upload-detail card spacing, on-device Storage saver backup quality, clear original/compressed sizes and savings, fast deduplicated timelines, and the mandatory Inhouse update gate.
 
 Storage saver prepares disposable copies before upload: photos are limited to 16 MP and videos to 1080p while the device originals remain unchanged. It applies only to new uploads, keeps the existing three-item upload concurrency, and never recompresses assets already present on the server.
 
@@ -16,7 +16,7 @@ The Android app checks `android-update.json` on launch, whenever it returns to t
 
 ## iOS download without a paid Apple membership
 
-[Download the unsigned Inhouse Photos IPA](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.35-inhouse-ios.1/Inhouse-Photos.ipa). It is installed and signed on the phone with a free Apple Account through [SideStore](https://docs.sidestore.io/docs/installation/prerequisites).
+[Download the unsigned Inhouse Photos IPA](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.36-inhouse-ios.3/Inhouse-Photos.ipa). It is installed and signed on the phone with a free Apple Account through [SideStore](https://docs.sidestore.io/docs/installation/prerequisites).
 
 After SideStore's one-time computer setup, add this source in SideStore:
 
@@ -26,7 +26,7 @@ https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/altstor
 
 SideStore can then install Inhouse Photos and receive later GitHub updates from the same source. With a free Apple Account, Apple limits signing to seven days at a time and three simultaneously installed sideloaded apps (including SideStore). SideStore refreshes the signature periodically; keep LocalDevVPN available for install/update/refresh operations. That local VPN only lets SideStore communicate with iOS installation services and does not route the app's connection to the photo server.
 
-Current iOS build: **3.1.35 (3094)**. It uses the same Flutter interface and server API as Android, plus native iOS Storage saver processing for new photos (up to 16 MP) and videos (up to 1080p). Backup starts are serialized so lifecycle events cannot cancel one another; if native compression stalls, the original uploads instead of blocking the queue. Existing server assets and device originals are never recompressed or modified.
+Current iOS build: **3.1.36 (3095)**. It uses the same Flutter interface and server API as Android, plus native iOS Storage saver processing for new photos (up to 16 MP) and videos (up to 1080p). On iPhone, the bottom navigation is a floating native Liquid Glass island on iOS 26, with a native-material fallback on earlier iOS versions. Backup starts are serialized so lifecycle events cannot cancel one another; if native compression stalls, the original uploads instead of blocking the queue. Existing server assets and device originals are never recompressed or modified.
 
 - Android application ID: `com.inhousesoftware.photos`
 - iOS bundle ID: `com.inhousesoftware.photos`
