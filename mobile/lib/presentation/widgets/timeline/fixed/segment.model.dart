@@ -95,7 +95,7 @@ class _DenseDiskAtlasEntry {
 /// Persistent raw-RGBA contact sheets. Raw pixels use more disk than PNG but
 /// avoid a full image decompression pass while the user is scrolling.
 class _DenseDiskAtlasCache {
-  static const _magic = 'IHDPANL2';
+  static const _magic = 'IHDPANL3';
   static const _headerBytes = 80;
   static const _maxBytes = 512 * 1024 * 1024;
   static const _trimToBytes = 448 * 1024 * 1024;
@@ -108,7 +108,7 @@ class _DenseDiskAtlasCache {
 
   Future<Directory> _getDirectory() => _directory ??= () async {
     final support = await getApplicationSupportDirectory();
-    final directory = Directory(path.join(support.path, 'inhouse_year_panels_v2'));
+    final directory = Directory(path.join(support.path, 'inhouse_year_panels_v3'));
     await directory.create(recursive: true);
     unawaited(_trim(directory));
     return directory;
@@ -212,113 +212,30 @@ class _DenseDiskAtlasCache {
   }
 }
 
-class _DenseThumbChannel {
-  final int nx;
-  final int ny;
-  late final List<double> ac;
-
-  _DenseThumbChannel(this.nx, this.ny) {
-    var count = 0;
-    for (var cy = 0; cy < ny; cy++) {
-      for (var cx = cy > 0 ? 0 : 1; cx * ny < nx * (ny - cy); cx++) {
-        count++;
-      }
-    }
-    ac = List<double>.filled(count, 0);
-  }
-
-  int decode(Uint8List hash, int start, int index, double scale) {
-    for (var i = 0; i < ac.length; i++) {
-      final data = hash[start + (index >> 1)] >> ((index & 1) << 2);
-      ac[i] = ((data & 15) / 7.5 - 1) * scale;
-      index++;
-    }
-    return index;
-  }
-}
-
 Uint8List _decodeThumbhashSquare(Uint8List hash, int size) {
-  final header24 = (hash[0] & 255) | ((hash[1] & 255) << 8) | ((hash[2] & 255) << 16);
-  final header16 = (hash[3] & 255) | ((hash[4] & 255) << 8);
-  final lDc = (header24 & 63) / 63;
-  final pDc = ((header24 >> 6) & 63) / 31.5 - 1;
-  final qDc = ((header24 >> 12) & 63) / 31.5 - 1;
-  final lScale = ((header24 >> 18) & 31) / 31;
-  final hasAlpha = (header24 >> 23) != 0;
-  final pScale = ((header16 >> 3) & 63) / 63;
-  final qScale = ((header16 >> 9) & 63) / 63;
-  final isLandscape = (header16 >> 15) != 0;
-  final lx = math.max(3, isLandscape ? (hasAlpha ? 5 : 7) : header16 & 7);
-  final ly = math.max(3, isLandscape ? header16 & 7 : (hasAlpha ? 5 : 7));
-  final aDc = hasAlpha ? (hash[5] & 15) / 15 : 1.0;
-  final aScale = hasAlpha ? ((hash[5] >> 4) & 15) / 15 : 0.0;
-
-  final acStart = hasAlpha ? 6 : 5;
-  var acIndex = 0;
-  final lChannel = _DenseThumbChannel(lx, ly);
-  final pChannel = _DenseThumbChannel(3, 3);
-  final qChannel = _DenseThumbChannel(3, 3);
-  _DenseThumbChannel? aChannel;
-  acIndex = lChannel.decode(hash, acStart, acIndex, lScale);
-  acIndex = pChannel.decode(hash, acStart, acIndex, pScale * 1.25);
-  acIndex = qChannel.decode(hash, acStart, acIndex, qScale * 1.25);
-  if (hasAlpha) {
-    aChannel = _DenseThumbChannel(5, 5)..decode(hash, acStart, acIndex, aScale);
+  if (hash.length < 5 || size <= 0) {
+    throw const FormatException('Invalid ThumbHash');
   }
+  final decoded = thumbhash.thumbHashToRGBA(hash);
+  final sourceWidth = decoded.width;
+  final sourceHeight = decoded.height;
+  final sourceSize = math.min(sourceWidth, sourceHeight);
+  final sourceLeft = (sourceWidth - sourceSize) / 2;
+  final sourceTop = (sourceHeight - sourceSize) / 2;
+  final output = Uint8List(size * size * 4);
 
-  final ratio = thumbhash.thumbHashToApproximateAspectRatio(hash);
-  final cxStop = math.max(lx, hasAlpha ? 5 : 3);
-  final cyStop = math.max(ly, hasAlpha ? 5 : 3);
-  final fx = List.generate(size, (x) {
-    final unitX = (x + 0.5) / size;
-    final sourceX = ratio > 1 ? 0.5 - 0.5 / ratio + unitX / ratio : unitX;
-    return List.generate(cxStop, (cx) => math.cos(math.pi * sourceX * cx), growable: false);
-  }, growable: false);
-  final fy = List.generate(size, (y) {
-    final unitY = (y + 0.5) / size;
-    final sourceY = ratio < 1 ? 0.5 - ratio / 2 + unitY * ratio : unitY;
-    return List.generate(cyStop, (cy) => math.cos(math.pi * sourceY * cy), growable: false);
-  }, growable: false);
-  final rgba = Uint8List(size * size * 4);
-
-  for (var y = 0, offset = 0; y < size; y++) {
-    for (var x = 0; x < size; x++, offset += 4) {
-      var l = lDc;
-      var p = pDc;
-      var q = qDc;
-      var a = aDc;
-      for (var cy = 0, index = 0; cy < ly; cy++) {
-        final fy2 = fy[y][cy] * 2;
-        for (var cx = cy > 0 ? 0 : 1; cx * ly < lx * (ly - cy); cx++, index++) {
-          l += lChannel.ac[index] * fx[x][cx] * fy2;
-        }
-      }
-      for (var cy = 0, index = 0; cy < 3; cy++) {
-        final fy2 = fy[y][cy] * 2;
-        for (var cx = cy > 0 ? 0 : 1; cx < 3 - cy; cx++, index++) {
-          final factor = fx[x][cx] * fy2;
-          p += pChannel.ac[index] * factor;
-          q += qChannel.ac[index] * factor;
-        }
-      }
-      if (aChannel != null) {
-        for (var cy = 0, index = 0; cy < 5; cy++) {
-          final fy2 = fy[y][cy] * 2;
-          for (var cx = cy > 0 ? 0 : 1; cx < 5 - cy; cx++, index++) {
-            a += aChannel.ac[index] * fx[x][cx] * fy2;
-          }
-        }
-      }
-      final b = l - (2 / 3) * p;
-      final r = (3 * l - b + q) / 2;
-      final g = r - q;
-      rgba[offset] = (255 * r.clamp(0, 1)).round();
-      rgba[offset + 1] = (255 * g.clamp(0, 1)).round();
-      rgba[offset + 2] = (255 * b.clamp(0, 1)).round();
-      rgba[offset + 3] = (255 * a.clamp(0, 1)).round();
+  // A 16px nearest-neighbour crop is intentional: ThumbHash is already a
+  // smooth DCT placeholder and this avoids another expensive filter pass.
+  for (var y = 0; y < size; y++) {
+    final sourceY = (sourceTop + ((y + 0.5) * sourceSize / size)).floor().clamp(0, sourceHeight - 1);
+    for (var x = 0; x < size; x++) {
+      final sourceX = (sourceLeft + ((x + 0.5) * sourceSize / size)).floor().clamp(0, sourceWidth - 1);
+      final sourceOffset = (sourceY * sourceWidth + sourceX) * 4;
+      final targetOffset = (y * size + x) * 4;
+      output.setRange(targetOffset, targetOffset + 4, decoded.rgba, sourceOffset);
     }
   }
-  return rgba;
+  return output;
 }
 
 _DenseAtlasPixelsResult _buildDenseThumbhashAtlas(
@@ -1039,9 +956,11 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   late Object _slotAtlasKey;
   String _contentSignature = '';
   bool _persistentExact = false;
+  bool _baseAtlasReady = false;
   int _requiredActualCount = 0;
   int _loadedCount = 0;
   int _generation = 0;
+  final Set<int> _actualThumbnailRequests = {};
 
   @override
   void didChangeDependencies() {
@@ -1093,10 +1012,10 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _atlasBuilding = false;
     _instantOverview = usesInstantDenseTimelineAtlas(widget.columnCount);
     _persistentExact = false;
+    _baseAtlasReady = false;
     _atlasTargetPixels = atlasTargetPixels;
-    _requiredActualCount = _instantOverview
-        ? widget.assets.where((asset) => _thumbHashFor(asset) == null).length
-        : widget.assets.length;
+    _requiredActualCount = 0;
+    _actualThumbnailRequests.clear();
 
     final atlasKey = Object.hash(
       _instantOverview ? 'thumbhash' : 'thumbnail',
@@ -1118,12 +1037,14 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     if (completeAtlas != null) {
       _replaceAtlas(completeAtlas);
       _persistentExact = true;
+      _baseAtlasReady = true;
       _scheduleRepaint();
       return;
     }
     final cachedAtlas = _denseRowAtlasCache.get(atlasKey);
     if (cachedAtlas != null) {
       _replaceAtlas(cachedAtlas);
+      _baseAtlasReady = true;
       _scheduleRepaint();
     }
     final positionalAtlas = _denseRowAtlasCache.get(_slotAtlasKey);
@@ -1137,7 +1058,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   }
 
   String _denseContentIdentity() {
-    final buffer = StringBuffer('v2:${widget.columnCount}:${widget.assets.length};');
+    final buffer = StringBuffer('v3:${widget.columnCount}:${widget.assets.length};');
     for (final asset in widget.assets) {
       buffer
         ..write(asset.remoteId ?? asset.localId ?? asset.checksum ?? asset.heroTag)
@@ -1173,6 +1094,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       _denseRowAtlasCache.put(_slotAtlasKey, image);
       if (entry.signature == _contentSignature) {
         _persistentExact = true;
+        _baseAtlasReady = true;
         _denseRowAtlasCache.put(_completeAtlasKey, image);
         return;
       }
@@ -1185,8 +1107,16 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       if (_instantOverview && _thumbHashFor(widget.assets[index]) != null) {
         continue;
       }
-      _denseThumbnailQueue.schedule(() => _loadAssetImage(index, thumbnailTargetPixels, atlasKey, generation));
+      _requestActualThumbnail(index, thumbnailTargetPixels, atlasKey, generation);
     }
+  }
+
+  void _requestActualThumbnail(int index, int targetPixels, int atlasKey, int generation) {
+    if (!_actualThumbnailRequests.add(index)) {
+      return;
+    }
+    _requiredActualCount++;
+    _denseThumbnailQueue.schedule(() => _loadAssetImage(index, targetPixels, atlasKey, generation));
   }
 
   void _replaceAtlas(ui.Image image) {
@@ -1233,6 +1163,8 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         final tile = result.tiles[index];
         if (tile != null && cachedTiles[index] == null) {
           _denseThumbTileCache.put(tileKeys[index], tile);
+        } else if (tile == null && hashes[index] != null) {
+          _requestActualThumbnail(index, targetPixels, atlasKey, generation);
         }
       }
 
@@ -1258,6 +1190,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       _denseRowAtlasCache.put(atlasKey, atlas);
       setState(() {
         _replaceAtlas(atlas);
+        _baseAtlasReady = true;
       });
       if (_requiredActualCount == 0) {
         _persistentExact = true;
@@ -1279,9 +1212,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         return;
       }
       for (var index = 0; index < hashes.length; index++) {
-        if (hashes[index] != null) {
-          _denseThumbnailQueue.schedule(() => _loadAssetImage(index, targetPixels, atlasKey, generation));
-        }
+        _requestActualThumbnail(index, targetPixels, atlasKey, generation);
       }
     }
   }
@@ -1331,7 +1262,11 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _loadedCount++;
     _scheduleRepaint();
     if (_instantOverview) {
-      _maybeBuildCompositeAtlas(atlasKey, generation);
+      if (_loadedCount == _requiredActualCount && !_baseAtlasReady && _requiredActualCount == widget.assets.length) {
+        unawaited(_buildAtlas(targetPixels, atlasKey, generation));
+      } else {
+        _maybeBuildCompositeAtlas(atlasKey, generation);
+      }
     } else if (_loadedCount == widget.assets.length) {
       unawaited(_buildAtlas(targetPixels, atlasKey, generation));
     }
@@ -1340,6 +1275,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   void _maybeBuildCompositeAtlas(int atlasKey, int generation) {
     if (_instantOverview &&
         _atlas != null &&
+        _baseAtlasReady &&
         _requiredActualCount > 0 &&
         _loadedCount == _requiredActualCount &&
         !_atlasBuilding) {
@@ -1394,6 +1330,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     setState(() {
       _replaceAtlas(atlas);
       _persistentExact = true;
+      _baseAtlasReady = true;
       for (var index = 0; index < _images.length; index++) {
         _images[index]?.dispose();
         _images[index] = null;
@@ -1509,6 +1446,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     setState(() {
       _replaceAtlas(atlas);
       _persistentExact = true;
+      _baseAtlasReady = true;
       for (var index = 0; index < _images.length; index++) {
         _images[index]?.dispose();
         _images[index] = null;
@@ -1576,7 +1514,9 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     }
     _loadedCount = 0;
     _requiredActualCount = 0;
+    _actualThumbnailRequests.clear();
     _atlasBuilding = false;
+    _baseAtlasReady = false;
   }
 
   void _handleTap(TapUpDetails details, TextDirection textDirection) {

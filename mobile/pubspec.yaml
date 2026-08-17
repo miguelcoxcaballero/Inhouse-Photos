@@ -2,7 +2,7 @@ name: immich_mobile
 description: Inhouse Photos - private self-hosted photo backup for mobile
 
 publish_to: 'none'
-version: 3.1.33+3092
+version: 3.1.34+3093
 
 environment:
   sdk: '>=3.12.0 <4.0.0'
