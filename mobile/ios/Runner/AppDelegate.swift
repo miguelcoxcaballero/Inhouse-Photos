@@ -27,6 +27,7 @@ import native_video_player
   public static func registerPlugins(with registry: FlutterPluginRegistry, messenger: FlutterBinaryMessenger) {
     NativeSyncApiImpl.register(with: registry.registrar(forPlugin: NativeSyncApiImpl.name)!)
     BackupMediaProcessorPlugin.register(with: registry.registrar(forPlugin: BackupMediaProcessorPlugin.name)!)
+    LiquidGlassTabBarPlugin.register(with: registry.registrar(forPlugin: LiquidGlassTabBarPlugin.name)!)
     PermissionApiSetup.setUp(binaryMessenger: messenger, api: PermissionApiImpl())
     LocalImageApiSetup.setUp(binaryMessenger: messenger, api: LocalImageApiImpl())
     RemoteImageApiSetup.setUp(binaryMessenger: messenger, api: RemoteImageApiImpl())

@@ -17,6 +17,7 @@ import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.da
 import 'package:immich_mobile/providers/search/search_input_focus.provider.dart';
 import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:immich_mobile/widgets/navigation/ios_liquid_glass_navigation_island.dart';
 
 @RoutePage()
 class TabShellPage extends ConsumerStatefulWidget {
@@ -31,6 +32,7 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
   Widget build(BuildContext context) {
     final isScreenLandscape = context.orientation == Orientation.landscape;
     final isReadonlyModeEnabled = ref.watch(readonlyModeProvider);
+    final usesIOSLiquidGlass = Theme.of(context).platform == TargetPlatform.iOS;
 
     final navigationDestinations = [
       NavigationDestination(
@@ -87,6 +89,7 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
           canPop: tabsRouter.activeIndex == 0,
           onPopInvokedWithResult: (didPop, _) => !didPop ? tabsRouter.setActiveIndex(0) : null,
           child: Scaffold(
+            extendBody: usesIOSLiquidGlass && !isScreenLandscape,
             resizeToAvoidBottomInset: false,
             body: isScreenLandscape
                 ? Row(
@@ -143,7 +146,7 @@ void _onNavigationSelected(TabsRouter router, int index, WidgetRef ref) {
 class _BottomNavigationBar extends ConsumerStatefulWidget {
   const _BottomNavigationBar({required this.tabsRouter, required this.destinations});
 
-  final List<Widget> destinations;
+  final List<NavigationDestination> destinations;
   final TabsRouter tabsRouter;
 
   @override
@@ -178,6 +181,14 @@ class _BottomNavigationBarState extends ConsumerState<_BottomNavigationBar> {
 
     if (isScreenLandscape || hideNavigationBar) {
       return const SizedBox.shrink();
+    }
+
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return IosLiquidGlassNavigationIsland(
+        selectedIndex: widget.tabsRouter.activeIndex,
+        destinations: widget.destinations,
+        onDestinationSelected: (index) => _onNavigationSelected(widget.tabsRouter, index, ref),
+      );
     }
 
     return NavigationBar(
