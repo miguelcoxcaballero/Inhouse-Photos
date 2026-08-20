@@ -60,7 +60,18 @@ jobs:
 
       - name: Generate platform APIs
         working-directory: ./mobile
-        run: mise //mobile:codegen:pigeon
+        run: |
+          for schema in pigeon/*.dart; do
+            dart run pigeon --input "$schema"
+          done
+          dart format lib/platform/
+          test -s android/app/src/main/kotlin/app/alextran/immich/background/BackgroundWorker.g.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/connectivity/Connectivity.g.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/core/Network.g.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/images/LocalImages.g.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/permission/PermissionApi.g.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/sync/Messages.g.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/viewintent/ViewIntent.g.kt
 
       - name: Create Shorebird release and signed APK
         working-directory: ./mobile
