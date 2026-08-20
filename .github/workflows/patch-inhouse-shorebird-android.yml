@@ -44,10 +44,14 @@ jobs:
 
       - name: Install Shorebird
         run: |
+          SHOREBIRD_HOME="${XDG_CONFIG_HOME:-$HOME/.shorebird}"
+          if [[ -n "${XDG_CONFIG_HOME:-}" ]]; then
+            SHOREBIRD_HOME="$XDG_CONFIG_HOME/shorebird"
+          fi
           curl --proto '=https' --tlsv1.2 \
             https://raw.githubusercontent.com/shorebirdtech/install/main/install.sh \
             -sSf | bash -s -- --force
-          echo "$HOME/.shorebird/bin" >> "$GITHUB_PATH"
+          echo "$SHOREBIRD_HOME/bin" >> "$GITHUB_PATH"
 
       - name: Install dependencies
         run: mise //mobile:install:ci
