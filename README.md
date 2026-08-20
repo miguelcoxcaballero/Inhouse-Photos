@@ -8,11 +8,13 @@ Inhouse Photos is the Inhouse-branded Android and iOS client for a private Immic
 
 [Direct APK download](https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/Inhouse-Photos.apk) is also available. Both contain the same signed ARM64 build for modern Android phones.
 
-Current Android build: **3.1.36 (5095)**. This build includes reliable three-at-a-time uploads, lightweight progress reporting, stable upload-detail card spacing, on-device Storage saver backup quality, clear original/compressed sizes and savings, fast deduplicated timelines, and the mandatory Inhouse update gate.
+Current Android build: **3.1.37 (5096)**. This build includes reliable three-at-a-time uploads, lightweight progress reporting, stable upload-detail card spacing, on-device Storage saver backup quality, clear original/compressed sizes and savings, fast deduplicated timelines, and the mandatory Inhouse update gate.
 
 Storage saver prepares disposable copies before upload: photos are limited to 16 MP and videos to 1080p while the device originals remain unchanged. It applies only to new uploads, keeps the existing three-item upload concurrency, and never recompresses assets already present on the server.
 
-The Android app checks `android-update.json` on launch, whenever it returns to the foreground, and every 15 minutes. A required newer semantic version blocks the app until its signed APK has been downloaded, package-checked, signature-verified, and handed to Android's installer.
+Version 3.1.37 is the one-time OTA base install. It includes Shorebird and checks for compatible Inhouse code updates automatically: eligible Dart/UI fixes download in the background and apply on the next app launch, without downloading another APK, reinstalling the app, or compiling on the PC. Android-native changes, permission changes, and new native dependencies still require a new signed base APK because Android does not allow those parts of an installed app to be replaced by code push.
+
+The existing APK update gate remains as a fallback for those native base releases. It checks `android-update.json` on launch, whenever the app returns to the foreground, and every 15 minutes. A required newer base version blocks the app until its signed APK has been downloaded, package-checked, signature-verified, and handed to Android's installer.
 
 ## iOS download without a paid Apple membership
 
