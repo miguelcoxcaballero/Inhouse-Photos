@@ -6,7 +6,7 @@ import 'package:pigeon/pigeon.dart';
     swiftOut: 'ios/Runner/Images/LocalImages.g.swift',
     swiftOptions: SwiftOptions(includeErrorClass: false),
     kotlinOut: 'android/app/src/main/kotlin/app/alextran/immich/images/LocalImages.g.kt',
-    kotlinOptions: KotlinOptions(package: 'app.alextran.immich.images'),
+    kotlinOptions: KotlinOptions(package: 'com.inhousesoftware.photos.images'),
     dartOptions: DartOptions(),
     dartPackageName: 'immich_mobile',
   ),

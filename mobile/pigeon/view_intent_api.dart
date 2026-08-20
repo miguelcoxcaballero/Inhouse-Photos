@@ -4,7 +4,7 @@ import 'package:pigeon/pigeon.dart';
   PigeonOptions(
     dartOut: 'lib/platform/view_intent_api.g.dart',
     kotlinOut: 'android/app/src/main/kotlin/app/alextran/immich/viewintent/ViewIntent.g.kt',
-    kotlinOptions: KotlinOptions(package: 'app.alextran.immich.viewintent'),
+    kotlinOptions: KotlinOptions(package: 'com.inhousesoftware.photos.viewintent'),
     dartOptions: DartOptions(),
     dartPackageName: 'immich_mobile',
   ),

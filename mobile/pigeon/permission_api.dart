@@ -8,7 +8,7 @@ enum PermissionStatus { granted, denied, permanentlyDenied }
     swiftOut: 'ios/Runner/Permission/PermissionApi.g.swift',
     swiftOptions: SwiftOptions(includeErrorClass: false),
     kotlinOut: 'android/app/src/main/kotlin/app/alextran/immich/permission/PermissionApi.g.kt',
-    kotlinOptions: KotlinOptions(package: 'app.alextran.immich.permission'),
+    kotlinOptions: KotlinOptions(package: 'com.inhousesoftware.photos.permission'),
     dartOptions: DartOptions(),
     dartPackageName: 'immich_mobile',
   ),
