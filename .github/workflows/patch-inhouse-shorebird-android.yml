@@ -1,0 +1,70 @@
+name: Publish Inhouse Photos Android OTA Patch
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Shorebird release to patch
+        required: true
+        default: '3.1.37+5096'
+
+concurrency:
+  group: inhouse-shorebird-android-patch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  patch:
+    name: Compile and publish Dart patch in GitHub Cloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@3bca63ca3c15020293b36b51737a3ee2c773340b # use-mise-action-v3.1.0
+        with:
+          github_token: ${{ github.token }}
+          working_directory: ./mobile
+
+      - name: Setup Java
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: zulu
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+        with:
+          packages: ''
+
+      - name: Install Shorebird
+        run: |
+          curl --proto '=https' --tlsv1.2 \
+            https://raw.githubusercontent.com/shorebirdtech/install/main/install.sh \
+            -sSf | bash -s -- --force
+          echo "$HOME/.shorebird/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: mise //mobile:install:ci
+
+      - name: Generate translations
+        run: mise //mobile:codegen:translation
+
+      - name: Generate platform APIs
+        working-directory: ./mobile
+        run: mise //mobile:codegen:pigeon
+
+      - name: Publish patch
+        working-directory: ./mobile
+        env:
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+        run: >-
+          shorebird patch android
+          --release-version "${{ inputs.release_version }}"
+          --build-name 3.1.37
+          --build-number 5096
