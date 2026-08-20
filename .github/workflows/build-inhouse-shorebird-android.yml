@@ -65,13 +65,22 @@ jobs:
             dart run pigeon --input "$schema"
           done
           dart format lib/platform/
-          test -s android/app/src/main/kotlin/app/alextran/immich/background/BackgroundWorker.g.kt
-          test -s android/app/src/main/kotlin/app/alextran/immich/connectivity/Connectivity.g.kt
-          test -s android/app/src/main/kotlin/app/alextran/immich/core/Network.g.kt
-          test -s android/app/src/main/kotlin/app/alextran/immich/images/LocalImages.g.kt
-          test -s android/app/src/main/kotlin/app/alextran/immich/permission/PermissionApi.g.kt
-          test -s android/app/src/main/kotlin/app/alextran/immich/sync/Messages.g.kt
-          test -s android/app/src/main/kotlin/app/alextran/immich/viewintent/ViewIntent.g.kt
+          mv android/app/src/main/kotlin/app/alextran/immich/background/BackgroundWorker.g.kt android/app/src/main/kotlin/app/alextran/immich/background/BackgroundWorker.pigeon.kt
+          mv android/app/src/main/kotlin/app/alextran/immich/background/BackgroundWorkerLock.g.kt android/app/src/main/kotlin/app/alextran/immich/background/BackgroundWorkerLock.pigeon.kt
+          mv android/app/src/main/kotlin/app/alextran/immich/connectivity/Connectivity.g.kt android/app/src/main/kotlin/app/alextran/immich/connectivity/Connectivity.pigeon.kt
+          mv android/app/src/main/kotlin/app/alextran/immich/core/Network.g.kt android/app/src/main/kotlin/app/alextran/immich/core/Network.pigeon.kt
+          mv android/app/src/main/kotlin/app/alextran/immich/images/LocalImages.g.kt android/app/src/main/kotlin/app/alextran/immich/images/LocalImages.pigeon.kt
+          mv android/app/src/main/kotlin/app/alextran/immich/images/RemoteImages.g.kt android/app/src/main/kotlin/app/alextran/immich/images/RemoteImages.pigeon.kt
+          mv android/app/src/main/kotlin/app/alextran/immich/permission/PermissionApi.g.kt android/app/src/main/kotlin/app/alextran/immich/permission/PermissionApi.pigeon.kt
+          mv android/app/src/main/kotlin/app/alextran/immich/sync/Messages.g.kt android/app/src/main/kotlin/app/alextran/immich/sync/Messages.pigeon.kt
+          mv android/app/src/main/kotlin/app/alextran/immich/viewintent/ViewIntent.g.kt android/app/src/main/kotlin/app/alextran/immich/viewintent/ViewIntent.pigeon.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/background/BackgroundWorker.pigeon.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/connectivity/Connectivity.pigeon.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/core/Network.pigeon.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/images/LocalImages.pigeon.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/permission/PermissionApi.pigeon.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/sync/Messages.pigeon.kt
+          test -s android/app/src/main/kotlin/app/alextran/immich/viewintent/ViewIntent.pigeon.kt
 
       - name: Create Shorebird release and signed APK
         working-directory: ./mobile
