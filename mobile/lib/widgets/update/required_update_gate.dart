@@ -110,7 +110,6 @@ class RequiredUpdateGate extends StatefulWidget {
 
 class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBindingObserver {
   Timer? _timer;
-  Timer? _dismissTimer;
   bool _checking = false;
   bool _showUpdateScreen = true;
   InhouseUpdateManifest? _apkUpdate;
@@ -140,7 +139,6 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
   @override
   void dispose() {
     _timer?.cancel();
-    _dismissTimer?.cancel();
     _updateChannel.setMethodCallHandler(null);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -187,7 +185,6 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
 
     _checking = true;
-    _dismissTimer?.cancel();
     if (showScreen && mounted) {
       setState(() {
         _showUpdateScreen = true;
@@ -235,10 +232,6 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
             ? 'A new Inhouse Photos app version is ready.'
             : 'Checking for improvements. Any Inhouse Photos data update downloads securely in the background.';
       });
-
-      if (!needsNativeUpdate) {
-        _dismissUpdateScreenSoon();
-      }
     } catch (_) {
       if (mounted && showScreen) {
         setState(() {
@@ -249,15 +242,6 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     } finally {
       _checking = false;
     }
-  }
-
-  void _dismissUpdateScreenSoon() {
-    _dismissTimer?.cancel();
-    _dismissTimer = Timer(const Duration(milliseconds: 900), () {
-      if (mounted && _apkUpdate == null && _installState == _InstallState.idle) {
-        setState(() => _showUpdateScreen = false);
-      }
-    });
   }
 
   Future<void> _installNativeUpdate() async {
@@ -321,7 +305,6 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
   }
 
   void _openApp() {
-    _dismissTimer?.cancel();
     setState(() => _showUpdateScreen = false);
   }
 
