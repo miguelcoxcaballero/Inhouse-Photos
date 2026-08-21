@@ -2,7 +2,6 @@
 # The app ID is public and identifies this app when requesting signed patches.
 app_id: d4b7d5eb-ce1d-4995-963f-059f69348fc8
 
-# The app owns the update experience so every launch can clearly show whether
-# a data patch, or a full APK, is needed. RequiredUpdateGate triggers the
-# signed Shorebird check and download itself.
-auto_update: false
+# Automatic updates are enabled. A compatible patch is downloaded quietly in
+# the background and applied the next time the app starts.
+auto_update: true

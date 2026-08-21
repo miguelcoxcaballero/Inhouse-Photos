@@ -65,7 +65,6 @@ dependencies:
   scrollable_positioned_list: ^0.3.8
   share_handler: ^0.0.25
   share_plus: ^10.1.4
-  shorebird_code_push: ^2.0.7
   sliver_tools: ^0.2.12
   stream_transform: ^2.1.1
   sqlite3: ^3.3.2

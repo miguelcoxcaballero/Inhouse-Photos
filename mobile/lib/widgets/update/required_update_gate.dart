@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi' as ffi;
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:immich_mobile/widgets/common/immich_logo.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:shorebird_code_push/shorebird_code_push.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _androidUpdateManifestUrl =
@@ -94,7 +95,41 @@ class InhouseUpdateManifest {
   }
 }
 
-enum _InstallState { idle, downloadingApk, applyingDataUpdate, permissionRequired, restartRequired, ready, error }
+enum _InstallState { idle, downloadingApk, dataUpdateAvailable, permissionRequired, restartRequired, ready, error }
+
+enum _DataUpdateStatus { unavailable, upToDate, available, restartRequired }
+
+/// Minimal bindings for the Shorebird engine that is already inside an OTA
+/// base APK. Keeping this here means a patch can update the UI without adding
+/// a Flutter package or other bundled assets, which Shorebird rightly refuses
+/// to patch in place.
+class _ShorebirdUpdateProbe {
+  static Future<_DataUpdateStatus> check() async {
+    try {
+      return await Isolate.run(() {
+        final library = ffi.DynamicLibrary.process();
+        final currentPatch = library.lookupFunction<ffi.Int32 Function(), int Function()>(
+          'shorebird_current_boot_patch_number',
+        );
+        final nextPatch = library.lookupFunction<ffi.Int32 Function(), int Function()>(
+          'shorebird_next_boot_patch_number',
+        );
+        final hasDownloadableUpdate = library
+            .lookupFunction<ffi.Bool Function(ffi.Pointer<ffi.Char>), bool Function(ffi.Pointer<ffi.Char>)>(
+              'shorebird_check_for_downloadable_update',
+            );
+        final stableTrack = ffi.Pointer<ffi.Char>.fromAddress(0);
+
+        if (hasDownloadableUpdate(stableTrack)) {
+          return _DataUpdateStatus.available;
+        }
+        return currentPatch() == nextPatch() ? _DataUpdateStatus.upToDate : _DataUpdateStatus.restartRequired;
+      });
+    } catch (_) {
+      return _DataUpdateStatus.unavailable;
+    }
+  }
+}
 
 /// A single launch gate for both signed Shorebird data patches and native app
 /// packages. The screen deliberately appears on every cold app launch: this
@@ -109,7 +144,6 @@ class RequiredUpdateGate extends StatefulWidget {
 }
 
 class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBindingObserver {
-  final ShorebirdUpdater _shorebirdUpdater = ShorebirdUpdater();
   Timer? _timer;
   Timer? _dismissTimer;
   bool _checking = false;
@@ -182,16 +216,8 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
   }
 
-  Future<UpdateStatus?> _fetchDataUpdateStatus() async {
-    if (!_shorebirdUpdater.isAvailable) {
-      return null;
-    }
-    try {
-      return await _shorebirdUpdater.checkForUpdate().timeout(const Duration(seconds: 15));
-    } catch (_) {
-      return null;
-    }
-  }
+  Future<_DataUpdateStatus> _fetchDataUpdateStatus() =>
+      _ShorebirdUpdateProbe.check().timeout(const Duration(seconds: 5), onTimeout: () => _DataUpdateStatus.unavailable);
 
   Future<void> _checkForUpdate({bool showScreen = false}) async {
     if ((!Platform.isAndroid && !Platform.isIOS) || _checking) {
@@ -246,10 +272,10 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
         _downloadTotalBytes = null;
         if (needsNativeUpdate) {
           _status = 'A new Inhouse Photos app version is ready.';
-        } else if (dataStatus == UpdateStatus.outdated) {
-          _installState = _InstallState.applyingDataUpdate;
-          _status = 'Downloading the latest Inhouse Photos improvements...';
-        } else if (dataStatus == UpdateStatus.restartRequired) {
+        } else if (dataStatus == _DataUpdateStatus.available) {
+          _installState = _InstallState.dataUpdateAvailable;
+          _status = 'A smaller Inhouse Photos update is downloading securely in the background.';
+        } else if (dataStatus == _DataUpdateStatus.restartRequired) {
           _installState = _InstallState.restartRequired;
           _status = 'The latest Inhouse Photos improvements are ready.';
         } else {
@@ -261,11 +287,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
       if (needsNativeUpdate) {
         return;
       }
-      if (dataStatus == UpdateStatus.outdated) {
-        unawaited(_applyDataUpdate());
-        return;
-      }
-      if (dataStatus != UpdateStatus.restartRequired) {
+      if (dataStatus == _DataUpdateStatus.upToDate || dataStatus == _DataUpdateStatus.unavailable) {
         _dismissUpdateScreenSoon();
       }
     } catch (_) {
@@ -277,30 +299,6 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
       }
     } finally {
       _checking = false;
-    }
-  }
-
-  Future<void> _applyDataUpdate() async {
-    if (!_shorebirdUpdater.isAvailable) {
-      return;
-    }
-    try {
-      await _shorebirdUpdater.update();
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _installState = _InstallState.restartRequired;
-        _status = 'Update downloaded and verified. Restart Inhouse Photos to use it.';
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _installState = _InstallState.error;
-        _status = 'The data update could not finish. Tap Try again to retry securely.';
-      });
     }
   }
 
@@ -395,19 +393,19 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
 
     final isNativeUpdate = nativeUpdate != null;
-    final isApplyingDataUpdate = _installState == _InstallState.applyingDataUpdate;
+    final isDataUpdateAvailable = _installState == _InstallState.dataUpdateAvailable;
     final isDownloadingApk = _installState == _InstallState.downloadingApk;
     final needsRestart = _installState == _InstallState.restartRequired;
     final hasError = _installState == _InstallState.error;
     final heading = switch (_installState) {
-      _InstallState.applyingDataUpdate => 'Updating Inhouse Photos',
+      _InstallState.dataUpdateAvailable => 'Data update available',
       _InstallState.restartRequired => 'Update ready',
       _InstallState.downloadingApk => 'Downloading app update',
       _ => isNativeUpdate ? 'App update ready' : 'Checking for updates',
     };
 
     return PopScope(
-      canPop: !isNativeUpdate && !isApplyingDataUpdate && !isDownloadingApk,
+      canPop: !isNativeUpdate && !isDownloadingApk,
       child: Stack(
         children: [
           widget.child,
@@ -459,11 +457,11 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                 ),
                               ],
                               const SizedBox(height: 24),
-                              if (isApplyingDataUpdate || isDownloadingApk) ...[
+                              if (isDownloadingApk) ...[
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(999),
                                   child: LinearProgressIndicator(
-                                    value: isApplyingDataUpdate ? null : _downloadProgress,
+                                    value: _downloadProgress,
                                     minHeight: 9,
                                     backgroundColor: const Color(0xFF3A302A),
                                     valueColor: const AlwaysStoppedAnimation(Color(0xFFD97736)),
@@ -471,9 +469,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                 ),
                                 const SizedBox(height: 9),
                                 Text(
-                                  isApplyingDataUpdate
-                                      ? 'This is a small app-data update. No APK installation is needed.'
-                                      : _downloadTotalBytes == null
+                                  _downloadTotalBytes == null
                                       ? formatInhouseDownloadBytes(_downloadedBytes)
                                       : '${(_downloadProgress! * 100).round()}% · '
                                             '${formatInhouseDownloadBytes(_downloadedBytes)} / '
@@ -485,10 +481,20 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                 ),
                                 const SizedBox(height: 18),
                               ],
+                              if (isDataUpdateAvailable) ...[
+                                Text(
+                                  'No APK download or installation is needed. The built-in updater will apply this change the next time the app opens.',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.bodySmall?.copyWith(color: const Color(0xFFB8AEA7), height: 1.4),
+                                ),
+                                const SizedBox(height: 18),
+                              ],
                               SizedBox(
                                 width: double.infinity,
                                 child: FilledButton(
-                                  onPressed: isApplyingDataUpdate || isDownloadingApk
+                                  onPressed: isDownloadingApk
                                       ? null
                                       : needsRestart
                                       ? _closeForRestart
@@ -503,8 +509,8 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                     padding: const EdgeInsets.symmetric(vertical: 15),
                                   ),
                                   child: Text(switch (_installState) {
-                                    _InstallState.applyingDataUpdate => 'Updating...',
                                     _InstallState.downloadingApk => 'Downloading...',
+                                    _InstallState.dataUpdateAvailable => 'Continue while updating',
                                     _InstallState.restartRequired =>
                                       Platform.isIOS ? 'Close and reopen' : 'Restart now',
                                     _InstallState.permissionRequired => 'Continue installation',
