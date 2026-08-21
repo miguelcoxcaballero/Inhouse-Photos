@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:immich_mobile/widgets/common/immich_logo.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shorebird_code_push/shorebird_code_push.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _androidUpdateManifestUrl =
@@ -16,6 +17,7 @@ const _iosUpdateManifestUrl =
 const _sideStoreSourceUrl =
     'https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/altstore-source.json';
 const _updateChannel = MethodChannel('com.inhousesoftware.photos/updates');
+const _minimumUpdateScreenTime = Duration(milliseconds: 650);
 
 double? calculateInhouseDownloadProgress({required int downloadedBytes, required int? totalBytes}) {
   if (totalBytes == null || totalBytes <= 0) {
@@ -92,8 +94,11 @@ class InhouseUpdateManifest {
   }
 }
 
-enum _InstallState { idle, downloading, permissionRequired, ready, error }
+enum _InstallState { idle, downloadingApk, applyingDataUpdate, permissionRequired, restartRequired, ready, error }
 
+/// A single launch gate for both signed Shorebird data patches and native app
+/// packages. The screen deliberately appears on every cold app launch: this
+/// makes an OTA update visible instead of silently looking like nothing changed.
 class RequiredUpdateGate extends StatefulWidget {
   const RequiredUpdateGate({required this.child, super.key});
 
@@ -104,12 +109,15 @@ class RequiredUpdateGate extends StatefulWidget {
 }
 
 class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBindingObserver {
+  final ShorebirdUpdater _shorebirdUpdater = ShorebirdUpdater();
   Timer? _timer;
+  Timer? _dismissTimer;
   bool _checking = false;
-  InhouseUpdateManifest? _update;
+  bool _showUpdateScreen = true;
+  InhouseUpdateManifest? _apkUpdate;
   String _installedVersion = '';
   _InstallState _installState = _InstallState.idle;
-  String _status = '';
+  String _status = 'Checking for the latest Inhouse Photos update...';
   double? _downloadProgress;
   int _downloadedBytes = 0;
   int? _downloadTotalBytes;
@@ -119,7 +127,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _updateChannel.setMethodCallHandler(_handleUpdateChannelCall);
-    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_checkForUpdate()));
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_checkForUpdate(showScreen: true)));
     _timer = Timer.periodic(const Duration(minutes: 15), (_) => unawaited(_checkForUpdate()));
   }
 
@@ -133,6 +141,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
   @override
   void dispose() {
     _timer?.cancel();
+    _dismissTimer?.cancel();
     _updateChannel.setMethodCallHandler(null);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -153,13 +162,8 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     });
   }
 
-  Future<void> _checkForUpdate() async {
-    if ((!Platform.isAndroid && !Platform.isIOS) || _checking) {
-      return;
-    }
-    _checking = true;
+  Future<InhouseUpdateManifest?> _fetchNativeUpdate() async {
     try {
-      final packageInfo = await PackageInfo.fromPlatform();
       final manifestUri = Uri.parse(
         Platform.isIOS ? _iosUpdateManifestUrl : _androidUpdateManifestUrl,
       ).replace(queryParameters: {'check': DateTime.now().millisecondsSinceEpoch.toString()});
@@ -167,43 +171,155 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
           .get(manifestUri, headers: const {'Cache-Control': 'no-cache'})
           .timeout(const Duration(seconds: 15));
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw HttpException('Update check failed (${response.statusCode})');
+        return null;
       }
-      final manifest = InhouseUpdateManifest.fromJson(
+      return InhouseUpdateManifest.fromJson(
         jsonDecode(response.body) as Map<String, dynamic>,
         assetKey: Platform.isIOS ? 'ipaUrl' : 'apkUrl',
       );
-      final needsUpdate = manifest.required && compareInhouseVersions(manifest.version, packageInfo.version) > 0;
+    } catch (_) {
+      return null;
+    }
+  }
 
+  Future<UpdateStatus?> _fetchDataUpdateStatus() async {
+    if (!_shorebirdUpdater.isAvailable) {
+      return null;
+    }
+    try {
+      return await _shorebirdUpdater.checkForUpdate().timeout(const Duration(seconds: 15));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _checkForUpdate({bool showScreen = false}) async {
+    if ((!Platform.isAndroid && !Platform.isIOS) || _checking) {
+      return;
+    }
+
+    _checking = true;
+    _dismissTimer?.cancel();
+    if (showScreen && mounted) {
+      setState(() {
+        _showUpdateScreen = true;
+        _installState = _InstallState.idle;
+        _status = 'Checking for the latest Inhouse Photos update...';
+      });
+    }
+
+    final startedAt = DateTime.now();
+    final packageInfoFuture = PackageInfo.fromPlatform();
+    final nativeUpdateFuture = _fetchNativeUpdate();
+    final dataUpdateFuture = _fetchDataUpdateStatus();
+
+    try {
+      final packageInfo = await packageInfoFuture;
+      final nativeUpdate = await nativeUpdateFuture;
+      final dataStatus = await dataUpdateFuture;
+      final remaining = _minimumUpdateScreenTime - DateTime.now().difference(startedAt);
+      if (!remaining.isNegative) {
+        await Future<void>.delayed(remaining);
+      }
       if (!mounted) {
         return;
       }
+
+      final nativeVersionComparison = nativeUpdate == null
+          ? 0
+          : compareInhouseVersions(nativeUpdate.version, packageInfo.version);
+      // The 3.1.37 OTA base used build 5096 while a short-lived manual APK
+      // used build 3097. A build number by itself must never offer a lower
+      // visible version, but it resolves two builds of the same version.
+      final needsNativeUpdate =
+          nativeUpdate != null &&
+          nativeUpdate.required &&
+          (nativeVersionComparison > 0 ||
+              (nativeVersionComparison == 0 &&
+                  nativeUpdate.versionCode > (int.tryParse(packageInfo.buildNumber) ?? 0)));
+
       setState(() {
         _installedVersion = packageInfo.version;
-        _update = needsUpdate ? manifest : null;
-        if (!needsUpdate) {
+        _apkUpdate = needsNativeUpdate ? nativeUpdate : null;
+        _downloadProgress = null;
+        _downloadedBytes = 0;
+        _downloadTotalBytes = null;
+        if (needsNativeUpdate) {
+          _status = 'A new Inhouse Photos app version is ready.';
+        } else if (dataStatus == UpdateStatus.outdated) {
+          _installState = _InstallState.applyingDataUpdate;
+          _status = 'Downloading the latest Inhouse Photos improvements...';
+        } else if (dataStatus == UpdateStatus.restartRequired) {
+          _installState = _InstallState.restartRequired;
+          _status = 'The latest Inhouse Photos improvements are ready.';
+        } else {
           _installState = _InstallState.idle;
-          _status = '';
+          _status = 'Inhouse Photos is up to date.';
         }
       });
+
+      if (needsNativeUpdate) {
+        return;
+      }
+      if (dataStatus == UpdateStatus.outdated) {
+        unawaited(_applyDataUpdate());
+        return;
+      }
+      if (dataStatus != UpdateStatus.restartRequired) {
+        _dismissUpdateScreenSoon();
+      }
     } catch (_) {
-      // Match Inhouse Notes: a temporary network or GitHub failure never
-      // prevents an already-current app from starting.
+      if (mounted && showScreen) {
+        setState(() {
+          _installState = _InstallState.error;
+          _status = 'We could not check for updates. Your installed app can still open normally.';
+        });
+      }
     } finally {
       _checking = false;
     }
   }
 
-  Future<void> _installUpdate() async {
-    final update = _update;
+  Future<void> _applyDataUpdate() async {
+    if (!_shorebirdUpdater.isAvailable) {
+      return;
+    }
+    try {
+      await _shorebirdUpdater.update();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _installState = _InstallState.restartRequired;
+        _status = 'Update downloaded and verified. Restart Inhouse Photos to use it.';
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _installState = _InstallState.error;
+        _status = 'The data update could not finish. Tap Try again to retry securely.';
+      });
+    }
+  }
+
+  void _dismissUpdateScreenSoon() {
+    _dismissTimer?.cancel();
+    _dismissTimer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted && _apkUpdate == null && _installState == _InstallState.idle) {
+        setState(() => _showUpdateScreen = false);
+      }
+    });
+  }
+
+  Future<void> _installNativeUpdate() async {
+    final update = _apkUpdate;
     if (update == null) {
       return;
     }
 
     if (Platform.isIOS) {
-      // iOS does not permit an app to replace its own bundle. Hand the exact,
-      // versioned IPA to SideStore so it can sign and install the update. The
-      // AltSource remains registered for future version discovery.
       final installUri = buildSideStoreInstallUri(update.apkUrl);
       var opened = false;
       try {
@@ -215,7 +331,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
         return;
       }
       setState(() {
-        _installState = opened ? _InstallState.idle : _InstallState.error;
+        _installState = opened ? _InstallState.ready : _InstallState.error;
         _status = opened
             ? 'SideStore is preparing the update. Keep LocalDevVPN enabled, install it there, then reopen Inhouse Photos.'
             : 'SideStore is not installed. Add the Inhouse Photos source there, then try again: $_sideStoreSourceUrl';
@@ -224,8 +340,8 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
 
     setState(() {
-      _installState = _InstallState.downloading;
-      _status = 'Downloading the update securely inside Inhouse Photos…';
+      _installState = _InstallState.downloadingApk;
+      _status = 'Downloading the app update securely...';
       _downloadProgress = 0;
       _downloadedBytes = 0;
       _downloadTotalBytes = null;
@@ -257,112 +373,160 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
   }
 
+  void _closeForRestart() {
+    // A Shorebird patch is loaded by a fresh Flutter engine. Android can close
+    // the task immediately; iOS follows the platform rule and asks the user to
+    // reopen it rather than attempting an unsafe in-process restart.
+    if (Platform.isAndroid) {
+      unawaited(SystemNavigator.pop());
+    }
+  }
+
+  void _openApp() {
+    _dismissTimer?.cancel();
+    setState(() => _showUpdateScreen = false);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final update = _update;
+    final nativeUpdate = _apkUpdate;
+    if (!_showUpdateScreen) {
+      return widget.child;
+    }
+
+    final isNativeUpdate = nativeUpdate != null;
+    final isApplyingDataUpdate = _installState == _InstallState.applyingDataUpdate;
+    final isDownloadingApk = _installState == _InstallState.downloadingApk;
+    final needsRestart = _installState == _InstallState.restartRequired;
+    final hasError = _installState == _InstallState.error;
+    final heading = switch (_installState) {
+      _InstallState.applyingDataUpdate => 'Updating Inhouse Photos',
+      _InstallState.restartRequired => 'Update ready',
+      _InstallState.downloadingApk => 'Downloading app update',
+      _ => isNativeUpdate ? 'App update ready' : 'Checking for updates',
+    };
+
     return PopScope(
-      canPop: update == null,
+      canPop: !isNativeUpdate && !isApplyingDataUpdate && !isDownloadingApk,
       child: Stack(
         children: [
           widget.child,
-          if (update != null)
-            Positioned.fill(
-              child: ColoredBox(
-                color: const Color(0xF5000000),
-                child: SafeArea(
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
-                        child: Material(
-                          color: const Color(0xFF171310),
-                          elevation: 24,
-                          borderRadius: BorderRadius.circular(24),
-                          child: Padding(
-                            padding: const EdgeInsets.all(28),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const ImmichLogo(heroTag: 'required-update-logo'),
-                                const SizedBox(height: 20),
-                                Text(
-                                  'Update required',
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                    color: const Color(0xFFF5F5F0),
-                                    fontWeight: FontWeight.w700,
-                                  ),
+          Positioned.fill(
+            child: ColoredBox(
+              color: const Color(0xF5000000),
+              child: SafeArea(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: Material(
+                        color: const Color(0xFF171310),
+                        elevation: 24,
+                        borderRadius: BorderRadius.circular(24),
+                        child: Padding(
+                          padding: const EdgeInsets.all(28),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const ImmichLogo(heroTag: 'required-update-logo'),
+                              const SizedBox(height: 20),
+                              Text(
+                                heading,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  color: const Color(0xFFF5F5F0),
+                                  fontWeight: FontWeight.w700,
                                 ),
-                                const SizedBox(height: 12),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                _status,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  color: hasError ? const Color(0xFFFFA8A8) : const Color(0xFFD7D0CA),
+                                  height: 1.45,
+                                ),
+                              ),
+                              if (isNativeUpdate) ...[
+                                const SizedBox(height: 8),
                                 Text(
-                                  'You have Inhouse Photos $_installedVersion. Install version ${update.version} to continue.',
+                                  'App version $_installedVersion to ${nativeUpdate.version}',
                                   textAlign: TextAlign.center,
                                   style: Theme.of(
                                     context,
-                                  ).textTheme.bodyLarge?.copyWith(color: const Color(0xFFD7D0CA), height: 1.45),
+                                  ).textTheme.bodySmall?.copyWith(color: const Color(0xFFB8AEA7)),
                                 ),
-                                const SizedBox(height: 24),
-                                if (_installState == _InstallState.downloading) ...[
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(999),
-                                    child: LinearProgressIndicator(
-                                      value: _downloadProgress,
-                                      minHeight: 9,
-                                      backgroundColor: const Color(0xFF3A302A),
-                                      valueColor: const AlwaysStoppedAnimation(Color(0xFFD97736)),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 9),
-                                  Text(
-                                    _downloadTotalBytes == null
-                                        ? formatInhouseDownloadBytes(_downloadedBytes)
-                                        : '${(_downloadProgress! * 100).round()}%  ·  '
-                                              '${formatInhouseDownloadBytes(_downloadedBytes)} / '
-                                              '${formatInhouseDownloadBytes(_downloadTotalBytes!)}',
-                                    textAlign: TextAlign.center,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelMedium?.copyWith(color: const Color(0xFFD7D0CA)),
-                                  ),
-                                  const SizedBox(height: 18),
-                                ],
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton(
-                                    onPressed:
-                                        _installState == _InstallState.downloading ||
-                                            _installState == _InstallState.ready
-                                        ? null
-                                        : _installUpdate,
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: const Color(0xFFD97736),
-                                      foregroundColor: Colors.black,
-                                      padding: const EdgeInsets.symmetric(vertical: 15),
-                                    ),
-                                    child: Text(switch (_installState) {
-                                      _InstallState.downloading => 'Downloading…',
-                                      _InstallState.permissionRequired => 'Continue installation',
-                                      _InstallState.error => 'Try again',
-                                      _ => Platform.isIOS ? 'Open SideStore' : 'Install update',
-                                    }),
-                                  ),
-                                ),
-                                if (_status.isNotEmpty) ...[
-                                  const SizedBox(height: 14),
-                                  Text(
-                                    _status,
-                                    textAlign: TextAlign.center,
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: _installState == _InstallState.error
-                                          ? const Color(0xFFFFA8A8)
-                                          : const Color(0xFFB8AEA7),
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
                               ],
-                            ),
+                              const SizedBox(height: 24),
+                              if (isApplyingDataUpdate || isDownloadingApk) ...[
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: LinearProgressIndicator(
+                                    value: isApplyingDataUpdate ? null : _downloadProgress,
+                                    minHeight: 9,
+                                    backgroundColor: const Color(0xFF3A302A),
+                                    valueColor: const AlwaysStoppedAnimation(Color(0xFFD97736)),
+                                  ),
+                                ),
+                                const SizedBox(height: 9),
+                                Text(
+                                  isApplyingDataUpdate
+                                      ? 'This is a small app-data update. No APK installation is needed.'
+                                      : _downloadTotalBytes == null
+                                      ? formatInhouseDownloadBytes(_downloadedBytes)
+                                      : '${(_downloadProgress! * 100).round()}% · '
+                                            '${formatInhouseDownloadBytes(_downloadedBytes)} / '
+                                            '${formatInhouseDownloadBytes(_downloadTotalBytes!)}',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium?.copyWith(color: const Color(0xFFD7D0CA)),
+                                ),
+                                const SizedBox(height: 18),
+                              ],
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton(
+                                  onPressed: isApplyingDataUpdate || isDownloadingApk
+                                      ? null
+                                      : needsRestart
+                                      ? _closeForRestart
+                                      : hasError
+                                      ? () => unawaited(_checkForUpdate(showScreen: true))
+                                      : isNativeUpdate
+                                      ? _installNativeUpdate
+                                      : _openApp,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFFD97736),
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(vertical: 15),
+                                  ),
+                                  child: Text(switch (_installState) {
+                                    _InstallState.applyingDataUpdate => 'Updating...',
+                                    _InstallState.downloadingApk => 'Downloading...',
+                                    _InstallState.restartRequired =>
+                                      Platform.isIOS ? 'Close and reopen' : 'Restart now',
+                                    _InstallState.permissionRequired => 'Continue installation',
+                                    _InstallState.error => 'Try again',
+                                    _ =>
+                                      isNativeUpdate
+                                          ? (Platform.isIOS ? 'Open SideStore' : 'Install app update')
+                                          : 'Open Photos',
+                                  }),
+                                ),
+                              ),
+                              if (needsRestart && Platform.isIOS) ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Close Inhouse Photos, then open it again to use the update.',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.bodySmall?.copyWith(color: const Color(0xFFB8AEA7), height: 1.4),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ),
@@ -371,6 +535,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
