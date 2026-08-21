@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi' as ffi;
 import 'dart:io';
+import 'dart:isolate';
 
+import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -93,7 +96,113 @@ class InhouseUpdateManifest {
   }
 }
 
-enum _InstallState { idle, downloadingApk, permissionRequired, ready, error }
+enum _InstallState {
+  checking,
+  upToDate,
+  downloadingData,
+  restartRequired,
+  downloadingApk,
+  permissionRequired,
+  ready,
+  error,
+}
+
+final class _ShorebirdUpdateResult extends ffi.Struct {
+  @ffi.Int32()
+  external int status;
+
+  external ffi.Pointer<ffi.Char> message;
+}
+
+typedef _NativePatchNumber = ffi.UintPtr Function();
+typedef _DartPatchNumber = int Function();
+typedef _NativeCheckUpdate = ffi.Bool Function(ffi.Pointer<ffi.Char>);
+typedef _DartCheckUpdate = bool Function(ffi.Pointer<ffi.Char>);
+typedef _NativeInstallUpdate = ffi.Pointer<_ShorebirdUpdateResult> Function(ffi.Pointer<ffi.Char>);
+typedef _DartInstallUpdate = ffi.Pointer<_ShorebirdUpdateResult> Function(ffi.Pointer<ffi.Char>);
+typedef _NativeFreeUpdate = ffi.Void Function(ffi.Pointer<_ShorebirdUpdateResult>);
+typedef _DartFreeUpdate = void Function(ffi.Pointer<_ShorebirdUpdateResult>);
+
+const _shorebirdNoUpdate = 0;
+const _shorebirdUpdateInstalled = 1;
+const _shorebirdUpdateInProgress = 4;
+
+class _ShorebirdSnapshot {
+  const _ShorebirdSnapshot({
+    required this.available,
+    required this.currentPatch,
+    required this.nextPatch,
+    required this.downloadable,
+  });
+
+  const _ShorebirdSnapshot.unavailable() : available = false, currentPatch = 0, nextPatch = 0, downloadable = false;
+
+  final bool available;
+  final int currentPatch;
+  final int nextPatch;
+  final bool downloadable;
+
+  bool get requiresRestart => available && currentPatch != nextPatch;
+}
+
+class _ShorebirdInstallResult {
+  const _ShorebirdInstallResult(this.status, this.message);
+
+  final int status;
+  final String message;
+
+  bool get accepted =>
+      status == _shorebirdNoUpdate || status == _shorebirdUpdateInstalled || status == _shorebirdUpdateInProgress;
+}
+
+/// Talks directly to the Shorebird engine already bundled in the installed
+/// OTA base. This avoids adding another native plugin to a data-only patch.
+class _ShorebirdUpdateClient {
+  static Future<_ShorebirdSnapshot> inspect({required bool checkNetwork}) => Isolate.run(() {
+    try {
+      final library = ffi.DynamicLibrary.process();
+      final currentPatch = library.lookupFunction<_NativePatchNumber, _DartPatchNumber>(
+        'shorebird_current_boot_patch_number',
+      );
+      final nextPatch = library.lookupFunction<_NativePatchNumber, _DartPatchNumber>(
+        'shorebird_next_boot_patch_number',
+      );
+      final checkUpdate = library.lookupFunction<_NativeCheckUpdate, _DartCheckUpdate>(
+        'shorebird_check_for_downloadable_update',
+      );
+      return _ShorebirdSnapshot(
+        available: true,
+        currentPatch: currentPatch(),
+        nextPatch: nextPatch(),
+        downloadable: checkNetwork && checkUpdate(ffi.nullptr),
+      );
+    } catch (_) {
+      return const _ShorebirdSnapshot.unavailable();
+    }
+  });
+
+  static Future<_ShorebirdInstallResult> install() => Isolate.run(() {
+    try {
+      final library = ffi.DynamicLibrary.process();
+      final installUpdate = library.lookupFunction<_NativeInstallUpdate, _DartInstallUpdate>(
+        'shorebird_update_with_result',
+      );
+      final freeUpdate = library.lookupFunction<_NativeFreeUpdate, _DartFreeUpdate>('shorebird_free_update_result');
+      final result = installUpdate(ffi.nullptr);
+      if (result == ffi.nullptr) {
+        return const _ShorebirdInstallResult(-1, 'The updater returned no result.');
+      }
+      try {
+        final message = result.ref.message == ffi.nullptr ? '' : result.ref.message.cast<Utf8>().toDartString();
+        return _ShorebirdInstallResult(result.ref.status, message);
+      } finally {
+        freeUpdate(result);
+      }
+    } catch (error) {
+      return _ShorebirdInstallResult(-1, error.toString());
+    }
+  });
+}
 
 /// One launch gate for both data patches and native packages. The Shorebird
 /// engine inside the OTA base APK checks and downloads data patches itself;
@@ -114,7 +223,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
   bool _showUpdateScreen = true;
   InhouseUpdateManifest? _apkUpdate;
   String _installedVersion = '';
-  _InstallState _installState = _InstallState.idle;
+  _InstallState _installState = _InstallState.checking;
   String _status = 'Checking for the latest Inhouse Photos update...';
   double? _downloadProgress;
   int _downloadedBytes = 0;
@@ -188,7 +297,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     if (showScreen && mounted) {
       setState(() {
         _showUpdateScreen = true;
-        _installState = _InstallState.idle;
+        _installState = _InstallState.checking;
         _status = 'Checking for the latest Inhouse Photos update...';
       });
     }
@@ -227,11 +336,15 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
         _downloadProgress = null;
         _downloadedBytes = 0;
         _downloadTotalBytes = null;
-        _installState = _InstallState.idle;
+        _installState = needsNativeUpdate ? _InstallState.ready : _InstallState.checking;
         _status = needsNativeUpdate
             ? 'A new Inhouse Photos app version is ready.'
-            : 'Checking for improvements. Any Inhouse Photos data update downloads securely in the background.';
+            : 'Checking for secure data updates...';
       });
+
+      if (!needsNativeUpdate) {
+        await _installDataUpdate();
+      }
     } catch (_) {
       if (mounted && showScreen) {
         setState(() {
@@ -242,6 +355,119 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     } finally {
       _checking = false;
     }
+  }
+
+  Future<void> _installDataUpdate() async {
+    _ShorebirdSnapshot snapshot;
+    try {
+      snapshot = await _ShorebirdUpdateClient.inspect(checkNetwork: true).timeout(const Duration(seconds: 30));
+    } catch (_) {
+      snapshot = const _ShorebirdSnapshot.unavailable();
+    }
+    if (!mounted) {
+      return;
+    }
+
+    if (!snapshot.available) {
+      setState(() {
+        _installState = _InstallState.error;
+        _status = 'The secure updater is unavailable. Check your connection and try again.';
+      });
+      return;
+    }
+
+    if (snapshot.requiresRestart) {
+      _showPreparedDataUpdate(snapshot.nextPatch);
+      return;
+    }
+
+    setState(() {
+      _showUpdateScreen = true;
+      _installState = _InstallState.downloadingData;
+      _status = snapshot.downloadable
+          ? 'Downloading and verifying the latest data update...'
+          : 'Confirming that all app data is up to date...';
+    });
+
+    final result = await _ShorebirdUpdateClient.install().timeout(
+      const Duration(minutes: 5),
+      onTimeout: () => const _ShorebirdInstallResult(-1, 'The update timed out.'),
+    );
+    if (!mounted) {
+      return;
+    }
+
+    if (!result.accepted) {
+      setState(() {
+        _installState = _InstallState.error;
+        _status = result.message.isEmpty
+            ? 'The data update could not be installed. Please try again.'
+            : 'The data update could not be installed: ${result.message}';
+      });
+      return;
+    }
+
+    if (result.status == _shorebirdNoUpdate) {
+      setState(() {
+        _installState = _InstallState.upToDate;
+        _status = 'Inhouse Photos is fully up to date.';
+      });
+      return;
+    }
+
+    final preparedPatch = await _waitForPreparedPatch();
+    if (!mounted) {
+      return;
+    }
+    if (preparedPatch != null) {
+      _showPreparedDataUpdate(preparedPatch);
+      return;
+    }
+
+    final settledSnapshot = await _ShorebirdUpdateClient.inspect(checkNetwork: true);
+    if (!mounted) {
+      return;
+    }
+    if (settledSnapshot.requiresRestart) {
+      _showPreparedDataUpdate(settledSnapshot.nextPatch);
+      return;
+    }
+    if (settledSnapshot.available && !settledSnapshot.downloadable) {
+      setState(() {
+        _installState = _InstallState.upToDate;
+        _status = 'Inhouse Photos is fully up to date.';
+      });
+      return;
+    }
+
+    setState(() {
+      _installState = _InstallState.error;
+      _status = 'The download did not finish. Keep your connection active and try again.';
+    });
+  }
+
+  Future<int?> _waitForPreparedPatch() async {
+    final deadline = DateTime.now().add(const Duration(minutes: 2));
+    while (DateTime.now().isBefore(deadline)) {
+      final snapshot = await _ShorebirdUpdateClient.inspect(checkNetwork: false);
+      if (snapshot.requiresRestart) {
+        return snapshot.nextPatch;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    return null;
+  }
+
+  void _showPreparedDataUpdate(int patchNumber) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _showUpdateScreen = true;
+      _installState = _InstallState.restartRequired;
+      _downloadProgress = 1;
+      _status = 'Update $patchNumber is downloaded, verified, and installed. Reopen the app to activate it.';
+    });
   }
 
   Future<void> _installNativeUpdate() async {
@@ -304,6 +530,12 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
   }
 
+  void _closeForRestart() {
+    if (Platform.isAndroid) {
+      unawaited(SystemNavigator.pop());
+    }
+  }
+
   void _openApp() {
     setState(() => _showUpdateScreen = false);
   }
@@ -316,15 +548,24 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
 
     final isNativeUpdate = nativeUpdate != null;
+    final isChecking = _installState == _InstallState.checking;
+    final isDownloadingData = _installState == _InstallState.downloadingData;
     final isDownloadingApk = _installState == _InstallState.downloadingApk;
+    final isDownloading = isDownloadingData || isDownloadingApk;
+    final needsRestart = _installState == _InstallState.restartRequired;
+    final isUpToDate = _installState == _InstallState.upToDate;
     final hasError = _installState == _InstallState.error;
     final heading = switch (_installState) {
+      _InstallState.checking => 'Checking for updates',
+      _InstallState.upToDate => 'You are up to date',
+      _InstallState.downloadingData => 'Installing data update',
+      _InstallState.restartRequired => 'Update installed',
       _InstallState.downloadingApk => 'Downloading app update',
       _ => isNativeUpdate ? 'App update ready' : 'Checking for updates',
     };
 
     return PopScope(
-      canPop: !isNativeUpdate && !isDownloadingApk,
+      canPop: false,
       child: Stack(
         children: [
           widget.child,
@@ -376,11 +617,11 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                 ),
                               ],
                               const SizedBox(height: 24),
-                              if (isDownloadingApk) ...[
+                              if (isDownloading) ...[
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(999),
                                   child: LinearProgressIndicator(
-                                    value: _downloadProgress,
+                                    value: isDownloadingData ? null : _downloadProgress,
                                     minHeight: 9,
                                     backgroundColor: const Color(0xFF3A302A),
                                     valueColor: const AlwaysStoppedAnimation(Color(0xFFD97736)),
@@ -388,7 +629,9 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                 ),
                                 const SizedBox(height: 9),
                                 Text(
-                                  _downloadTotalBytes == null
+                                  isDownloadingData
+                                      ? 'Keep Inhouse Photos open until verification finishes'
+                                      : _downloadTotalBytes == null
                                       ? formatInhouseDownloadBytes(_downloadedBytes)
                                       : '${(_downloadProgress! * 100).round()}% · '
                                             '${formatInhouseDownloadBytes(_downloadedBytes)} / '
@@ -403,19 +646,28 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                               SizedBox(
                                 width: double.infinity,
                                 child: FilledButton(
-                                  onPressed: isDownloadingApk
+                                  onPressed: isChecking || isDownloading
                                       ? null
+                                      : needsRestart
+                                      ? _closeForRestart
                                       : hasError
                                       ? () => unawaited(_checkForUpdate(showScreen: true))
                                       : isNativeUpdate
                                       ? _installNativeUpdate
-                                      : _openApp,
+                                      : isUpToDate
+                                      ? _openApp
+                                      : null,
                                   style: FilledButton.styleFrom(
                                     backgroundColor: const Color(0xFFD97736),
                                     foregroundColor: Colors.black,
                                     padding: const EdgeInsets.symmetric(vertical: 15),
                                   ),
                                   child: Text(switch (_installState) {
+                                    _InstallState.checking => 'Checking...',
+                                    _InstallState.upToDate => 'Open Photos',
+                                    _InstallState.downloadingData => 'Installing securely...',
+                                    _InstallState.restartRequired =>
+                                      Platform.isAndroid ? 'Close and activate' : 'Close and reopen',
                                     _InstallState.downloadingApk => 'Downloading...',
                                     _InstallState.permissionRequired => 'Continue installation',
                                     _InstallState.error => 'Try again',
@@ -426,6 +678,18 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                   }),
                                 ),
                               ),
+                              if (needsRestart) ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                  Platform.isAndroid
+                                      ? 'Open Inhouse Photos again after it closes.'
+                                      : 'Close Inhouse Photos completely, then open it again to activate the update.',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.bodySmall?.copyWith(color: const Color(0xFFB8AEA7), height: 1.4),
+                                ),
+                              ],
                             ],
                           ),
                         ),
