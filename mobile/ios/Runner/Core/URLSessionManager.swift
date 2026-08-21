@@ -149,7 +149,13 @@ class URLSessionManager: NSObject {
     config.urlCache = urlCache
     config.httpCookieStorage = cookieStorage
     config.httpMaximumConnectionsPerHost = 64
-    config.timeoutIntervalForRequest = 60
+    // A photo library can contain large 4K videos. Do not fail a healthy
+    // upload just because it takes more than a minute on a mobile connection;
+    // URLSession still reports normal network errors and the Dart uploader
+    // retries transient failures.
+    config.timeoutIntervalForRequest = 15 * 60
+    config.timeoutIntervalForResource = 24 * 60 * 60
+    config.waitsForConnectivity = true
 
     var headers = UserDefaults.group.dictionary(forKey: HEADERS_KEY) as? [String: String] ?? [:]
     headers["User-Agent"] = headers["User-Agent"] ?? userAgent
@@ -198,6 +204,9 @@ private extension URLSessionConfiguration {
     let config = immich_background(withIdentifier: id)
     config.httpCookieStorage = URLSessionManager.cookieStorage
     config.httpAdditionalHeaders = ["User-Agent": URLSessionManager.userAgent]
+    config.timeoutIntervalForRequest = 15 * 60
+    config.timeoutIntervalForResource = 24 * 60 * 60
+    config.waitsForConnectivity = true
     return config
   }
 }

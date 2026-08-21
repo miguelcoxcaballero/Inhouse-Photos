@@ -35,6 +35,7 @@ class DriftBackupSettings extends ConsumerWidget {
           icon: Icons.high_quality_rounded,
         ),
         const _BackupQualityButton(),
+        const _BackupSpeedButton(),
         const Divider(),
         SettingGroupTitle(
           title: "network_requirements".t(context: context),
@@ -60,6 +61,108 @@ class DriftBackupSettings extends ConsumerWidget {
       ],
     );
   }
+}
+
+class _BackupSpeedButton extends ConsumerWidget {
+  const _BackupSpeedButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final speed = ref.watch(appConfigProvider.select((config) => config.backup.speed));
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: SettingListTile(
+        title: 'Upload speed',
+        subtitle: switch (speed) {
+          .balanced => 'Balanced — fast backup with lower heat and battery use',
+          .fast => 'Fast — uses more of your connection and battery',
+          .maximum => 'Maximum — uses the available connection as aggressively as possible',
+        },
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(switch (speed) {
+              .balanced => 'Balanced',
+              .fast => 'Fast',
+              .maximum => 'Maximum',
+            }, style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.primary)),
+            const Icon(Icons.chevron_right_rounded),
+          ],
+        ),
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          builder: (_) => _BackupSpeedSheet(selected: speed),
+        ),
+      ),
+    );
+  }
+}
+
+class _BackupSpeedSheet extends ConsumerWidget {
+  final BackupSpeedMode selected;
+
+  const _BackupSpeedSheet({required this.selected});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+            title: Text('Upload speed', style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+            subtitle: const Text('Applies to new uploads. Already backed-up photos are not changed.'),
+          ),
+          RadioGroup<BackupSpeedMode>(
+            groupValue: selected,
+            onChanged: (value) async {
+              if (value == null) return;
+              await ref.read(settingsProvider).write(SettingsKey.backupSpeed, value);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: Column(
+              children: const [
+                _BackupSpeedOption(
+                  value: BackupSpeedMode.balanced,
+                  title: 'Balanced',
+                  subtitle: 'Three uploads at once with a small preparation buffer.',
+                ),
+                _BackupSpeedOption(
+                  value: BackupSpeedMode.fast,
+                  title: 'Fast',
+                  subtitle: 'Five uploads at once. Best for reliable Wi-Fi.',
+                ),
+                _BackupSpeedOption(
+                  value: BackupSpeedMode.maximum,
+                  title: 'Maximum',
+                  subtitle: 'Up to eight uploads at once. May use more battery and make the phone warm.',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+}
+
+class _BackupSpeedOption extends StatelessWidget {
+  final BackupSpeedMode value;
+  final String title;
+  final String subtitle;
+
+  const _BackupSpeedOption({required this.value, required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) => RadioListTile<BackupSpeedMode>(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+    value: value,
+    title: Text(title),
+    subtitle: Text(subtitle),
+  );
 }
 
 class _BackupQualityButton extends ConsumerWidget {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/asset_metadata.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart' hide AssetVisibility;
+import 'package:immich_mobile/domain/models/config/backup_config.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/network_capability_extensions.dart';
@@ -41,6 +43,90 @@ class UploadCallbacks {
     this.onError,
     this.onICloudProgress,
   });
+}
+
+class _PreparedAsset {
+  final LocalAsset asset;
+  final File file;
+  final String originalFileName;
+  final Map<String, String> fields;
+  final bool isLivePhoto;
+  final File? livePhotoFile;
+  final File? temporaryFile;
+  final File? temporaryLivePhotoFile;
+  final File? sourceFile;
+  final File? sourceLivePhotoFile;
+
+  const _PreparedAsset({
+    required this.asset,
+    required this.file,
+    required this.originalFileName,
+    required this.fields,
+    required this.isLivePhoto,
+    required this.livePhotoFile,
+    required this.temporaryFile,
+    required this.temporaryLivePhotoFile,
+    required this.sourceFile,
+    required this.sourceLivePhotoFile,
+  });
+}
+
+class _UploadAcknowledgement {
+  final _PreparedAsset item;
+  final String remoteAssetId;
+
+  const _UploadAcknowledgement(this.item, this.remoteAssetId);
+}
+
+/// A small async queue with disk-safe back pressure. [close] stops producers
+/// but permits consumers to drain items that were already prepared.
+class _BoundedAsyncQueue<T> {
+  final int capacity;
+  final Queue<T> _items = Queue<T>();
+  final Queue<Completer<T?>> _readers = Queue<Completer<T?>>();
+  final Queue<Completer<void>> _writers = Queue<Completer<void>>();
+  bool _closed = false;
+
+  _BoundedAsyncQueue(int capacity) : capacity = capacity < 1 ? 1 : (capacity > 64 ? 64 : capacity);
+
+  Future<bool> add(T item) async {
+    while (!_closed && _items.length >= capacity && _readers.isEmpty) {
+      final writer = Completer<void>();
+      _writers.add(writer);
+      await writer.future;
+    }
+    if (_closed) return false;
+
+    if (_readers.isNotEmpty) {
+      _readers.removeFirst().complete(item);
+    } else {
+      _items.addLast(item);
+    }
+    return true;
+  }
+
+  Future<T?> take() {
+    if (_items.isNotEmpty) {
+      final item = _items.removeFirst();
+      if (_writers.isNotEmpty) _writers.removeFirst().complete();
+      return Future<T?>.value(item);
+    }
+    if (_closed) return Future<T?>.value();
+    final reader = Completer<T?>();
+    _readers.add(reader);
+    return reader.future;
+  }
+
+  void close() {
+    if (_closed) return;
+    _closed = true;
+    while (_writers.isNotEmpty) {
+      _writers.removeFirst().complete();
+    }
+    while (_readers.isNotEmpty) {
+      _readers.removeFirst().complete(null);
+    }
+  }
 }
 
 final foregroundUploadServiceProvider = Provider((ref) {
@@ -105,16 +191,111 @@ class ForegroundUploadService {
     if (useSequentialUpload) {
       await _uploadSequentially(items: candidates, cancelToken: cancelToken, hasWifi: hasWifi, callbacks: callbacks);
     } else {
-      await _executeWithWorkerPool<LocalAsset>(
+      await _uploadWithPipeline(
         items: candidates,
         cancelToken: cancelToken,
         shouldSkip: (asset) {
           final requireWifi = _shouldRequireWiFi(asset);
           return requireWifi && !hasWifi;
         },
-        processItem: (asset) => uploadSingleAsset(asset, cancelToken, callbacks: callbacks),
+        callbacks: callbacks,
       );
     }
+  }
+
+  /// Upload candidates through three independent bounded stages. The former
+  /// worker pool compressed, uploaded and acknowledged one asset at a time,
+  /// leaving the network idle whenever a worker was preparing media or writing
+  /// local state. Keeping those stages separate gives the uploader enough
+  /// read-ahead to keep the connection saturated without filling disk storage.
+  Future<void> _uploadWithPipeline({
+    required List<LocalAsset> items,
+    required Completer<void>? cancelToken,
+    required bool Function(LocalAsset) shouldSkip,
+    required UploadCallbacks callbacks,
+  }) async {
+    await _storageRepository.clearCache();
+    shouldAbortUpload = false;
+
+    final speed = SettingsRepository.instance.appConfig.backup.speed;
+    final prepared = _BoundedAsyncQueue<_PreparedAsset>(speed.preparedQueueCapacity);
+    final acknowledgements = _BoundedAsyncQueue<_UploadAcknowledgement>(speed.uploadWorkers * 2);
+    var currentIndex = 0;
+
+    // Wake producers blocked on a full preparation queue. Existing uploads are
+    // allowed to receive their cancellation signal and every temporary file is
+    // still cleaned up by its owning worker.
+    cancelToken?.future.whenComplete(prepared.close);
+
+    LocalAsset? nextAsset() {
+      if (shouldAbortUpload || (cancelToken?.isCompleted ?? false) || currentIndex >= items.length) {
+        return null;
+      }
+      return items[currentIndex++];
+    }
+
+    Future<void> prepareWorker() async {
+      while (true) {
+        final asset = nextAsset();
+        if (asset == null) return;
+        if (shouldSkip(asset)) continue;
+
+        final item = await _prepareAsset(asset, callbacks: callbacks);
+        if (item == null) continue;
+        if (!await prepared.add(item)) {
+          await _cleanupPreparedAsset(item);
+          return;
+        }
+      }
+    }
+
+    Future<void> uploadWorker() async {
+      while (true) {
+        final item = await prepared.take();
+        if (item == null) return;
+        if (shouldAbortUpload || (cancelToken?.isCompleted ?? false)) {
+          await _cleanupPreparedAsset(item);
+          continue;
+        }
+
+        final acknowledgement = await _uploadPreparedAsset(item, cancelToken, callbacks: callbacks);
+        if (acknowledgement == null) {
+          await _cleanupPreparedAsset(item);
+          continue;
+        }
+        if (!await acknowledgements.add(acknowledgement)) {
+          await _cleanupPreparedAsset(item);
+        }
+      }
+    }
+
+    Future<void> acknowledgementWorker() async {
+      while (true) {
+        final acknowledgement = await acknowledgements.take();
+        if (acknowledgement == null) return;
+        try {
+          final onSuccess = callbacks.onSuccess;
+          if (onSuccess != null) {
+            await Future<void>.value(onSuccess(acknowledgement.item.asset.localId!, acknowledgement.remoteAssetId));
+          }
+        } catch (error, stackTrace) {
+          _logger.severe(() => 'Error recording uploaded asset: $error', stackTrace);
+          callbacks.onError?.call(acknowledgement.item.asset.localId!, error.toString());
+        } finally {
+          await _cleanupPreparedAsset(acknowledgement.item);
+        }
+      }
+    }
+
+    final preparationWorkers = List.generate(speed.preparationWorkers, (_) => prepareWorker());
+    final uploadWorkers = List.generate(speed.uploadWorkers, (_) => uploadWorker());
+    final acknowledgementWorkers = List.generate(2, (_) => acknowledgementWorker());
+
+    await Future.wait(preparationWorkers);
+    prepared.close();
+    await Future.wait(uploadWorkers);
+    acknowledgements.close();
+    await Future.wait(acknowledgementWorkers);
   }
 
   /// Sequential upload - used for background isolate where concurrent HTTP clients may cause issues
@@ -251,6 +432,23 @@ class ForegroundUploadService {
     Completer<void>? cancelToken, {
     required UploadCallbacks callbacks,
   }) async {
+    final item = await _prepareAsset(asset, callbacks: callbacks);
+    if (item == null) return;
+
+    try {
+      final acknowledgement = await _uploadPreparedAsset(item, cancelToken, callbacks: callbacks);
+      if (acknowledgement != null) {
+        final onSuccess = callbacks.onSuccess;
+        if (onSuccess != null) {
+          await Future<void>.value(onSuccess(acknowledgement.item.asset.localId!, acknowledgement.remoteAssetId));
+        }
+      }
+    } finally {
+      await _cleanupPreparedAsset(item);
+    }
+  }
+
+  Future<_PreparedAsset?> _prepareAsset(LocalAsset asset, {required UploadCallbacks callbacks}) async {
     File? file;
     File? livePhotoFile;
     File? sourceFile;
@@ -265,7 +463,7 @@ class ForegroundUploadService {
           asset.localId!,
           CurrentPlatform.isAndroid ? "asset_not_found_on_device_android".t() : "asset_not_found_on_device_ios".t(),
         );
-        return;
+        return null;
       }
 
       final isAvailableLocally = await _storageRepository.isAssetAvailableLocally(asset.id);
@@ -302,7 +500,7 @@ class ForegroundUploadService {
             asset.localId!,
             CurrentPlatform.isAndroid ? "asset_not_found_on_device_android".t() : "asset_not_found_on_device_ios".t(),
           );
-          return;
+          return null;
         }
 
         // For live photos, get the motion video file
@@ -321,7 +519,7 @@ class ForegroundUploadService {
       if (file == null) {
         _logger.warning("Failed to obtain file from iCloud for asset ${asset.id} - ${asset.name}");
         callbacks.onError?.call(asset.localId!, "asset_not_found_on_icloud".t());
-        return;
+        return null;
       }
 
       sourceFile = file;
@@ -370,46 +568,19 @@ class ForegroundUploadService {
           temporaryLivePhotoFile = preparedMotion.file;
         }
       }
-      final deviceId = Store.get(StoreKey.deviceId);
-
-      final fields = {
+      final fields = <String, String>{
         // deviceAssetId/deviceId required by server v2.7.5 and below (drop in v4.0 per #27818).
         'deviceAssetId': asset.localId!,
-        'deviceId': deviceId,
+        'deviceId': Store.get(StoreKey.deviceId),
         'fileCreatedAt': asset.createdAt.toUtc().toIso8601String(),
         'fileModifiedAt': asset.updatedAt.toUtc().toIso8601String(),
         'isFavorite': asset.isFavorite.toString(),
         'duration': (asset.durationMs ?? 0).toString(),
       };
 
-      // Upload live photo video first if available
-      String? livePhotoVideoId;
-      if (entity.isLivePhoto && livePhotoFile != null) {
-        final livePhotoTitle = p.setExtension(originalFileName, p.extension(livePhotoFile.path));
-
-        final onProgress = callbacks.onProgress;
-        final livePhotoResult = await _uploadRepository.uploadFile(
-          file: livePhotoFile,
-          originalFileName: livePhotoTitle,
-          // Visibility hidden on upload to prevent the server from running regular jobs on the live photo asset
-          fields: {...fields, 'visibility': AssetVisibility.hidden.toString()},
-          cancelToken: cancelToken,
-          onProgress: onProgress != null
-              ? (bytes, totalBytes) => onProgress(asset.localId!, livePhotoTitle, bytes, totalBytes)
-              : null,
-          logContext: 'livePhotoVideo[${asset.localId}]',
-        );
-
-        if (livePhotoResult.isSuccess && livePhotoResult.remoteAssetId != null) {
-          livePhotoVideoId = livePhotoResult.remoteAssetId;
-        }
-      }
-
-      if (livePhotoVideoId != null) {
-        fields['livePhotoVideoId'] = livePhotoVideoId;
-      }
-
-      // Add cloudId metadata only to the still image, not the motion video, becasue when the sync id happens, the motion video can get associated with the wrong still image.
+      // Add cloudId metadata only to the still image, not the motion video,
+      // because a motion upload can otherwise be associated with the wrong
+      // still image during a sync.
       final sourceChecksum = prepared.isTemporary ? asset.checksum : null;
       if ((CurrentPlatform.isIOS && asset.cloudId != null) || sourceChecksum != null) {
         fields['metadata'] = jsonEncode([
@@ -429,54 +600,121 @@ class ForegroundUploadService {
         ]);
       }
 
-      final onProgress = callbacks.onProgress;
-      final result = await _uploadRepository.uploadFile(
-        file: file,
+      return _PreparedAsset(
+        asset: asset,
+        file: file!,
         originalFileName: originalFileName,
+        fields: fields,
+        isLivePhoto: entity.isLivePhoto,
+        livePhotoFile: livePhotoFile,
+        temporaryFile: temporaryFile,
+        temporaryLivePhotoFile: temporaryLivePhotoFile,
+        sourceFile: sourceFile,
+        sourceLivePhotoFile: sourceLivePhotoFile,
+      );
+    } catch (error, stackTrace) {
+      _logger.severe(() => "Error backup asset: ${error.toString()}", stackTrace);
+      callbacks.onError?.call(asset.localId!, error.toString());
+      await _cleanupFiles(
+        temporaryFile: temporaryFile,
+        temporaryLivePhotoFile: temporaryLivePhotoFile,
+        sourceFile: sourceFile,
+        sourceLivePhotoFile: sourceLivePhotoFile,
+      );
+      return null;
+    }
+  }
+
+  Future<_UploadAcknowledgement?> _uploadPreparedAsset(
+    _PreparedAsset item,
+    Completer<void>? cancelToken, {
+    required UploadCallbacks callbacks,
+  }) async {
+    final asset = item.asset;
+    final onProgress = callbacks.onProgress;
+    final fields = Map<String, String>.of(item.fields);
+
+    try {
+      String? livePhotoVideoId;
+      if (item.isLivePhoto && item.livePhotoFile != null) {
+        final livePhotoTitle = p.setExtension(item.originalFileName, p.extension(item.livePhotoFile!.path));
+        final livePhotoResult = await _uploadRepository.uploadFile(
+          file: item.livePhotoFile!,
+          originalFileName: livePhotoTitle,
+          fields: {...fields, 'visibility': AssetVisibility.hidden.toString()},
+          cancelToken: cancelToken,
+          onProgress: onProgress != null
+              ? (bytes, totalBytes) => onProgress(asset.localId!, livePhotoTitle, bytes, totalBytes)
+              : null,
+          logContext: 'livePhotoVideo[${asset.localId}]',
+        );
+        if (livePhotoResult.isCancelled) {
+          shouldAbortUpload = true;
+          return null;
+        }
+        if (livePhotoResult.isSuccess && livePhotoResult.remoteAssetId != null) {
+          livePhotoVideoId = livePhotoResult.remoteAssetId;
+        }
+      }
+
+      if (livePhotoVideoId != null) fields['livePhotoVideoId'] = livePhotoVideoId;
+
+      final result = await _uploadRepository.uploadFile(
+        file: item.file,
+        originalFileName: item.originalFileName,
         fields: fields,
         cancelToken: cancelToken,
         onProgress: onProgress != null
-            ? (bytes, totalBytes) => onProgress(asset.localId!, originalFileName, bytes, totalBytes)
+            ? (bytes, totalBytes) => onProgress(asset.localId!, item.originalFileName, bytes, totalBytes)
             : null,
         logContext: 'asset[${asset.localId}]',
       );
 
       if (result.isSuccess && result.remoteAssetId != null) {
-        final onSuccess = callbacks.onSuccess;
-        if (onSuccess != null) {
-          await Future<void>.value(onSuccess(asset.localId!, result.remoteAssetId!));
-        }
-      } else if (result.isCancelled) {
-        _logger.warning(() => "Backup was cancelled by the user");
+        return _UploadAcknowledgement(item, result.remoteAssetId!);
+      }
+      if (result.isCancelled) {
+        _logger.warning(() => 'Backup was cancelled by the user');
         shouldAbortUpload = true;
       } else if (result.errorMessage != null) {
         _logger.severe(
           () =>
-              "Error(${result.statusCode}) uploading ${asset.localId} | $originalFileName | Created on ${asset.createdAt} | ${result.errorMessage}",
+              'Error(${result.statusCode}) uploading ${asset.localId} | ${item.originalFileName} | Created on ${asset.createdAt} | ${result.errorMessage}',
         );
-
         callbacks.onError?.call(asset.localId!, result.errorMessage!);
-
-        if (result.errorMessage == "Quota has been exceeded!") {
-          shouldAbortUpload = true;
-        }
+        if (result.errorMessage == 'Quota has been exceeded!') shouldAbortUpload = true;
       }
     } catch (error, stackTrace) {
-      _logger.severe(() => "Error backup asset: ${error.toString()}", stackTrace);
+      _logger.severe(() => 'Error uploading prepared asset: $error', stackTrace);
       callbacks.onError?.call(asset.localId!, error.toString());
-    } finally {
-      try {
-        await temporaryFile?.delete();
-        await temporaryLivePhotoFile?.delete();
-        if (Platform.isIOS) {
-          await sourceFile?.delete();
-          await sourceLivePhotoFile?.delete();
-        }
-      } catch (error, stackTrace) {
-        _logger.severe(() => "ERROR deleting prepared upload file: ${error.toString()}", stackTrace);
+    }
+    return null;
+  }
+
+  Future<void> _cleanupFiles({
+    File? temporaryFile,
+    File? temporaryLivePhotoFile,
+    File? sourceFile,
+    File? sourceLivePhotoFile,
+  }) async {
+    try {
+      await temporaryFile?.delete();
+      await temporaryLivePhotoFile?.delete();
+      if (Platform.isIOS) {
+        await sourceFile?.delete();
+        await sourceLivePhotoFile?.delete();
       }
+    } catch (error, stackTrace) {
+      _logger.severe(() => 'ERROR deleting prepared upload file: $error', stackTrace);
     }
   }
+
+  Future<void> _cleanupPreparedAsset(_PreparedAsset item) => _cleanupFiles(
+    temporaryFile: item.temporaryFile,
+    temporaryLivePhotoFile: item.temporaryLivePhotoFile,
+    sourceFile: item.sourceFile,
+    sourceLivePhotoFile: item.sourceLivePhotoFile,
+  );
 
   Future<UploadResult> _uploadSingleFile(
     File file, {

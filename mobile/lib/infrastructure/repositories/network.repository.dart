@@ -27,7 +27,10 @@ class NetworkRepository {
         configuration: const OkHttpClientConfiguration(
           connectTimeout: Duration(seconds: 30),
           readTimeout: Duration(seconds: 60),
-          writeTimeout: Duration(seconds: 60),
+          // Large videos on mobile links may take longer than one minute even
+          // while bytes are moving. UploadRepository enforces a progress-aware
+          // stall timeout instead of aborting healthy uploads at a fixed time.
+          writeTimeout: Duration.zero,
         ),
       );
     }

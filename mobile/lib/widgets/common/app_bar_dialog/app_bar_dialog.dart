@@ -16,12 +16,12 @@ import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/providers/websocket.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
+import 'package:immich_mobile/utils/inhouse_app_version.dart';
 import 'package:immich_mobile/widgets/common/app_bar_dialog/app_bar_profile_info.dart';
 import 'package:immich_mobile/widgets/common/app_bar_dialog/app_bar_server_info.dart';
 import 'package:immich_mobile/widgets/common/confirm_dialog.dart';
 import 'package:immich_mobile/widgets/common/immich_logo.dart';
 import 'package:immich_mobile/widgets/common/immich_title_text.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ImmichAppBarDialog extends HookConsumerWidget {
@@ -191,14 +191,14 @@ class ImmichAppBarDialog extends HookConsumerWidget {
             InkWell(
               onTap: () async {
                 ContextHelper(context).pop();
-                final packageInfo = await PackageInfo.fromPlatform();
+                final version = await InhouseAppVersion.read();
                 showLicensePage(
                   context: context,
                   applicationIcon: const Padding(
                     padding: EdgeInsetsGeometry.symmetric(vertical: 10),
                     child: ImmichLogo(size: 40),
                   ),
-                  applicationVersion: packageInfo.version,
+                  applicationVersion: version.detailedVersion,
                 );
               },
               child: Text("licenses", style: context.textTheme.bodySmall).tr(),

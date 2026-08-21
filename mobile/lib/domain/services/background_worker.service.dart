@@ -110,6 +110,15 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
 
   Future<void> init() async {
     try {
+      final speed = SettingsRepository.instance.appConfig.backup.speed;
+      // URLSession/background_downloader owns the actual background requests.
+      // Keep its queue aligned with the user-selected foreground mode while
+      // retaining a finite per-group cap for OS reliability.
+      final holdingQueue = switch (speed) {
+        .balanced => (4, 4, 3),
+        .fast => (6, 6, 4),
+        .maximum => (8, 8, 6),
+      };
       await Future.wait(
         [
           loadTranslations(),
@@ -118,8 +127,7 @@ class BackgroundWorkerBgService extends BackgroundWorkerFlutterApi {
           // Initialize the file downloader
           FileDownloader().configure(
             globalConfig: [
-              // maxConcurrent: 6, maxConcurrentByHost(server):6, maxConcurrentByGroup: 3
-              (Config.holdingQueue, (6, 6, 3)),
+              (Config.holdingQueue, holdingQueue),
               // On Android, if files are larger than 256MB, run in foreground service
               (Config.runInForegroundIfFileLargerThan, 256),
             ],

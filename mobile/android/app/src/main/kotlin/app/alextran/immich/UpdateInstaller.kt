@@ -28,6 +28,7 @@ class UpdateInstaller(
   init {
     channel.setMethodCallHandler { call, result ->
       when (call.method) {
+        "restartApp" -> restartApp(result)
         "installUpdate" -> {
           val url = call.argument<String>("url")
           if (url.isNullOrBlank()) {
@@ -43,6 +44,15 @@ class UpdateInstaller(
 
   fun dispose() {
     channel.setMethodCallHandler(null)
+  }
+
+  private fun restartApp(result: MethodChannel.Result) {
+    result.success("restarting")
+    activity.startActivity(
+      Intent(activity, RestartActivity::class.java).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+      },
+    )
   }
 
   private fun installUpdate(url: String, result: MethodChannel.Result) {
