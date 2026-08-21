@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ffi' as ffi;
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -95,45 +93,12 @@ class InhouseUpdateManifest {
   }
 }
 
-enum _InstallState { idle, downloadingApk, dataUpdateAvailable, permissionRequired, restartRequired, ready, error }
+enum _InstallState { idle, downloadingApk, permissionRequired, ready, error }
 
-enum _DataUpdateStatus { unavailable, upToDate, available, restartRequired }
-
-/// Minimal bindings for the Shorebird engine that is already inside an OTA
-/// base APK. Keeping this here means a patch can update the UI without adding
-/// a Flutter package or other bundled assets, which Shorebird rightly refuses
-/// to patch in place.
-class _ShorebirdUpdateProbe {
-  static Future<_DataUpdateStatus> check() async {
-    try {
-      return await Isolate.run(() {
-        final library = ffi.DynamicLibrary.process();
-        final currentPatch = library.lookupFunction<ffi.Int32 Function(), int Function()>(
-          'shorebird_current_boot_patch_number',
-        );
-        final nextPatch = library.lookupFunction<ffi.Int32 Function(), int Function()>(
-          'shorebird_next_boot_patch_number',
-        );
-        final hasDownloadableUpdate = library
-            .lookupFunction<ffi.Bool Function(ffi.Pointer<ffi.Char>), bool Function(ffi.Pointer<ffi.Char>)>(
-              'shorebird_check_for_downloadable_update',
-            );
-        final stableTrack = ffi.Pointer<ffi.Char>.fromAddress(0);
-
-        if (hasDownloadableUpdate(stableTrack)) {
-          return _DataUpdateStatus.available;
-        }
-        return currentPatch() == nextPatch() ? _DataUpdateStatus.upToDate : _DataUpdateStatus.restartRequired;
-      });
-    } catch (_) {
-      return _DataUpdateStatus.unavailable;
-    }
-  }
-}
-
-/// A single launch gate for both signed Shorebird data patches and native app
-/// packages. The screen deliberately appears on every cold app launch: this
-/// makes an OTA update visible instead of silently looking like nothing changed.
+/// One launch gate for both data patches and native packages. The Shorebird
+/// engine inside the OTA base APK checks and downloads data patches itself;
+/// this screen intentionally appears at every cold start so that behaviour is
+/// visible instead of looking like nothing happened.
 class RequiredUpdateGate extends StatefulWidget {
   const RequiredUpdateGate({required this.child, super.key});
 
@@ -216,9 +181,6 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
   }
 
-  Future<_DataUpdateStatus> _fetchDataUpdateStatus() =>
-      _ShorebirdUpdateProbe.check().timeout(const Duration(seconds: 5), onTimeout: () => _DataUpdateStatus.unavailable);
-
   Future<void> _checkForUpdate({bool showScreen = false}) async {
     if ((!Platform.isAndroid && !Platform.isIOS) || _checking) {
       return;
@@ -237,12 +199,10 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     final startedAt = DateTime.now();
     final packageInfoFuture = PackageInfo.fromPlatform();
     final nativeUpdateFuture = _fetchNativeUpdate();
-    final dataUpdateFuture = _fetchDataUpdateStatus();
 
     try {
       final packageInfo = await packageInfoFuture;
       final nativeUpdate = await nativeUpdateFuture;
-      final dataStatus = await dataUpdateFuture;
       final remaining = _minimumUpdateScreenTime - DateTime.now().difference(startedAt);
       if (!remaining.isNegative) {
         await Future<void>.delayed(remaining);
@@ -255,8 +215,8 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
           ? 0
           : compareInhouseVersions(nativeUpdate.version, packageInfo.version);
       // The 3.1.37 OTA base used build 5096 while a short-lived manual APK
-      // used build 3097. A build number by itself must never offer a lower
-      // visible version, but it resolves two builds of the same version.
+      // used build 3097. A build number alone must never offer a lower visible
+      // version, but it resolves two builds of the same version.
       final needsNativeUpdate =
           nativeUpdate != null &&
           nativeUpdate.required &&
@@ -270,24 +230,13 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
         _downloadProgress = null;
         _downloadedBytes = 0;
         _downloadTotalBytes = null;
-        if (needsNativeUpdate) {
-          _status = 'A new Inhouse Photos app version is ready.';
-        } else if (dataStatus == _DataUpdateStatus.available) {
-          _installState = _InstallState.dataUpdateAvailable;
-          _status = 'A smaller Inhouse Photos update is downloading securely in the background.';
-        } else if (dataStatus == _DataUpdateStatus.restartRequired) {
-          _installState = _InstallState.restartRequired;
-          _status = 'The latest Inhouse Photos improvements are ready.';
-        } else {
-          _installState = _InstallState.idle;
-          _status = 'Inhouse Photos is up to date.';
-        }
+        _installState = _InstallState.idle;
+        _status = needsNativeUpdate
+            ? 'A new Inhouse Photos app version is ready.'
+            : 'Checking for improvements. Any Inhouse Photos data update downloads securely in the background.';
       });
 
-      if (needsNativeUpdate) {
-        return;
-      }
-      if (dataStatus == _DataUpdateStatus.upToDate || dataStatus == _DataUpdateStatus.unavailable) {
+      if (!needsNativeUpdate) {
         _dismissUpdateScreenSoon();
       }
     } catch (_) {
@@ -371,15 +320,6 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
   }
 
-  void _closeForRestart() {
-    // A Shorebird patch is loaded by a fresh Flutter engine. Android can close
-    // the task immediately; iOS follows the platform rule and asks the user to
-    // reopen it rather than attempting an unsafe in-process restart.
-    if (Platform.isAndroid) {
-      unawaited(SystemNavigator.pop());
-    }
-  }
-
   void _openApp() {
     _dismissTimer?.cancel();
     setState(() => _showUpdateScreen = false);
@@ -393,13 +333,9 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
 
     final isNativeUpdate = nativeUpdate != null;
-    final isDataUpdateAvailable = _installState == _InstallState.dataUpdateAvailable;
     final isDownloadingApk = _installState == _InstallState.downloadingApk;
-    final needsRestart = _installState == _InstallState.restartRequired;
     final hasError = _installState == _InstallState.error;
     final heading = switch (_installState) {
-      _InstallState.dataUpdateAvailable => 'Data update available',
-      _InstallState.restartRequired => 'Update ready',
       _InstallState.downloadingApk => 'Downloading app update',
       _ => isNativeUpdate ? 'App update ready' : 'Checking for updates',
     };
@@ -481,23 +417,11 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                 ),
                                 const SizedBox(height: 18),
                               ],
-                              if (isDataUpdateAvailable) ...[
-                                Text(
-                                  'No APK download or installation is needed. The built-in updater will apply this change the next time the app opens.',
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.bodySmall?.copyWith(color: const Color(0xFFB8AEA7), height: 1.4),
-                                ),
-                                const SizedBox(height: 18),
-                              ],
                               SizedBox(
                                 width: double.infinity,
                                 child: FilledButton(
                                   onPressed: isDownloadingApk
                                       ? null
-                                      : needsRestart
-                                      ? _closeForRestart
                                       : hasError
                                       ? () => unawaited(_checkForUpdate(showScreen: true))
                                       : isNativeUpdate
@@ -510,9 +434,6 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                   ),
                                   child: Text(switch (_installState) {
                                     _InstallState.downloadingApk => 'Downloading...',
-                                    _InstallState.dataUpdateAvailable => 'Continue while updating',
-                                    _InstallState.restartRequired =>
-                                      Platform.isIOS ? 'Close and reopen' : 'Restart now',
                                     _InstallState.permissionRequired => 'Continue installation',
                                     _InstallState.error => 'Try again',
                                     _ =>
@@ -522,16 +443,6 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                   }),
                                 ),
                               ),
-                              if (needsRestart && Platform.isIOS) ...[
-                                const SizedBox(height: 12),
-                                Text(
-                                  'Close Inhouse Photos, then open it again to use the update.',
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.bodySmall?.copyWith(color: const Color(0xFFB8AEA7), height: 1.4),
-                                ),
-                              ],
                             ],
                           ),
                         ),
