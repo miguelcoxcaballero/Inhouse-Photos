@@ -4,9 +4,9 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/theme_extensions.dart';
-import 'package:immich_mobile/widgets/forms/login/login_form.dart';
 import 'package:immich_mobile/routing/router.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import 'package:immich_mobile/utils/inhouse_app_version.dart';
+import 'package:immich_mobile/widgets/forms/login/login_form.dart';
 
 @RoutePage()
 class LoginPage extends HookConsumerWidget {
@@ -17,8 +17,8 @@ class LoginPage extends HookConsumerWidget {
     final appVersion = useState('0.0.0');
 
     getAppInfo() async {
-      PackageInfo packageInfo = await PackageInfo.fromPlatform();
-      appVersion.value = packageInfo.version;
+      final version = await InhouseAppVersion.read();
+      appVersion.value = version.displayVersion;
     }
 
     useEffect(() {

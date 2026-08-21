@@ -85,8 +85,8 @@ jobs:
           shorebird release android
           --artifact apk
           --flutter-version 3.44.8
-          --build-name 3.1.37
-          --build-number 5096
+          --build-name 3.1.39
+          --build-number 5097
           --target-platform android-arm64
 
       - name: Stage APK for download
@@ -97,7 +97,7 @@ jobs:
       - name: Upload workflow artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: Inhouse-Photos-3.1.37-OTA
+          name: Inhouse-Photos-3.1.39-OTA
           path: |
             Inhouse-Photos.apk
             Inhouse-Photos.apk.sha256

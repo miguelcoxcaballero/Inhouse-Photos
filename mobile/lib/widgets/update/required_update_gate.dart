@@ -542,9 +542,19 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
   }
 
-  void _closeForRestart() {
+  Future<void> _restartAndActivate() async {
     if (Platform.isAndroid) {
-      unawaited(SystemNavigator.pop());
+      setState(() {
+        _installState = _InstallState.checking;
+        _status = 'Restarting Inhouse Photos to activate the update...';
+      });
+      try {
+        await _updateChannel.invokeMethod<String>('restartApp');
+      } on PlatformException {
+        // Older native bases cannot relaunch themselves. Closing remains a
+        // safe fallback until the one-time native base update is installed.
+        await SystemNavigator.pop();
+      }
     }
   }
 
@@ -661,7 +671,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                   onPressed: isChecking || isDownloading
                                       ? null
                                       : needsRestart
-                                      ? _closeForRestart
+                                      ? () => unawaited(_restartAndActivate())
                                       : hasError
                                       ? () => unawaited(_checkForUpdate(showScreen: true))
                                       : isNativeUpdate
@@ -679,7 +689,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                     _InstallState.upToDate => 'Open Photos',
                                     _InstallState.downloadingData => 'Installing securely...',
                                     _InstallState.restartRequired =>
-                                      Platform.isAndroid ? 'Close and activate' : 'Close and reopen',
+                                      Platform.isAndroid ? 'Activate update' : 'Close and reopen',
                                     _InstallState.downloadingApk => 'Downloading...',
                                     _InstallState.permissionRequired => 'Continue installation',
                                     _InstallState.error => 'Try again',
@@ -694,7 +704,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                 const SizedBox(height: 12),
                                 Text(
                                   Platform.isAndroid
-                                      ? 'Open Inhouse Photos again after it closes.'
+                                      ? 'Inhouse Photos will restart automatically.'
                                       : 'Close Inhouse Photos completely, then open it again to activate the update.',
                                   textAlign: TextAlign.center,
                                   style: Theme.of(

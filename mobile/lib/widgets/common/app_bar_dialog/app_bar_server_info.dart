@@ -8,9 +8,9 @@ import 'package:immich_mobile/models/server_info/server_info.model.dart';
 import 'package:immich_mobile/providers/locale_provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/utils/inhouse_app_version.dart';
 import 'package:immich_mobile/utils/url_helper.dart';
 import 'package:immich_mobile/widgets/common/app_bar_dialog/server_update_notification.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
 class AppBarServerInfo extends HookConsumerWidget {
   const AppBarServerInfo({super.key});
@@ -25,9 +25,8 @@ class AppBarServerInfo extends HookConsumerWidget {
     final appInfo = useState({});
 
     getPackageInfo() async {
-      PackageInfo packageInfo = await PackageInfo.fromPlatform();
-
-      appInfo.value = {"version": packageInfo.version, "buildNumber": packageInfo.buildNumber};
+      final version = await InhouseAppVersion.read();
+      appInfo.value = {"version": version.displayVersion, "buildNumber": version.buildNumber};
     }
 
     useEffect(() {
