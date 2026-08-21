@@ -20,6 +20,7 @@ import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/generated/codegen_loader.g.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/network.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/pages/common/splash_screen.page.dart';
 import 'package:immich_mobile/platform/background_worker_lock_api.g.dart';
 import 'package:immich_mobile/providers/app_life_cycle.provider.dart';
@@ -97,12 +98,15 @@ Future<void> initApp() async {
 
   initializeTimeZones();
 
-  // Initialize the file downloader
+  // Initialize the file downloader.
+  final backupSpeed = SettingsRepository.instance.appConfig.backup.speed;
+  final holdingQueue = switch (backupSpeed) {
+    .balanced => (4, 4, 3),
+    .fast => (6, 6, 4),
+    .maximum => (8, 8, 6),
+  };
   await FileDownloader().configure(
-    // maxConcurrent: 6, maxConcurrentByHost(server):6, maxConcurrentByGroup: 3
-
-    // On Android, if files are larger than 256MB, run in foreground service
-    globalConfig: [(Config.holdingQueue, (6, 6, 3)), (Config.runInForegroundIfFileLargerThan, 256)],
+    globalConfig: [(Config.holdingQueue, holdingQueue), (Config.runInForegroundIfFileLargerThan, 256)],
   );
 
   await FileDownloader().trackTasksInGroup(kDownloadGroupLivePhoto, markDownloadedComplete: false);

@@ -45,6 +45,7 @@ enum SettingsKey<T> {
   backupTriggerDelay<int>(),
   backupSyncAlbums<bool>(),
   backupQuality<BackupQuality>(codec: EnumCodec(BackupQuality.values)),
+  backupSpeed<BackupSpeedMode>(codec: EnumCodec(BackupSpeedMode.values)),
 
   // Timeline
   timelineTilesPerRow<int>(),

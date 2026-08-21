@@ -96,6 +96,50 @@ class UploadRepository {
     void Function(int bytes, int totalBytes)? onProgress,
     required String logContext,
   }) async {
+    UploadResult? lastResult;
+    const retryDelays = [Duration(seconds: 2), Duration(seconds: 5), Duration(seconds: 15), Duration(seconds: 45)];
+
+    for (var attempt = 0; attempt <= retryDelays.length; attempt++) {
+      if (cancelToken?.isCompleted ?? false) return UploadResult.cancelled();
+
+      final result = await _uploadFileOnce(
+        file: file,
+        originalFileName: originalFileName,
+        fields: fields,
+        cancelToken: cancelToken,
+        onProgress: onProgress,
+        logContext: '$logContext#$attempt',
+      );
+      lastResult = result;
+      if (!_shouldRetry(result) || attempt == retryDelays.length) return result;
+
+      logger.warning('Transient upload failure for $logContext; retrying in ${retryDelays[attempt].inSeconds}s');
+      final cancellation = cancelToken?.future;
+      if (cancellation == null) {
+        await Future<void>.delayed(retryDelays[attempt]);
+      } else {
+        await Future.any<void>([Future<void>.delayed(retryDelays[attempt]), cancellation]);
+      }
+    }
+    return lastResult ?? UploadResult.error(errorMessage: 'Upload failed before it could start');
+  }
+
+  bool _shouldRetry(UploadResult result) {
+    if (result.isSuccess || result.isCancelled) return false;
+    final status = result.statusCode;
+    // Network errors do not have an HTTP status. Retry only responses that are
+    // normally transient; validation and quota failures must surface at once.
+    return status == null || status == 408 || status == 429 || (status >= 500 && status <= 599);
+  }
+
+  Future<UploadResult> _uploadFileOnce({
+    required File file,
+    required String originalFileName,
+    required Map<String, String> fields,
+    required Completer<void>? cancelToken,
+    void Function(int bytes, int totalBytes)? onProgress,
+    required String logContext,
+  }) async {
     final String savedEndpoint = Store.get(StoreKey.serverEndpoint);
     final baseRequest = ProgressMultipartRequest(
       'POST',
