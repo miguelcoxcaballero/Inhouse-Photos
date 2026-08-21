@@ -88,3 +88,4 @@ jobs:
           --release-version "${{ inputs.release_version }}"
           --build-name 3.1.37
           --build-number 5096
+          --allow-asset-diffs
