@@ -220,7 +220,7 @@ class RequiredUpdateGate extends StatefulWidget {
 class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBindingObserver {
   Timer? _timer;
   bool _checking = false;
-  bool _showUpdateScreen = true;
+  bool _showUpdateScreen = false;
   InhouseUpdateManifest? _apkUpdate;
   String _installedVersion = '';
   _InstallState _installState = _InstallState.checking;
@@ -234,7 +234,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _updateChannel.setMethodCallHandler(_handleUpdateChannelCall);
-    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_checkForUpdate(showScreen: true)));
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_checkForUpdate()));
     _timer = Timer.periodic(const Duration(minutes: 15), (_) => unawaited(_checkForUpdate()));
   }
 
@@ -340,6 +340,9 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
         _status = needsNativeUpdate
             ? 'A new Inhouse Photos app version is ready.'
             : 'Checking for secure data updates...';
+        if (needsNativeUpdate) {
+          _showUpdateScreen = true;
+        }
       });
 
       if (!needsNativeUpdate) {
@@ -369,10 +372,6 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
 
     if (!snapshot.available) {
-      setState(() {
-        _installState = _InstallState.error;
-        _status = 'The secure updater is unavailable. Check your connection and try again.';
-      });
       return;
     }
 
@@ -381,13 +380,13 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
       return;
     }
 
-    setState(() {
-      _showUpdateScreen = true;
-      _installState = _InstallState.downloadingData;
-      _status = snapshot.downloadable
-          ? 'Downloading and verifying the latest data update...'
-          : 'Confirming that all app data is up to date...';
-    });
+    if (snapshot.downloadable) {
+      setState(() {
+        _showUpdateScreen = true;
+        _installState = _InstallState.downloadingData;
+        _status = 'Downloading and verifying the latest data update...';
+      });
+    }
 
     final result = await _ShorebirdUpdateClient.install().timeout(
       const Duration(minutes: 5),
@@ -398,6 +397,9 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
 
     if (!result.accepted) {
+      if (!snapshot.downloadable) {
+        return;
+      }
       setState(() {
         _installState = _InstallState.error;
         _status = result.message.isEmpty
@@ -411,8 +413,17 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
       setState(() {
         _installState = _InstallState.upToDate;
         _status = 'Inhouse Photos is fully up to date.';
+        _showUpdateScreen = false;
       });
       return;
+    }
+
+    if (!snapshot.downloadable) {
+      setState(() {
+        _showUpdateScreen = true;
+        _installState = _InstallState.downloadingData;
+        _status = 'Finishing and verifying the data update...';
+      });
     }
 
     final preparedPatch = await _waitForPreparedPatch();
@@ -436,6 +447,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
       setState(() {
         _installState = _InstallState.upToDate;
         _status = 'Inhouse Photos is fully up to date.';
+        _showUpdateScreen = false;
       });
       return;
     }
