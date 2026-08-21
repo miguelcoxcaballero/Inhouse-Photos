@@ -592,6 +592,17 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
           body: asyncSegments.widgetWhen(
             onLoading: widget.loadingWidget != null ? () => widget.loadingWidget! : null,
             onData: (segments) {
+              if (yearOverview) {
+                // Warm the current and adjacent dense panels after the first
+                // frame. The visible panel still renders from memory/disk
+                // immediately; this only makes the next scroll positions
+                // ready without putting decode work on the build path.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    warmDenseOverviewCache(service: ref.read(timelineServiceProvider), segments: segments);
+                  }
+                });
+              }
               final childCount = (segments.lastOrNull?.lastIndex ?? -1) + 1;
               final double appBarExpandedHeight = widget.appBar != null && widget.appBar is MesmerizingSliverAppBar
                   ? 200

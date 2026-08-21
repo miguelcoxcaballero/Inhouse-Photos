@@ -112,6 +112,8 @@ void main() {
     expect(denseTimelineRowsPerChild(24), 16);
     expect(denseTimelineRowsPerChild(36), 24);
     expect(denseTimelineRowsPerChild(48), 16);
+    expect(denseOverviewMetadataCellPixels, 32);
+    expect(denseOverviewDiskCacheLimitBytes, 256 * 1024 * 1024);
   });
 
   test('ultra-dense layout virtualizes many photo rows into each sliver child', () {
