@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:collection/collection.dart';
@@ -226,7 +227,7 @@ class _SliverTimeline extends ConsumerStatefulWidget {
 }
 
 class _SliverTimelineState extends ConsumerState<_SliverTimeline>
-    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   late final ScrollController _scrollController;
   StreamSubscription? _eventSubscription;
 
@@ -243,6 +244,12 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   int? _restoreAssetIndex;
   int _renderedPerRow = 4;
   late final AnimationController _layoutTransitionController;
+  late final AnimationController _denseZoomSnapshotController;
+  final GlobalKey _timelineRepaintKey = GlobalKey();
+  ui.Image? _denseZoomSnapshot;
+  Timer? _denseZoomSnapshotReleaseTimer;
+  bool _denseZoomSnapshotCapturePending = false;
+  int _denseZoomSnapshotGeneration = 0;
   Map<Object, Rect> _previousTileRects = const {};
   int _layoutTransitionGeneration = 0;
   final Set<ScrollPosition> _attachedScrollPositions = {};
@@ -257,6 +264,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
       vsync: this,
       duration: const Duration(milliseconds: 190),
       value: 1,
+    );
+    _denseZoomSnapshotController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+      value: 0,
     );
     _eventSubscription = EventStream.shared.listen(_onEvent);
 
@@ -348,6 +360,69 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
         }
       });
     });
+  }
+
+  bool _isDenseZoomTransition({required int currentColumns, required int nextColumns}) =>
+      currentColumns >= kTimelineYearOverviewMinColumns || nextColumns >= kTimelineYearOverviewMinColumns;
+
+  void _prepareDenseZoomSnapshot() {
+    _denseZoomSnapshotReleaseTimer?.cancel();
+    if (_denseZoomSnapshot != null) {
+      _denseZoomSnapshotReleaseTimer = Timer(const Duration(milliseconds: 850), _fadeDenseZoomSnapshot);
+      return;
+    }
+    if (_denseZoomSnapshotCapturePending) {
+      return;
+    }
+
+    final renderObject = _timelineRepaintKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderRepaintBoundary || !renderObject.hasSize || renderObject.size.isEmpty) {
+      return;
+    }
+
+    _denseZoomSnapshotCapturePending = true;
+    final generation = ++_denseZoomSnapshotGeneration;
+    final pixelRatio = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.0);
+    unawaited(
+      renderObject
+          .toImage(pixelRatio: pixelRatio)
+          .then((image) {
+            if (!mounted || generation != _denseZoomSnapshotGeneration) {
+              image.dispose();
+              return;
+            }
+            final previous = _denseZoomSnapshot;
+            setState(() {
+              _denseZoomSnapshot = image;
+              _denseZoomSnapshotCapturePending = false;
+            });
+            previous?.dispose();
+            _denseZoomSnapshotController.value = 1;
+            _denseZoomSnapshotReleaseTimer?.cancel();
+            _denseZoomSnapshotReleaseTimer = Timer(const Duration(milliseconds: 850), _fadeDenseZoomSnapshot);
+          })
+          .catchError((_) {
+            if (generation == _denseZoomSnapshotGeneration) {
+              _denseZoomSnapshotCapturePending = false;
+            }
+          }),
+    );
+  }
+
+  void _fadeDenseZoomSnapshot() {
+    if (!mounted || _denseZoomSnapshot == null) {
+      return;
+    }
+    unawaited(
+      _denseZoomSnapshotController.reverse().whenComplete(() {
+        if (!mounted) {
+          return;
+        }
+        final previous = _denseZoomSnapshot;
+        setState(() => _denseZoomSnapshot = null);
+        previous?.dispose();
+      }),
+    );
   }
 
   @override
@@ -444,6 +519,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _scrollIdleTimer?.cancel();
+    _denseZoomSnapshotReleaseTimer?.cancel();
+    _denseZoomSnapshotGeneration++;
+    _denseZoomSnapshot?.dispose();
+    _denseZoomSnapshot = null;
+    _denseZoomSnapshotController.dispose();
     for (final position in _attachedScrollPositions.toList()) {
       position.isScrollingNotifier.removeListener(_onScrollActivityChanged);
     }
@@ -725,6 +805,8 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                           final targetAssetIndex = _getCurrentAssetIndex(segments);
                           if (shouldAnimateTimelineColumnTransition(currentColumns: _perRow, nextColumns: newPerRow)) {
                             _prepareLayoutTransition();
+                          } else if (_isDenseZoomTransition(currentColumns: _perRow, nextColumns: newPerRow)) {
+                            _prepareDenseZoomSnapshot();
                           } else {
                             _layoutTransitionController
                               ..stop()
@@ -762,8 +844,23 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                       TimelineLayoutTransitionScope(
                         animation: _layoutTransitionController,
                         previousRects: _previousTileRects,
-                        child: timeline,
+                        child: RepaintBoundary(key: _timelineRepaintKey, child: timeline),
                       ),
+                      if (_denseZoomSnapshot != null)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: AnimatedBuilder(
+                              animation: _denseZoomSnapshotController,
+                              builder: (context, child) =>
+                                  Opacity(opacity: _denseZoomSnapshotController.value, child: child),
+                              child: RawImage(
+                                image: _denseZoomSnapshot,
+                                fit: BoxFit.fill,
+                                filterQuality: FilterQuality.low,
+                              ),
+                            ),
+                          ),
+                        ),
                       if (isBottomWidgetVisible)
                         Positioned(
                           top: MediaQuery.paddingOf(context).top,
