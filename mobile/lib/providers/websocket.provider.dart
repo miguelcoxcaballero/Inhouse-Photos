@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/network.repository.dart';
 import 'package:immich_mobile/models/server_info/server_version.model.dart';
@@ -106,10 +108,36 @@ class WebsocketNotifier extends StateNotifier<WebsocketState> {
         socket.on('on_album_update', _handleAlbumUpdate);
         socket.on('on_config_update', _handleOnConfigUpdate);
         socket.on('on_new_release', _handleReleaseUpdates);
+        socket.on('StorageSaverProgressV1', _handleStorageSaverProgress);
       } catch (e) {
         dPrint(() => "[WEBSOCKET] Catch Websocket Error - ${e.toString()}");
       }
     }
+  }
+
+  void _handleStorageSaverProgress(dynamic data) {
+    if (data is! Map) {
+      return;
+    }
+
+    final assetId = data['assetId'];
+    final progress = data['progress'];
+    final compressionState = data['state'];
+    if (assetId is! String || progress is! num || compressionState is! String) {
+      return;
+    }
+
+    final originalBytes = data['originalBytes'];
+    final outputBytes = data['outputBytes'];
+    EventStream.shared.emit(
+      ServerCompressionProgressEvent(
+        assetId: assetId,
+        progress: progress.toDouble().clamp(0.0, 1.0),
+        state: compressionState,
+        originalBytes: originalBytes is num ? originalBytes.toInt() : null,
+        outputBytes: outputBytes is num ? outputBytes.toInt() : null,
+      ),
+    );
   }
 
   void disconnect() {

@@ -28,6 +28,7 @@ import {
   VideoContainer,
 } from 'src/enum';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
+import { ArgOf } from 'src/repositories/event.repository';
 import { BoundingBox } from 'src/repositories/machine-learning.repository';
 import { BaseService } from 'src/services/base.service';
 import {
@@ -68,6 +69,11 @@ export class MediaService extends BaseService {
     this.videoInterfaces = await this.storageCore.getVideoInterfaces();
   }
 
+  @OnEvent({ name: 'StorageSaverProgress', server: true, workers: [ImmichWorker.Api] })
+  handleStorageSaverProgress(event: ArgOf<'StorageSaverProgress'>) {
+    this.websocketRepository.clientSend('StorageSaverProgressV1', event.userId, event);
+  }
+
   @OnJob({ name: JobName.AssetCompressStorageSaver, queue: QueueName.VideoConversion })
   async handleStorageSaverCompression({ id }: JobOf<JobName.AssetCompressStorageSaver>): Promise<JobStatus> {
     const asset = await this.assetRepository.getById(id);
@@ -79,22 +85,50 @@ export class MediaService extends BaseService {
     const isGif = asset.originalFileName.toLowerCase().endsWith('.gif');
     const extension = asset.type === AssetType.Video ? '.mp4' : '.jpg';
     const outputPath = `${sourcePath}.storage-saver${extension}`;
+    const sourceStats = await this.storageRepository.stat(sourcePath);
+    let lastReportedProgress = -1;
+    let lastReportedState: ArgOf<'StorageSaverProgress'>['state'] | undefined;
+    const report = (progress: number, state: ArgOf<'StorageSaverProgress'>['state'], outputBytes?: number) => {
+      const normalizedProgress = Math.min(1, Math.max(0, progress));
+      if (
+        state === 'compressing' &&
+        lastReportedState === state &&
+        normalizedProgress < 1 &&
+        normalizedProgress - lastReportedProgress < 0.01
+      ) {
+        return;
+      }
+      lastReportedProgress = normalizedProgress;
+      lastReportedState = state;
+      this.websocketRepository.serverSend('StorageSaverProgress', {
+        assetId: id,
+        userId: asset.ownerId,
+        progress: normalizedProgress,
+        state,
+        originalBytes: sourceStats.size,
+        outputBytes,
+      });
+    };
 
     try {
+      report(0.01, 'compressing');
       if (asset.type === AssetType.Video) {
-        await this.mediaRepository.compressStorageSaverVideo(sourcePath, outputPath);
+        await this.mediaRepository.compressStorageSaverVideo(sourcePath, outputPath, (progress) =>
+          report(progress, 'compressing'),
+        );
       } else if (asset.type === AssetType.Image && !isGif) {
-        await this.mediaRepository.compressStorageSaverImage(sourcePath, outputPath);
+        await this.mediaRepository.compressStorageSaverImage(sourcePath, outputPath, (progress) =>
+          report(progress, 'compressing'),
+        );
       } else {
+        report(1, 'skipped', sourceStats.size);
         return JobStatus.Skipped;
       }
 
-      const [sourceStats, outputStats] = await Promise.all([
-        this.storageRepository.stat(sourcePath),
-        this.storageRepository.stat(outputPath),
-      ]);
+      const outputStats = await this.storageRepository.stat(outputPath);
       if (outputStats.size <= 0 || outputStats.size >= sourceStats.size) {
         await this.storageRepository.unlink(outputPath);
+        report(1, 'skipped', sourceStats.size);
         return JobStatus.Skipped;
       }
 
@@ -114,12 +148,14 @@ export class MediaService extends BaseService {
       await this.userRepository.updateUsage(asset.ownerId, outputStats.size - sourceStats.size);
       await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [sourcePath] } });
       this.logger.log(`Storage Saver reduced asset ${id} from ${sourceStats.size} to ${outputStats.size} bytes`);
+      report(1, 'completed', outputStats.size);
       return JobStatus.Success;
     } catch (error: any) {
       this.logger.error(`Storage Saver failed for asset ${id}: ${error}`, error?.stack);
       if (await this.storageRepository.checkFileExists(outputPath)) {
         await this.storageRepository.unlink(outputPath);
       }
+      report(1, 'failed', sourceStats.size);
       return JobStatus.Failed;
     } finally {
       // Metadata and thumbnails are generated only after the final file exists.

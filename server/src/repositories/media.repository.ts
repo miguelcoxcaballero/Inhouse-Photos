@@ -184,8 +184,14 @@ export class MediaRepository {
   }
 
   /** Encode a newly uploaded photo for Storage Saver without ever touching the phone CPU. */
-  async compressStorageSaverImage(input: string, output: string): Promise<void> {
+  async compressStorageSaverImage(
+    input: string,
+    output: string,
+    onProgress?: (progress: number) => void,
+  ): Promise<void> {
+    onProgress?.(0.08);
     const metadata = await sharp(input, { failOn: 'none', limitInputPixels: false, unlimited: true }).metadata();
+    onProgress?.(0.18);
     const width = metadata.width ?? 0;
     const height = metadata.height ?? 0;
     const maxPixels = 16_000_000;
@@ -201,13 +207,15 @@ export class MediaRepository {
       })
       .jpeg({ quality: 85, progressive: true, mozjpeg: true })
       .toFile(output);
+    onProgress?.(0.88);
 
     // Keep capture date, camera and location metadata in the server copy.
     await this.copyTagGroup('all', input, output);
+    onProgress?.(0.96);
   }
 
   /** Encode a newly uploaded video to a broadly compatible 1080p Storage Saver copy. */
-  compressStorageSaverVideo(input: string, output: string): Promise<void> {
+  compressStorageSaverVideo(input: string, output: string, onProgress?: (progress: number) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       ffmpeg(input, { niceness: 10 })
         .outputOptions([
@@ -225,6 +233,11 @@ export class MediaRepository {
         ])
         .output(output)
         .on('start', (command: string) => this.logger.debug(command))
+        .on('progress', (progress: ProgressEvent) => {
+          if (progress.percent != null && Number.isFinite(progress.percent)) {
+            onProgress?.(Math.min(0.97, Math.max(0.01, progress.percent / 100)));
+          }
+        })
         .on('error', reject)
         .on('end', () => resolve())
         .run();

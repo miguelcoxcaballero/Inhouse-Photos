@@ -7,6 +7,8 @@ import 'package:logging/logging.dart';
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/domain/models/album/local_album.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/events.model.dart';
+import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/infrastructure/repositories/local_asset.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
 import 'package:immich_mobile/utils/upload_speed_calculator.dart';
@@ -37,6 +39,8 @@ class DriftUploadStatus {
   final int originalFileSize;
   final int fileSize;
   final String networkSpeedAsString;
+  final bool compressionExpected;
+  final String compressionState;
   final bool? isFailed;
   final String? error;
 
@@ -48,6 +52,8 @@ class DriftUploadStatus {
     required this.originalFileSize,
     required this.fileSize,
     required this.networkSpeedAsString,
+    this.compressionExpected = false,
+    this.compressionState = 'none',
     this.isFailed,
     this.error,
   });
@@ -60,6 +66,8 @@ class DriftUploadStatus {
     int? originalFileSize,
     int? fileSize,
     String? networkSpeedAsString,
+    bool? compressionExpected,
+    String? compressionState,
     bool? isFailed,
     String? error,
   }) {
@@ -71,6 +79,8 @@ class DriftUploadStatus {
       originalFileSize: originalFileSize ?? this.originalFileSize,
       fileSize: fileSize ?? this.fileSize,
       networkSpeedAsString: networkSpeedAsString ?? this.networkSpeedAsString,
+      compressionExpected: compressionExpected ?? this.compressionExpected,
+      compressionState: compressionState ?? this.compressionState,
       isFailed: isFailed ?? this.isFailed,
       error: error ?? this.error,
     );
@@ -78,7 +88,7 @@ class DriftUploadStatus {
 
   @override
   String toString() {
-    return 'DriftUploadStatus(taskId: $taskId, filename: $filename, preparationProgress: $preparationProgress, progress: $progress, originalFileSize: $originalFileSize, fileSize: $fileSize, networkSpeedAsString: $networkSpeedAsString, isFailed: $isFailed, error: $error)';
+    return 'DriftUploadStatus(taskId: $taskId, filename: $filename, preparationProgress: $preparationProgress, progress: $progress, originalFileSize: $originalFileSize, fileSize: $fileSize, networkSpeedAsString: $networkSpeedAsString, compressionExpected: $compressionExpected, compressionState: $compressionState, isFailed: $isFailed, error: $error)';
   }
 
   @override
@@ -94,6 +104,8 @@ class DriftUploadStatus {
         other.originalFileSize == originalFileSize &&
         other.fileSize == fileSize &&
         other.networkSpeedAsString == networkSpeedAsString &&
+        other.compressionExpected == compressionExpected &&
+        other.compressionState == compressionState &&
         other.isFailed == isFailed &&
         other.error == error;
   }
@@ -107,6 +119,8 @@ class DriftUploadStatus {
         originalFileSize.hashCode ^
         fileSize.hashCode ^
         networkSpeedAsString.hashCode ^
+        compressionExpected.hashCode ^
+        compressionState.hashCode ^
         isFailed.hashCode ^
         error.hashCode;
   }
@@ -224,7 +238,11 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
           uploadItems: {},
           error: BackupError.none,
         ),
-      );
+      ) {
+    _compressionSubscription = EventStream.shared.listen<ServerCompressionProgressEvent>(
+      _handleServerCompressionProgress,
+    );
+  }
 
   final ForegroundUploadService _foregroundUploadService;
   final BackgroundUploadService _backgroundUploadService;
@@ -234,8 +252,17 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   Completer<void>? _cancelToken;
   Future<void>? _activeForegroundBackup;
   bool _restartForegroundBackup = false;
+  late final StreamSubscription<ServerCompressionProgressEvent> _compressionSubscription;
+  final Map<String, String> _remoteToLocalAssetIds = {};
+  final Map<String, ServerCompressionProgressEvent> _pendingCompressionEvents = {};
 
   final _logger = Logger("DriftBackupNotifier");
+
+  @override
+  void dispose() {
+    unawaited(_compressionSubscription.cancel());
+    super.dispose();
+  }
 
   /// Remove upload item from state
   void _removeUploadItem(String taskId) {
@@ -304,7 +331,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
           cancelToken,
           callbacks: UploadCallbacks(
             onProgress: _handleForegroundBackupProgress,
-            onPreparationProgress: _handleForegroundPreparationProgress,
+            onServerCompressionExpected: _handleServerCompressionExpected,
             onSuccess: (localId, remoteId) => _handleForegroundBackupSuccess(userId, localId, remoteId),
             onError: _handleForegroundBackupError,
             onICloudProgress: _handleICloudProgress,
@@ -337,6 +364,8 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     }
     _restartForegroundBackup = false;
     _uploadSpeedManager.clear();
+    _remoteToLocalAssetIds.clear();
+    _pendingCompressionEvents.clear();
     state = state.copyWith(uploadItems: {}, iCloudDownloadProgress: {});
   }
 
@@ -367,7 +396,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
           localAssetId: currentItem.copyWith(
             filename: filename,
             progress: progress,
-            fileSize: totalBytes,
+            fileSize: currentItem.compressionExpected ? currentItem.fileSize : totalBytes,
             networkSpeedAsString: networkSpeedAsString,
           ),
         },
@@ -390,39 +419,42 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     }
   }
 
-  void _handleForegroundPreparationProgress(
-    String localAssetId,
-    String filename,
-    double progress,
-    int originalBytes,
-    int? preparedBytes,
-  ) {
+  void _handleServerCompressionExpected(String localAssetId, String filename, int originalBytes) {
     if (_cancelToken == null || _cancelToken!.isCompleted) {
       return;
     }
 
     final currentItem = state.uploadItems[localAssetId];
-    final preparedSize = preparedBytes ?? currentItem?.fileSize ?? 0;
     final item =
         currentItem?.copyWith(
           filename: filename,
-          preparationProgress: progress,
+          preparationProgress: 0,
           originalFileSize: originalBytes,
-          fileSize: preparedSize,
+          fileSize: 0,
+          compressionExpected: true,
+          compressionState: 'waiting',
         ) ??
         DriftUploadStatus(
           taskId: localAssetId,
           filename: filename,
-          preparationProgress: progress,
+          preparationProgress: 0,
           progress: 0,
           originalFileSize: originalBytes,
-          fileSize: preparedSize,
+          fileSize: 0,
           networkSpeedAsString: '',
+          compressionExpected: true,
+          compressionState: 'waiting',
         );
     state = state.copyWith(uploadItems: {...state.uploadItems, localAssetId: item});
   }
 
   Future<void> _handleForegroundBackupSuccess(String userId, String localAssetId, String remoteAssetId) async {
+    _remoteToLocalAssetIds[remoteAssetId] = localAssetId;
+    final pendingCompression = _pendingCompressionEvents.remove(remoteAssetId);
+    if (pendingCompression != null) {
+      _handleServerCompressionProgress(pendingCompression);
+    }
+
     try {
       final source = await _localAssetRepository.getById(localAssetId);
       if (source == null) {
@@ -439,9 +471,59 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     state = state.copyWith(backupCount: state.backupCount + 1, remainderCount: state.remainderCount - 1);
     _uploadSpeedManager.removeTask(localAssetId);
 
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      _removeUploadItem(localAssetId);
-    });
+    final uploadItem = state.uploadItems[localAssetId];
+    if (uploadItem?.compressionExpected != true || _isCompressionFinished(uploadItem!.compressionState)) {
+      _scheduleUploadItemRemoval(localAssetId);
+    } else {
+      // Do not leave a completed upload pinned forever if the app lost its
+      // websocket connection while the server was encoding it.
+      Future.delayed(const Duration(minutes: 15), () => _removeUploadItem(localAssetId));
+    }
+  }
+
+  bool _isCompressionFinished(String compressionState) =>
+      compressionState == 'completed' || compressionState == 'skipped' || compressionState == 'failed';
+
+  void _scheduleUploadItemRemoval(String localAssetId) {
+    Future.delayed(const Duration(milliseconds: 1200), () => _removeUploadItem(localAssetId));
+  }
+
+  void _handleServerCompressionProgress(ServerCompressionProgressEvent event) {
+    final localAssetId = _remoteToLocalAssetIds[event.assetId];
+    if (localAssetId == null) {
+      // The queued/first encode event can beat the HTTP upload response. Keep
+      // only the newest event for that asset until its remote ID is known.
+      if (_pendingCompressionEvents.length >= 128 && !_pendingCompressionEvents.containsKey(event.assetId)) {
+        _pendingCompressionEvents.remove(_pendingCompressionEvents.keys.first);
+      }
+      _pendingCompressionEvents[event.assetId] = event;
+      return;
+    }
+
+    final currentItem = state.uploadItems[localAssetId];
+    if (currentItem == null) {
+      return;
+    }
+
+    final finished = event.isFinished;
+    state = state.copyWith(
+      uploadItems: {
+        ...state.uploadItems,
+        localAssetId: currentItem.copyWith(
+          preparationProgress: event.progress,
+          originalFileSize: event.originalBytes,
+          fileSize: event.outputBytes,
+          compressionExpected: true,
+          compressionState: event.state,
+        ),
+      },
+    );
+
+    if (finished) {
+      _remoteToLocalAssetIds.remove(event.assetId);
+      _pendingCompressionEvents.remove(event.assetId);
+      _scheduleUploadItemRemoval(localAssetId);
+    }
   }
 
   void _handleForegroundBackupError(String localAssetId, String errorMessage) {

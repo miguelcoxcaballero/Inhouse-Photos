@@ -40,3 +40,22 @@ class MultiSelectToggleEvent extends Event {
 class MapMarkerReloadEvent extends Event {
   const MapMarkerReloadEvent();
 }
+
+// Server-side Storage Saver events
+class ServerCompressionProgressEvent extends Event {
+  final String assetId;
+  final double progress;
+  final String state;
+  final int? originalBytes;
+  final int? outputBytes;
+
+  const ServerCompressionProgressEvent({
+    required this.assetId,
+    required this.progress,
+    required this.state,
+    this.originalBytes,
+    this.outputBytes,
+  });
+
+  bool get isFinished => state == 'completed' || state == 'skipped' || state == 'failed';
+}

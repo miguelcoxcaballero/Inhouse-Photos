@@ -187,6 +187,15 @@ export class AssetMediaService extends BaseService {
         name: JobName.AssetExtractMetadata,
         data: { id: asset.id, source: dto.storageSaver ? 'storage-saver-upload' : 'upload' },
       });
+      if (dto.storageSaver) {
+        this.websocketRepository.clientSend('StorageSaverProgressV1', asset.ownerId, {
+          assetId: asset.id,
+          userId: asset.ownerId,
+          progress: 0,
+          state: 'queued',
+          originalBytes: file.size,
+        });
+      }
 
       if (auth.sharedLink) {
         await this.addToSharedLink(auth.sharedLink, asset.id);

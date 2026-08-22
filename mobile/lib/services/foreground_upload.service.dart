@@ -29,15 +29,14 @@ import 'package:photo_manager/photo_manager.dart' show PMProgressHandler;
 /// Callbacks for upload progress and status updates
 class UploadCallbacks {
   final void Function(String id, String filename, int bytes, int totalBytes)? onProgress;
-  final void Function(String id, String filename, double progress, int originalBytes, int? preparedBytes)?
-  onPreparationProgress;
+  final void Function(String id, String filename, int originalBytes)? onServerCompressionExpected;
   final FutureOr<void> Function(String localId, String remoteId)? onSuccess;
   final void Function(String id, String errorMessage)? onError;
   final void Function(String id, double progress)? onICloudProgress;
 
   const UploadCallbacks({
     this.onProgress,
-    this.onPreparationProgress,
+    this.onServerCompressionExpected,
     this.onSuccess,
     this.onError,
     this.onICloudProgress,
@@ -532,7 +531,9 @@ class ForegroundUploadService {
       // before every transfer.
       final storageSaver = SettingsRepository.instance.appConfig.backup.quality == BackupQuality.storageSaver;
       final originalBytes = await file.length().onError((_, __) => 0);
-      callbacks.onPreparationProgress?.call(asset.localId!, originalFileName, 1, originalBytes, null);
+      if (storageSaver) {
+        callbacks.onServerCompressionExpected?.call(asset.localId!, originalFileName, originalBytes);
+      }
       final fields = <String, String>{
         // deviceAssetId/deviceId required by server v2.7.5 and below (drop in v4.0 per #27818).
         'deviceAssetId': asset.localId!,

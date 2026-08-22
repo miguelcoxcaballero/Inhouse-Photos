@@ -50,6 +50,7 @@ type EventMap = {
   AssetTrash: [{ assetId: string; userId: string }];
   AssetDelete: [{ assetId: string; userId: string }];
   AssetMetadataExtracted: [{ assetId: string; userId: string; source?: JobSource }];
+  StorageSaverProgress: [StorageSaverProgressEvent];
 
   // asset bulk events
   AssetTrashAll: [{ assetIds: string[]; userId: string }];
@@ -106,6 +107,15 @@ type EventMap = {
 
 export type AppRestartEvent = {
   isMaintenanceMode: boolean;
+};
+
+export type StorageSaverProgressEvent = {
+  assetId: string;
+  userId: string;
+  progress: number;
+  state: 'queued' | 'compressing' | 'completed' | 'skipped' | 'failed';
+  originalBytes?: number;
+  outputBytes?: number;
 };
 
 type JobSuccessEvent = { job: JobItem; response?: JobStatus };

@@ -12,7 +12,7 @@ import { AuthDto } from 'src/dtos/auth.dto';
 import { NotificationDto } from 'src/dtos/notification.dto';
 import { ReleaseEventV1, ServerVersionResponseDto } from 'src/dtos/server.dto';
 import { SyncAssetEditV1, SyncAssetExifV1, SyncAssetV2 } from 'src/dtos/sync.dto';
-import { AppRestartEvent, ArgsOf, EventRepository } from 'src/repositories/event.repository';
+import { AppRestartEvent, ArgsOf, EventRepository, StorageSaverProgressEvent } from 'src/repositories/event.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { handlePromiseError } from 'src/utils/misc';
 
@@ -25,6 +25,7 @@ export const serverEvents = [
   'HlsSessionRequest',
   'HlsSessionResult',
   'HlsSessionEnd',
+  'StorageSaverProgress',
 ] as const;
 export type ServerEvents = (typeof serverEvents)[number];
 
@@ -48,6 +49,7 @@ export interface ClientEventMap {
   AssetUploadReadyV2: [{ asset: SyncAssetV2; exif: SyncAssetExifV1 }];
   AppRestartV1: [AppRestartEvent];
   AssetEditReadyV2: [{ asset: SyncAssetV2; edit: SyncAssetEditV1[] }];
+  StorageSaverProgressV1: [StorageSaverProgressEvent];
 }
 
 export type AuthFn = (client: Socket) => Promise<AuthDto>;

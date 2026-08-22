@@ -19,12 +19,20 @@ class DriftUploadDetailPage extends ConsumerStatefulWidget {
 }
 
 class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
+  static const double _uploadCardContentHeight = 82;
+
   @override
   Widget build(BuildContext context) {
     final uploadItems = ref.watch(driftBackupProvider.select((state) => state.uploadItems));
     final iCloudProgress = ref.watch(driftBackupProvider.select((state) => state.iCloudDownloadProgress));
 
-    final uploadingItems = uploadItems.values.where((item) => item.progress < 1.0 && item.isFailed != true).toList();
+    final uploadingItems = uploadItems.values
+        .where(
+          (item) =>
+              item.isFailed != true &&
+              (item.progress < 1.0 || (item.compressionExpected && item.preparationProgress < 1.0)),
+        )
+        .toList();
     final failedItems = uploadItems.values.where((item) => item.isFailed == true).toList();
 
     return Scaffold(
@@ -225,6 +233,9 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
   }
 
   Widget _buildCurrentUploadCard(BuildContext context, DriftUploadStatus item) {
+    final isUploading = item.progress < 0.999;
+    final activeProgress = isUploading ? item.progress : item.preparationProgress;
+    final activeColor = isUploading ? context.colorScheme.primary : context.colorScheme.tertiary;
     return Card(
       margin: EdgeInsets.zero,
       elevation: 0,
@@ -236,58 +247,63 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
       child: InkWell(
         onTap: () => _showFileDetailDialog(context, item),
         borderRadius: const BorderRadius.all(Radius.circular(10)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _CurrentUploadThumbnail(taskId: item.taskId),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            path.basename(item.filename),
-                            style: context.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+        child: SizedBox(
+          height: _uploadCardContentHeight,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _CurrentUploadThumbnail(taskId: item.taskId),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              path.basename(item.filename),
+                              style: context.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${(item.progress.clamp(0.0, 1.0) * 100).round()}%',
-                          style: context.textTheme.labelSmall?.copyWith(
-                            color: context.colorScheme.primary,
-                            fontWeight: FontWeight.w800,
+                          const SizedBox(width: 8),
+                          Text(
+                            '${(activeProgress.clamp(0.0, 1.0) * 100).round()}%',
+                            style: context.textTheme.labelSmall?.copyWith(
+                              color: activeColor,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      _buildCompactSizeSummary(context, item),
+                      const SizedBox(height: 6),
+                      _buildCompactStageProgress(
+                        context,
+                        label: "backup_upload_stage".t(context: context),
+                        detail: item.networkSpeedAsString,
+                        progress: item.progress,
+                        color: context.colorScheme.primary,
+                      ),
+                      if (item.compressionExpected && !isUploading) ...[
+                        const SizedBox(height: 4),
+                        _buildCompactStageProgress(
+                          context,
+                          label: 'Cloud compression',
+                          progress: item.preparationProgress,
+                          color: context.colorScheme.tertiary,
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 3),
-                    _buildCompactSizeSummary(context, item),
-                    const SizedBox(height: 6),
-                    _buildCompactStageProgress(
-                      context,
-                      label: "backup_compression_stage".t(context: context),
-                      progress: item.preparationProgress,
-                      color: context.colorScheme.tertiary,
-                    ),
-                    const SizedBox(height: 4),
-                    _buildCompactStageProgress(
-                      context,
-                      label: "backup_upload_stage".t(context: context),
-                      detail: item.networkSpeedAsString,
-                      progress: item.progress,
-                      color: context.colorScheme.primary,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -297,7 +313,11 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
   Widget _buildCompactSizeSummary(BuildContext context, DriftUploadStatus item) {
     final hasPreparedSize = item.fileSize > 0;
     final originalSize = formatHumanReadableBytes(item.originalFileSize, 1);
-    final compressedSize = hasPreparedSize ? formatHumanReadableBytes(item.fileSize, 1) : '—';
+    final compressedSize = hasPreparedSize
+        ? formatHumanReadableBytes(item.fileSize, 1)
+        : item.progress < 0.999
+        ? 'waiting for upload'
+        : 'compressing on server';
     final savingsPercent = calculateStorageSavingsPercent(item.originalFileSize, item.fileSize);
     final savings = savingsPercent == null ? '' : ' · ${savingsPercent > 0 ? '−$savingsPercent%' : '0%'}';
     return Text(
@@ -404,7 +424,7 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
 
   Widget _buildEmptyUploadState(BuildContext context) {
     return Container(
-      height: 54,
+      height: _uploadCardContentHeight,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: context.colorScheme.surfaceContainerLow,
