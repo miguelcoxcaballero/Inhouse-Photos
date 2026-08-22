@@ -54,16 +54,22 @@ class TimelineAssetLayoutTransition extends SingleChildRenderObjectWidget {
   @override
   RenderTimelineAssetLayoutTransition createRenderObject(BuildContext context) {
     final scope = TimelineLayoutTransitionScope.maybeOf(context);
-    return RenderTimelineAssetLayoutTransition(assetKey, scope?.animation, scope?.previousRects ?? const {});
+    final previousRects = scope?.previousRects ?? const <Object, Rect>{};
+    return RenderTimelineAssetLayoutTransition(
+      assetKey,
+      previousRects.containsKey(assetKey) ? scope?.animation : null,
+      previousRects,
+    );
   }
 
   @override
   void updateRenderObject(BuildContext context, RenderTimelineAssetLayoutTransition renderObject) {
     final scope = TimelineLayoutTransitionScope.maybeOf(context);
+    final previousRects = scope?.previousRects ?? const <Object, Rect>{};
     renderObject
       ..assetKey = assetKey
-      ..animation = scope?.animation
-      ..previousRects = scope?.previousRects ?? const {};
+      ..animation = previousRects.containsKey(assetKey) ? scope?.animation : null
+      ..previousRects = previousRects;
   }
 }
 

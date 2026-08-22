@@ -273,6 +273,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    setDenseTimelineAppVisible(true);
     _scrollController = ScrollController(onAttach: _onScrollAttach, onDetach: _onScrollDetach);
     _layoutTransitionController = AnimationController(
       vsync: this,
@@ -564,6 +565,21 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     releaseDenseTimelineMemory();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        setDenseTimelineAppVisible(true);
+      case AppLifecycleState.paused || AppLifecycleState.hidden || AppLifecycleState.detached:
+        setDenseTimelineAppVisible(false);
+      case AppLifecycleState.inactive:
+        // A notification shade or permission sheet can make Android briefly
+        // inactive. Keep the foreground state unchanged until the app genuinely
+        // backgrounds rather than starting a PNG encode during that short gap.
+        break;
+    }
+  }
+
   void _onEvent(Event event) {
     switch (event) {
       case ScrollToTopEvent():
@@ -571,7 +587,10 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
       case ScrollToDateEvent scrollToDateEvent:
         _scrollToDate(scrollToDateEvent.date);
       case TimelineReloadEvent():
-        setState(() {});
+        // The service publishes the matching bucket snapshot after its asset
+        // buffer is coherent. timelineSegmentProvider performs the one needed
+        // rebuild; doing another setState here doubled every upload refresh.
+        break;
       default:
         break;
     }
@@ -822,17 +841,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
           body: asyncSegments.widgetWhen(
             onLoading: widget.loadingWidget != null ? () => widget.loadingWidget! : null,
             onData: (segments) {
-              if (yearOverview) {
-                // Warm the current and adjacent dense panels after the first
-                // frame. The visible panel still renders from memory/disk
-                // immediately; this only makes the next scroll positions
-                // ready without putting decode work on the build path.
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    warmDenseOverviewCache(service: ref.read(timelineServiceProvider), segments: segments);
-                  }
-                });
-              }
               final childCount = (segments.lastOrNull?.lastIndex ?? -1) + 1;
               final double appBarExpandedHeight = widget.appBar != null && widget.appBar is MesmerizingSliverAppBar
                   ? 200

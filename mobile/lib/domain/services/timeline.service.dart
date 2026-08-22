@@ -90,55 +90,167 @@ class TimelineFactory {
 }
 
 class TimelineService {
+  static const Duration _defaultBucketRefreshInterval = Duration(milliseconds: 750);
+
   final TimelineAssetSource _assetSource;
   final TimelineBucketSource _bucketSource;
   final TimelineOrigin origin;
+  final Duration _bucketRefreshInterval;
   final AsyncMutex _mutex = AsyncMutex();
+  final StreamController<_TimelineBucketSnapshot> _publishedBuckets =
+      StreamController<_TimelineBucketSnapshot>.broadcast(sync: true);
   int _bufferOffset = 0;
   List<BaseAsset> _buffer = [];
   StreamSubscription? _bucketSubscription;
+  Timer? _bucketRefreshTimer;
+  List<Bucket>? _pendingBuckets;
+  _TimelineBucketSnapshot? _latestBucketSnapshot;
+  bool _bucketRefreshRunning = false;
+  bool _disposed = false;
+  int _publishedBucketRevision = 0;
 
   int _totalAssets = 0;
   int get totalAssets => _totalAssets;
   int _revision = 0;
   int get revision => _revision;
 
-  TimelineService(TimelineQuery query)
-    : this._(assetSource: query.assetSource, bucketSource: query.bucketSource, origin: query.origin);
+  TimelineService(TimelineQuery query, {Duration bucketRefreshInterval = _defaultBucketRefreshInterval})
+    : this._(
+        assetSource: query.assetSource,
+        bucketSource: query.bucketSource,
+        origin: query.origin,
+        bucketRefreshInterval: bucketRefreshInterval,
+      );
 
-  TimelineService._({required this._assetSource, required this._bucketSource, required this.origin}) {
-    _bucketSubscription = _bucketSource().listen((buckets) {
-      _mutex.run(() async {
-        final totalAssets = buckets.fold<int>(0, (acc, bucket) => acc + bucket.assetCount);
-
-        if (totalAssets == 0) {
-          _bufferOffset = 0;
-          _buffer = [];
-        } else {
-          final int offset;
-          final int count;
-          // When the buffer is empty or the old bufferOffset is greater than the new total assets,
-          // we need to reset the buffer and load the first batch of assets.
-          if (_bufferOffset >= totalAssets || _buffer.isEmpty) {
-            offset = 0;
-            count = kTimelineAssetLoadBatchSize;
-          } else {
-            offset = _bufferOffset;
-            count = math.min(_buffer.length, totalAssets - _bufferOffset);
-          }
-          _buffer = await _assetSource(offset, count);
-          _bufferOffset = offset;
+  TimelineService._({
+    required this._assetSource,
+    required this._bucketSource,
+    required this.origin,
+    required this._bucketRefreshInterval,
+  }) {
+    // Keep one database bucket subscription for the lifetime of the service.
+    // The old implementation opened a second query for the UI and queued a
+    // complete buffer reload for every upload event. A busy backup could then
+    // leave hundreds of obsolete 8k-asset reads ahead of taps and painting.
+    _bucketSubscription = _bucketSource().listen(
+      _onBucketsChanged,
+      onError: (Object error, StackTrace stackTrace) {
+        if (!_disposed) {
+          _publishedBuckets.addError(error, stackTrace);
         }
+      },
+    );
+  }
 
-        // change the state's total assets count only after the buffer is reloaded
-        _totalAssets = totalAssets;
-        _revision++;
-        EventStream.shared.emit(const TimelineReloadEvent());
-      });
+  Stream<List<Bucket>> Function() get watchBuckets => _watchPublishedBuckets;
+
+  Stream<List<Bucket>> _watchPublishedBuckets() => Stream<List<Bucket>>.multi((listener) {
+    var observedRevision = -1;
+
+    void publish(_TimelineBucketSnapshot snapshot) {
+      if (snapshot.revision <= observedRevision) {
+        return;
+      }
+      observedRevision = snapshot.revision;
+      listener.add(snapshot.buckets);
+    }
+
+    // Subscribe before reading the replay value so an update cannot fall into
+    // the gap between the two operations. The revision check removes the one
+    // possible duplicate when a synchronous publish happens in that window.
+    final subscription = _publishedBuckets.stream.listen(publish, onError: listener.addError, onDone: listener.close);
+    final latest = _latestBucketSnapshot;
+    if (latest != null) {
+      publish(latest);
+    }
+    listener.onCancel = subscription.cancel;
+  });
+
+  void _onBucketsChanged(List<Bucket> buckets) {
+    if (_disposed) {
+      return;
+    }
+    // Only the newest database snapshot matters. While a buffer read is in
+    // flight, newer snapshots replace the pending one instead of adding more
+    // work to the mutex queue.
+    _pendingBuckets = buckets;
+    if (_revision == 0 && !_bucketRefreshRunning && _bucketRefreshTimer == null) {
+      unawaited(_processPendingBuckets());
+      return;
+    }
+    _scheduleBucketRefresh();
+  }
+
+  void _scheduleBucketRefresh() {
+    if (_disposed || _bucketRefreshRunning || _bucketRefreshTimer != null || _pendingBuckets == null) {
+      return;
+    }
+    _bucketRefreshTimer = Timer(_bucketRefreshInterval, () {
+      _bucketRefreshTimer = null;
+      unawaited(_processPendingBuckets());
     });
   }
 
-  Stream<List<Bucket>> Function() get watchBuckets => _bucketSource;
+  Future<void> _processPendingBuckets() async {
+    if (_disposed || _bucketRefreshRunning) {
+      return;
+    }
+    final buckets = _pendingBuckets;
+    if (buckets == null) {
+      return;
+    }
+    _pendingBuckets = null;
+    _bucketRefreshRunning = true;
+    try {
+      await _mutex.run(() => _applyBuckets(buckets));
+    } catch (error, stackTrace) {
+      if (!_disposed) {
+        _publishedBuckets.addError(error, stackTrace);
+      }
+    } finally {
+      _bucketRefreshRunning = false;
+      if (_pendingBuckets != null) {
+        _scheduleBucketRefresh();
+      }
+    }
+  }
+
+  Future<void> _applyBuckets(List<Bucket> buckets) async {
+    final totalAssets = buckets.fold<int>(0, (acc, bucket) => acc + bucket.assetCount);
+
+    if (totalAssets == 0) {
+      _bufferOffset = 0;
+      _buffer = [];
+    } else {
+      final int offset;
+      final int count;
+      // A dense overview can temporarily request several thousand assets. Do
+      // not repeat that huge read for every upload notification: refresh one
+      // normal navigation window and let demand-loading fetch another range.
+      if (_bufferOffset >= totalAssets || _buffer.isEmpty) {
+        offset = 0;
+        count = math.min(kTimelineAssetLoadBatchSize, totalAssets);
+      } else {
+        offset = _bufferOffset;
+        count = math.min(kTimelineAssetLoadBatchSize, totalAssets - _bufferOffset);
+      }
+      _buffer = await _assetSource(offset, count);
+      _bufferOffset = offset;
+    }
+
+    if (_disposed) {
+      return;
+    }
+    // Publish the buckets only after their matching asset window is coherent.
+    // All consumers share this replaying stream, so relayout no longer opens a
+    // duplicate Drift query or races ahead of the service buffer.
+    _totalAssets = totalAssets;
+    _revision++;
+    final snapshot = _TimelineBucketSnapshot(++_publishedBucketRevision, List.unmodifiable(buckets));
+    _latestBucketSnapshot = snapshot;
+    _publishedBuckets.add(snapshot);
+    EventStream.shared.emit(const TimelineReloadEvent());
+  }
 
   Future<List<BaseAsset>> loadAssets(int index, int count) => _mutex.run(() => _loadAssets(index, count));
 
@@ -237,9 +349,21 @@ class TimelineService {
   }
 
   Future<void> dispose() async {
+    _disposed = true;
+    _bucketRefreshTimer?.cancel();
+    _bucketRefreshTimer = null;
+    _pendingBuckets = null;
     await _bucketSubscription?.cancel();
     _bucketSubscription = null;
+    await _publishedBuckets.close();
     _buffer = [];
     _bufferOffset = 0;
   }
+}
+
+class _TimelineBucketSnapshot {
+  final int revision;
+  final List<Bucket> buckets;
+
+  const _TimelineBucketSnapshot(this.revision, this.buckets);
 }

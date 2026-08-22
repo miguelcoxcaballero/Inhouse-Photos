@@ -239,9 +239,9 @@ void main() {
     expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: false), 800);
   });
 
-  test('year overview preloads enough assets for the complete viewport in one shared chunk', () {
-    expect(denseTimelineAssetChunkSize(columnCount: 48, viewportHeight: 800, tileExtent: 8.34), 8192);
-    expect(denseTimelineAssetChunkSize(columnCount: 24, viewportHeight: 800, tileExtent: 16.67), 8192);
+  test('year overview bounds each database chunk while retaining a multi-screen window', () {
+    expect(denseTimelineAssetChunkSize(columnCount: 48, viewportHeight: 800, tileExtent: 8.34), 2048);
+    expect(denseTimelineAssetChunkSize(columnCount: 24, viewportHeight: 800, tileExtent: 16.67), 2048);
     expect(denseTimelineAssetChunkSize(columnCount: 12, viewportHeight: 0, tileExtent: 32), 1024);
     expect(denseTimelineTargetPixels(tileExtent: 8.34, devicePixelRatio: 3), 32);
     expect(denseTimelineTargetPixels(tileExtent: 18, devicePixelRatio: 3), 54);
