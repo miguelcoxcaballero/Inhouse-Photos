@@ -91,7 +91,7 @@ void main() {
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 6, nextColumns: 12), isFalse);
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 12, nextColumns: 18), isFalse);
     expect(shouldAnimateTimelineColumnTransition(currentColumns: 4, nextColumns: 5), isTrue);
-    expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: true), 1200);
+    expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: true), 400);
     expect(timelineScrollCacheExtent(maxHeight: 800, yearOverview: false), 800);
   });
 

@@ -120,33 +120,48 @@ class _DenseDiskAtlasCache {
   }();
 
   Future<_DenseDiskAtlasEntry?> get(String slot) {
-    return _reads.putIfAbsent(slot, () async {
-      try {
-        final directory = await _getDirectory();
-        final file = File(path.join(directory.path, _fileName(slot)));
-        final bytes = await file.readAsBytes();
-        if (bytes.length < _headerBytes || ascii.decode(bytes.sublist(0, 8)) != _magic) {
-          return null;
-        }
-        final header = ByteData.sublistView(bytes, 8, 16);
-        final width = header.getUint32(0, Endian.little);
-        final height = header.getUint32(4, Endian.little);
-        final encodedBytes = Uint8List.sublistView(bytes, _headerBytes);
-        if (width <= 0 || height <= 0 || encodedBytes.isEmpty) {
-          return null;
-        }
-        final signature = ascii.decode(bytes.sublist(16, 80));
-        unawaited(file.setLastModified(DateTime.now()).catchError((_) => file));
-        return _DenseDiskAtlasEntry(width: width, height: height, signature: signature, encodedBytes: encodedBytes);
-      } catch (_) {
-        return null;
-      }
-    });
+    final inFlight = _reads[slot];
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    late final Future<_DenseDiskAtlasEntry?> read;
+    read =
+        () async {
+          try {
+            final directory = await _getDirectory();
+            final file = File(path.join(directory.path, _fileName(slot)));
+            final bytes = await file.readAsBytes();
+            if (bytes.length < _headerBytes || ascii.decode(bytes.sublist(0, 8)) != _magic) {
+              return null;
+            }
+            final header = ByteData.sublistView(bytes, 8, 16);
+            final width = header.getUint32(0, Endian.little);
+            final height = header.getUint32(4, Endian.little);
+            final encodedBytes = Uint8List.sublistView(bytes, _headerBytes);
+            if (width <= 0 || height <= 0 || encodedBytes.isEmpty) {
+              return null;
+            }
+            final signature = ascii.decode(bytes.sublist(16, 80));
+            return _DenseDiskAtlasEntry(width: width, height: height, signature: signature, encodedBytes: encodedBytes);
+          } catch (_) {
+            return null;
+          }
+        }().whenComplete(() {
+          // Cache decoded textures, not the compressed file bytes. Retaining every
+          // PNG read here duplicated the complete disk cache in Dart heap and was
+          // the main source of OOM crashes in long year-view scrolls.
+          if (identical(_reads[slot], read)) {
+            _reads.remove(slot);
+          }
+        });
+    _reads[slot] = read;
+    return read;
   }
 
-  void put(String slot, String signature, int width, int height, Uint8List encodedBytes) {
+  Future<void> put(String slot, String signature, int width, int height, Uint8List encodedBytes) {
     if (signature.length != 64 || width <= 0 || height <= 0 || encodedBytes.isEmpty) {
-      return;
+      return Future.value();
     }
     final previous = _writes[slot] ?? Future.value();
     final write = previous.then((_) async {
@@ -166,9 +181,6 @@ class _DenseDiskAtlasCache {
           await file.delete();
         }
         await temporary.rename(file.path);
-        _reads[slot] = Future.value(
-          _DenseDiskAtlasEntry(width: width, height: height, signature: signature, encodedBytes: encodedBytes),
-        );
       } catch (_) {
         // The in-memory atlas remains valid if Android denies or runs out of
         // cache storage; the next successful render can retry the write.
@@ -181,6 +193,7 @@ class _DenseDiskAtlasCache {
       }
     });
     _writes[slot] = trackedWrite;
+    return trackedWrite;
   }
 
   Future<void> remove(String slot) async {
@@ -314,8 +327,11 @@ Uint8List buildDenseThumbhashAtlasPixels(List<String?> hashes, int targetPixels,
 final Expando<_DenseAssetChunkStore> _denseAssetStores = Expando<_DenseAssetChunkStore>();
 
 class _DenseAssetChunkStore {
-  final LinkedHashMap<(int, int), Future<List<BaseAsset>>> _rows = LinkedHashMap();
-  final Map<(int, int), List<BaseAsset>> _resolvedRows = {};
+  static const int _chunkSize = 8192;
+  static const int _maxResidentChunks = 3;
+
+  final LinkedHashMap<int, Future<List<BaseAsset>>> _chunks = LinkedHashMap();
+  final Map<int, List<BaseAsset>> _resolvedChunks = {};
   int _revision = -1;
 
   void _resetIfNeeded(TimelineService service) {
@@ -323,49 +339,155 @@ class _DenseAssetChunkStore {
       return;
     }
     _revision = service.revision;
-    _rows.clear();
-    _resolvedRows.clear();
+    _chunks.clear();
+    _resolvedChunks.clear();
   }
 
   List<BaseAsset>? getRow(TimelineService service, {required int index, required int count}) {
     _resetIfNeeded(service);
-    return _resolvedRows[(index, count)];
+    if (count <= 0) {
+      return const [];
+    }
+    final result = <BaseAsset>[];
+    var cursor = index;
+    final end = index + count;
+    while (cursor < end) {
+      final chunkStart = (cursor ~/ _chunkSize) * _chunkSize;
+      final chunk = _resolvedChunks[chunkStart];
+      if (chunk == null) {
+        return null;
+      }
+      final offset = cursor - chunkStart;
+      final take = math.min(end - cursor, chunk.length - offset);
+      if (take <= 0) {
+        return null;
+      }
+      result.addAll(chunk.getRange(offset, offset + take));
+      cursor += take;
+    }
+    return result;
   }
 
-  Future<List<BaseAsset>> loadRow(TimelineService service, {required int index, required int count}) {
+  Future<List<BaseAsset>> loadRow(TimelineService service, {required int index, required int count}) async {
     _resetIfNeeded(service);
-    final exactKey = (index, count);
-    final resolved = _resolvedRows[exactKey];
+    if (count <= 0) {
+      return const [];
+    }
+    final end = index + count;
+    var cursor = index;
+    while (cursor < end) {
+      final chunkStart = (cursor ~/ _chunkSize) * _chunkSize;
+      await _loadChunk(service, chunkStart);
+      cursor = math.min(end, chunkStart + _chunkSize);
+    }
+    return getRow(service, index: index, count: count) ?? const [];
+  }
+
+  Future<List<BaseAsset>> _loadChunk(TimelineService service, int chunkStart) {
+    final resolved = _resolvedChunks[chunkStart];
     if (resolved != null) {
+      final existing = _chunks.remove(chunkStart);
+      if (existing != null) {
+        _chunks[chunkStart] = existing;
+      }
       return Future.value(resolved);
     }
-    var row = _rows.remove(exactKey);
-    if (row == null) {
+
+    var future = _chunks.remove(chunkStart);
+    if (future == null) {
       final expectedRevision = _revision;
-      row = service
-          .loadAssets(index, count)
+      final available = service.totalAssets - chunkStart;
+      if (available <= 0) {
+        return Future.error(RangeError('Dense timeline chunk is outside the current revision'));
+      }
+      final count = math.min(_chunkSize, available);
+      future = service
+          .loadAssets(chunkStart, count)
           .then(
             (assets) {
-              if (_revision == expectedRevision) {
-                _resolvedRows[exactKey] = assets;
+              if (_revision == expectedRevision && _chunks.containsKey(chunkStart)) {
+                _resolvedChunks[chunkStart] = assets;
               }
               return assets;
             },
             onError: (Object error, StackTrace stackTrace) {
-              _rows.remove(exactKey);
+              _chunks.remove(chunkStart);
+              _resolvedChunks.remove(chunkStart);
               Error.throwWithStackTrace(error, stackTrace);
             },
           );
     }
-    _rows[exactKey] = row;
-    while (_rows.length > 512) {
-      final oldest = _rows.keys.first;
-      _rows.remove(oldest);
-      _resolvedRows.remove(oldest);
+    _chunks[chunkStart] = future;
+    while (_chunks.length > _maxResidentChunks) {
+      final oldest = _chunks.keys.first;
+      _chunks.remove(oldest);
+      _resolvedChunks.remove(oldest);
     }
-
-    return row;
+    return future;
   }
+}
+
+class _DenseAtlasPersistenceQueue {
+  static const int _maxPending = 8;
+  final LinkedHashMap<String, _DenseAtlasPersistenceTask> _pending = LinkedHashMap();
+  bool _active = false;
+
+  void schedule({required String slot, required String signature, required ui.Image image}) {
+    final snapshot = image.clone();
+    _pending.remove(slot)?.image.dispose();
+    _pending[slot] = _DenseAtlasPersistenceTask(slot: slot, signature: signature, image: snapshot);
+    while (_pending.length > _maxPending) {
+      _pending.remove(_pending.keys.first)?.image.dispose();
+    }
+    _drain();
+  }
+
+  void trimPending() {
+    while (_pending.length > 2) {
+      _pending.remove(_pending.keys.first)?.image.dispose();
+    }
+  }
+
+  void _drain() {
+    if (_active || _pending.isEmpty) {
+      return;
+    }
+    _active = true;
+    final task = _pending.remove(_pending.keys.first)!;
+    unawaited(
+      _encode(task).whenComplete(() {
+        _active = false;
+        _drain();
+      }),
+    );
+  }
+
+  Future<void> _encode(_DenseAtlasPersistenceTask task) async {
+    try {
+      final data = await task.image.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) {
+        return;
+      }
+      await _denseDiskAtlasCache.put(
+        task.slot,
+        task.signature,
+        task.image.width,
+        task.image.height,
+        Uint8List.fromList(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes)),
+      );
+    } catch (_) {
+    } finally {
+      task.image.dispose();
+    }
+  }
+}
+
+class _DenseAtlasPersistenceTask {
+  final String slot;
+  final String signature;
+  final ui.Image image;
+
+  const _DenseAtlasPersistenceTask({required this.slot, required this.signature, required this.image});
 }
 
 class FixedSegment extends Segment {
@@ -462,7 +584,9 @@ class _FixedSegmentRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isScrubbing = ref.watch(timelineStateProvider.select((s) => s.isScrubbing));
+    final timelineState = ref.watch(
+      timelineStateProvider.select((state) => (isScrubbing: state.isScrubbing, isInteracting: state.isInteracting)),
+    );
     final timelineService = ref.read(timelineServiceProvider);
     final cacheSlot = '${timelineService.origin.name}:$denseCacheSlot';
     final isDynamicLayout = columnCount <= (context.isMobile ? 2 : 3);
@@ -492,7 +616,7 @@ class _FixedSegmentRow extends ConsumerWidget {
       );
     }
 
-    if (isScrubbing) {
+    if (timelineState.isScrubbing) {
       return _buildPlaceholder(context, cacheSlot);
     }
 
@@ -547,6 +671,7 @@ class _FixedSegmentRow extends ConsumerWidget {
         tileExtent: tileHeight,
         columnCount: columnCount,
         cacheSlot: cacheSlot,
+        deferHighResolution: ref.read(timelineStateProvider).isInteracting,
         onAssetTap: (index, asset) => _openAsset(context, ref, index, asset),
       );
     }
@@ -700,30 +825,46 @@ typedef _DenseAssetTap = void Function(int index, BaseAsset asset);
 const int denseOverviewMetadataCellPixels = 32;
 
 /// Hard upper bound for persisted overview atlases. Individual files are
-/// compressed PNGs and evicted least-recently-used when this budget is full.
+/// compressed PNGs and the oldest generated panels are evicted when full.
 const int denseOverviewDiskCacheLimitBytes = 256 * 1024 * 1024;
 
-const int _denseThumbnailConcurrency = 8;
-const int _denseMetadataAtlasConcurrency = 4;
+const int _denseThumbnailConcurrency = 3;
+const int _denseMetadataAtlasConcurrency = 1;
 const int _denseMetadataCellPixels = denseOverviewMetadataCellPixels;
-const int _denseAtlasCacheBytes = 96 * 1024 * 1024;
-const int _denseThumbTileCacheBytes = 16 * 1024 * 1024;
+const int _denseAtlasCacheBytes = 24 * 1024 * 1024;
+const int _denseThumbTileCacheBytes = 8 * 1024 * 1024;
 final _DenseThumbnailQueue _denseThumbnailQueue = _DenseThumbnailQueue();
-final _DenseAsyncQueue _denseMetadataAtlasQueue = _DenseAsyncQueue(_denseMetadataAtlasConcurrency);
+final _DenseAsyncQueue _denseMetadataAtlasQueue = _DenseAsyncQueue(_denseMetadataAtlasConcurrency, maxPending: 48);
 final _DenseRowAtlasCache _denseRowAtlasCache = _DenseRowAtlasCache();
 final _DenseThumbTileCache _denseThumbTileCache = _DenseThumbTileCache();
 final _DenseDiskAtlasCache _denseDiskAtlasCache = _DenseDiskAtlasCache();
-final _DenseAsyncQueue _denseWarmupQueue = _DenseAsyncQueue(1);
+final _DenseAtlasPersistenceQueue _denseAtlasPersistenceQueue = _DenseAtlasPersistenceQueue();
+final _DenseAsyncQueue _denseWarmupQueue = _DenseAsyncQueue(1, maxPending: 4);
 final Map<String, int> _denseWarmupRevisions = {};
+
+/// Drops speculative overview work and LRU textures when the OS signals memory
+/// pressure. Visible panels retain their own small atlas, so this does not turn
+/// the current viewport blank while immediately releasing off-screen memory.
+void releaseDenseTimelineMemory() {
+  _denseThumbnailQueue.cancelPending();
+  _denseMetadataAtlasQueue.cancelPending();
+  _denseWarmupQueue.cancelPending();
+  _denseAtlasPersistenceQueue.trimPending();
+  _denseRowAtlasCache.clear();
+  _denseThumbTileCache.clear();
+}
 
 /// Restores a small rolling window of persisted overview panels before the
 /// sliver asks for them. This work is serialized and cancellable at the image
 /// layer, so opening the gallery never competes with the first visible frame.
-void warmDenseOverviewCache({required TimelineService service, required List<Segment> segments, int maxPanels = 18}) {
+void warmDenseOverviewCache({required TimelineService service, required List<Segment> segments, int maxPanels = 2}) {
   var scheduled = 0;
   for (final segment in segments) {
-    if (scheduled >= maxPanels || segment is! FixedSegment || segment.header != HeaderType.year) {
+    if (scheduled >= maxPanels) {
       break;
+    }
+    if (segment is! FixedSegment || !segment.denseOverview) {
+      continue;
     }
     final rows = (segment.bucket.assetCount / segment.columnCount).ceil();
     final panelCount = (rows / segment.rowsPerChild).ceil();
@@ -750,29 +891,31 @@ void warmDenseOverviewCache({required TimelineService service, required List<Seg
       final width = segment.columnCount * _denseMetadataCellPixels;
       final height = ((assetCount + segment.columnCount - 1) ~/ segment.columnCount) * _denseMetadataCellPixels;
       unawaited(
-        _denseWarmupQueue.schedule(() async {
-          final memoryKey = Object.hash('persistent-slot', slot);
-          final existing = _denseRowAtlasCache.get(memoryKey);
-          if (existing != null) {
-            existing.dispose();
-            return;
-          }
-          final entry = await _denseDiskAtlasCache.get(slot);
-          if (entry == null || entry.width != width || entry.height != height) {
-            return;
-          }
-          ui.Image? image;
-          try {
-            image = await _decodeDenseDiskAtlas(entry);
-          } catch (_) {
-            await _denseDiskAtlasCache.remove(slot);
-          }
-          if (image == null) {
-            return;
-          }
-          _denseRowAtlasCache.put(memoryKey, image);
-          image.dispose();
-        }),
+        _denseWarmupQueue
+            .schedule(() async {
+              final memoryKey = Object.hash('persistent-slot', slot);
+              final existing = _denseRowAtlasCache.get(memoryKey);
+              if (existing != null) {
+                existing.dispose();
+                return;
+              }
+              final entry = await _denseDiskAtlasCache.get(slot);
+              if (entry == null || entry.width != width || entry.height != height) {
+                return;
+              }
+              ui.Image? image;
+              try {
+                image = await _decodeDenseDiskAtlas(entry);
+              } catch (_) {
+                await _denseDiskAtlasCache.remove(slot);
+              }
+              if (image == null) {
+                return;
+              }
+              _denseRowAtlasCache.put(memoryKey, image, signature: entry.signature);
+              image.dispose();
+            })
+            .then<void>((_) {}, onError: (_, __) {}),
       );
     }
   }
@@ -783,11 +926,20 @@ class _DenseLoadCancelled implements Exception {
 }
 
 class _DenseThumbnailQueue {
+  static const int _maxPending = 384;
   final List<_DenseThumbnailTask> _pending = [];
   int _active = 0;
 
-  _DenseThumbnailHandle schedule(Future<void> Function() task, {int priority = 1}) {
-    final item = _DenseThumbnailTask(task: task, priority: priority, sequence: _sequence++);
+  _DenseThumbnailHandle schedule(Future<void> Function() task, {int priority = 1, void Function()? onDiscard}) {
+    _pending.removeWhere((item) => item.cancelled);
+    if (_pending.length >= _maxPending) {
+      final lowestPriority = _pending.fold<int>(0, (value, item) => math.max(value, item.priority));
+      final removeIndex = _pending.indexWhere((item) => item.priority == lowestPriority);
+      if (removeIndex >= 0) {
+        _pending.removeAt(removeIndex).discard();
+      }
+    }
+    final item = _DenseThumbnailTask(task: task, priority: priority, sequence: _sequence++, onDiscard: onDiscard);
     final handle = _DenseThumbnailHandle(item);
     _pending.add(item);
     _drain();
@@ -796,6 +948,13 @@ class _DenseThumbnailQueue {
 
   int _sequence = 0;
 
+  void cancelPending() {
+    for (final item in _pending) {
+      item.discard(notify: false);
+    }
+    _pending.clear();
+  }
+
   void _drain() {
     while (_active < _denseThumbnailConcurrency && _pending.isNotEmpty) {
       _pending.sort((a, b) {
@@ -803,12 +962,14 @@ class _DenseThumbnailQueue {
         return priority == 0 ? a.sequence.compareTo(b.sequence) : priority;
       });
       final item = _pending.removeAt(0);
-      if (item.cancelled) {
+      final task = item.task;
+      if (item.cancelled || task == null) {
         continue;
       }
       _active++;
       unawaited(
-        Future<void>.sync(item.task).then<void>((_) {}, onError: (_, __) {}).whenComplete(() {
+        Future<void>.sync(task).then<void>((_) {}, onError: (_, __) {}).whenComplete(() {
+          item.release();
           _active--;
           _drain();
         }),
@@ -818,12 +979,33 @@ class _DenseThumbnailQueue {
 }
 
 class _DenseThumbnailTask {
-  final Future<void> Function() task;
+  Future<void> Function()? task;
   final int priority;
   final int sequence;
+  void Function()? onDiscard;
   bool cancelled = false;
 
-  _DenseThumbnailTask({required this.task, required this.priority, required this.sequence});
+  _DenseThumbnailTask({required this.task, required this.priority, required this.sequence, this.onDiscard});
+
+  void discard({bool notify = true}) {
+    if (cancelled) {
+      return;
+    }
+    cancelled = true;
+    task = null;
+    if (notify) {
+      final callback = onDiscard;
+      onDiscard = null;
+      callback?.call();
+    } else {
+      onDiscard = null;
+    }
+  }
+
+  void release() {
+    task = null;
+    onDiscard = null;
+  }
 }
 
 class _DenseThumbnailHandle {
@@ -831,27 +1013,51 @@ class _DenseThumbnailHandle {
 
   const _DenseThumbnailHandle(this._task);
 
-  void cancel() => _task.cancelled = true;
+  void cancel() => _task.discard(notify: false);
 }
 
 class _DenseAsyncQueue {
   final int concurrency;
-  final Queue<Future<void> Function()> _pending = Queue();
+  final int maxPending;
+  final Queue<_DenseAsyncTask> _pending = Queue();
   int _active = 0;
 
-  _DenseAsyncQueue(this.concurrency);
+  _DenseAsyncQueue(this.concurrency, {this.maxPending = 64});
 
   Future<T> schedule<T>(Future<T> Function() task) {
     final completer = Completer<T>();
-    _pending.add(() async {
-      try {
-        completer.complete(await task());
-      } catch (error, stackTrace) {
-        completer.completeError(error, stackTrace);
-      }
-    });
+    if (_pending.length >= maxPending) {
+      _pending.removeFirst().cancel();
+    }
+    _pending.add(
+      _DenseAsyncTask(
+        run: () async {
+          try {
+            final result = await task();
+            if (!completer.isCompleted) {
+              completer.complete(result);
+            }
+          } catch (error, stackTrace) {
+            if (!completer.isCompleted) {
+              completer.completeError(error, stackTrace);
+            }
+          }
+        },
+        cancel: () {
+          if (!completer.isCompleted) {
+            completer.completeError(const _DenseLoadCancelled());
+          }
+        },
+      ),
+    );
     _drain();
     return completer.future;
+  }
+
+  void cancelPending() {
+    while (_pending.isNotEmpty) {
+      _pending.removeFirst().cancel();
+    }
   }
 
   void _drain() {
@@ -859,7 +1065,7 @@ class _DenseAsyncQueue {
       final task = _pending.removeFirst();
       _active++;
       unawaited(
-        Future<void>.sync(task).whenComplete(() {
+        Future<void>.sync(task.run).whenComplete(() {
           _active--;
           _drain();
         }),
@@ -868,8 +1074,16 @@ class _DenseAsyncQueue {
   }
 }
 
+class _DenseAsyncTask {
+  final Future<void> Function() run;
+  final void Function() cancel;
+
+  const _DenseAsyncTask({required this.run, required this.cancel});
+}
+
 class _DenseRowAtlasCache {
   final LinkedHashMap<Object, ui.Image> _images = LinkedHashMap();
+  final Map<Object, String> _signatures = {};
   int _bytes = 0;
 
   ui.Image? get(Object key) {
@@ -881,11 +1095,18 @@ class _DenseRowAtlasCache {
     return image.clone();
   }
 
-  void put(Object key, ui.Image image) {
+  String? signature(Object key) => _signatures[key];
+
+  void put(Object key, ui.Image image, {String? signature}) {
     final previous = _images.remove(key);
     if (previous != null) {
       _bytes -= _imageBytes(previous);
       previous.dispose();
+    }
+    if (signature == null) {
+      _signatures.remove(key);
+    } else {
+      _signatures[key] = signature;
     }
     final cached = image.clone();
     _images[key] = cached;
@@ -893,12 +1114,22 @@ class _DenseRowAtlasCache {
     while (_bytes > _denseAtlasCacheBytes && _images.isNotEmpty) {
       final oldestKey = _images.keys.first;
       final oldest = _images.remove(oldestKey)!;
+      _signatures.remove(oldestKey);
       _bytes -= _imageBytes(oldest);
       oldest.dispose();
     }
   }
 
   int _imageBytes(ui.Image image) => image.width * image.height * 4;
+
+  void clear() {
+    for (final image in _images.values) {
+      image.dispose();
+    }
+    _images.clear();
+    _signatures.clear();
+    _bytes = 0;
+  }
 }
 
 Future<ui.Image> _decodeDenseDiskAtlas(_DenseDiskAtlasEntry entry) async {
@@ -927,6 +1158,7 @@ class _DenseCachedPanel extends StatefulWidget {
 
 class _DenseCachedPanelState extends State<_DenseCachedPanel> {
   ui.Image? _atlas;
+  int _generation = 0;
 
   Object get _memoryKey => Object.hash('persistent-slot', widget.cacheSlot);
 
@@ -947,35 +1179,38 @@ class _DenseCachedPanelState extends State<_DenseCachedPanel> {
   }
 
   Future<void> _restore() async {
-    final memory = _denseRowAtlasCache.get(_memoryKey);
+    final generation = ++_generation;
+    final cacheSlot = widget.cacheSlot;
+    final memoryKey = _memoryKey;
+    final expectedWidth = widget.columnCount * _denseMetadataCellPixels;
+    final expectedHeight = (widget.itemCount / widget.columnCount).ceil() * _denseMetadataCellPixels;
+    final memory = _denseRowAtlasCache.get(memoryKey);
     if (memory != null) {
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(() => _atlas = memory);
       } else {
         memory.dispose();
       }
       return;
     }
-    final entry = await _denseDiskAtlasCache.get(widget.cacheSlot);
-    if (entry == null ||
-        entry.width != widget.columnCount * _denseMetadataCellPixels ||
-        entry.height != (widget.itemCount / widget.columnCount).ceil() * _denseMetadataCellPixels) {
+    final entry = await _denseDiskAtlasCache.get(cacheSlot);
+    if (entry == null || entry.width != expectedWidth || entry.height != expectedHeight) {
       return;
     }
     ui.Image? image;
     try {
       image = await _decodeDenseDiskAtlas(entry);
     } catch (_) {
-      await _denseDiskAtlasCache.remove(widget.cacheSlot);
+      await _denseDiskAtlasCache.remove(cacheSlot);
     }
     if (image == null) {
       return;
     }
-    if (!mounted) {
+    if (!mounted || generation != _generation) {
       image.dispose();
       return;
     }
-    _denseRowAtlasCache.put(_memoryKey, image);
+    _denseRowAtlasCache.put(memoryKey, image, signature: entry.signature);
     setState(() => _atlas = image);
   }
 
@@ -1000,6 +1235,7 @@ class _DenseCachedPanelState extends State<_DenseCachedPanel> {
 
   @override
   void dispose() {
+    _generation++;
     _atlas?.dispose();
     super.dispose();
   }
@@ -1040,6 +1276,11 @@ class _DenseThumbTileCache {
       _bytes -= oldest.lengthInBytes;
     }
   }
+
+  void clear() {
+    _tiles.clear();
+    _bytes = 0;
+  }
 }
 
 /// Paints a virtualized overview panel in one layer. At 48 columns, 16 rows are
@@ -1051,6 +1292,7 @@ class _DenseAssetRow extends StatefulWidget {
   final double tileExtent;
   final int columnCount;
   final String cacheSlot;
+  final bool deferHighResolution;
   final _DenseAssetTap onAssetTap;
 
   const _DenseAssetRow({
@@ -1060,6 +1302,7 @@ class _DenseAssetRow extends StatefulWidget {
     required this.tileExtent,
     required this.columnCount,
     required this.cacheSlot,
+    required this.deferHighResolution,
     required this.onAssetTap,
   });
 
@@ -1086,6 +1329,8 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   bool _baseAtlasReady = false;
   int _requiredActualCount = 0;
   int _loadedCount = 0;
+  int _finishedActualCount = 0;
+  int _actualWorkGeneration = 0;
   int _generation = 0;
   final Set<int> _actualThumbnailRequests = {};
   final Set<_DenseThumbnailHandle> _thumbnailHandles = {};
@@ -1107,6 +1352,12 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         oldWidget.columnCount != widget.columnCount ||
         !_sameAssets(oldWidget.assets, widget.assets)) {
       _subscribeToImages();
+    } else if (oldWidget.deferHighResolution != widget.deferHighResolution) {
+      if (widget.deferHighResolution) {
+        _cancelActualThumbnailWork();
+      } else {
+        _queueMissingActualThumbnails();
+      }
     }
   }
 
@@ -1137,6 +1388,8 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _listeners = List<ImageStreamListener?>.filled(widget.assets.length, null);
     _completers = List<Completer<ImageInfo>?>.filled(widget.assets.length, null);
     _loadedCount = 0;
+    _finishedActualCount = 0;
+    _actualWorkGeneration++;
     _atlasBuilding = false;
     _instantOverview = usesInstantDenseTimelineAtlas(widget.columnCount);
     _persistentExact = false;
@@ -1175,14 +1428,31 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       _baseAtlasReady = true;
       _scheduleRepaint();
     }
+    final positionalSignature = _denseRowAtlasCache.signature(_slotAtlasKey);
     final positionalAtlas = _denseRowAtlasCache.get(_slotAtlasKey);
-    if (_atlas == null && positionalAtlas != null) {
+    var restoredFromSlot = false;
+    if (positionalAtlas != null && (_atlas == null || positionalSignature == _contentSignature)) {
       _replaceAtlas(positionalAtlas);
+      restoredFromSlot = true;
       _scheduleRepaint();
     } else {
       positionalAtlas?.dispose();
     }
-    unawaited(_restorePersistentThenBuild(thumbnailTargetPixels, atlasTargetPixels, atlasKey, generation));
+    if (restoredFromSlot && positionalSignature == _contentSignature) {
+      _persistentExact = true;
+      _baseAtlasReady = true;
+      _denseRowAtlasCache.put(_completeAtlasKey, _atlas!);
+      return;
+    }
+    unawaited(
+      _restorePersistentThenBuild(
+        thumbnailTargetPixels,
+        atlasTargetPixels,
+        atlasKey,
+        generation,
+        skipDiskRestore: restoredFromSlot && positionalSignature != null,
+      ),
+    );
   }
 
   String _denseContentIdentity() {
@@ -1207,55 +1477,82 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     int thumbnailTargetPixels,
     int atlasTargetPixels,
     int atlasKey,
-    int generation,
-  ) async {
-    final entry = await _denseDiskAtlasCache.get(widget.cacheSlot);
-    if (!mounted || generation != _generation) {
-      return;
-    }
-    final rows = (widget.assets.length / widget.columnCount).ceil();
-    if (entry != null &&
-        entry.width == widget.columnCount * atlasTargetPixels &&
-        entry.height == rows * atlasTargetPixels) {
-      ui.Image? image;
-      try {
-        image = await _decodeDenseDiskAtlas(entry);
-      } catch (_) {
-        await _denseDiskAtlasCache.remove(widget.cacheSlot);
-      }
-      if (image == null) {
-        if (_instantOverview) {
-          unawaited(_buildThumbhashAtlas(atlasTargetPixels, atlasKey, generation));
-        }
-        return;
-      }
+    int generation, {
+    required bool skipDiskRestore,
+  }) async {
+    if (!skipDiskRestore) {
+      final entry = await _denseDiskAtlasCache.get(widget.cacheSlot);
       if (!mounted || generation != _generation) {
-        image.dispose();
         return;
       }
-      final restoredImage = image;
-      setState(() => _replaceAtlas(restoredImage));
-      _denseRowAtlasCache.put(_slotAtlasKey, restoredImage);
-      if (entry.signature == _contentSignature) {
-        _persistentExact = true;
-        _baseAtlasReady = true;
-        _denseRowAtlasCache.put(_completeAtlasKey, restoredImage);
-        return;
+      final rows = (widget.assets.length / widget.columnCount).ceil();
+      if (entry != null &&
+          entry.width == widget.columnCount * atlasTargetPixels &&
+          entry.height == rows * atlasTargetPixels) {
+        ui.Image? image;
+        try {
+          image = await _decodeDenseDiskAtlas(entry);
+        } catch (_) {
+          await _denseDiskAtlasCache.remove(widget.cacheSlot);
+        }
+        if (image != null) {
+          if (!mounted || generation != _generation) {
+            image.dispose();
+            return;
+          }
+          final restoredImage = image;
+          setState(() => _replaceAtlas(restoredImage));
+          _denseRowAtlasCache.put(_slotAtlasKey, restoredImage, signature: entry.signature);
+          if (entry.signature == _contentSignature) {
+            _persistentExact = true;
+            _baseAtlasReady = true;
+            _denseRowAtlasCache.put(_completeAtlasKey, restoredImage);
+            return;
+          }
+        }
       }
     }
 
     if (_instantOverview) {
       unawaited(_buildThumbhashAtlas(atlasTargetPixels, atlasKey, generation));
     }
+    if (!widget.deferHighResolution) {
+      _queueMissingActualThumbnails(
+        thumbnailTargetPixels: thumbnailTargetPixels,
+        atlasKey: atlasKey,
+        generation: generation,
+      );
+    }
+  }
+
+  void _queueMissingActualThumbnails({int? thumbnailTargetPixels, int? atlasKey, int? generation}) {
+    if (_persistentExact || widget.deferHighResolution || !mounted) {
+      return;
+    }
+    final targetPixels =
+        thumbnailTargetPixels ??
+        denseTimelineTargetPixels(tileExtent: widget.tileExtent, devicePixelRatio: _devicePixelRatio ?? 1);
+    final targetAtlasKey =
+        atlasKey ??
+        Object.hash(
+          _instantOverview ? 'thumbhash' : 'thumbnail',
+          _atlasTargetPixels,
+          widget.columnCount,
+          Object.hashAll(widget.assets.map((asset) => asset.heroTag)),
+        );
+    final targetGeneration = generation ?? _generation;
     for (var index = 0; index < widget.assets.length; index++) {
-      // ThumbHash is an immediate fallback, not the final preview. Queue the
-      // real local/cloud thumbnail as a low-priority upgrade so every cached
-      // photo becomes sharper without blocking the first frame or scrolling.
+      // Remote ThumbHashes are already complete visual previews at this tiny
+      // scale. Only assets without one (normally new local-only photos) need
+      // an individual decode, and those decodes run only while scrolling is idle.
+      if (_thumbHashFor(widget.assets[index]) != null) {
+        continue;
+      }
       _requestActualThumbnail(
         index,
-        thumbnailTargetPixels,
-        atlasKey,
-        generation,
+        targetPixels,
+        targetAtlasKey,
+        targetGeneration,
         priority: index < widget.columnCount * 2 ? 0 : 1,
       );
     }
@@ -1266,12 +1563,27 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       return;
     }
     _requiredActualCount++;
+    final actualWorkGeneration = _actualWorkGeneration;
     _thumbnailHandles.add(
       _denseThumbnailQueue.schedule(
-        () => _loadAssetImage(index, targetPixels, atlasKey, generation),
+        () async {
+          try {
+            await _loadAssetImage(index, targetPixels, atlasKey, generation, actualWorkGeneration);
+          } finally {
+            _finishActualThumbnail(atlasKey, generation, actualWorkGeneration);
+          }
+        },
         priority: priority,
+        onDiscard: () => _finishActualThumbnail(atlasKey, generation, actualWorkGeneration),
       ),
     );
+  }
+
+  void _finishActualThumbnail(int atlasKey, int generation, int actualWorkGeneration) {
+    if (mounted && generation == _generation && actualWorkGeneration == _actualWorkGeneration) {
+      _finishedActualCount++;
+      _maybeBuildCompositeAtlas(atlasKey, generation);
+    }
   }
 
   void _replaceAtlas(ui.Image image) {
@@ -1318,7 +1630,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         final tile = result.tiles[index];
         if (tile != null && cachedTiles[index] == null) {
           _denseThumbTileCache.put(tileKeys[index], tile);
-        } else if (tile == null && hashes[index] != null) {
+        } else if (tile == null && hashes[index] != null && !widget.deferHighResolution) {
           _requestActualThumbnail(index, targetPixels, atlasKey, generation);
         }
       }
@@ -1350,8 +1662,13 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       if (_requiredActualCount == 0) {
         _persistentExact = true;
         _denseRowAtlasCache.put(_completeAtlasKey, atlas);
-        _denseRowAtlasCache.put(_slotAtlasKey, atlas);
+        _denseRowAtlasCache.put(_slotAtlasKey, atlas, signature: _contentSignature);
         unawaited(_persistAtlas(atlas));
+      } else {
+        // Persist the metadata texture as an immediate next-launch fallback,
+        // but mark it as provisional so missing local tiles are still upgraded
+        // after the view becomes idle.
+        unawaited(_persistAtlas(atlas, exact: false));
       }
       _maybeBuildCompositeAtlas(atlasKey, generation);
     } on _DenseLoadCancelled {
@@ -1360,14 +1677,26 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       if (!mounted || generation != _generation) {
         return;
       }
-      for (var index = 0; index < hashes.length; index++) {
-        _requestActualThumbnail(index, targetPixels, atlasKey, generation, priority: 0);
+      if (!widget.deferHighResolution) {
+        for (var index = 0; index < hashes.length; index++) {
+          _requestActualThumbnail(index, targetPixels, atlasKey, generation, priority: 0);
+        }
       }
     }
   }
 
-  Future<void> _loadAssetImage(int index, int targetPixels, int atlasKey, int generation) async {
-    if (!mounted || generation != _generation || _persistentExact || (!_instantOverview && _atlas != null)) {
+  Future<void> _loadAssetImage(
+    int index,
+    int targetPixels,
+    int atlasKey,
+    int generation,
+    int actualWorkGeneration,
+  ) async {
+    if (!mounted ||
+        generation != _generation ||
+        actualWorkGeneration != _actualWorkGeneration ||
+        _persistentExact ||
+        (!_instantOverview && _atlas != null)) {
       return;
     }
     final asset = widget.assets[index];
@@ -1382,11 +1711,14 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
           targetPixels,
           useFullThumbnail: !_instantOverview && attempt == 2,
         );
-        if (provider == null || !mounted || generation != _generation) {
+        if (provider == null ||
+            !mounted ||
+            generation != _generation ||
+            actualWorkGeneration != _actualWorkGeneration) {
           return;
         }
         final image = await _resolveImage(index, provider);
-        if (!mounted || generation != _generation) {
+        if (!mounted || generation != _generation || actualWorkGeneration != _actualWorkGeneration) {
           image.dispose();
           return;
         }
@@ -1395,16 +1727,22 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       } on _DenseLoadCancelled {
         return;
       } catch (_) {
-        if (attempt + 1 < maxAttempts && mounted && generation == _generation) {
+        if (attempt + 1 < maxAttempts &&
+            mounted &&
+            generation == _generation &&
+            actualWorkGeneration == _actualWorkGeneration) {
           await Future<void>.delayed(Duration(milliseconds: attempt == 0 ? 180 : 650));
         }
       }
     }
 
+    if (actualWorkGeneration != _actualWorkGeneration) {
+      return;
+    }
     if (asset case RemoteAsset(thumbHash: final hash?) when hash.isNotEmpty) {
       try {
         final image = await _resolveImage(index, ThumbHashProvider(thumbHash: hash));
-        if (!mounted || generation != _generation) {
+        if (!mounted || generation != _generation || actualWorkGeneration != _actualWorkGeneration) {
           image.dispose();
           return;
         }
@@ -1419,10 +1757,11 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _loadedCount++;
     _scheduleRepaint();
     if (_instantOverview) {
-      if (_loadedCount == _requiredActualCount && !_baseAtlasReady && _requiredActualCount == widget.assets.length) {
+      if (_finishedActualCount == _requiredActualCount &&
+          _loadedCount == _requiredActualCount &&
+          !_baseAtlasReady &&
+          _requiredActualCount == widget.assets.length) {
         unawaited(_buildAtlas(targetPixels, atlasKey, generation));
-      } else {
-        _maybeBuildCompositeAtlas(atlasKey, generation);
       }
     } else if (_loadedCount == widget.assets.length) {
       unawaited(_buildAtlas(targetPixels, atlasKey, generation));
@@ -1434,7 +1773,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         _atlas != null &&
         _baseAtlasReady &&
         _requiredActualCount > 0 &&
-        _loadedCount == _requiredActualCount &&
+        _finishedActualCount == _requiredActualCount &&
         !_atlasBuilding) {
       unawaited(_buildCompositeAtlas(_atlasTargetPixels, atlasKey, generation));
     }
@@ -1446,6 +1785,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       return;
     }
     _atlasBuilding = true;
+    final isComplete = _loadedCount == _requiredActualCount;
     final rows = (widget.assets.length / widget.columnCount).ceil();
     final width = targetPixels * widget.columnCount;
     final height = targetPixels * rows;
@@ -1480,20 +1820,24 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     picture.dispose();
     if (!mounted || generation != _generation) {
       atlas.dispose();
+      _atlasBuilding = false;
       return;
     }
-    _denseRowAtlasCache.put(_completeAtlasKey, atlas);
-    _denseRowAtlasCache.put(_slotAtlasKey, atlas);
+    if (isComplete) {
+      _denseRowAtlasCache.put(_completeAtlasKey, atlas);
+    }
+    _denseRowAtlasCache.put(_slotAtlasKey, atlas, signature: isComplete ? _contentSignature : ''.padLeft(64, '0'));
     setState(() {
       _replaceAtlas(atlas);
-      _persistentExact = true;
+      _persistentExact = isComplete;
       _baseAtlasReady = true;
       for (var index = 0; index < _images.length; index++) {
         _images[index]?.dispose();
         _images[index] = null;
       }
+      _atlasBuilding = false;
     });
-    unawaited(_persistAtlas(atlas));
+    unawaited(_persistAtlas(atlas, exact: isComplete));
   }
 
   Future<ImageProvider?> _providerForAttempt(
@@ -1505,15 +1849,9 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     if (normalProvider == null) {
       return null;
     }
-    if (useFullThumbnail) {
+    if (useFullThumbnail && !_instantOverview) {
       return normalProvider;
     }
-    try {
-      final key = await normalProvider.obtainKey(const ImageConfiguration());
-      if (PaintingBinding.instance.imageCache.containsKey(key)) {
-        return normalProvider;
-      }
-    } catch (_) {}
     final denseProvider = getThumbnailImageProvider(asset, size: Size.square(targetPixels.toDouble()));
     return denseProvider == null ? null : ResizeImage.resizeIfNeeded(targetPixels, targetPixels, denseProvider);
   }
@@ -1596,10 +1934,11 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     picture.dispose();
     if (!mounted || generation != _generation) {
       atlas.dispose();
+      _atlasBuilding = false;
       return;
     }
     _denseRowAtlasCache.put(atlasKey, atlas);
-    _denseRowAtlasCache.put(_slotAtlasKey, atlas);
+    _denseRowAtlasCache.put(_slotAtlasKey, atlas, signature: _contentSignature);
     setState(() {
       _replaceAtlas(atlas);
       _persistentExact = true;
@@ -1608,28 +1947,18 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         _images[index]?.dispose();
         _images[index] = null;
       }
+      _atlasBuilding = false;
     });
     unawaited(_persistAtlas(atlas));
   }
 
-  Future<void> _persistAtlas(ui.Image atlas) async {
-    final snapshot = atlas.clone();
-    try {
-      final data = await snapshot.toByteData(format: ui.ImageByteFormat.png);
-      if (data == null) {
-        return;
-      }
-      _denseDiskAtlasCache.put(
-        widget.cacheSlot,
-        _contentSignature,
-        atlas.width,
-        atlas.height,
-        Uint8List.fromList(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes)),
-      );
-    } catch (_) {
-    } finally {
-      snapshot.dispose();
-    }
+  Future<void> _persistAtlas(ui.Image atlas, {bool exact = true}) {
+    _denseAtlasPersistenceQueue.schedule(
+      slot: widget.cacheSlot,
+      signature: exact ? _contentSignature : ''.padLeft(64, '0'),
+      image: atlas,
+    );
+    return Future.value();
   }
 
   void _scheduleRepaint() {
@@ -1645,8 +1974,12 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     });
   }
 
-  void _unsubscribeFromImages({bool preserveAtlas = false}) {
-    _generation++;
+  void _cancelActualThumbnailWork() {
+    _actualWorkGeneration++;
+    for (final handle in _thumbnailHandles) {
+      handle.cancel();
+    }
+    _thumbnailHandles.clear();
     for (var index = 0; index < _streams.length; index++) {
       final stream = _streams[index];
       final listener = _listeners[index];
@@ -1657,10 +1990,21 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       if (completer != null && !completer.isCompleted) {
         completer.completeError(const _DenseLoadCancelled());
       }
+      _images[index]?.dispose();
     }
-    for (final image in _images) {
-      image?.dispose();
-    }
+    _images = List<ImageInfo?>.filled(widget.assets.length, null);
+    _streams = List<ImageStream?>.filled(widget.assets.length, null);
+    _listeners = List<ImageStreamListener?>.filled(widget.assets.length, null);
+    _completers = List<Completer<ImageInfo>?>.filled(widget.assets.length, null);
+    _loadedCount = 0;
+    _finishedActualCount = 0;
+    _requiredActualCount = 0;
+    _actualThumbnailRequests.clear();
+  }
+
+  void _unsubscribeFromImages({bool preserveAtlas = false}) {
+    _generation++;
+    _cancelActualThumbnailWork();
     _images = const [];
     _streams = const [];
     _listeners = const [];
@@ -1669,13 +2013,6 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       _atlas?.dispose();
       _atlas = null;
     }
-    _loadedCount = 0;
-    _requiredActualCount = 0;
-    _actualThumbnailRequests.clear();
-    for (final handle in _thumbnailHandles) {
-      handle.cancel();
-    }
-    _thumbnailHandles.clear();
     _atlasBuilding = false;
     _baseAtlasReady = false;
   }

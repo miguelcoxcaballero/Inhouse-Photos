@@ -43,7 +43,7 @@ bool shouldAnimateTimelineColumnTransition({required int currentColumns, require
     currentColumns < kTimelineYearOverviewMinColumns && nextColumns < kTimelineYearOverviewMinColumns;
 
 double timelineScrollCacheExtent({required double maxHeight, required bool yearOverview}) =>
-    yearOverview ? maxHeight * 1.5 : maxHeight;
+    yearOverview ? maxHeight * 0.5 : maxHeight;
 
 double timelineScaleFactorForColumnCount(int columnCount) => switch (columnCount) {
   <= 2 => 5.0,
@@ -245,12 +245,14 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   late final AnimationController _layoutTransitionController;
   Map<Object, Rect> _previousTileRects = const {};
   int _layoutTransitionGeneration = 0;
+  final Set<ScrollPosition> _attachedScrollPositions = {};
+  Timer? _scrollIdleTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _scrollController = ScrollController(onAttach: _restoreAssetPosition);
+    _scrollController = ScrollController(onAttach: _onScrollAttach, onDetach: _onScrollDetach);
     _layoutTransitionController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 190),
@@ -266,6 +268,34 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
 
     ref.listenManual(multiSelectProvider.select((s) => s.isEnabled), _onMultiSelectionToggled);
     ref.listenManual(timelineArgsProvider.select((args) => args.columnCount), _onColumnCountChanged);
+  }
+
+  void _onScrollAttach(ScrollPosition position) {
+    _attachedScrollPositions.add(position);
+    position.isScrollingNotifier.addListener(_onScrollActivityChanged);
+    _restoreAssetPosition(position);
+  }
+
+  void _onScrollDetach(ScrollPosition position) {
+    position.isScrollingNotifier.removeListener(_onScrollActivityChanged);
+    _attachedScrollPositions.remove(position);
+  }
+
+  void _onScrollActivityChanged() {
+    if (!mounted) {
+      return;
+    }
+    final isScrolling = _attachedScrollPositions.any((position) => position.isScrollingNotifier.value);
+    _scrollIdleTimer?.cancel();
+    if (isScrolling) {
+      ref.read(timelineStateProvider.notifier).setScrolling(true);
+      return;
+    }
+    _scrollIdleTimer = Timer(const Duration(milliseconds: 180), () {
+      if (mounted && !_attachedScrollPositions.any((position) => position.isScrollingNotifier.value)) {
+        ref.read(timelineStateProvider.notifier).setScrolling(false);
+      }
+    });
   }
 
   void _onColumnCountChanged(int? previous, int next) {
@@ -344,6 +374,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     }
   }
 
+  @override
+  void didHaveMemoryPressure() {
+    releaseDenseTimelineMemory();
+  }
+
   void _onEvent(Event event) {
     switch (event) {
       case ScrollToTopEvent():
@@ -408,6 +443,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _scrollIdleTimer?.cancel();
+    for (final position in _attachedScrollPositions.toList()) {
+      position.isScrollingNotifier.removeListener(_onScrollActivityChanged);
+    }
+    _attachedScrollPositions.clear();
     _layoutTransitionController.dispose();
     _scrollController.dispose();
     _eventSubscription?.cancel();

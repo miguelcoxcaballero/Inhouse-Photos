@@ -76,10 +76,16 @@ class TimelineState {
 
 class TimelineStateNotifier extends Notifier<TimelineState> {
   void setScrubbing(bool isScrubbing) {
+    if (state.isScrubbing == isScrubbing) {
+      return;
+    }
     state = state.copyWith(isScrubbing: isScrubbing);
   }
 
   void setScrolling(bool isScrolling) {
+    if (state.isScrolling == isScrolling) {
+      return;
+    }
     state = state.copyWith(isScrolling: isScrolling);
   }
 
