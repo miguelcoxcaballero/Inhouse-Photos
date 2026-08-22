@@ -33,6 +33,19 @@ String formatInhouseDownloadBytes(int bytes) {
   return '${(bytes / bytesPerMegabyte).toStringAsFixed(1)} MB';
 }
 
+String formatInhouseInstallerError(String message) {
+  final normalized = message.toLowerCase();
+  if (normalized.contains('not newer') ||
+      normalized.contains('older than the installed') ||
+      normalized.contains('versiondowngrade')) {
+    return 'This download was older than the installed app. The update catalogue has been refreshed; tap Try again to download the latest build.';
+  }
+  if (normalized.contains('parse') || normalized.contains('malformed') || normalized.contains('invalid apk')) {
+    return 'The downloaded update was incomplete or invalid. Tap Try again to download a fresh copy.';
+  }
+  return message.isEmpty ? 'The update could not be installed. Please try again.' : message;
+}
+
 Uri buildSideStoreInstallUri(Uri ipaUrl) {
   return Uri(scheme: 'sidestore', host: 'install', queryParameters: {'url': ipaUrl.toString()});
 }
@@ -537,7 +550,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
       }
       setState(() {
         _installState = _InstallState.error;
-        _status = error.message ?? 'The update could not be installed. Please try again.';
+        _status = formatInhouseInstallerError(error.message ?? '');
       });
     }
   }

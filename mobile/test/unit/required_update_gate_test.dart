@@ -28,6 +28,11 @@ void main() {
     test('formats downloaded bytes in megabytes', () {
       expect(formatInhouseDownloadBytes(1572864), '1.5 MB');
     });
+
+    test('explains stale or incomplete installer downloads clearly', () {
+      expect(formatInhouseInstallerError('INSTALL_FAILED_VERSION_DOWNGRADE: not newer'), contains('older'));
+      expect(formatInhouseInstallerError('invalid APK parse error'), contains('incomplete or invalid'));
+    });
   });
 
   test('builds a SideStore install link for the exact IPA release', () {
