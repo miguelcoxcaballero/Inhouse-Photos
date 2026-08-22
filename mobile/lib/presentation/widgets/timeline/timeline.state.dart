@@ -5,6 +5,7 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment_builder.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_zoom_transition.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 
@@ -56,21 +57,26 @@ class TimelineArgs {
 class TimelineState {
   final bool isScrubbing;
   final bool isScrolling;
+  final bool isZooming;
 
-  const TimelineState({this.isScrubbing = false, this.isScrolling = false});
+  const TimelineState({this.isScrubbing = false, this.isScrolling = false, this.isZooming = false});
 
-  bool get isInteracting => isScrubbing || isScrolling;
+  bool get isInteracting => isScrubbing || isScrolling || isZooming;
 
   @override
   bool operator ==(covariant TimelineState other) {
-    return isScrubbing == other.isScrubbing && isScrolling == other.isScrolling;
+    return isScrubbing == other.isScrubbing && isScrolling == other.isScrolling && isZooming == other.isZooming;
   }
 
   @override
-  int get hashCode => isScrubbing.hashCode ^ isScrolling.hashCode;
+  int get hashCode => isScrubbing.hashCode ^ isScrolling.hashCode ^ isZooming.hashCode;
 
-  TimelineState copyWith({bool? isScrubbing, bool? isScrolling}) {
-    return TimelineState(isScrubbing: isScrubbing ?? this.isScrubbing, isScrolling: isScrolling ?? this.isScrolling);
+  TimelineState copyWith({bool? isScrubbing, bool? isScrolling, bool? isZooming}) {
+    return TimelineState(
+      isScrubbing: isScrubbing ?? this.isScrubbing,
+      isScrolling: isScrolling ?? this.isScrolling,
+      isZooming: isZooming ?? this.isZooming,
+    );
   }
 }
 
@@ -89,8 +95,15 @@ class TimelineStateNotifier extends Notifier<TimelineState> {
     state = state.copyWith(isScrolling: isScrolling);
   }
 
+  void setZooming(bool isZooming) {
+    if (state.isZooming == isZooming) {
+      return;
+    }
+    state = state.copyWith(isZooming: isZooming);
+  }
+
   @override
-  TimelineState build() => const TimelineState(isScrubbing: false, isScrolling: false);
+  TimelineState build() => const TimelineState();
 }
 
 // Keep the photo bucket subscription independent from grid geometry. Column-count
@@ -126,3 +139,9 @@ final timelineSegmentProvider = Provider.autoDispose<AsyncValue<List<Segment>>>(
 }, dependencies: [timelineBucketProvider, timelineArgsProvider]);
 
 final timelineStateProvider = NotifierProvider<TimelineStateNotifier, TimelineState>(TimelineStateNotifier.new);
+
+final timelineVisualReadyProvider = Provider.autoDispose<TimelineVisualReadySignal>((ref) {
+  final signal = TimelineVisualReadySignal();
+  ref.onDispose(signal.dispose);
+  return signal;
+});

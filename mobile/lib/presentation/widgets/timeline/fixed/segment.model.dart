@@ -29,6 +29,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/segment_builder.dart
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_drag_region.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_layout_transition.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_zoom_transition.dart';
 import 'package:immich_mobile/providers/asset_viewer/is_motion_video_playing.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/current_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -686,7 +687,7 @@ class _FixedSegmentRow extends ConsumerWidget {
     }
 
     if (timelineState.isScrubbing) {
-      return _buildPlaceholder(context, cacheSlot);
+      return _buildPlaceholder(context, ref, cacheSlot);
     }
 
     if (denseOverview) {
@@ -694,7 +695,7 @@ class _FixedSegmentRow extends ConsumerWidget {
         future: denseStore!.loadRow(timelineService, index: assetIndex, count: assetCount),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return _buildPlaceholder(context, cacheSlot);
+            return _buildPlaceholder(context, ref, cacheSlot);
           }
           return _buildAssetRow(context, ref, snapshot.requireData, timelineService, false, cacheSlot);
         },
@@ -705,20 +706,21 @@ class _FixedSegmentRow extends ConsumerWidget {
       future: timelineService.loadAssets(assetIndex, assetCount),
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return _buildPlaceholder(context, cacheSlot);
+          return _buildPlaceholder(context, ref, cacheSlot);
         }
         return _buildAssetRow(context, ref, snapshot.requireData, timelineService, isDynamicLayout, cacheSlot);
       },
     );
   }
 
-  Widget _buildPlaceholder(BuildContext context, String cacheSlot) {
+  Widget _buildPlaceholder(BuildContext context, WidgetRef ref, String cacheSlot) {
     if (denseOverview && denseTimelineRowsPerChild(columnCount) > 1) {
       return _DenseCachedPanel(
         cacheSlot: cacheSlot,
         itemCount: assetCount,
         columnCount: columnCount,
         tileExtent: tileHeight,
+        onVisualReady: () => ref.read(timelineVisualReadyProvider).markReady(columnCount),
       );
     }
     return SegmentBuilder.buildPlaceholder(context, assetCount, size: Size.square(tileHeight), spacing: spacing);
@@ -741,6 +743,7 @@ class _FixedSegmentRow extends ConsumerWidget {
         columnCount: columnCount,
         cacheSlot: cacheSlot,
         deferHighResolution: ref.read(timelineStateProvider).isInteracting,
+        onVisualReady: () => ref.read(timelineVisualReadyProvider).markReady(columnCount),
         onAssetTap: (index, asset) => _openAsset(context, ref, index, asset),
       );
     }
@@ -1217,12 +1220,14 @@ class _DenseCachedPanel extends StatefulWidget {
   final int itemCount;
   final int columnCount;
   final double tileExtent;
+  final VoidCallback onVisualReady;
 
   const _DenseCachedPanel({
     required this.cacheSlot,
     required this.itemCount,
     required this.columnCount,
     required this.tileExtent,
+    required this.onVisualReady,
   });
 
   @override
@@ -1232,6 +1237,7 @@ class _DenseCachedPanel extends StatefulWidget {
 class _DenseCachedPanelState extends State<_DenseCachedPanel> {
   ui.Image? _atlas;
   int _generation = 0;
+  bool _didReportVisualReady = false;
 
   Object get _memoryKey => Object.hash('persistent-slot', widget.cacheSlot);
 
@@ -1244,11 +1250,26 @@ class _DenseCachedPanelState extends State<_DenseCachedPanel> {
   @override
   void didUpdateWidget(covariant _DenseCachedPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.cacheSlot != widget.cacheSlot) {
+    if (oldWidget.cacheSlot != widget.cacheSlot ||
+        oldWidget.columnCount != widget.columnCount ||
+        oldWidget.itemCount != widget.itemCount) {
       _atlas?.dispose();
       _atlas = null;
+      _didReportVisualReady = false;
       _restore();
     }
+  }
+
+  void _reportVisualReady() {
+    if (_didReportVisualReady || _atlas == null) {
+      return;
+    }
+    _didReportVisualReady = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _atlas != null) {
+        widget.onVisualReady();
+      }
+    });
   }
 
   Future<void> _restore() async {
@@ -1261,6 +1282,7 @@ class _DenseCachedPanelState extends State<_DenseCachedPanel> {
     if (memory != null) {
       if (mounted && generation == _generation) {
         setState(() => _atlas = memory);
+        _reportVisualReady();
       } else {
         memory.dispose();
       }
@@ -1285,23 +1307,28 @@ class _DenseCachedPanelState extends State<_DenseCachedPanel> {
     }
     _denseRowAtlasCache.put(memoryKey, image, signature: entry.signature);
     setState(() => _atlas = image);
+    _reportVisualReady();
   }
 
   @override
   Widget build(BuildContext context) {
     final rowCount = (widget.itemCount / widget.columnCount).ceil();
-    return CustomPaint(
-      size: Size(double.infinity, rowCount * widget.tileExtent),
-      isComplex: true,
-      willChange: false,
-      painter: _DenseAssetRowPainter(
-        images: const [],
-        atlas: _atlas,
-        itemCount: widget.itemCount,
-        columnCount: widget.columnCount,
-        tileExtent: widget.tileExtent,
-        textDirection: Directionality.of(context),
-        repaint: const _NeverNotifyListenable(),
+    return TimelineVisualReadyMarker(
+      columnCount: widget.columnCount,
+      ready: _atlas != null,
+      child: CustomPaint(
+        size: Size(double.infinity, rowCount * widget.tileExtent),
+        isComplex: true,
+        willChange: false,
+        painter: _DenseAssetRowPainter(
+          images: const [],
+          atlas: _atlas,
+          itemCount: widget.itemCount,
+          columnCount: widget.columnCount,
+          tileExtent: widget.tileExtent,
+          textDirection: Directionality.of(context),
+          repaint: const _NeverNotifyListenable(),
+        ),
       ),
     );
   }
@@ -1366,6 +1393,7 @@ class _DenseAssetRow extends StatefulWidget {
   final int columnCount;
   final String cacheSlot;
   final bool deferHighResolution;
+  final VoidCallback onVisualReady;
   final _DenseAssetTap onAssetTap;
 
   const _DenseAssetRow({
@@ -1376,6 +1404,7 @@ class _DenseAssetRow extends StatefulWidget {
     required this.columnCount,
     required this.cacheSlot,
     required this.deferHighResolution,
+    required this.onVisualReady,
     required this.onAssetTap,
   });
 
@@ -1405,6 +1434,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   int _finishedActualCount = 0;
   int _actualWorkGeneration = 0;
   int _generation = 0;
+  bool _didReportVisualReady = false;
   final Set<int> _actualThumbnailRequests = {};
   final Set<_DenseThumbnailHandle> _thumbnailHandles = {};
 
@@ -1470,6 +1500,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _atlasTargetPixels = atlasTargetPixels;
     _requiredActualCount = 0;
     _actualThumbnailRequests.clear();
+    _didReportVisualReady = false;
 
     final atlasKey = Object.hash(
       _instantOverview ? 'thumbhash' : 'thumbnail',
@@ -1670,6 +1701,19 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     }
     _atlas?.dispose();
     _atlas = image;
+    _reportVisualReady();
+  }
+
+  void _reportVisualReady() {
+    if (_didReportVisualReady || (_atlas == null && !_images.any((image) => image != null))) {
+      return;
+    }
+    _didReportVisualReady = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && (_atlas != null || _images.any((image) => image != null))) {
+        widget.onVisualReady();
+      }
+    });
   }
 
   String? _thumbHashFor(BaseAsset asset) => switch (asset) {
@@ -1855,6 +1899,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _images[index]?.dispose();
     _images[index] = image;
     _loadedCount++;
+    _reportVisualReady();
     _scheduleRepaint();
     if (_instantOverview) {
       if (_finishedActualCount == _requiredActualCount &&
@@ -2134,22 +2179,26 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   Widget build(BuildContext context) {
     final textDirection = Directionality.of(context);
     final rowCount = (widget.assets.length / widget.columnCount).ceil();
-    return RepaintBoundary(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapUp: (details) => _handleTap(details, textDirection),
-        child: CustomPaint(
-          size: Size(double.infinity, rowCount * widget.tileExtent),
-          isComplex: true,
-          willChange: false,
-          painter: _DenseAssetRowPainter(
-            images: _images,
-            atlas: _atlas,
-            itemCount: widget.assets.length,
-            columnCount: widget.columnCount,
-            tileExtent: widget.tileExtent,
-            textDirection: textDirection,
-            repaint: _repaint,
+    return TimelineVisualReadyMarker(
+      columnCount: widget.columnCount,
+      ready: _atlas != null || _images.any((image) => image != null),
+      child: RepaintBoundary(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapUp: (details) => _handleTap(details, textDirection),
+          child: CustomPaint(
+            size: Size(double.infinity, rowCount * widget.tileExtent),
+            isComplex: true,
+            willChange: false,
+            painter: _DenseAssetRowPainter(
+              images: _images,
+              atlas: _atlas,
+              itemCount: widget.assets.length,
+              columnCount: widget.columnCount,
+              tileExtent: widget.tileExtent,
+              textDirection: textDirection,
+              repaint: _repaint,
+            ),
           ),
         ),
       ),

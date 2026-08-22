@@ -15,6 +15,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment_builde
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_layout_transition.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/timeline_zoom_transition.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:thumbhash/thumbhash.dart' as thumbhash;
@@ -69,6 +70,152 @@ void main() {
     expect(calculateTimelineColumnCount(scaleFactor: 2.61, gestureStartScaleFactor: 3), 4);
     expect(calculateTimelineColumnCount(scaleFactor: 2.59, gestureStartScaleFactor: 3), 5);
     expect(kTimelinePinchSensitivity, 1.25);
+  });
+
+  test('pinch preview stays bounded and follows the gesture focal point', () {
+    expect(calculateTimelineZoomPreviewScale(1), 1);
+    expect(calculateTimelineZoomPreviewScale(100), 1.22);
+    expect(calculateTimelineZoomPreviewScale(0.001), 0.82);
+    expect(calculateTimelineZoomPreviewScale(double.nan), 1);
+    expect(
+      calculateTimelineZoomAlignment(focalPoint: const Offset(300, 100), viewportSize: const Size(400, 800)),
+      const Alignment(0.5, -0.75),
+    );
+  });
+
+  test('zooming is treated as active timeline interaction', () {
+    expect(const TimelineState(isZooming: true).isInteracting, isTrue);
+    expect(const TimelineState().isInteracting, isFalse);
+  });
+
+  testWidgets('retained timeline stays painted until the incoming layout is ready', (tester) async {
+    late StateSetter update;
+    Object layoutKey = 'old-layout';
+    bool ready = true;
+    int completedTransitions = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return TimelineRetainedSwitcher(
+              layoutKey: layoutKey,
+              ready: ready,
+              onTransitionComplete: () => completedTransitions++,
+              child: ColoredBox(
+                color: layoutKey == 'old-layout' ? Colors.red : Colors.blue,
+                child: Center(child: Text(layoutKey.toString())),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    update(() {
+      layoutKey = 'new-layout';
+      ready = false;
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('old-layout'), findsOneWidget);
+    expect(find.text('new-layout'), findsOneWidget);
+    expect(completedTransitions, 0);
+
+    update(() => ready = true);
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('old-layout'), findsNothing);
+    expect(find.text('new-layout'), findsOneWidget);
+    expect(completedTransitions, 1);
+  });
+
+  testWidgets('retained timeline hands the primary scroll controller to exactly one layout', (tester) async {
+    late StateSetter update;
+    final primary = ScrollController();
+    final retained = ScrollController();
+    addTearDown(primary.dispose);
+    addTearDown(retained.dispose);
+    Object layoutKey = 0;
+    bool useRetainedController = false;
+    bool ready = true;
+
+    Widget buildTimeline(ScrollController controller, String label) {
+      return ListView(
+        controller: controller,
+        children: [SizedBox(height: 1200, child: Text(label))],
+      );
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return TimelineRetainedSwitcher(
+              layoutKey: layoutKey,
+              ready: ready,
+              child: buildTimeline(useRetainedController ? retained : primary, 'layout-$layoutKey'),
+            );
+          },
+        ),
+      ),
+    );
+    expect(primary.positions, hasLength(1));
+
+    update(() {
+      useRetainedController = true;
+      ready = false;
+    });
+    await tester.pump();
+    expect(primary.positions, isEmpty);
+    expect(retained.positions, hasLength(1));
+    final retainedPosition = retained.position;
+
+    update(() {
+      layoutKey = 1;
+      useRetainedController = false;
+    });
+    await tester.pump();
+    expect(primary.positions, hasLength(1));
+    expect(retained.positions, hasLength(1));
+    expect(retained.position, same(retainedPosition));
+
+    update(() => ready = true);
+    await tester.pumpAndSettle();
+    expect(primary.positions, hasLength(1));
+    expect(retained.positions, isEmpty);
+  });
+
+  testWidgets('120 pinch ticks update only the compositor transform subtree', (tester) async {
+    final preview = ValueNotifier<TimelineZoomPreview>((scale: 1.0, alignment: Alignment.center));
+    addTearDown(preview.dispose);
+    int galleryBuilds = 0;
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: TimelineZoomTransform(
+          preview: preview,
+          child: Builder(
+            builder: (context) {
+              galleryBuilds++;
+              return const ColoredBox(color: Colors.black);
+            },
+          ),
+        ),
+      ),
+    );
+
+    for (var frame = 0; frame < 120; frame++) {
+      preview.value = (scale: 0.9 + (frame / 600), alignment: Alignment((frame % 20) / 10 - 1, 0));
+      await tester.pump(const Duration(microseconds: 8333));
+    }
+
+    expect(galleryBuilds, 1, reason: 'pinch frames must not rebuild the virtualized gallery');
   });
 
   test('pinching farther out enters dense year overview levels', () {
