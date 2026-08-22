@@ -329,9 +329,12 @@ final Expando<_DenseAssetChunkStore> _denseAssetStores = Expando<_DenseAssetChun
 class _DenseAssetChunkStore {
   static const int _chunkSize = 8192;
   static const int _maxResidentChunks = 3;
+  static const int _maxResidentRows = 48;
 
   final LinkedHashMap<int, Future<List<BaseAsset>>> _chunks = LinkedHashMap();
   final Map<int, List<BaseAsset>> _resolvedChunks = {};
+  final LinkedHashMap<(int, int), Future<List<BaseAsset>>> _rows = LinkedHashMap();
+  final LinkedHashMap<(int, int), List<BaseAsset>> _resolvedRows = LinkedHashMap();
   int _revision = -1;
 
   void _resetIfNeeded(TimelineService service) {
@@ -341,12 +344,20 @@ class _DenseAssetChunkStore {
     _revision = service.revision;
     _chunks.clear();
     _resolvedChunks.clear();
+    _rows.clear();
+    _resolvedRows.clear();
   }
 
   List<BaseAsset>? getRow(TimelineService service, {required int index, required int count}) {
     _resetIfNeeded(service);
     if (count <= 0) {
       return const [];
+    }
+    final rowKey = (index, count);
+    final resolvedRow = _resolvedRows.remove(rowKey);
+    if (resolvedRow != null) {
+      _resolvedRows[rowKey] = resolvedRow;
+      return resolvedRow;
     }
     final result = <BaseAsset>[];
     var cursor = index;
@@ -368,19 +379,77 @@ class _DenseAssetChunkStore {
     return result;
   }
 
-  Future<List<BaseAsset>> loadRow(TimelineService service, {required int index, required int count}) async {
+  Future<List<BaseAsset>> loadRow(TimelineService service, {required int index, required int count}) {
     _resetIfNeeded(service);
     if (count <= 0) {
-      return const [];
+      return Future.value(const []);
     }
+
+    final rowKey = (index, count);
+    final resolvedRow = _resolvedRows.remove(rowKey);
+    if (resolvedRow != null) {
+      _resolvedRows[rowKey] = resolvedRow;
+      return Future.value(resolvedRow);
+    }
+    final existing = _rows.remove(rowKey);
+    if (existing != null) {
+      _rows[rowKey] = existing;
+      return existing;
+    }
+
+    final expectedRevision = _revision;
+    late final Future<List<BaseAsset>> future;
+    future = _loadRow(service, index: index, count: count).then(
+      (assets) {
+        if (_revision == expectedRevision && identical(_rows[rowKey], future)) {
+          _resolvedRows[rowKey] = assets;
+        }
+        return assets;
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (identical(_rows[rowKey], future)) {
+          _rows.remove(rowKey);
+          _resolvedRows.remove(rowKey);
+        }
+        Error.throwWithStackTrace(error, stackTrace);
+      },
+    );
+    _rows[rowKey] = future;
+    while (_rows.length > _maxResidentRows) {
+      final oldest = _rows.keys.first;
+      _rows.remove(oldest);
+      _resolvedRows.remove(oldest);
+    }
+    return future;
+  }
+
+  Future<List<BaseAsset>> _loadRow(TimelineService service, {required int index, required int count}) async {
     final end = index + count;
+    final loadedChunks = <int, List<BaseAsset>>{};
     var cursor = index;
     while (cursor < end) {
       final chunkStart = (cursor ~/ _chunkSize) * _chunkSize;
-      await _loadChunk(service, chunkStart);
+      loadedChunks[chunkStart] = await _loadChunk(service, chunkStart);
       cursor = math.min(end, chunkStart + _chunkSize);
     }
-    return getRow(service, index: index, count: count) ?? const [];
+
+    final result = <BaseAsset>[];
+    cursor = index;
+    while (cursor < end) {
+      final chunkStart = (cursor ~/ _chunkSize) * _chunkSize;
+      final chunk = loadedChunks[chunkStart];
+      if (chunk == null) {
+        throw StateError('Dense timeline chunk was evicted before the row was assembled');
+      }
+      final offset = cursor - chunkStart;
+      final take = math.min(end - cursor, chunk.length - offset);
+      if (take <= 0) {
+        throw StateError('Dense timeline row is outside the current revision');
+      }
+      result.addAll(chunk.getRange(offset, offset + take));
+      cursor += take;
+    }
+    return result;
   }
 
   Future<List<BaseAsset>> _loadChunk(TimelineService service, int chunkStart) {
@@ -831,7 +900,11 @@ const int denseOverviewDiskCacheLimitBytes = 256 * 1024 * 1024;
 const int _denseThumbnailConcurrency = 3;
 const int _denseMetadataAtlasConcurrency = 1;
 const int _denseMetadataCellPixels = denseOverviewMetadataCellPixels;
-const int _denseAtlasCacheBytes = 24 * 1024 * 1024;
+// ui.Image.clone shares the underlying GPU texture, so keeping a wider rolling
+// window here does not duplicate pixels. It prevents a fast fling from evicting
+// every nearby panel and falling back to an asynchronous disk decode (visible
+// as a brief blank row). Android memory-pressure callbacks still clear it.
+const int _denseAtlasCacheBytes = 64 * 1024 * 1024;
 const int _denseThumbTileCacheBytes = 8 * 1024 * 1024;
 final _DenseThumbnailQueue _denseThumbnailQueue = _DenseThumbnailQueue();
 final _DenseAsyncQueue _denseMetadataAtlasQueue = _DenseAsyncQueue(_denseMetadataAtlasConcurrency, maxPending: 48);
@@ -1414,19 +1487,24 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         : atlasKey;
     _slotAtlasKey = Object.hash('persistent-slot', widget.cacheSlot);
     _contentSignature = sha256.convert(utf8.encode(_denseContentIdentity())).toString();
+    final completeSignature = _denseRowAtlasCache.signature(_completeAtlasKey);
     final completeAtlas = _denseRowAtlasCache.get(_completeAtlasKey);
-    if (completeAtlas != null) {
+    if (completeAtlas != null && completeSignature == _contentSignature) {
       _replaceAtlas(completeAtlas);
       _persistentExact = true;
       _baseAtlasReady = true;
       _scheduleRepaint();
       return;
     }
+    completeAtlas?.dispose();
+    final cachedSignature = _denseRowAtlasCache.signature(atlasKey);
     final cachedAtlas = _denseRowAtlasCache.get(atlasKey);
-    if (cachedAtlas != null) {
+    if (cachedAtlas != null && cachedSignature == _contentSignature) {
       _replaceAtlas(cachedAtlas);
       _baseAtlasReady = true;
       _scheduleRepaint();
+    } else {
+      cachedAtlas?.dispose();
     }
     final positionalSignature = _denseRowAtlasCache.signature(_slotAtlasKey);
     final positionalAtlas = _denseRowAtlasCache.get(_slotAtlasKey);
@@ -1441,7 +1519,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     if (restoredFromSlot && positionalSignature == _contentSignature) {
       _persistentExact = true;
       _baseAtlasReady = true;
-      _denseRowAtlasCache.put(_completeAtlasKey, _atlas!);
+      _denseRowAtlasCache.put(_completeAtlasKey, _atlas!, signature: _contentSignature);
       return;
     }
     unawaited(
@@ -1506,7 +1584,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
           if (entry.signature == _contentSignature) {
             _persistentExact = true;
             _baseAtlasReady = true;
-            _denseRowAtlasCache.put(_completeAtlasKey, restoredImage);
+            _denseRowAtlasCache.put(_completeAtlasKey, restoredImage, signature: _contentSignature);
             return;
           }
         }
@@ -1654,14 +1732,36 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         return;
       }
 
-      _denseRowAtlasCache.put(atlasKey, atlas);
+      // A panel can already have a good atlas from the disk/LRU cache while
+      // this metadata rebuild is finishing. Replacing it with a newer atlas
+      // that has transparent cells for local assets causes a one-frame flash
+      // (the actual thumbnail arrives a moment later). Keep the visible base
+      // atlas and let the idle thumbnail upgrade merge into it instead.
+      final keepExistingAtlas =
+          _baseAtlasReady &&
+          _atlas != null &&
+          _atlas!.width == targetPixels * widget.columnCount &&
+          _atlas!.height == targetPixels * (hashes.length / widget.columnCount).ceil();
+      if (keepExistingAtlas) {
+        atlas.dispose();
+        if (_requiredActualCount == 0) {
+          _persistentExact = true;
+          _denseRowAtlasCache.put(_completeAtlasKey, _atlas!, signature: _contentSignature);
+          _denseRowAtlasCache.put(_slotAtlasKey, _atlas!, signature: _contentSignature);
+          unawaited(_persistAtlas(_atlas!));
+        }
+        _maybeBuildCompositeAtlas(atlasKey, generation);
+        return;
+      }
+
+      _denseRowAtlasCache.put(atlasKey, atlas, signature: _contentSignature);
       setState(() {
         _replaceAtlas(atlas);
         _baseAtlasReady = true;
       });
       if (_requiredActualCount == 0) {
         _persistentExact = true;
-        _denseRowAtlasCache.put(_completeAtlasKey, atlas);
+        _denseRowAtlasCache.put(_completeAtlasKey, atlas, signature: _contentSignature);
         _denseRowAtlasCache.put(_slotAtlasKey, atlas, signature: _contentSignature);
         unawaited(_persistAtlas(atlas));
       } else {
@@ -1824,7 +1924,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       return;
     }
     if (isComplete) {
-      _denseRowAtlasCache.put(_completeAtlasKey, atlas);
+      _denseRowAtlasCache.put(_completeAtlasKey, atlas, signature: _contentSignature);
     }
     _denseRowAtlasCache.put(_slotAtlasKey, atlas, signature: isComplete ? _contentSignature : ''.padLeft(64, '0'));
     setState(() {
@@ -1937,7 +2037,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       _atlasBuilding = false;
       return;
     }
-    _denseRowAtlasCache.put(atlasKey, atlas);
+    _denseRowAtlasCache.put(atlasKey, atlas, signature: _contentSignature);
     _denseRowAtlasCache.put(_slotAtlasKey, atlas, signature: _contentSignature);
     setState(() {
       _replaceAtlas(atlas);
