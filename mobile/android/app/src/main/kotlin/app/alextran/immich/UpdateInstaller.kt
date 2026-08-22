@@ -23,7 +23,6 @@ class UpdateInstaller(
   messenger: BinaryMessenger,
 ) {
   private val channel = MethodChannel(messenger, CHANNEL_NAME)
-  private val downloadRunning = AtomicBoolean(false)
 
   init {
     channel.setMethodCallHandler { call, result ->
@@ -68,7 +67,7 @@ class UpdateInstaller(
     }
 
     if (!downloadRunning.compareAndSet(false, true)) {
-      result.error("already_downloading", "The update is already downloading.", null)
+      result.success("downloading")
       return
     }
 
@@ -78,8 +77,22 @@ class UpdateInstaller(
         if (!updateDirectory.exists() && !updateDirectory.mkdirs()) {
           throw IllegalStateException("Could not prepare secure update storage.")
         }
-        val apkFile = File(updateDirectory, "inhouse-photos-update.apk")
-        download(url, apkFile)
+        val fileKey = MessageDigest.getInstance("SHA-256")
+          .digest(url.toByteArray())
+          .joinToString("") { byte -> "%02x".format(byte) }
+          .take(16)
+        val partialFile = File(updateDirectory, "inhouse-photos-$fileKey.apk.part")
+        val apkFile = File(updateDirectory, "inhouse-photos-$fileKey.apk")
+        download(url, partialFile)
+        if (apkFile.exists() && !apkFile.delete()) {
+          throw IllegalStateException("Could not replace the previous update package.")
+        }
+        if (!partialFile.renameTo(apkFile)) {
+          partialFile.copyTo(apkFile, overwrite = true)
+          if (!partialFile.delete()) {
+            partialFile.deleteOnExit()
+          }
+        }
         verifyApk(apkFile)
 
         val apkUri = FileProvider.getUriForFile(
@@ -112,6 +125,7 @@ class UpdateInstaller(
   private fun download(initialUrl: String, destination: File) {
     var currentUrl = URL(initialUrl)
     var redirects = 0
+    var restartedWithoutRange = false
 
     while (true) {
       validateUrl(currentUrl)
@@ -120,6 +134,10 @@ class UpdateInstaller(
       connection.connectTimeout = 15_000
       connection.readTimeout = 120_000
       connection.setRequestProperty("Accept", APK_MIME_TYPE)
+      val resumeFrom = destination.length().takeIf { it > 0L } ?: 0L
+      if (resumeFrom > 0L) {
+        connection.setRequestProperty("Range", "bytes=$resumeFrom-")
+      }
 
       try {
         val responseCode = connection.responseCode
@@ -132,16 +150,31 @@ class UpdateInstaller(
           currentUrl = URL(currentUrl, location)
           continue
         }
+        if (responseCode == 416 && !restartedWithoutRange) {
+          if (destination.exists() && !destination.delete()) {
+            throw IllegalStateException("Could not restart the interrupted update download.")
+          }
+          currentUrl = URL(initialUrl)
+          redirects = 0
+          restartedWithoutRange = true
+          continue
+        }
         if (responseCode !in 200..299) {
           throw IllegalStateException("Update download failed ($responseCode).")
         }
 
-        var downloadedBytes = 0L
-        val expectedBytes = connection.contentLengthLong.takeIf { it > 0L }
+        val isResuming = responseCode == HttpURLConnection.HTTP_PARTIAL && resumeFrom > 0L
+        var downloadedBytes = if (isResuming) resumeFrom else 0L
+        val contentRangeTotal = connection.getHeaderField("Content-Range")
+          ?.substringAfterLast('/', "")
+          ?.toLongOrNull()
+          ?.takeIf { it > 0L }
+        val responseBytes = connection.contentLengthLong.takeIf { it > 0L }
+        val expectedBytes = contentRangeTotal ?: responseBytes?.let { it + downloadedBytes }
         var lastProgressUpdate = 0L
-        publishDownloadProgress(0L, expectedBytes)
+        publishDownloadProgress(downloadedBytes, expectedBytes)
         BufferedInputStream(connection.inputStream).use { input ->
-          FileOutputStream(destination, false).use { output ->
+          FileOutputStream(destination, isResuming).use { output ->
             val buffer = ByteArray(32 * 1024)
             while (true) {
               val count = input.read(buffer)
@@ -264,6 +297,7 @@ class UpdateInstaller(
     private const val MINIMUM_APK_BYTES = 100_000L
     private const val MAX_REDIRECTS = 5
     private const val PROGRESS_UPDATE_INTERVAL_MS = 200L
+    private val downloadRunning = AtomicBoolean(false)
     private val ALLOWED_HOSTS = setOf(
       "github.com",
       "raw.githubusercontent.com",

@@ -304,7 +304,12 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
   }
 
   Future<void> _checkForUpdate({bool showScreen = false}) async {
-    if ((!Platform.isAndroid && !Platform.isIOS) || _checking) {
+    final updateOperationActive =
+        _installState == _InstallState.downloadingApk ||
+        _installState == _InstallState.downloadingData ||
+        _installState == _InstallState.permissionRequired ||
+        _installState == _InstallState.restartRequired;
+    if ((!Platform.isAndroid && !Platform.isIOS) || _checking || updateOperationActive) {
       return;
     }
 
@@ -555,6 +560,9 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
         if (result == 'permission_required') {
           _installState = _InstallState.permissionRequired;
           _status = 'Allow installs from this source, return here, then tap Continue.';
+        } else if (result == 'downloading') {
+          _installState = _InstallState.downloadingApk;
+          _status = 'The update download is continuing securely...';
         } else {
           _installState = _InstallState.ready;
           _downloadProgress = 1;
@@ -566,8 +574,13 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
         return;
       }
       setState(() {
-        _installState = _InstallState.error;
-        _status = formatInhouseInstallerError(error.message ?? '');
+        if (error.code == 'already_downloading') {
+          _installState = _InstallState.downloadingApk;
+          _status = 'The update download is still running. Progress will continue here automatically.';
+        } else {
+          _installState = _InstallState.error;
+          _status = formatInhouseInstallerError(error.message ?? '');
+        }
       });
     }
   }
