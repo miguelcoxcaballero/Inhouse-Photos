@@ -255,10 +255,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   int? _restoreAssetIndex;
   int _renderedPerRow = 4;
   late final AnimationController _layoutTransitionController;
-  late final AnimationController _zoomSettleController;
-  final ValueNotifier<TimelineZoomPreview> _zoomPreview = ValueNotifier((scale: 1, alignment: Alignment.center));
-  double _zoomSettleStartScale = 1;
-  Alignment _zoomSettleAlignment = Alignment.center;
   final GlobalKey<TimelineRetainedSwitcherState> _retainedSwitcherKey = GlobalKey();
   ScrollController? _retainedScrollController;
   int? _retainedSourcePerRow;
@@ -283,8 +279,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
       duration: const Duration(milliseconds: 190),
       value: 1,
     );
-    _zoomSettleController = AnimationController(vsync: this, duration: kTimelineZoomSettleDuration)
-      ..addListener(_updateZoomSettleFrame);
     widget.visualReadySignal.addListener(_onTimelineVisualReady);
     _eventSubscription = EventStream.shared.listen(_onEvent);
 
@@ -350,6 +344,8 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
         if (rect.overlaps(visibleBounds)) {
           rects[tile.assetKey] = rect;
         }
+      } else if (renderObject case RenderTimelineDenseAssetLayoutMarker denseMarker) {
+        denseMarker.collectVisibleAssetRects(visibleBounds, rects);
       }
       renderObject.visitChildren(visit);
     }
@@ -358,10 +354,12 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     return rects;
   }
 
-  void _prepareLayoutTransition() {
+  bool _prepareLayoutTransition({bool startAutomatically = true}) {
     final rects = _captureVisibleTileRects();
     if (rects.isEmpty) {
-      return;
+      _layoutTransitionController.value = 1;
+      _previousTileRects = const {};
+      return false;
     }
 
     _layoutTransitionController.stop();
@@ -369,48 +367,50 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     final generation = ++_layoutTransitionGeneration;
     setState(() => _previousTileRects = Map.unmodifiable(rects));
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (startAutomatically) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && generation == _layoutTransitionGeneration) {
-          _layoutTransitionController.forward(from: 0);
-        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _startLayoutTransition(generation);
+        });
       });
+    }
+    return true;
+  }
+
+  void _startLayoutTransition(int generation, {VoidCallback? onComplete}) {
+    if (!mounted || generation != _layoutTransitionGeneration) {
+      return;
+    }
+    if (_previousTileRects.isEmpty || (MediaQuery.maybeOf(context)?.disableAnimations ?? false)) {
+      _layoutTransitionController.value = 1;
+      if (_previousTileRects.isNotEmpty) {
+        setState(() => _previousTileRects = const {});
+      }
+      onComplete?.call();
+      return;
+    }
+
+    _layoutTransitionController.forward(from: 0).whenComplete(() {
+      if (!mounted || generation != _layoutTransitionGeneration) {
+        return;
+      }
+      setState(() => _previousTileRects = const {});
+      onComplete?.call();
     });
+  }
+
+  void _finishLayoutTransitionImmediately() {
+    _layoutTransitionGeneration++;
+    _layoutTransitionController
+      ..stop()
+      ..value = 1;
+    if (_previousTileRects.isNotEmpty) {
+      setState(() => _previousTileRects = const {});
+    }
   }
 
   bool _isDenseZoomTransition({required int currentColumns, required int nextColumns}) =>
       currentColumns >= kTimelineYearOverviewMinColumns || nextColumns >= kTimelineYearOverviewMinColumns;
-
-  void _updateZoomPreview(ScaleUpdateDetails details) {
-    _zoomSettleController.stop();
-    final viewport = context.size ?? MediaQuery.sizeOf(context);
-    _zoomPreview.value = (
-      scale: calculateTimelineZoomPreviewScale(details.scale),
-      alignment: calculateTimelineZoomAlignment(focalPoint: details.localFocalPoint, viewportSize: viewport),
-    );
-  }
-
-  void _updateZoomSettleFrame() {
-    final progress = Curves.easeOutCubic.transform(_zoomSettleController.value);
-    _zoomPreview.value = (
-      scale: _zoomSettleStartScale + ((1 - _zoomSettleStartScale) * progress),
-      alignment: _zoomSettleAlignment,
-    );
-  }
-
-  void _settleZoomPreview() {
-    _zoomSettleStartScale = _zoomPreview.value.scale;
-    _zoomSettleAlignment = _zoomPreview.value.alignment;
-    if ((_zoomSettleStartScale - 1).abs() < 0.0001 || (MediaQuery.maybeOf(context)?.disableAnimations ?? false)) {
-      _zoomPreview.value = (scale: 1.0, alignment: _zoomSettleAlignment);
-      return;
-    }
-    _zoomSettleController.forward(from: 0).whenComplete(() {
-      if (mounted) {
-        _zoomPreview.value = (scale: 1.0, alignment: _zoomSettleAlignment);
-      }
-    });
-  }
 
   void _onTimelineVisualReady() {
     final target = _retainedTransitionTarget;
@@ -524,8 +524,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
       _incomingLayoutReady = true;
       _incomingPositionReady = true;
     });
-    ref.read(timelineStateProvider.notifier).setZooming(false);
     WidgetsBinding.instance.addPostFrameCallback((_) => retainedController.dispose());
+    _startLayoutTransition(
+      _layoutTransitionGeneration,
+      onComplete: () => ref.read(timelineStateProvider.notifier).setZooming(false),
+    );
   }
 
   @override
@@ -630,8 +633,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     _retainedTransitionGeneration++;
     widget.visualReadySignal.removeListener(_onTimelineVisualReady);
     _retainedScrollController?.dispose();
-    _zoomSettleController.dispose();
-    _zoomPreview.dispose();
     for (final position in _attachedScrollPositions.toList()) {
       position.isScrollingNotifier.removeListener(_onScrollActivityChanged);
     }
@@ -903,6 +904,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                         if (_retainedTransitionTarget != null) {
                           _retainedSwitcherKey.currentState?.finishImmediately();
                         }
+                        _finishLayoutTransitionImmediately();
                         _baseScaleFactor = _scaleFactor;
                         _pendingPerRow = _perRow;
                         ref.read(timelineStateProvider.notifier).setZooming(true);
@@ -916,14 +918,12 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                         );
                         _scaleFactor = newScaleFactor;
                         _pendingPerRow = newPerRow;
-                        _updateZoomPreview(details);
                       };
                       scale.onEnd = (_) {
                         final targetColumns = _pendingPerRow ?? _perRow;
                         _pendingPerRow = null;
                         _scaleFactor = timelineScaleFactorForColumnCount(targetColumns);
                         _baseScaleFactor = _scaleFactor;
-                        _settleZoomPreview();
                         if (targetColumns == _perRow) {
                           ref.read(timelineStateProvider.notifier).setZooming(false);
                           return;
@@ -938,6 +938,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                           _commitColumnCount(targetColumns, targetAssetIndex);
                           ref.read(timelineStateProvider.notifier).setZooming(false);
                         } else if (_isDenseZoomTransition(currentColumns: _perRow, nextColumns: targetColumns)) {
+                          _prepareLayoutTransition(startAutomatically: false);
                           _beginRetainedColumnTransition(
                             targetColumns: targetColumns,
                             targetAssetIndex: targetAssetIndex,
@@ -966,18 +967,16 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      TimelineZoomTransform(
-                        preview: _zoomPreview,
-                        child: TimelineRetainedSwitcher(
-                          key: _retainedSwitcherKey,
-                          layoutKey: _retainedLayoutVersion,
-                          ready: _incomingLayoutReady,
-                          onTransitionComplete: _onRetainedTransitionComplete,
-                          child: TimelineLayoutTransitionScope(
-                            animation: _layoutTransitionController,
-                            previousRects: _previousTileRects,
-                            child: timeline,
-                          ),
+                      TimelineRetainedSwitcher(
+                        key: _retainedSwitcherKey,
+                        layoutKey: _retainedLayoutVersion,
+                        ready: _incomingLayoutReady,
+                        animateReveal: false,
+                        onTransitionComplete: _onRetainedTransitionComplete,
+                        child: TimelineLayoutTransitionScope(
+                          animation: _layoutTransitionController,
+                          previousRects: _previousTileRects,
+                          child: timeline,
                         ),
                       ),
                       if (isBottomWidgetVisible)

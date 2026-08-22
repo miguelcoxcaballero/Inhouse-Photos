@@ -72,17 +72,6 @@ void main() {
     expect(kTimelinePinchSensitivity, 1.25);
   });
 
-  test('pinch preview stays bounded and follows the gesture focal point', () {
-    expect(calculateTimelineZoomPreviewScale(1), 1);
-    expect(calculateTimelineZoomPreviewScale(100), 1.22);
-    expect(calculateTimelineZoomPreviewScale(0.001), 0.82);
-    expect(calculateTimelineZoomPreviewScale(double.nan), 1);
-    expect(
-      calculateTimelineZoomAlignment(focalPoint: const Offset(300, 100), viewportSize: const Size(400, 800)),
-      const Alignment(0.5, -0.75),
-    );
-  });
-
   test('zooming is treated as active timeline interaction', () {
     expect(const TimelineState(isZooming: true).isInteracting, isTrue);
     expect(const TimelineState().isInteracting, isFalse);
@@ -190,32 +179,40 @@ void main() {
     expect(retained.positions, isEmpty);
   });
 
-  testWidgets('120 pinch ticks update only the compositor transform subtree', (tester) async {
-    final preview = ValueNotifier<TimelineZoomPreview>((scale: 1.0, alignment: Alignment.center));
-    addTearDown(preview.dispose);
-    int galleryBuilds = 0;
+  testWidgets('dense reflow hands off immediately once target pixels are ready', (tester) async {
+    late StateSetter update;
+    Object layoutKey = 'old-layout';
+    bool ready = true;
 
     await tester.pumpWidget(
-      Directionality(
-        textDirection: TextDirection.ltr,
-        child: TimelineZoomTransform(
-          preview: preview,
-          child: Builder(
-            builder: (context) {
-              galleryBuilds++;
-              return const ColoredBox(color: Colors.black);
-            },
-          ),
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return TimelineRetainedSwitcher(
+              layoutKey: layoutKey,
+              ready: ready,
+              animateReveal: false,
+              child: Center(child: Text(layoutKey.toString())),
+            );
+          },
         ),
       ),
     );
 
-    for (var frame = 0; frame < 120; frame++) {
-      preview.value = (scale: 0.9 + (frame / 600), alignment: Alignment((frame % 20) / 10 - 1, 0));
-      await tester.pump(const Duration(microseconds: 8333));
-    }
+    update(() {
+      layoutKey = 'new-layout';
+      ready = false;
+    });
+    await tester.pump();
+    expect(find.text('old-layout'), findsOneWidget);
+    expect(find.text('new-layout'), findsOneWidget);
 
-    expect(galleryBuilds, 1, reason: 'pinch frames must not rebuild the virtualized gallery');
+    update(() => ready = true);
+    await tester.pump();
+
+    expect(find.text('old-layout'), findsNothing, reason: 'the ready target becomes the sole reflow surface');
+    expect(find.text('new-layout'), findsOneWidget);
   });
 
   test('pinching farther out enters dense year overview levels', () {
@@ -363,6 +360,71 @@ void main() {
 
     expect(calculateTimelineAssetTransitionRect(previousRect: previous, currentRect: current, progress: 0), previous);
     expect(calculateTimelineAssetTransitionRect(previousRect: previous, currentRect: current, progress: 1), current);
+  });
+
+  test('dense cells use the same deterministic grid geometry as regular photo tiles', () {
+    expect(
+      calculateTimelineDenseAssetRect(
+        index: 4,
+        columnCount: 3,
+        tileExtent: 40,
+        containerWidth: 120,
+        textDirection: TextDirection.ltr,
+      ),
+      const Rect.fromLTWH(40, 40, 40, 40),
+    );
+    expect(
+      calculateTimelineDenseAssetRect(
+        index: 4,
+        columnCount: 3,
+        tileExtent: 40,
+        containerWidth: 120,
+        textDirection: TextDirection.rtl,
+      ),
+      const Rect.fromLTWH(40, 40, 40, 40),
+    );
+    expect(
+      calculateTimelineDenseAssetRect(
+        index: 3,
+        columnCount: 3,
+        tileExtent: 40,
+        containerWidth: 120,
+        textDirection: TextDirection.rtl,
+      ),
+      const Rect.fromLTWH(80, 40, 40, 40),
+    );
+  });
+
+  testWidgets('dense atlas marker exposes visible per-photo rectangles without per-photo widgets', (tester) async {
+    const keys = <Object>['a', 'b', 'c', 'd', 'e', 'f'];
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: 120,
+            height: 80,
+            child: TimelineDenseAssetLayoutMarker(
+              assetKeys: keys,
+              columnCount: 3,
+              tileExtent: 40,
+              textDirection: TextDirection.ltr,
+              child: SizedBox.expand(),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final marker = tester.renderObject<RenderTimelineDenseAssetLayoutMarker>(
+      find.byType(TimelineDenseAssetLayoutMarker),
+    );
+    final visible = <Object, Rect>{};
+    marker.collectVisibleAssetRects(const Rect.fromLTWH(0, 0, 120, 40), visible);
+
+    expect(visible.keys, unorderedEquals(const ['a', 'b', 'c']));
+    expect(visible['b'], const Rect.fromLTWH(40, 0, 40, 40));
   });
 
   testWidgets('timeline args follow constraints after a zero-sized first frame while buckets are still loading', (

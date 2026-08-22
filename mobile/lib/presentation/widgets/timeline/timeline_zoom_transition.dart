@@ -1,51 +1,7 @@
-import 'dart:math' as math;
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-const Duration kTimelineZoomSettleDuration = Duration(milliseconds: 220);
 const Duration kTimelineLayoutRevealDuration = Duration(milliseconds: 180);
-
-/// Keeps pinch feedback subtle enough that cached thumbnails remain crisp while
-/// still tracking the user's fingers. The actual grid geometry changes once,
-/// when the gesture settles.
-double calculateTimelineZoomPreviewScale(double gestureScale) {
-  if (!gestureScale.isFinite || gestureScale <= 0) {
-    return 1;
-  }
-  return math.pow(gestureScale, 0.32).toDouble().clamp(0.82, 1.22);
-}
-
-Alignment calculateTimelineZoomAlignment({required Offset focalPoint, required Size viewportSize}) {
-  if (viewportSize.isEmpty || !viewportSize.width.isFinite || !viewportSize.height.isFinite) {
-    return Alignment.center;
-  }
-  return Alignment(
-    ((focalPoint.dx / viewportSize.width) * 2 - 1).clamp(-1.0, 1.0),
-    ((focalPoint.dy / viewportSize.height) * 2 - 1).clamp(-1.0, 1.0),
-  );
-}
-
-typedef TimelineZoomPreview = ({double scale, Alignment alignment});
-
-class TimelineZoomTransform extends StatelessWidget {
-  const TimelineZoomTransform({super.key, required this.preview, required this.child});
-
-  final ValueListenable<TimelineZoomPreview> preview;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<TimelineZoomPreview>(
-      valueListenable: preview,
-      child: child,
-      builder: (context, value, child) {
-        return Transform.scale(scale: value.scale, alignment: value.alignment, child: child);
-      },
-    );
-  }
-}
 
 /// A layout reports readiness only after it has real pixels to paint. This lets
 /// the gallery retain the previous layout instead of exposing an empty frame
@@ -126,6 +82,7 @@ class TimelineRetainedSwitcher extends StatefulWidget {
     required this.ready,
     required this.child,
     this.onTransitionComplete,
+    this.animateReveal = true,
     this.duration = kTimelineLayoutRevealDuration,
   });
 
@@ -133,6 +90,7 @@ class TimelineRetainedSwitcher extends StatefulWidget {
   final bool ready;
   final Widget child;
   final VoidCallback? onTransitionComplete;
+  final bool animateReveal;
   final Duration duration;
 
   @override
@@ -184,7 +142,7 @@ class TimelineRetainedSwitcherState extends State<TimelineRetainedSwitcher> with
     if (!widget.ready || _outgoing == null || _controller.isAnimating) {
       return;
     }
-    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+    if (!widget.animateReveal || (MediaQuery.maybeOf(context)?.disableAnimations ?? false)) {
       finishImmediately();
       return;
     }

@@ -717,6 +717,7 @@ class _FixedSegmentRow extends ConsumerWidget {
     if (denseOverview && denseTimelineRowsPerChild(columnCount) > 1) {
       return _DenseCachedPanel(
         cacheSlot: cacheSlot,
+        firstAssetIndex: assetIndex,
         itemCount: assetCount,
         columnCount: columnCount,
         tileExtent: tileHeight,
@@ -873,7 +874,7 @@ class _AssetTileWidget extends ConsumerWidget {
     final showStackIndicator = ref.read(timelineServiceProvider).origin != TimelineOrigin.trash;
 
     return TimelineAssetLayoutTransition(
-      assetKey: asset.heroTag,
+      assetKey: timelineAssetLayoutKey(assetIndex),
       child: RepaintBoundary(
         child: GestureDetector(
           onTap: () => lockSelection ? null : _handleOnTap(context, ref, assetIndex, asset, heroOffset),
@@ -1217,6 +1218,7 @@ Future<ui.Image> _decodeDenseDiskAtlas(_DenseDiskAtlasEntry entry) async {
 
 class _DenseCachedPanel extends StatefulWidget {
   final String cacheSlot;
+  final int firstAssetIndex;
   final int itemCount;
   final int columnCount;
   final double tileExtent;
@@ -1224,6 +1226,7 @@ class _DenseCachedPanel extends StatefulWidget {
 
   const _DenseCachedPanel({
     required this.cacheSlot,
+    required this.firstAssetIndex,
     required this.itemCount,
     required this.columnCount,
     required this.tileExtent,
@@ -1251,6 +1254,7 @@ class _DenseCachedPanelState extends State<_DenseCachedPanel> {
   void didUpdateWidget(covariant _DenseCachedPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.cacheSlot != widget.cacheSlot ||
+        oldWidget.firstAssetIndex != widget.firstAssetIndex ||
         oldWidget.columnCount != widget.columnCount ||
         oldWidget.itemCount != widget.itemCount) {
       _atlas?.dispose();
@@ -1310,25 +1314,50 @@ class _DenseCachedPanelState extends State<_DenseCachedPanel> {
     _reportVisualReady();
   }
 
+  Matrix4? _globalToLocalTransform() {
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.attached) {
+      return null;
+    }
+    return Matrix4.tryInvert(renderObject.getTransformTo(null));
+  }
+
   @override
   Widget build(BuildContext context) {
     final rowCount = (widget.itemCount / widget.columnCount).ceil();
+    final textDirection = Directionality.of(context);
+    final layoutTransition = TimelineLayoutTransitionScope.maybeOf(context);
+    final assetKeys = [
+      for (var index = 0; index < widget.itemCount; index++) timelineAssetLayoutKey(widget.firstAssetIndex + index),
+    ];
+    final paintSurface = CustomPaint(
+      size: Size(double.infinity, rowCount * widget.tileExtent),
+      isComplex: true,
+      willChange: layoutTransition?.animation.value != 1,
+      painter: _DenseAssetRowPainter(
+        images: const [],
+        atlas: _atlas,
+        assetKeys: assetKeys,
+        columnCount: widget.columnCount,
+        tileExtent: widget.tileExtent,
+        textDirection: textDirection,
+        layoutAnimation: layoutTransition?.animation,
+        previousRects: layoutTransition?.previousRects ?? const {},
+        globalToLocalTransform: _globalToLocalTransform,
+        repaint: const _NeverNotifyListenable(),
+      ),
+    );
     return TimelineVisualReadyMarker(
       columnCount: widget.columnCount,
       ready: _atlas != null,
-      child: CustomPaint(
-        size: Size(double.infinity, rowCount * widget.tileExtent),
-        isComplex: true,
-        willChange: false,
-        painter: _DenseAssetRowPainter(
-          images: const [],
-          atlas: _atlas,
-          itemCount: widget.itemCount,
-          columnCount: widget.columnCount,
-          tileExtent: widget.tileExtent,
-          textDirection: Directionality.of(context),
-          repaint: const _NeverNotifyListenable(),
-        ),
+      child: TimelineDenseAssetLayoutMarker(
+        assetKeys: assetKeys,
+        columnCount: widget.columnCount,
+        tileExtent: widget.tileExtent,
+        textDirection: textDirection,
+        child: layoutTransition?.previousRects.isNotEmpty ?? false
+            ? paintSurface
+            : RepaintBoundary(child: paintSurface),
       ),
     );
   }
@@ -2175,32 +2204,54 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     }
   }
 
+  Matrix4? _globalToLocalTransform() {
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.attached) {
+      return null;
+    }
+    return Matrix4.tryInvert(renderObject.getTransformTo(null));
+  }
+
   @override
   Widget build(BuildContext context) {
     final textDirection = Directionality.of(context);
     final rowCount = (widget.assets.length / widget.columnCount).ceil();
+    final layoutTransition = TimelineLayoutTransitionScope.maybeOf(context);
+    final assetKeys = [
+      for (var index = 0; index < widget.assets.length; index++) timelineAssetLayoutKey(widget.firstAssetIndex + index),
+    ];
+    final paintSurface = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapUp: (details) => _handleTap(details, textDirection),
+      child: CustomPaint(
+        size: Size(double.infinity, rowCount * widget.tileExtent),
+        isComplex: true,
+        willChange: layoutTransition?.animation.value != 1,
+        painter: _DenseAssetRowPainter(
+          images: _images,
+          atlas: _atlas,
+          assetKeys: assetKeys,
+          columnCount: widget.columnCount,
+          tileExtent: widget.tileExtent,
+          textDirection: textDirection,
+          layoutAnimation: layoutTransition?.animation,
+          previousRects: layoutTransition?.previousRects ?? const {},
+          globalToLocalTransform: _globalToLocalTransform,
+          repaint: _repaint,
+        ),
+      ),
+    );
     return TimelineVisualReadyMarker(
       columnCount: widget.columnCount,
       ready: _atlas != null || _images.any((image) => image != null),
-      child: RepaintBoundary(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapUp: (details) => _handleTap(details, textDirection),
-          child: CustomPaint(
-            size: Size(double.infinity, rowCount * widget.tileExtent),
-            isComplex: true,
-            willChange: false,
-            painter: _DenseAssetRowPainter(
-              images: _images,
-              atlas: _atlas,
-              itemCount: widget.assets.length,
-              columnCount: widget.columnCount,
-              tileExtent: widget.tileExtent,
-              textDirection: textDirection,
-              repaint: _repaint,
-            ),
-          ),
-        ),
+      child: TimelineDenseAssetLayoutMarker(
+        assetKeys: assetKeys,
+        columnCount: widget.columnCount,
+        tileExtent: widget.tileExtent,
+        textDirection: textDirection,
+        child: layoutTransition?.previousRects.isNotEmpty ?? false
+            ? paintSurface
+            : RepaintBoundary(child: paintSurface),
       ),
     );
   }
@@ -2216,45 +2267,157 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
 class _DenseAssetRowPainter extends CustomPainter {
   final List<ImageInfo?> images;
   final ui.Image? atlas;
-  final int itemCount;
+  final List<Object> assetKeys;
   final int columnCount;
   final double tileExtent;
   final TextDirection textDirection;
+  final Animation<double>? layoutAnimation;
+  final Map<Object, Rect> previousRects;
+  final Matrix4? Function() globalToLocalTransform;
+
+  Float32List? _atlasSourceRects;
+  Float32List? _atlasTransforms;
+  Float64List? _startLeft;
+  Float64List? _startTop;
+  Float64List? _startExtent;
+  Float64List? _endLeft;
+  Float64List? _endTop;
 
   _DenseAssetRowPainter({
     required this.images,
     required this.atlas,
-    required this.itemCount,
+    required this.assetKeys,
     required this.columnCount,
     required this.tileExtent,
     required this.textDirection,
+    required this.layoutAnimation,
+    required this.previousRects,
+    required this.globalToLocalTransform,
     required Listenable repaint,
-  }) : super(repaint: repaint);
+  }) : super(repaint: Listenable.merge([repaint, if (layoutAnimation != null) layoutAnimation]));
+
+  int get itemCount => assetKeys.length;
+
+  Rect _currentRect(int index, Size size) => calculateTimelineDenseAssetRect(
+    index: index,
+    columnCount: columnCount,
+    tileExtent: tileExtent,
+    containerWidth: size.width,
+    textDirection: textDirection,
+  );
+
+  void _prepareAtlasReflow(Size size, ui.Image atlas) {
+    if (_atlasTransforms != null) {
+      return;
+    }
+
+    final inverseTransform = globalToLocalTransform();
+    final sourceRows = (itemCount / columnCount).ceil();
+    final sourceWidth = atlas.width / columnCount;
+    final sourceHeight = atlas.height / sourceRows;
+    _atlasSourceRects = Float32List(itemCount * 4);
+    _atlasTransforms = Float32List(itemCount * 4);
+    _startLeft = Float64List(itemCount);
+    _startTop = Float64List(itemCount);
+    _startExtent = Float64List(itemCount);
+    _endLeft = Float64List(itemCount);
+    _endTop = Float64List(itemCount);
+
+    for (var index = 0; index < itemCount; index++) {
+      final current = _currentRect(index, size);
+      final previousGlobal = previousRects[assetKeys[index]];
+      final previous = previousGlobal != null && inverseTransform != null
+          ? MatrixUtils.transformRect(inverseTransform, previousGlobal)
+          : current;
+      _startLeft![index] = previous.left;
+      _startTop![index] = previous.top;
+      _startExtent![index] = previous.width;
+      _endLeft![index] = current.left;
+      _endTop![index] = current.top;
+
+      final sourceColumn = index % columnCount;
+      final sourceRow = index ~/ columnCount;
+      final offset = index * 4;
+      _atlasSourceRects![offset] = sourceColumn * sourceWidth;
+      _atlasSourceRects![offset + 1] = sourceRow * sourceHeight;
+      _atlasSourceRects![offset + 2] = (sourceColumn + 1) * sourceWidth;
+      _atlasSourceRects![offset + 3] = (sourceRow + 1) * sourceHeight;
+    }
+  }
+
+  Rect _reflowRect(int index, double progress, Size size) {
+    final startLeft = _startLeft;
+    if (startLeft == null) {
+      return _currentRect(index, size);
+    }
+    final extent = _startExtent![index] + ((tileExtent - _startExtent![index]) * progress);
+    return Rect.fromLTWH(
+      startLeft[index] + ((_endLeft![index] - startLeft[index]) * progress),
+      _startTop![index] + ((_endTop![index] - _startTop![index]) * progress),
+      extent,
+      extent,
+    );
+  }
+
+  void _paintReflowAtlas(Canvas canvas, Size size, ui.Image atlas, double progress) {
+    _prepareAtlasReflow(size, atlas);
+    final transforms = _atlasTransforms!;
+    final sourceRects = _atlasSourceRects!;
+    final sourceWidth = atlas.width / columnCount;
+    final sourceHeight = atlas.height / (itemCount / columnCount).ceil();
+    final sourceExtent = math.min(sourceWidth, sourceHeight);
+
+    for (var index = 0; index < itemCount; index++) {
+      final visualRect = _reflowRect(index, progress, size);
+      final scale = visualRect.width / sourceExtent;
+      final sourceOffset = index * 4;
+      final sourceCenterX = (sourceRects[sourceOffset] + sourceRects[sourceOffset + 2]) * 0.5;
+      final sourceCenterY = (sourceRects[sourceOffset + 1] + sourceRects[sourceOffset + 3]) * 0.5;
+      transforms[sourceOffset] = scale;
+      transforms[sourceOffset + 1] = 0;
+      transforms[sourceOffset + 2] = visualRect.center.dx - (scale * sourceCenterX);
+      transforms[sourceOffset + 3] = visualRect.center.dy - (scale * sourceCenterY);
+    }
+
+    canvas.drawRawAtlas(
+      atlas,
+      transforms,
+      sourceRects,
+      null,
+      null,
+      Offset.zero & size,
+      Paint()..filterQuality = FilterQuality.low,
+    );
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     final atlas = this.atlas;
+    final animationProgress = layoutAnimation?.value ?? 1;
+    final isReflowing = previousRects.isNotEmpty && animationProgress < 1;
+    final reflowProgress = isReflowing ? timelineLayoutTransitionProgress(animationProgress) : 1.0;
     if (atlas != null) {
-      final rowCount = (itemCount / columnCount).ceil();
-      final left = textDirection == TextDirection.rtl ? size.width - (columnCount * tileExtent) : 0.0;
-      canvas.drawImageRect(
-        atlas,
-        Rect.fromLTWH(0, 0, atlas.width.toDouble(), atlas.height.toDouble()),
-        Rect.fromLTWH(left, 0, columnCount * tileExtent, rowCount * tileExtent),
-        Paint()..filterQuality = FilterQuality.low,
-      );
+      if (isReflowing) {
+        _paintReflowAtlas(canvas, size, atlas, reflowProgress);
+      } else {
+        final rowCount = (itemCount / columnCount).ceil();
+        final left = textDirection == TextDirection.rtl ? size.width - (columnCount * tileExtent) : 0.0;
+        canvas.drawImageRect(
+          atlas,
+          Rect.fromLTWH(0, 0, atlas.width.toDouble(), atlas.height.toDouble()),
+          Rect.fromLTWH(left, 0, columnCount * tileExtent, rowCount * tileExtent),
+          Paint()..filterQuality = FilterQuality.low,
+        );
+      }
     }
     for (var index = 0; index < images.length; index++) {
       final image = images[index]?.image;
       if (image == null) {
         continue;
       }
-      final column = index % columnCount;
-      final row = index ~/ columnCount;
-      final left = textDirection == TextDirection.rtl ? size.width - ((column + 1) * tileExtent) : column * tileExtent;
       paintImage(
         canvas: canvas,
-        rect: Rect.fromLTWH(left, row * tileExtent, tileExtent, tileExtent),
+        rect: isReflowing ? _reflowRect(index, reflowProgress, size) : _currentRect(index, size),
         image: image,
         fit: BoxFit.cover,
         filterQuality: FilterQuality.none,
@@ -2266,8 +2429,10 @@ class _DenseAssetRowPainter extends CustomPainter {
   bool shouldRepaint(covariant _DenseAssetRowPainter oldDelegate) =>
       oldDelegate.images != images ||
       oldDelegate.atlas != atlas ||
-      oldDelegate.itemCount != itemCount ||
+      oldDelegate.assetKeys != assetKeys ||
       oldDelegate.columnCount != columnCount ||
       oldDelegate.tileExtent != tileExtent ||
-      oldDelegate.textDirection != textDirection;
+      oldDelegate.textDirection != textDirection ||
+      oldDelegate.layoutAnimation != layoutAnimation ||
+      oldDelegate.previousRects != previousRects;
 }

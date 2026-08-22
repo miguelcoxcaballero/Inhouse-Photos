@@ -1,13 +1,30 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
+double timelineLayoutTransitionProgress(double progress) => Curves.easeOutCubic.transform(progress.clamp(0.0, 1.0));
+
+Object timelineAssetLayoutKey(int assetIndex) => (assetIndex: assetIndex);
+
 Rect calculateTimelineAssetTransitionRect({
   required Rect previousRect,
   required Rect currentRect,
   required double progress,
 }) {
-  final easedProgress = Curves.easeOutCubic.transform(progress.clamp(0.0, 1.0));
+  final easedProgress = timelineLayoutTransitionProgress(progress);
   return Rect.lerp(previousRect, currentRect, easedProgress)!;
+}
+
+Rect calculateTimelineDenseAssetRect({
+  required int index,
+  required int columnCount,
+  required double tileExtent,
+  required double containerWidth,
+  required TextDirection textDirection,
+}) {
+  final column = index % columnCount;
+  final row = index ~/ columnCount;
+  final left = textDirection == TextDirection.rtl ? containerWidth - ((column + 1) * tileExtent) : column * tileExtent;
+  return Rect.fromLTWH(left, row * tileExtent, tileExtent, tileExtent);
 }
 
 class TimelineLayoutTransitionScope extends InheritedWidget {
@@ -144,5 +161,79 @@ class RenderTimelineAssetLayoutTransition extends RenderProxyBox {
       ..scaleByDouble(scaleX, scaleY, 1, 1);
 
     context.pushTransform(needsCompositing, offset, transform, super.paint);
+  }
+}
+
+/// Exposes the real on-screen rectangles of the cells inside a dense atlas.
+///
+/// Dense overview panels intentionally use one render object for hundreds of
+/// photos. This marker gives the timeline the same FLIP geometry that regular
+/// (up to six-column) tiles expose without replacing the atlas with hundreds
+/// of widgets.
+class TimelineDenseAssetLayoutMarker extends SingleChildRenderObjectWidget {
+  const TimelineDenseAssetLayoutMarker({
+    super.key,
+    required this.assetKeys,
+    required this.columnCount,
+    required this.tileExtent,
+    required this.textDirection,
+    required super.child,
+  });
+
+  final List<Object> assetKeys;
+  final int columnCount;
+  final double tileExtent;
+  final TextDirection textDirection;
+
+  @override
+  RenderTimelineDenseAssetLayoutMarker createRenderObject(BuildContext context) => RenderTimelineDenseAssetLayoutMarker(
+    assetKeys: assetKeys,
+    columnCount: columnCount,
+    tileExtent: tileExtent,
+    textDirection: textDirection,
+  );
+
+  @override
+  void updateRenderObject(BuildContext context, RenderTimelineDenseAssetLayoutMarker renderObject) {
+    renderObject
+      ..assetKeys = assetKeys
+      ..columnCount = columnCount
+      ..tileExtent = tileExtent
+      ..textDirection = textDirection;
+  }
+}
+
+class RenderTimelineDenseAssetLayoutMarker extends RenderProxyBox {
+  RenderTimelineDenseAssetLayoutMarker({
+    required this.assetKeys,
+    required this.columnCount,
+    required this.tileExtent,
+    required this.textDirection,
+  });
+
+  List<Object> assetKeys;
+  int columnCount;
+  double tileExtent;
+  TextDirection textDirection;
+
+  void collectVisibleAssetRects(Rect visibleBounds, Map<Object, Rect> result) {
+    if (!attached || !hasSize || size.isEmpty || columnCount <= 0 || tileExtent <= 0) {
+      return;
+    }
+
+    final transform = getTransformTo(null);
+    for (var index = 0; index < assetKeys.length; index++) {
+      final localRect = calculateTimelineDenseAssetRect(
+        index: index,
+        columnCount: columnCount,
+        tileExtent: tileExtent,
+        containerWidth: size.width,
+        textDirection: textDirection,
+      );
+      final globalRect = MatrixUtils.transformRect(transform, localRect);
+      if (globalRect.overlaps(visibleBounds)) {
+        result[assetKeys[index]] = globalRect;
+      }
+    }
   }
 }
