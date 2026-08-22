@@ -20,6 +20,8 @@ const _sideStoreSourceUrl =
     'https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/altstore-source.json';
 const _updateChannel = MethodChannel('com.inhousesoftware.photos/updates');
 const _minimumUpdateScreenTime = Duration(milliseconds: 650);
+const _dataUpdateCheckTimeout = Duration(seconds: 12);
+const _dataUpdateInstallTimeout = Duration(seconds: 45);
 
 double? calculateInhouseDownloadProgress({required int downloadedBytes, required int? totalBytes}) {
   if (totalBytes == null || totalBytes <= 0) {
@@ -359,7 +361,7 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
       });
 
       if (!needsNativeUpdate) {
-        await _installDataUpdate();
+        await _installDataUpdate(keepResultVisible: showScreen);
       }
     } catch (_) {
       if (mounted && showScreen) {
@@ -373,10 +375,10 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
   }
 
-  Future<void> _installDataUpdate() async {
+  Future<void> _installDataUpdate({required bool keepResultVisible}) async {
     _ShorebirdSnapshot snapshot;
     try {
-      snapshot = await _ShorebirdUpdateClient.inspect(checkNetwork: true).timeout(const Duration(seconds: 30));
+      snapshot = await _ShorebirdUpdateClient.inspect(checkNetwork: true).timeout(_dataUpdateCheckTimeout);
     } catch (_) {
       snapshot = const _ShorebirdSnapshot.unavailable();
     }
@@ -385,6 +387,10 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
 
     if (!snapshot.available) {
+      _finishDataUpdateCheck(
+        'Data updates are unavailable right now. Your installed app is ready to use.',
+        keepResultVisible: keepResultVisible,
+      );
       return;
     }
 
@@ -393,16 +399,19 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
       return;
     }
 
-    if (snapshot.downloadable) {
-      setState(() {
-        _showUpdateScreen = true;
-        _installState = _InstallState.downloadingData;
-        _status = 'Downloading and verifying the latest data update...';
-      });
+    if (!snapshot.downloadable) {
+      _finishDataUpdateCheck('Inhouse Photos is fully up to date.', keepResultVisible: keepResultVisible);
+      return;
     }
 
+    setState(() {
+      _showUpdateScreen = true;
+      _installState = _InstallState.downloadingData;
+      _status = 'Downloading and verifying the latest data update...';
+    });
+
     final result = await _ShorebirdUpdateClient.install().timeout(
-      const Duration(minutes: 5),
+      _dataUpdateInstallTimeout,
       onTimeout: () => const _ShorebirdInstallResult(-1, 'The update timed out.'),
     );
     if (!mounted) {
@@ -410,13 +419,10 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     }
 
     if (!result.accepted) {
-      if (!snapshot.downloadable) {
-        return;
-      }
       setState(() {
         _installState = _InstallState.error;
         _status = result.message.isEmpty
-            ? 'The data update could not be installed. Please try again.'
+            ? 'The data update could not be installed. You can keep using Photos and try again later.'
             : 'The data update could not be installed: ${result.message}';
       });
       return;
@@ -467,7 +473,18 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
 
     setState(() {
       _installState = _InstallState.error;
-      _status = 'The download did not finish. Keep your connection active and try again.';
+      _status = 'The data update did not finish. You can keep using Photos and try again later.';
+    });
+  }
+
+  void _finishDataUpdateCheck(String status, {required bool keepResultVisible}) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _installState = _InstallState.upToDate;
+      _status = status;
+      _showUpdateScreen = keepResultVisible;
     });
   }
 
@@ -681,8 +698,10 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                               SizedBox(
                                 width: double.infinity,
                                 child: FilledButton(
-                                  onPressed: isChecking || isDownloading
+                                  onPressed: (isChecking || isDownloading) && isNativeUpdate
                                       ? null
+                                      : (!isNativeUpdate && (isChecking || isDownloadingData))
+                                      ? _openApp
                                       : needsRestart
                                       ? () => unawaited(_restartAndActivate())
                                       : hasError
@@ -698,9 +717,9 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
                                     padding: const EdgeInsets.symmetric(vertical: 15),
                                   ),
                                   child: Text(switch (_installState) {
-                                    _InstallState.checking => 'Checking...',
+                                    _InstallState.checking => isNativeUpdate ? 'Checking...' : 'Open Photos',
                                     _InstallState.upToDate => 'Open Photos',
-                                    _InstallState.downloadingData => 'Installing securely...',
+                                    _InstallState.downloadingData => 'Open Photos',
                                     _InstallState.restartRequired =>
                                       Platform.isAndroid ? 'Activate update' : 'Close and reopen',
                                     _InstallState.downloadingApk => 'Downloading...',
