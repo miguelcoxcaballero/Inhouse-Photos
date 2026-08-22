@@ -8,6 +8,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/domain/models/asset/asset_metadata.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/config/backup_config.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/platform_extensions.dart';
@@ -400,6 +401,7 @@ class BackgroundUploadService {
       'fileModifiedAt': modifiedAt.toUtc().toIso8601String(),
       'isFavorite': isFavorite?.toString() ?? 'false',
       'duration': '0',
+      'storageSaver': (SettingsRepository.instance.appConfig.backup.quality == BackupQuality.storageSaver).toString(),
       if (fields != null) ...fields,
       if (CurrentPlatform.isIOS && cloudId != null)
         'metadata': jsonEncode([

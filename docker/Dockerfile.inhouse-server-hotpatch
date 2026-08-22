@@ -1,0 +1,6 @@
+FROM inhouse-photos-server:v3.1.0
+
+# Keep the already-built branded web client and production dependencies, while
+# replacing only the compiled server application for fast, reproducible local
+# deployments.
+COPY server/dist /usr/src/app/server/dist

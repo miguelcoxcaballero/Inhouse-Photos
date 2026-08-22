@@ -1,6 +1,6 @@
 {
-  "version": "3.1.43",
-  "versionCode": 5101,
+  "version": "3.1.44",
+  "versionCode": 7102,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.43-resumable-update/Inhouse-Photos-3.1.43-arm64.apk"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.44-server-compression/Inhouse-Photos-3.1.44-arm64.apk"
 }

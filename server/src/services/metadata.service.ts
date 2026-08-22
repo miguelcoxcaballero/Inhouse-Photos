@@ -232,6 +232,11 @@ export class MetadataService extends BaseService {
 
   @OnJob({ name: JobName.AssetExtractMetadata, queue: QueueName.MetadataExtraction })
   async handleMetadataExtraction(data: JobOf<JobName.AssetExtractMetadata>) {
+    if (data.source === 'storage-saver-upload') {
+      await this.jobRepository.queue({ name: JobName.AssetCompressStorageSaver, data: { id: data.id } });
+      return JobStatus.Success;
+    }
+
     const [{ metadata, reverseGeocoding }, asset] = await Promise.all([
       this.getConfig({ withCache: true }),
       this.assetJobRepository.getForMetadataExtraction(data.id),

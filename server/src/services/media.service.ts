@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import path from 'node:path';
 import { SystemConfig } from 'src/config';
 import { FACE_THUMBNAIL_SIZE, JOBS_ASSET_PAGINATION_SIZE } from 'src/constants';
 import { ImagePathOptions, StorageCore, ThumbnailPathEntity } from 'src/cores/storage.core';
@@ -64,6 +66,65 @@ export class MediaService extends BaseService {
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap() {
     this.videoInterfaces = await this.storageCore.getVideoInterfaces();
+  }
+
+  @OnJob({ name: JobName.AssetCompressStorageSaver, queue: QueueName.VideoConversion })
+  async handleStorageSaverCompression({ id }: JobOf<JobName.AssetCompressStorageSaver>): Promise<JobStatus> {
+    const asset = await this.assetRepository.getById(id);
+    if (!asset?.originalPath) {
+      return JobStatus.Failed;
+    }
+
+    const sourcePath = asset.originalPath;
+    const isGif = asset.originalFileName.toLowerCase().endsWith('.gif');
+    const extension = asset.type === AssetType.Video ? '.mp4' : '.jpg';
+    const outputPath = `${sourcePath}.storage-saver${extension}`;
+
+    try {
+      if (asset.type === AssetType.Video) {
+        await this.mediaRepository.compressStorageSaverVideo(sourcePath, outputPath);
+      } else if (asset.type === AssetType.Image && !isGif) {
+        await this.mediaRepository.compressStorageSaverImage(sourcePath, outputPath);
+      } else {
+        return JobStatus.Skipped;
+      }
+
+      const [sourceStats, outputStats] = await Promise.all([
+        this.storageRepository.stat(sourcePath),
+        this.storageRepository.stat(outputPath),
+      ]);
+      if (outputStats.size <= 0 || outputStats.size >= sourceStats.size) {
+        await this.storageRepository.unlink(outputPath);
+        return JobStatus.Skipped;
+      }
+
+      const checksum = createHash('sha1');
+      for await (const chunk of this.storageRepository.createPlainReadStream(outputPath)) {
+        checksum.update(chunk);
+      }
+
+      const originalFileName = `${path.parse(asset.originalFileName).name}${extension}`;
+      await this.storageRepository.utimes(outputPath, new Date(), sourceStats.mtime);
+      await this.assetRepository.update({
+        id,
+        originalPath: outputPath,
+        originalFileName,
+        checksum: checksum.digest(),
+      });
+      await this.userRepository.updateUsage(asset.ownerId, outputStats.size - sourceStats.size);
+      await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [sourcePath] } });
+      this.logger.log(`Storage Saver reduced asset ${id} from ${sourceStats.size} to ${outputStats.size} bytes`);
+      return JobStatus.Success;
+    } catch (error: any) {
+      this.logger.error(`Storage Saver failed for asset ${id}: ${error}`, error?.stack);
+      if (await this.storageRepository.checkFileExists(outputPath)) {
+        await this.storageRepository.unlink(outputPath);
+      }
+      return JobStatus.Failed;
+    } finally {
+      // Metadata and thumbnails are generated only after the final file exists.
+      await this.jobRepository.queue({ name: JobName.AssetExtractMetadata, data: { id, source: 'upload' } });
+    }
   }
 
   @OnJob({ name: JobName.AssetGenerateThumbnailsQueueAll, queue: QueueName.ThumbnailGeneration })

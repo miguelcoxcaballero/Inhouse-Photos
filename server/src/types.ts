@@ -232,7 +232,7 @@ export interface IDelayedJob extends IBaseJob {
   delay?: number;
 }
 
-export type JobSource = 'upload' | 'sidecar-write' | 'copy' | 'edit';
+export type JobSource = 'upload' | 'storage-saver-upload' | 'sidecar-write' | 'copy' | 'edit';
 export interface IEntityJob extends IBaseJob {
   id: string;
   source?: JobSource;
@@ -389,6 +389,7 @@ export type JobItem =
   // Metadata Extraction
   | { name: JobName.AssetExtractMetadataQueueAll; data: IBaseJob }
   | { name: JobName.AssetExtractMetadata; data: IEntityJob }
+  | { name: JobName.AssetCompressStorageSaver; data: IEntityJob }
 
   // Notifications
   | { name: JobName.NotificationsCleanup; data?: IBaseJob }

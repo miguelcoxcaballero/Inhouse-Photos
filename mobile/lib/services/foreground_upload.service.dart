@@ -21,7 +21,6 @@ import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/storage.provider.dart';
 import 'package:immich_mobile/repositories/asset_media.repository.dart';
 import 'package:immich_mobile/repositories/upload.repository.dart';
-import 'package:immich_mobile/services/backup_media_preprocessor.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
 import 'package:path/path.dart' as p;
@@ -150,16 +149,14 @@ class ForegroundUploadService {
     this._storageRepository,
     this._backupRepository,
     this._connectivityApi,
-    this._assetMediaRepository, {
-    this._mediaPreprocessor = const BackupMediaPreprocessor(),
-  });
+    this._assetMediaRepository,
+  );
 
   final UploadRepository _uploadRepository;
   final StorageRepository _storageRepository;
   final DriftBackupRepository _backupRepository;
   final ConnectivityApi _connectivityApi;
   final AssetMediaRepository _assetMediaRepository;
-  final BackupMediaPreprocessor _mediaPreprocessor;
   final Logger _logger = Logger('ForegroundUploadService');
 
   bool shouldAbortUpload = false;
@@ -530,44 +527,12 @@ class ForegroundUploadService {
       final extension = p.extension(file.path).isNotEmpty ? p.extension(file.path) : p.extension(asset.name);
       var originalFileName = p.setExtension(fileName, extension);
 
-      final prepared = await _mediaPreprocessor.prepare(
-        file,
-        asset,
-        originalFileName,
-        onProgress: (progress, originalBytes, preparedBytes) => callbacks.onPreparationProgress?.call(
-          asset.localId!,
-          originalFileName,
-          progress,
-          originalBytes,
-          preparedBytes,
-        ),
-      );
-      file = prepared.file;
-      originalFileName = prepared.uploadFileName;
-      if (prepared.isTemporary) {
-        temporaryFile = prepared.file;
-      }
-
-      if (entity.isLivePhoto && livePhotoFile != null) {
-        final livePhotoTitle = p.setExtension(originalFileName, p.extension(livePhotoFile.path));
-        final preparedMotion = await _mediaPreprocessor.prepare(
-          livePhotoFile,
-          asset,
-          livePhotoTitle,
-          isVideoOverride: true,
-          onProgress: (progress, originalBytes, preparedBytes) => callbacks.onPreparationProgress?.call(
-            asset.localId!,
-            livePhotoTitle,
-            progress,
-            originalBytes,
-            preparedBytes,
-          ),
-        );
-        livePhotoFile = preparedMotion.file;
-        if (preparedMotion.isTemporary) {
-          temporaryLivePhotoFile = preparedMotion.file;
-        }
-      }
+      // Storage saver is deliberately performed by the server. The phone only
+      // reads and uploads the source file, avoiding a CPU/thermal-heavy encode
+      // before every transfer.
+      final storageSaver = SettingsRepository.instance.appConfig.backup.quality == BackupQuality.storageSaver;
+      final originalBytes = await file.length().onError((_, __) => 0);
+      callbacks.onPreparationProgress?.call(asset.localId!, originalFileName, 1, originalBytes, null);
       final fields = <String, String>{
         // deviceAssetId/deviceId required by server v2.7.5 and below (drop in v4.0 per #27818).
         'deviceAssetId': asset.localId!,
@@ -576,12 +541,13 @@ class ForegroundUploadService {
         'fileModifiedAt': asset.updatedAt.toUtc().toIso8601String(),
         'isFavorite': asset.isFavorite.toString(),
         'duration': (asset.durationMs ?? 0).toString(),
+        'storageSaver': storageSaver.toString(),
       };
 
       // Add cloudId metadata only to the still image, not the motion video,
       // because a motion upload can otherwise be associated with the wrong
       // still image during a sync.
-      final sourceChecksum = prepared.isTemporary ? asset.checksum : null;
+      final sourceChecksum = storageSaver ? asset.checksum : null;
       if ((CurrentPlatform.isIOS && asset.cloudId != null) || sourceChecksum != null) {
         fields['metadata'] = jsonEncode([
           RemoteAssetMetadataItem(
@@ -602,7 +568,7 @@ class ForegroundUploadService {
 
       return _PreparedAsset(
         asset: asset,
-        file: file!,
+        file: file,
         originalFileName: originalFileName,
         fields: fields,
         isLivePhoto: entity.isLivePhoto,

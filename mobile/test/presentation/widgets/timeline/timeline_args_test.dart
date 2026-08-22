@@ -108,10 +108,10 @@ void main() {
     expect(usesInstantDenseTimelineAtlas(24), isTrue);
     expect(usesInstantDenseTimelineAtlas(36), isTrue);
     expect(usesInstantDenseTimelineAtlas(48), isTrue);
-    expect(denseTimelineRowsPerChild(12), 12);
-    expect(denseTimelineRowsPerChild(24), 16);
-    expect(denseTimelineRowsPerChild(36), 24);
-    expect(denseTimelineRowsPerChild(48), 16);
+    expect(denseTimelineRowsPerChild(12), 8);
+    expect(denseTimelineRowsPerChild(24), 6);
+    expect(denseTimelineRowsPerChild(36), 6);
+    expect(denseTimelineRowsPerChild(48), 4);
     expect(denseOverviewMetadataCellPixels, 32);
     expect(denseOverviewDiskCacheLimitBytes, 256 * 1024 * 1024);
   });
@@ -127,8 +127,8 @@ void main() {
             ).generate().single
             as FixedSegment;
 
-    expect(segment.rowsPerChild, 16);
-    expect(segment.lastIndex - segment.firstIndex, 7);
+    expect(segment.rowsPerChild, 4);
+    expect(segment.lastIndex - segment.firstIndex, 27);
     expect(segment.endOffset - segment.gridOffset, 105 * 8);
   });
 
@@ -188,7 +188,7 @@ void main() {
     expect(tester.renderObject(find.byType(Thumbnail)).isRepaintBoundary, isFalse);
   });
 
-  test('year overview merges adjacent date buckets and preserves asset offsets', () {
+  test('year overview keeps stable day segments and preserves asset offsets', () {
     final builder = FixedSegmentBuilder(
       buckets: [
         TimeBucket(date: DateTime(2026, 8, 14), assetCount: 2),
@@ -201,11 +201,13 @@ void main() {
     );
 
     final segments = builder.generate();
-    expect(segments, hasLength(2));
+    expect(segments, hasLength(3));
     expect(segments.first.header, HeaderType.year);
-    expect(segments.first.bucket, TimeBucket(date: DateTime(2026), assetCount: 5));
+    expect(segments.first.bucket, TimeBucket(date: DateTime(2026, 8, 14), assetCount: 2));
+    expect(segments[1].header, HeaderType.none);
+    expect(segments[1].firstAssetIndex, 2);
     expect(segments.last.firstAssetIndex, 5);
-    expect(segments.last.bucket, TimeBucket(date: DateTime(2025), assetCount: 1));
+    expect(segments.last.bucket, TimeBucket(date: DateTime(2025, 12, 1), assetCount: 1));
   });
 
   test('asset transition moves and resizes a tile into its new grid rectangle', () {

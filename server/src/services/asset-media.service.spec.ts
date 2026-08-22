@@ -348,6 +348,29 @@ describe(AssetMediaService.name, () => {
         expect.any(Date),
         new Date(createDto.fileModifiedAt),
       );
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetExtractMetadata,
+        data: { id: assetEntity.id, source: 'upload' },
+      });
+    });
+
+    it('should request server-side Storage Saver only for a new upload that opts in', async () => {
+      const file = {
+        uuid: 'random-uuid',
+        originalPath: 'fake_path/asset_1.jpeg',
+        mimeType: 'image/jpeg',
+        checksum: Buffer.from('file hash', 'utf8'),
+        originalName: 'asset_1.jpeg',
+        size: 42,
+      };
+      mocks.asset.create.mockResolvedValue(assetEntity);
+
+      await sut.uploadAsset(authStub.user1, { ...createDto, storageSaver: true }, file);
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetExtractMetadata,
+        data: { id: assetEntity.id, source: 'storage-saver-upload' },
+      });
     });
 
     it('should handle a duplicate', async () => {

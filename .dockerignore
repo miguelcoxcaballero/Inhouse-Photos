@@ -10,6 +10,8 @@
 **/node_modules/
 **/.pnpm-store/
 **/dist/
+!server/dist/
+!server/dist/**
 **/coverage/
 **/build/
 !web/build/

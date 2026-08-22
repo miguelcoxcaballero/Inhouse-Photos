@@ -183,7 +183,10 @@ export class AssetMediaService extends BaseService {
         lockedPropertiesBehavior: 'override',
       });
 
-      await this.jobRepository.queue({ name: JobName.AssetExtractMetadata, data: { id: asset.id, source: 'upload' } });
+      await this.jobRepository.queue({
+        name: JobName.AssetExtractMetadata,
+        data: { id: asset.id, source: dto.storageSaver ? 'storage-saver-upload' : 'upload' },
+      });
 
       if (auth.sharedLink) {
         await this.addToSharedLink(auth.sharedLink, asset.id);

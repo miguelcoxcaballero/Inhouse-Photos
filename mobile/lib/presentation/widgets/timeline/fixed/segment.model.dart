@@ -64,10 +64,10 @@ int denseTimelineTargetPixels({required double tileExtent, required double devic
 bool usesInstantDenseTimelineAtlas(int columnCount) => columnCount >= 12;
 
 int denseTimelineRowsPerChild(int columnCount) => switch (columnCount) {
-  >= 48 => 16,
-  >= 36 => 24,
-  >= 24 => 16,
-  >= 12 => 12,
+  >= 48 => 4,
+  >= 36 => 6,
+  >= 24 => 6,
+  >= 12 => 8,
   _ => 1,
 };
 
@@ -373,6 +373,7 @@ class FixedSegment extends Segment {
   final int columnCount;
   final int rowsPerChild;
   final double mainAxisExtend;
+  final bool denseOverview;
 
   const FixedSegment({
     required super.firstIndex,
@@ -384,6 +385,7 @@ class FixedSegment extends Segment {
     required this.tileHeight,
     required this.columnCount,
     this.rowsPerChild = 1,
+    this.denseOverview = false,
     required super.headerExtent,
     required super.spacing,
     required super.header,
@@ -431,7 +433,7 @@ class FixedSegment extends Segment {
       tileHeight: tileHeight,
       spacing: spacing,
       columnCount: columnCount,
-      denseOverview: header == HeaderType.year,
+      denseOverview: denseOverview,
       denseCacheSlot: bucket is TimeBucket
           ? '${(bucket as TimeBucket).date.toUtc().microsecondsSinceEpoch}:$rowIndexInSegment:$columnCount:$numberOfAssets'
           : '$firstAssetIndex:$rowIndexInSegment:$columnCount:$numberOfAssets',
@@ -539,7 +541,7 @@ class _FixedSegmentRow extends ConsumerWidget {
   ) {
     if (denseOverview) {
       return _DenseAssetRow(
-        key: ValueKey(Object.hash(assetIndex, timelineService.hashCode)),
+        key: ValueKey(Object.hash(cacheSlot, timelineService.hashCode)),
         assets: assets,
         firstAssetIndex: assetIndex,
         tileExtent: tileHeight,

@@ -122,6 +122,8 @@ void main() {
       expect(captured[0].containsKey('livePhotoVideoId'), isFalse);
       expect(captured[1].containsKey('visibility'), isFalse);
       expect(captured[1]['livePhotoVideoId'], equals('remote-1'));
+      expect(captured[0]['storageSaver'], equals('true'));
+      expect(captured[1]['storageSaver'], equals('true'));
     });
 
     test('should not set visibility for a regular photo', () async {
@@ -141,6 +143,7 @@ void main() {
 
       expect(captured, hasLength(1));
       expect(captured[0].containsKey('visibility'), isFalse);
+      expect(captured[0]['storageSaver'], equals('true'));
     });
 
     test('waits for the successful-upload callback before completing', () async {

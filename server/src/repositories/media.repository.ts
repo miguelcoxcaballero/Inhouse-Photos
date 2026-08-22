@@ -183,6 +183,54 @@ export class MediaRepository {
       .toFile(output);
   }
 
+  /** Encode a newly uploaded photo for Storage Saver without ever touching the phone CPU. */
+  async compressStorageSaverImage(input: string, output: string): Promise<void> {
+    const metadata = await sharp(input, { failOn: 'none', limitInputPixels: false, unlimited: true }).metadata();
+    const width = metadata.width ?? 0;
+    const height = metadata.height ?? 0;
+    const maxPixels = 16_000_000;
+    const scale = width > 0 && height > 0 && width * height > maxPixels ? Math.sqrt(maxPixels / (width * height)) : 1;
+
+    await sharp(input, { failOn: 'none', limitInputPixels: false, unlimited: true })
+      .rotate()
+      .resize({
+        width: scale < 1 ? Math.max(1, Math.floor(width * scale)) : undefined,
+        height: scale < 1 ? Math.max(1, Math.floor(height * scale)) : undefined,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 85, progressive: true, mozjpeg: true })
+      .toFile(output);
+
+    // Keep capture date, camera and location metadata in the server copy.
+    await this.copyTagGroup('all', input, output);
+  }
+
+  /** Encode a newly uploaded video to a broadly compatible 1080p Storage Saver copy. */
+  compressStorageSaverVideo(input: string, output: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      ffmpeg(input, { niceness: 10 })
+        .outputOptions([
+          '-map 0:v:0',
+          '-map 0:a?',
+          '-map_metadata 0',
+          '-vf scale=1920:1920:force_original_aspect_ratio=decrease:force_divisible_by=2',
+          '-c:v libx264',
+          '-preset medium',
+          '-crf 24',
+          '-pix_fmt yuv420p',
+          '-c:a aac',
+          '-b:a 128k',
+          '-movflags +faststart',
+        ])
+        .output(output)
+        .on('start', (command: string) => this.logger.debug(command))
+        .on('error', reject)
+        .on('end', () => resolve())
+        .run();
+    });
+  }
+
   private getImageDecodingPipeline(input: string | Buffer, options: DecodeToBufferOptions) {
     let pipeline = sharp(input, {
       // some invalid images can still be processed by sharp, but we want to fail on them by default to avoid crashes

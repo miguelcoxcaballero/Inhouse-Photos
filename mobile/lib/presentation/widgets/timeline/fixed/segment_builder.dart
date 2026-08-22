@@ -18,37 +18,10 @@ class FixedSegmentBuilder extends SegmentBuilder {
   });
 
   List<Bucket> _layoutBuckets() {
-    if (!yearOverview) {
-      return buckets;
-    }
-
-    final result = <Bucket>[];
-    DateTime? activeYear;
-    var activeCount = 0;
-
-    void flushYear() {
-      if (activeYear != null) {
-        result.add(TimeBucket(date: activeYear!, assetCount: activeCount));
-      }
-      activeYear = null;
-      activeCount = 0;
-    }
-
-    for (final bucket in buckets) {
-      if (bucket is! TimeBucket) {
-        flushYear();
-        result.add(bucket);
-        continue;
-      }
-
-      if (activeYear?.year != bucket.date.year) {
-        flushYear();
-        activeYear = DateTime(bucket.date.year);
-      }
-      activeCount += bucket.assetCount;
-    }
-    flushYear();
-    return result;
+    // Keep dense overview segments aligned with the repository's day buckets.
+    // A new asset then invalidates only its day instead of shifting every
+    // atlas panel that follows it in the year.
+    return buckets;
   }
 
   List<Segment> generate() {
@@ -73,7 +46,9 @@ class FixedSegmentBuilder extends SegmentBuilder {
       final segmentLastIndex = firstIndex - 1;
 
       final timelineHeader = yearOverview
-          ? HeaderType.year
+          ? bucket is TimeBucket && bucket.date.year != previousDate?.year
+                ? HeaderType.year
+                : HeaderType.none
           : switch (groupBy) {
               GroupAssetsBy.month => HeaderType.month,
               GroupAssetsBy.day || GroupAssetsBy.auto =>
@@ -99,6 +74,7 @@ class FixedSegmentBuilder extends SegmentBuilder {
           tileHeight: tileHeight,
           columnCount: columnCount,
           rowsPerChild: rowsPerChild,
+          denseOverview: yearOverview,
           headerExtent: headerExtent,
           spacing: spacing,
           header: timelineHeader,
