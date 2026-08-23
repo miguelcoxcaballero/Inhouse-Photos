@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/config/timeline_config.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/providers/app_settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
@@ -13,7 +14,9 @@ class LayoutSettings extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tilesPerRow = useState(ref.read(appConfigProvider.select((s) => s.timeline.tilesPerRow)));
+    final tilesPerRow = useState(
+      normalizeTimelineTilesPerRow(ref.read(appConfigProvider.select((s) => s.timeline.tilesPerRow))),
+    );
     useValueChanged<int, void>(tilesPerRow.value, (_, __) {
       ref.read(settingsProvider).write(.timelineTilesPerRow, tilesPerRow.value);
     });
@@ -29,8 +32,8 @@ class LayoutSettings extends HookConsumerWidget {
           valueNotifier: tilesPerRow,
           text: 'theme_setting_asset_list_tiles_per_row_title'.tr(namedArgs: {'count': "${tilesPerRow.value}"}),
           label: "${tilesPerRow.value}",
-          maxValue: 6,
-          minValue: 2,
+          maxValue: maxTimelineTilesPerRow.toDouble(),
+          minValue: minTimelineTilesPerRow.toDouble(),
           noDivisons: 4,
           onChangeEnd: (value) {
             ref.invalidate(appSettingsServiceProvider);

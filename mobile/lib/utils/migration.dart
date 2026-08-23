@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:collection/collection.dart';
 import 'package:drift/drift.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:immich_mobile/constants/colors.dart';
 import 'package:immich_mobile/constants/enums.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
+import 'package:immich_mobile/domain/models/config/timeline_config.dart';
 import 'package:immich_mobile/domain/models/log.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
@@ -19,8 +21,9 @@ import 'package:immich_mobile/infrastructure/repositories/network.repository.dar
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/models/auth/auxilary_endpoint.model.dart';
 import 'package:immich_mobile/providers/album/album_sort_by_options.provider.dart';
+import 'package:path_provider/path_provider.dart';
 
-const int targetVersion = 26;
+const int targetVersion = 27;
 
 Future<void> migrateDatabaseIfNeeded(Drift drift) async {
   final int? storedVersion = Store.tryGet(StoreKey.version);
@@ -34,12 +37,47 @@ Future<void> migrateDatabaseIfNeeded(Drift drift) async {
     await _migrateTo26(drift);
   }
 
+  if (version < 27) {
+    await _migrateTo27();
+  }
+
   if (storedVersion == null) {
     await FeatureMessageService(SettingsRepository.instance).markSeen();
   }
 
   await Store.put(StoreKey.version, targetVersion);
   return;
+}
+
+Future<void> _migrateTo27() async {
+  final settings = SettingsRepository.instance;
+  final savedColumns = settings.appConfig.timeline.tilesPerRow;
+  final normalizedColumns = normalizeTimelineTilesPerRow(savedColumns);
+  if (normalizedColumns != savedColumns) {
+    await settings.write(SettingsKey.timelineTilesPerRow, normalizedColumns);
+  }
+
+  // Do not delay first paint while removing cache files from the retired
+  // renderer. Nothing reads these directories anymore, so cleanup is safe in
+  // the background.
+  unawaited(_clearRemovedYearOverviewCache());
+}
+
+Future<void> _clearRemovedYearOverviewCache() async {
+  // These folders contain only generated contact sheets from the removed
+  // year-overview renderer. Clear them once so an upgrade cannot leave up to
+  // hundreds of megabytes of obsolete gallery cache behind.
+  try {
+    final support = await getApplicationSupportDirectory();
+    for (final name in const ['inhouse_year_panels_v3', 'inhouse_year_panels_v4']) {
+      final directory = Directory('${support.path}${Platform.pathSeparator}$name');
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    }
+  } catch (_) {
+    // Cache cleanup is best-effort and must never prevent the app from opening.
+  }
 }
 
 Future<void> _migrateTo25() async {

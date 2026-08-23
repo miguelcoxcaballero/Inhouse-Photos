@@ -7,10 +7,7 @@ import 'package:immich_mobile/presentation/widgets/images/thumb_hash_provider.da
 /// so that a single large image does not evict all small images
 final class CustomImageCache implements ImageCache {
   final _thumbhash = ImageCache()..maximumSize = 0;
-  // The 48-column year overview can show several thousand tiny decoded images
-  // at once. Keep them by count while the existing byte limit still prevents
-  // regular, larger thumbnails from consuming unbounded memory.
-  final _small = ImageCache()..maximumSize = 12000;
+  final _small = ImageCache();
   final _large = ImageCache()..maximumSize = 5; // Maximum 5 images
 
   @override

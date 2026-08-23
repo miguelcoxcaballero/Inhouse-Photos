@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/config/timeline_config.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
@@ -18,13 +19,11 @@ import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/download_status_floating_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/general_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
-import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/scrubber.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_drag_region.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_layout_transition.dart';
-import 'package:immich_mobile/presentation/widgets/timeline/timeline_zoom_transition.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -35,49 +34,18 @@ import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/selection_sliver_app_bar.dart';
 
 const double kTimelinePinchSensitivity = 1.25;
-const int kTimelineYearOverviewMinColumns = 12;
-
-bool isTimelineYearOverview({required int columnCount, GroupAssetsBy? groupBy}) =>
-    columnCount >= kTimelineYearOverviewMinColumns && groupBy != GroupAssetsBy.none;
-
-bool shouldAnimateTimelineColumnTransition({required int currentColumns, required int nextColumns}) =>
-    currentColumns < kTimelineYearOverviewMinColumns && nextColumns < kTimelineYearOverviewMinColumns;
-
-double timelineScrollCacheExtent({required double maxHeight, required bool yearOverview}) =>
-    yearOverview ? maxHeight * 0.5 : maxHeight;
 
 double timelineScaleFactorForColumnCount(int columnCount) => switch (columnCount) {
   <= 2 => 5.0,
   3 => 4.0,
   4 => 3.0,
   5 => 2.0,
-  6 => 1.0,
-  12 => 0.74,
-  18 => 0.62,
-  24 => 0.48,
-  36 => 0.34,
-  48 => 0.22,
-  _ => 0.22,
+  _ => 1.0,
 };
 
 int calculateTimelineColumnCount({required double scaleFactor, required double gestureStartScaleFactor}) {
   final sensitiveScaleFactor =
       gestureStartScaleFactor + ((scaleFactor - gestureStartScaleFactor) * kTimelinePinchSensitivity);
-  if (sensitiveScaleFactor < 0.27) {
-    return 48;
-  }
-  if (sensitiveScaleFactor < 0.40) {
-    return 36;
-  }
-  if (sensitiveScaleFactor < 0.56) {
-    return 24;
-  }
-  if (sensitiveScaleFactor < 0.68) {
-    return 18;
-  }
-  if (sensitiveScaleFactor < 0.88) {
-    return 12;
-  }
   return 7 - sensitiveScaleFactor.round().clamp(1, 5);
 }
 
@@ -119,7 +87,6 @@ class Timeline extends ConsumerStatefulWidget {
 
 class _TimelineState extends ConsumerState<Timeline> {
   int? _interactiveColumnCount;
-  final TimelineVisualReadySignal _visualReadySignal = TimelineVisualReadySignal();
 
   void _setInteractiveColumnCount(int value) {
     if (_interactiveColumnCount == value) {
@@ -141,8 +108,9 @@ class _TimelineState extends ConsumerState<Timeline> {
   @override
   Widget build(BuildContext context) {
     final savedColumnCount = ref.watch(appConfigProvider.select((config) => config.timeline.tilesPerRow));
-    final columnCount = _interactiveColumnCount ?? savedColumnCount;
-    final yearOverview = isTimelineYearOverview(columnCount: columnCount, groupBy: widget.groupBy);
+    // Older releases persisted 12-48 column overview levels. Clamp them on
+    // read so upgrading returns directly to the regular gallery renderer.
+    final columnCount = normalizeTimelineTilesPerRow(_interactiveColumnCount ?? savedColumnCount);
     return LayoutBuilder(
       builder: (_, constraints) {
         return ProviderScope(
@@ -153,15 +121,13 @@ class _TimelineState extends ConsumerState<Timeline> {
               TimelineArgs(
                 maxWidth: constraints.maxWidth,
                 maxHeight: constraints.maxHeight,
-                spacing: yearOverview ? 0 : kTimelineSpacing,
+                spacing: kTimelineSpacing,
                 columnCount: columnCount,
-                showStorageIndicator: !yearOverview && widget.showStorageIndicator,
+                showStorageIndicator: widget.showStorageIndicator,
                 withStack: widget.withStack,
                 groupBy: widget.groupBy,
-                yearOverview: yearOverview,
               ),
             ),
-            timelineVisualReadyProvider.overrideWithValue(_visualReadySignal),
             if (widget.readOnly) readonlyModeProvider.overrideWith(() => _AlwaysReadOnlyNotifier()),
           ],
           child: _SliverTimeline(
@@ -177,17 +143,10 @@ class _TimelineState extends ConsumerState<Timeline> {
             loadingWidget: widget.loadingWidget,
             onInteractiveColumnCountChanged: _setInteractiveColumnCount,
             onInteractiveColumnCountSettled: _persistColumnCount,
-            visualReadySignal: _visualReadySignal,
           ),
         );
       },
     );
-  }
-
-  @override
-  void dispose() {
-    _visualReadySignal.dispose();
-    super.dispose();
   }
 }
 
@@ -216,7 +175,6 @@ class _SliverTimeline extends ConsumerStatefulWidget {
     this.loadingWidget,
     required this.onInteractiveColumnCountChanged,
     required this.onInteractiveColumnCountSettled,
-    required this.visualReadySignal,
   });
 
   final Widget? topSliverWidget;
@@ -231,14 +189,13 @@ class _SliverTimeline extends ConsumerStatefulWidget {
   final Widget? loadingWidget;
   final ValueChanged<int> onInteractiveColumnCountChanged;
   final ValueChanged<int> onInteractiveColumnCountSettled;
-  final TimelineVisualReadySignal visualReadySignal;
 
   @override
   ConsumerState createState() => _SliverTimelineState();
 }
 
 class _SliverTimelineState extends ConsumerState<_SliverTimeline>
-    with WidgetsBindingObserver, TickerProviderStateMixin {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   late final ScrollController _scrollController;
   StreamSubscription? _eventSubscription;
 
@@ -255,15 +212,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   int? _restoreAssetIndex;
   int _renderedPerRow = 4;
   late final AnimationController _layoutTransitionController;
-  final GlobalKey<TimelineRetainedSwitcherState> _retainedSwitcherKey = GlobalKey();
-  ScrollController? _retainedScrollController;
-  int? _retainedSourcePerRow;
-  int? _retainedTransitionTarget;
-  int _retainedLayoutVersion = 0;
-  int _retainedTransitionGeneration = 0;
-  bool _incomingLayoutReady = true;
-  bool _incomingPositionReady = true;
-  Timer? _visualReadyFallbackTimer;
   Map<Object, Rect> _previousTileRects = const {};
   int _layoutTransitionGeneration = 0;
   final Set<ScrollPosition> _attachedScrollPositions = {};
@@ -273,19 +221,17 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    setDenseTimelineAppVisible(true);
     _scrollController = ScrollController(onAttach: _onScrollAttach, onDetach: _onScrollDetach);
     _layoutTransitionController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 190),
       value: 1,
     );
-    widget.visualReadySignal.addListener(_onTimelineVisualReady);
     _eventSubscription = EventStream.shared.listen(_onEvent);
 
     final currentTilesPerRow = ref.read(appConfigProvider.select((config) => config.timeline.tilesPerRow));
-    _perRow = currentTilesPerRow;
-    _renderedPerRow = currentTilesPerRow;
+    _perRow = normalizeTimelineTilesPerRow(currentTilesPerRow);
+    _renderedPerRow = _perRow;
     _scaleFactor = timelineScaleFactorForColumnCount(_perRow);
     _baseScaleFactor = _scaleFactor;
 
@@ -345,8 +291,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
         if (rect.overlaps(visibleBounds)) {
           rects[tile.assetKey] = rect;
         }
-      } else if (renderObject case RenderTimelineDenseAssetLayoutMarker denseMarker) {
-        denseMarker.collectVisibleAssetRects(visibleBounds, rects);
       }
       renderObject.visitChildren(visit);
     }
@@ -355,12 +299,12 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     return rects;
   }
 
-  bool _prepareLayoutTransition({bool startAutomatically = true}) {
+  void _prepareLayoutTransition() {
     final rects = _captureVisibleTileRects();
     if (rects.isEmpty) {
       _layoutTransitionController.value = 1;
       _previousTileRects = const {};
-      return false;
+      return;
     }
 
     _layoutTransitionController.stop();
@@ -368,17 +312,14 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     final generation = ++_layoutTransitionGeneration;
     setState(() => _previousTileRects = Map.unmodifiable(rects));
 
-    if (startAutomatically) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _startLayoutTransition(generation);
-        });
+        _startLayoutTransition(generation);
       });
-    }
-    return true;
+    });
   }
 
-  void _startLayoutTransition(int generation, {VoidCallback? onComplete}) {
+  void _startLayoutTransition(int generation) {
     if (!mounted || generation != _layoutTransitionGeneration) {
       return;
     }
@@ -387,7 +328,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
       if (_previousTileRects.isNotEmpty) {
         setState(() => _previousTileRects = const {});
       }
-      onComplete?.call();
       return;
     }
 
@@ -396,7 +336,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
         return;
       }
       setState(() => _previousTileRects = const {});
-      onComplete?.call();
     });
   }
 
@@ -410,55 +349,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     }
   }
 
-  bool _isDenseZoomTransition({required int currentColumns, required int nextColumns}) =>
-      currentColumns >= kTimelineYearOverviewMinColumns || nextColumns >= kTimelineYearOverviewMinColumns;
-
-  void _onTimelineVisualReady() {
-    final target = _retainedTransitionTarget;
-    if (target != null &&
-        _incomingPositionReady &&
-        widget.visualReadySignal.columnCount == target &&
-        _hasVisibleTargetContent(target)) {
-      _markIncomingLayoutReady();
-    }
-  }
-
-  bool _hasVisibleTargetContent(int targetColumns) {
-    final root = context.findRenderObject();
-    if (root == null || !root.attached) {
-      return false;
-    }
-    final visibleBounds = Offset.zero & MediaQuery.sizeOf(context);
-    var found = false;
-
-    void visit(RenderObject renderObject) {
-      if (found) {
-        return;
-      }
-      if (renderObject case RenderTimelineVisualReadyMarker marker
-          when marker.attached &&
-              marker.hasSize &&
-              marker.ready &&
-              marker.columnCount == targetColumns &&
-              marker.globalRect.overlaps(visibleBounds)) {
-        found = true;
-        return;
-      }
-      renderObject.visitChildren(visit);
-    }
-
-    root.visitChildren(visit);
-    return found;
-  }
-
-  void _markIncomingLayoutReady() {
-    if (!mounted || _incomingLayoutReady || _retainedTransitionTarget == null) {
-      return;
-    }
-    _visualReadyFallbackTimer?.cancel();
-    setState(() => _incomingLayoutReady = true);
-  }
-
   void _commitColumnCount(int targetColumns, int? targetAssetIndex) {
     _perRow = targetColumns;
     _restoreAssetIndex = targetAssetIndex;
@@ -466,79 +356,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     widget.onInteractiveColumnCountSettled(targetColumns);
   }
 
-  void _beginRetainedColumnTransition({required int targetColumns, required int? targetAssetIndex}) {
-    _retainedSwitcherKey.currentState?.finishImmediately();
-    _visualReadyFallbackTimer?.cancel();
-
-    final sourceColumns = _perRow;
-    final offset = _scrollController.hasClients ? _scrollController.offset : 0.0;
-    final retainedController = ScrollController(initialScrollOffset: offset, keepScrollOffset: false);
-    final generation = ++_retainedTransitionGeneration;
-    setState(() {
-      _retainedScrollController = retainedController;
-      _retainedSourcePerRow = sourceColumns;
-      _retainedTransitionTarget = targetColumns;
-      _incomingLayoutReady = false;
-      _incomingPositionReady = false;
-    });
-
-    // First move the existing scroll view to its own controller. On the next
-    // frame the target can attach to the primary controller while Flutter keeps
-    // the old render subtree alive above it.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || generation != _retainedTransitionGeneration) {
-        retainedController.dispose();
-        return;
-      }
-      setState(() => _retainedLayoutVersion++);
-      _commitColumnCount(targetColumns, targetAssetIndex);
-
-      _visualReadyFallbackTimer = Timer(const Duration(milliseconds: 1400), _markIncomingLayoutReady);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted || generation != _retainedTransitionGeneration) {
-              return;
-            }
-            _incomingPositionReady = true;
-            final targetSegments = ref.read(timelineSegmentProvider).valueOrNull;
-            final isEmpty = targetSegments?.every((segment) => segment.bucket.assetCount == 0) ?? false;
-            if (targetColumns < kTimelineYearOverviewMinColumns || isEmpty || _hasVisibleTargetContent(targetColumns)) {
-              _markIncomingLayoutReady();
-            }
-          });
-        });
-      });
-    });
-  }
-
-  void _onRetainedTransitionComplete() {
-    final retainedController = _retainedScrollController;
-    if (retainedController == null) {
-      return;
-    }
-    _visualReadyFallbackTimer?.cancel();
-    setState(() {
-      _retainedScrollController = null;
-      _retainedSourcePerRow = null;
-      _retainedTransitionTarget = null;
-      _incomingLayoutReady = true;
-      _incomingPositionReady = true;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) => retainedController.dispose());
-    _startLayoutTransition(
-      _layoutTransitionGeneration,
-      onComplete: () => ref.read(timelineStateProvider.notifier).setZooming(false),
-    );
-  }
-
   @override
   void didUpdateWidget(covariant _SliverTimeline oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.visualReadySignal != widget.visualReadySignal) {
-      oldWidget.visualReadySignal.removeListener(_onTimelineVisualReady);
-      widget.visualReadySignal.addListener(_onTimelineVisualReady);
-    }
     if (widget.maxWidth != oldWidget.maxWidth) {
       // The updated args already regenerate the segments, only remember the scroll position to restore it afterwards
       final segments = ref.read(timelineSegmentProvider).valueOrNull;
@@ -557,26 +377,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     final routeData = context.findAncestorWidgetOfExactType<RouteDataScope>()?.routeData;
     if (ModalRoute.of(context)?.isCurrent == true && routeData?.isActive == true) {
       _scrollToTop();
-    }
-  }
-
-  @override
-  void didHaveMemoryPressure() {
-    releaseDenseTimelineMemory();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    switch (state) {
-      case AppLifecycleState.resumed:
-        setDenseTimelineAppVisible(true);
-      case AppLifecycleState.paused || AppLifecycleState.hidden || AppLifecycleState.detached:
-        setDenseTimelineAppVisible(false);
-      case AppLifecycleState.inactive:
-        // A notification shade or permission sheet can make Android briefly
-        // inactive. Keep the foreground state unchanged until the app genuinely
-        // backgrounds rather than starting a PNG encode during that short gap.
-        break;
     }
   }
 
@@ -607,8 +407,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
       if (targetSegment != null) {
         final assetIndexInSegment = _restoreAssetIndex! - targetSegment.firstAssetIndex;
         final newColumnCount = ref.read(timelineArgsProvider).columnCount;
-        final rowsPerChild = targetSegment is FixedSegment ? targetSegment.rowsPerChild : 1;
-        final childIndexInSegment = (assetIndexInSegment / (newColumnCount * rowsPerChild)).floor();
+        final childIndexInSegment = (assetIndexInSegment / newColumnCount).floor();
         final targetChildIndex = targetSegment.firstIndex + 1 + childIndexInSegment;
         final targetOffset = targetSegment.indexToLayoutOffset(targetChildIndex);
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -634,8 +433,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
       if (rowIndex > segment.firstIndex) {
         final childIndexInSegment = rowIndex - (segment.firstIndex + 1);
         final assetsPerRow = ref.read(timelineArgsProvider).columnCount;
-        final rowsPerChild = segment is FixedSegment ? segment.rowsPerChild : 1;
-        final assetIndexInSegment = childIndexInSegment * assetsPerRow * rowsPerChild;
+        final assetIndexInSegment = childIndexInSegment * assetsPerRow;
         targetAssetIndex = segment.firstAssetIndex + assetIndexInSegment;
       } else {
         targetAssetIndex = segment.firstAssetIndex;
@@ -648,10 +446,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _scrollIdleTimer?.cancel();
-    _visualReadyFallbackTimer?.cancel();
-    _retainedTransitionGeneration++;
-    widget.visualReadySignal.removeListener(_onTimelineVisualReady);
-    _retainedScrollController?.dispose();
     for (final position in _attachedScrollPositions.toList()) {
       position.isScrollingNotifier.removeListener(_onScrollActivityChanged);
     }
@@ -814,8 +608,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   Widget build(BuildContext context) {
     final asyncSegments = ref.watch(timelineSegmentProvider);
     final maxHeight = ref.watch(timelineArgsProvider.select((args) => args.maxHeight));
-    final yearOverview = ref.watch(timelineArgsProvider.select((args) => args.yearOverview));
-    final renderedColumnCount = ref.watch(timelineArgsProvider.select((args) => args.columnCount));
     final isSelectionMode = ref.watch(multiSelectProvider.select((s) => s.forceEnable));
     final isMultiSelectEnabled = ref.watch(multiSelectProvider.select((s) => s.isEnabled));
     final isReadonlyModeEnabled = ref.watch(readonlyModeProvider);
@@ -852,16 +644,13 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                   context.padding.bottom + (isMultiSelectEnabled ? bottomSheetOpenModifier : 0);
               final scrubberBottomPadding = contentBottomPadding + kScrubberThumbHeight;
 
-              final useRetainedController =
-                  _retainedScrollController != null && _retainedSourcePerRow == renderedColumnCount;
               final grid = CustomScrollView(
-                controller: useRetainedController ? _retainedScrollController : null,
-                primary: !useRetainedController,
+                primary: true,
                 physics: _scrollPhysics,
                 // One viewport is enough to keep the next rows ready without
                 // decoding and compositing several screens of thumbnails while
                 // the user is actively scrolling.
-                scrollCacheExtent: .pixels(timelineScrollCacheExtent(maxHeight: maxHeight, yearOverview: yearOverview)),
+                scrollCacheExtent: .pixels(maxHeight),
                 slivers: [
                   if (isSelectionMode) const SelectionSliverAppBar() else if (widget.appBar != null) widget.appBar!,
                   if (widget.topSliverWidget != null) widget.topSliverWidget!,
@@ -896,7 +685,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                   bottomPadding: scrubberBottomPadding,
                   monthSegmentSnappingOffset: widget.topSliverWidgetHeight ?? 0 + appBarExpandedHeight,
                   hasAppBar: widget.appBar != null,
-                  yearOverview: yearOverview,
                   child: grid,
                 );
               } else {
@@ -909,9 +697,6 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                     () => CustomScaleGestureRecognizer(),
                     (CustomScaleGestureRecognizer scale) {
                       scale.onStart = (details) {
-                        if (_retainedTransitionTarget != null) {
-                          _retainedSwitcherKey.currentState?.finishImmediately();
-                        }
                         _finishLayoutTransitionImmediately();
                         _baseScaleFactor = _scaleFactor;
                         _pendingPerRow = _perRow;
@@ -919,7 +704,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                       };
 
                       scale.onUpdate = (details) {
-                        final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 0.15);
+                        final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 1.0);
                         final newPerRow = calculateTimelineColumnCount(
                           scaleFactor: newScaleFactor,
                           gestureStartScaleFactor: _baseScaleFactor,
@@ -938,27 +723,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                         }
 
                         final targetAssetIndex = _getCurrentAssetIndex(segments);
-                        if (shouldAnimateTimelineColumnTransition(
-                          currentColumns: _perRow,
-                          nextColumns: targetColumns,
-                        )) {
-                          _prepareLayoutTransition();
-                          _commitColumnCount(targetColumns, targetAssetIndex);
-                          ref.read(timelineStateProvider.notifier).setZooming(false);
-                        } else if (_isDenseZoomTransition(currentColumns: _perRow, nextColumns: targetColumns)) {
-                          _prepareLayoutTransition(startAutomatically: false);
-                          _beginRetainedColumnTransition(
-                            targetColumns: targetColumns,
-                            targetAssetIndex: targetAssetIndex,
-                          );
-                        } else {
-                          _layoutTransitionController
-                            ..stop()
-                            ..value = 1;
-                          _previousTileRects = const {};
-                          _commitColumnCount(targetColumns, targetAssetIndex);
-                          ref.read(timelineStateProvider.notifier).setZooming(false);
-                        }
+                        _prepareLayoutTransition();
+                        _commitColumnCount(targetColumns, targetAssetIndex);
+                        ref.read(timelineStateProvider.notifier).setZooming(false);
                       };
                     },
                   ),
@@ -975,17 +742,10 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      TimelineRetainedSwitcher(
-                        key: _retainedSwitcherKey,
-                        layoutKey: _retainedLayoutVersion,
-                        ready: _incomingLayoutReady,
-                        animateReveal: false,
-                        onTransitionComplete: _onRetainedTransitionComplete,
-                        child: TimelineLayoutTransitionScope(
-                          animation: _layoutTransitionController,
-                          previousRects: _previousTileRects,
-                          child: timeline,
-                        ),
+                      TimelineLayoutTransitionScope(
+                        animation: _layoutTransitionController,
+                        previousRects: _previousTileRects,
+                        child: timeline,
                       ),
                       if (isBottomWidgetVisible)
                         Positioned(

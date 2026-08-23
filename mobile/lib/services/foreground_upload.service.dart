@@ -93,7 +93,9 @@ class _BoundedAsyncQueue<T> {
       _writers.add(writer);
       await writer.future;
     }
-    if (_closed) return false;
+    if (_closed) {
+      return false;
+    }
 
     if (_readers.isNotEmpty) {
       _readers.removeFirst().complete(item);
@@ -106,17 +108,23 @@ class _BoundedAsyncQueue<T> {
   Future<T?> take() {
     if (_items.isNotEmpty) {
       final item = _items.removeFirst();
-      if (_writers.isNotEmpty) _writers.removeFirst().complete();
+      if (_writers.isNotEmpty) {
+        _writers.removeFirst().complete();
+      }
       return Future<T?>.value(item);
     }
-    if (_closed) return Future<T?>.value();
+    if (_closed) {
+      return Future<T?>.value();
+    }
     final reader = Completer<T?>();
     _readers.add(reader);
     return reader.future;
   }
 
   void close() {
-    if (_closed) return;
+    if (_closed) {
+      return;
+    }
     _closed = true;
     while (_writers.isNotEmpty) {
       _writers.removeFirst().complete();
@@ -221,7 +229,10 @@ class ForegroundUploadService {
     // Wake producers blocked on a full preparation queue. Existing uploads are
     // allowed to receive their cancellation signal and every temporary file is
     // still cleaned up by its owning worker.
-    cancelToken?.future.whenComplete(prepared.close);
+    final cancellation = cancelToken?.future;
+    if (cancellation != null) {
+      unawaited(cancellation.whenComplete(prepared.close));
+    }
 
     LocalAsset? nextAsset() {
       if (shouldAbortUpload || (cancelToken?.isCompleted ?? false) || currentIndex >= items.length) {
@@ -233,11 +244,17 @@ class ForegroundUploadService {
     Future<void> prepareWorker() async {
       while (true) {
         final asset = nextAsset();
-        if (asset == null) return;
-        if (shouldSkip(asset)) continue;
+        if (asset == null) {
+          return;
+        }
+        if (shouldSkip(asset)) {
+          continue;
+        }
 
         final item = await _prepareAsset(asset, callbacks: callbacks);
-        if (item == null) continue;
+        if (item == null) {
+          continue;
+        }
         if (!await prepared.add(item)) {
           await _cleanupPreparedAsset(item);
           return;
@@ -248,7 +265,9 @@ class ForegroundUploadService {
     Future<void> uploadWorker() async {
       while (true) {
         final item = await prepared.take();
-        if (item == null) return;
+        if (item == null) {
+          return;
+        }
         if (shouldAbortUpload || (cancelToken?.isCompleted ?? false)) {
           await _cleanupPreparedAsset(item);
           continue;
@@ -268,7 +287,9 @@ class ForegroundUploadService {
     Future<void> acknowledgementWorker() async {
       while (true) {
         final acknowledgement = await acknowledgements.take();
-        if (acknowledgement == null) return;
+        if (acknowledgement == null) {
+          return;
+        }
         try {
           final onSuccess = callbacks.onSuccess;
           if (onSuccess != null) {
@@ -429,7 +450,9 @@ class ForegroundUploadService {
     required UploadCallbacks callbacks,
   }) async {
     final item = await _prepareAsset(asset, callbacks: callbacks);
-    if (item == null) return;
+    if (item == null) {
+      return;
+    }
 
     try {
       final acknowledgement = await _uploadPreparedAsset(item, cancelToken, callbacks: callbacks);
@@ -624,7 +647,9 @@ class ForegroundUploadService {
         }
       }
 
-      if (livePhotoVideoId != null) fields['livePhotoVideoId'] = livePhotoVideoId;
+      if (livePhotoVideoId != null) {
+        fields['livePhotoVideoId'] = livePhotoVideoId;
+      }
 
       final result = await _uploadRepository.uploadFile(
         file: item.file,
@@ -649,7 +674,9 @@ class ForegroundUploadService {
               'Error(${result.statusCode}) uploading ${asset.localId} | ${item.originalFileName} | Created on ${asset.createdAt} | ${result.errorMessage}',
         );
         callbacks.onError?.call(asset.localId!, result.errorMessage!);
-        if (result.errorMessage == 'Quota has been exceeded!') shouldAbortUpload = true;
+        if (result.errorMessage == 'Quota has been exceeded!') {
+          shouldAbortUpload = true;
+        }
       }
     } catch (error, stackTrace) {
       _logger.severe(() => 'Error uploading prepared asset: $error', stackTrace);

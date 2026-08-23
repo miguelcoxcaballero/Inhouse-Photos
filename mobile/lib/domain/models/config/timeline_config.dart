@@ -1,5 +1,18 @@
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 
+const int minTimelineTilesPerRow = 2;
+const int maxTimelineTilesPerRow = 6;
+
+int normalizeTimelineTilesPerRow(int value) {
+  if (value < minTimelineTilesPerRow) {
+    return minTimelineTilesPerRow;
+  }
+  if (value > maxTimelineTilesPerRow) {
+    return maxTimelineTilesPerRow;
+  }
+  return value;
+}
+
 class TimelineConfig {
   final int tilesPerRow;
   final GroupAssetsBy groupAssetsBy;

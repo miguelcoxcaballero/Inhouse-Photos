@@ -5,7 +5,6 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment_builder.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
-import 'package:immich_mobile/presentation/widgets/timeline/timeline_zoom_transition.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 
@@ -17,7 +16,6 @@ class TimelineArgs {
   final bool showStorageIndicator;
   final bool withStack;
   final GroupAssetsBy? groupBy;
-  final bool yearOverview;
 
   const TimelineArgs({
     required this.maxWidth,
@@ -27,7 +25,6 @@ class TimelineArgs {
     this.showStorageIndicator = false,
     this.withStack = false,
     this.groupBy,
-    this.yearOverview = false,
   });
 
   @override
@@ -38,8 +35,7 @@ class TimelineArgs {
         columnCount == other.columnCount &&
         showStorageIndicator == other.showStorageIndicator &&
         withStack == other.withStack &&
-        groupBy == other.groupBy &&
-        yearOverview == other.yearOverview;
+        groupBy == other.groupBy;
   }
 
   @override
@@ -50,8 +46,7 @@ class TimelineArgs {
       columnCount.hashCode ^
       showStorageIndicator.hashCode ^
       withStack.hashCode ^
-      groupBy.hashCode ^
-      yearOverview.hashCode;
+      groupBy.hashCode;
 }
 
 class TimelineState {
@@ -117,10 +112,8 @@ final timelineBucketProvider = StreamProvider.autoDispose<List<Bucket>>(
 // It should be used only after the timeline service and timeline args provider are overridden.
 final timelineSegmentProvider = Provider.autoDispose<AsyncValue<List<Segment>>>((ref) {
   // maxHeight is left out on purpose, a height-only change must not relayout the segments
-  final (maxWidth, columnCount, spacing, groupByArg, yearOverview) = ref.watch(
-    timelineArgsProvider.select(
-      (args) => (args.maxWidth, args.columnCount, args.spacing, args.groupBy, args.yearOverview),
-    ),
+  final (maxWidth, columnCount, spacing, groupByArg) = ref.watch(
+    timelineArgsProvider.select((args) => (args.maxWidth, args.columnCount, args.spacing, args.groupBy)),
   );
   final availableTileWidth = maxWidth - (spacing * (columnCount - 1));
   final tileExtent = math.max(0, availableTileWidth) / columnCount;
@@ -133,15 +126,8 @@ final timelineSegmentProvider = Provider.autoDispose<AsyncValue<List<Segment>>>(
       columnCount: columnCount,
       spacing: spacing,
       groupBy: groupBy!,
-      yearOverview: yearOverview,
     ).generate();
   });
 }, dependencies: [timelineBucketProvider, timelineArgsProvider]);
 
 final timelineStateProvider = NotifierProvider<TimelineStateNotifier, TimelineState>(TimelineStateNotifier.new);
-
-final timelineVisualReadyProvider = Provider.autoDispose<TimelineVisualReadySignal>((ref) {
-  final signal = TimelineVisualReadySignal();
-  ref.onDispose(signal.dispose);
-  return signal;
-});

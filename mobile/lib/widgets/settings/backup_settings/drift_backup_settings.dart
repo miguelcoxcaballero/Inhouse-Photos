@@ -118,12 +118,16 @@ class _BackupSpeedSheet extends ConsumerWidget {
           RadioGroup<BackupSpeedMode>(
             groupValue: selected,
             onChanged: (value) async {
-              if (value == null) return;
+              if (value == null) {
+                return;
+              }
               await ref.read(settingsProvider).write(SettingsKey.backupSpeed, value);
-              if (context.mounted) Navigator.pop(context);
+              if (context.mounted) {
+                Navigator.pop(context);
+              }
             },
-            child: Column(
-              children: const [
+            child: const Column(
+              children: [
                 _BackupSpeedOption(
                   value: BackupSpeedMode.balanced,
                   title: 'Balanced',

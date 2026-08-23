@@ -33,8 +33,6 @@ class Scrubber extends ConsumerStatefulWidget {
 
   final bool snapToMonth;
 
-  final bool yearOverview;
-
   /// Whether an app bar is present, affects coordinate calculations
   final bool hasAppBar;
 
@@ -47,7 +45,6 @@ class Scrubber extends ConsumerStatefulWidget {
     this.bottomPadding = 0,
     this.monthSegmentSnappingOffset,
     this.snapToMonth = true,
-    this.yearOverview = false,
     this.hasAppBar = true,
     required this.child,
   }) : assert(child.scrollDirection == Axis.vertical);
@@ -56,11 +53,7 @@ class Scrubber extends ConsumerStatefulWidget {
   ConsumerState createState() => ScrubberState();
 }
 
-List<_Segment> _buildSegments({
-  required List<Segment> layoutSegments,
-  required double timelineHeight,
-  bool yearOverview = false,
-}) {
+List<_Segment> _buildSegments({required List<Segment> layoutSegments, required double timelineHeight}) {
   const double offsetThreshold = 40.0;
 
   final segments = <_Segment>[];
@@ -68,7 +61,7 @@ List<_Segment> _buildSegments({
     return [];
   }
 
-  final formatter = yearOverview ? DateFormat.y() : DateFormat.yMMM();
+  final formatter = DateFormat.yMMM();
   DateTime? lastDate;
   double lastOffset = -offsetThreshold;
   for (final layoutSegment in layoutSegments) {
@@ -122,11 +115,7 @@ class ScrubberState extends ConsumerState<Scrubber> with TickerProviderStateMixi
   void initState() {
     super.initState();
     _isDragging = false;
-    _segments = _buildSegments(
-      layoutSegments: widget.layoutSegments,
-      timelineHeight: _scrubberHeight,
-      yearOverview: widget.yearOverview,
-    );
+    _segments = _buildSegments(layoutSegments: widget.layoutSegments, timelineHeight: _scrubberHeight);
     _thumbAnimationController = AnimationController(vsync: this, duration: kTimelineScrubberFadeInDuration);
     _thumbAnimation = CurvedAnimation(parent: _thumbAnimationController, curve: Curves.fastEaseInToSlowEaseOut);
     _labelAnimationController = AnimationController(vsync: this, duration: kTimelineScrubberFadeInDuration);
@@ -145,13 +134,8 @@ class ScrubberState extends ConsumerState<Scrubber> with TickerProviderStateMixi
   void didUpdateWidget(covariant Scrubber oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.layoutSegments.lastOrNull?.endOffset != widget.layoutSegments.lastOrNull?.endOffset ||
-        oldWidget.yearOverview != widget.yearOverview) {
-      _segments = _buildSegments(
-        layoutSegments: widget.layoutSegments,
-        timelineHeight: _scrubberHeight,
-        yearOverview: widget.yearOverview,
-      );
+    if (oldWidget.layoutSegments.lastOrNull?.endOffset != widget.layoutSegments.lastOrNull?.endOffset) {
+      _segments = _buildSegments(layoutSegments: widget.layoutSegments, timelineHeight: _scrubberHeight);
       _monthCount = getMonthCount();
     }
   }

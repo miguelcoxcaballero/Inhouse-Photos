@@ -100,7 +100,9 @@ class UploadRepository {
     const retryDelays = [Duration(seconds: 2), Duration(seconds: 5), Duration(seconds: 15), Duration(seconds: 45)];
 
     for (var attempt = 0; attempt <= retryDelays.length; attempt++) {
-      if (cancelToken?.isCompleted ?? false) return UploadResult.cancelled();
+      if (cancelToken?.isCompleted ?? false) {
+        return UploadResult.cancelled();
+      }
 
       final result = await _uploadFileOnce(
         file: file,
@@ -111,7 +113,9 @@ class UploadRepository {
         logContext: '$logContext#$attempt',
       );
       lastResult = result;
-      if (!_shouldRetry(result) || attempt == retryDelays.length) return result;
+      if (!_shouldRetry(result) || attempt == retryDelays.length) {
+        return result;
+      }
 
       logger.warning('Transient upload failure for $logContext; retrying in ${retryDelays[attempt].inSeconds}s');
       final cancellation = cancelToken?.future;
@@ -125,7 +129,9 @@ class UploadRepository {
   }
 
   bool _shouldRetry(UploadResult result) {
-    if (result.isSuccess || result.isCancelled) return false;
+    if (result.isSuccess || result.isCancelled) {
+      return false;
+    }
     final status = result.statusCode;
     // Network errors do not have an HTTP status. Retry only responses that are
     // normally transient; validation and quota failures must surface at once.

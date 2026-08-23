@@ -73,9 +73,7 @@ class RemoteImagesImpl(context: Context) : RemoteImageApi {
 
     // Shared, process-lifetime pool: RemoteImagesImpl is re-created per FlutterEngine, so a
     // per-instance pool would leak threads across engine restarts.
-    private val decodeExecutor = Executors.newFixedThreadPool(
-      Runtime.getRuntime().availableProcessors().coerceIn(4, 6)
-    )
+    private val decodeExecutor = Executors.newFixedThreadPool(2)
   }
 
   override fun requestImage(
