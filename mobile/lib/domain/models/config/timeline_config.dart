@@ -1,16 +1,22 @@
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 
 const int minTimelineTilesPerRow = 2;
-const int maxTimelineTilesPerRow = 6;
+const int maxTimelineTilesPerRow = 48;
+const List<int> timelineTilesPerRowSteps = [2, 3, 4, 5, 6, 12, 18, 24, 36, 48];
+
+int timelineTilesPerRowStepIndex(int value) => timelineTilesPerRowSteps.indexOf(normalizeTimelineTilesPerRow(value));
 
 int normalizeTimelineTilesPerRow(int value) {
-  if (value < minTimelineTilesPerRow) {
-    return minTimelineTilesPerRow;
+  var nearest = timelineTilesPerRowSteps.first;
+  var distance = (value - nearest).abs();
+  for (final candidate in timelineTilesPerRowSteps.skip(1)) {
+    final candidateDistance = (value - candidate).abs();
+    if (candidateDistance < distance) {
+      nearest = candidate;
+      distance = candidateDistance;
+    }
   }
-  if (value > maxTimelineTilesPerRow) {
-    return maxTimelineTilesPerRow;
-  }
-  return value;
+  return nearest;
 }
 
 class TimelineConfig {

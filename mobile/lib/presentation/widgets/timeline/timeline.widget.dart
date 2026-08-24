@@ -19,6 +19,7 @@ import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/download_status_floating_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/general_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/scrubber.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
@@ -40,14 +41,36 @@ double timelineScaleFactorForColumnCount(int columnCount) => switch (columnCount
   3 => 4.0,
   4 => 3.0,
   5 => 2.0,
-  _ => 1.0,
+  6 => 1.0,
+  12 => 0.74,
+  18 => 0.62,
+  24 => 0.48,
+  36 => 0.34,
+  _ => 0.22,
 };
 
 int calculateTimelineColumnCount({required double scaleFactor, required double gestureStartScaleFactor}) {
   final sensitiveScaleFactor =
       gestureStartScaleFactor + ((scaleFactor - gestureStartScaleFactor) * kTimelinePinchSensitivity);
+  if (sensitiveScaleFactor < 0.27) {
+    return 48;
+  }
+  if (sensitiveScaleFactor < 0.40) {
+    return 36;
+  }
+  if (sensitiveScaleFactor < 0.56) {
+    return 24;
+  }
+  if (sensitiveScaleFactor < 0.68) {
+    return 18;
+  }
+  if (sensitiveScaleFactor < 0.88) {
+    return 12;
+  }
   return 7 - sensitiveScaleFactor.round().clamp(1, 5);
 }
+
+bool usesBatchedTimelineGrid(int columnCount) => columnCount > 6;
 
 class Timeline extends ConsumerStatefulWidget {
   const Timeline({
@@ -108,9 +131,8 @@ class _TimelineState extends ConsumerState<Timeline> {
   @override
   Widget build(BuildContext context) {
     final savedColumnCount = ref.watch(appConfigProvider.select((config) => config.timeline.tilesPerRow));
-    // Older releases persisted 12-48 column overview levels. Clamp them on
-    // read so upgrading returns directly to the regular gallery renderer.
     final columnCount = normalizeTimelineTilesPerRow(_interactiveColumnCount ?? savedColumnCount);
+    final batchedGrid = usesBatchedTimelineGrid(columnCount);
     return LayoutBuilder(
       builder: (_, constraints) {
         return ProviderScope(
@@ -121,9 +143,9 @@ class _TimelineState extends ConsumerState<Timeline> {
               TimelineArgs(
                 maxWidth: constraints.maxWidth,
                 maxHeight: constraints.maxHeight,
-                spacing: kTimelineSpacing,
+                spacing: batchedGrid ? 0 : kTimelineSpacing,
                 columnCount: columnCount,
-                showStorageIndicator: widget.showStorageIndicator,
+                showStorageIndicator: !batchedGrid && widget.showStorageIndicator,
                 withStack: widget.withStack,
                 groupBy: widget.groupBy,
               ),
@@ -221,10 +243,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    setDenseTimelineAppVisible(true);
     _scrollController = ScrollController(onAttach: _onScrollAttach, onDetach: _onScrollDetach);
     _layoutTransitionController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 190),
+      duration: const Duration(milliseconds: 210),
       value: 1,
     );
     _eventSubscription = EventStream.shared.listen(_onEvent);
@@ -291,6 +314,8 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
         if (rect.overlaps(visibleBounds)) {
           rects[tile.assetKey] = rect;
         }
+      } else if (renderObject case RenderTimelineDenseAssetLayoutMarker marker) {
+        marker.collectVisibleAssetRects(visibleBounds, rects);
       }
       renderObject.visitChildren(visit);
     }
@@ -312,11 +337,10 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     final generation = ++_layoutTransitionGeneration;
     setState(() => _previousTileRects = Map.unmodifiable(rects));
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _startLayoutTransition(generation);
-      });
-    });
+    // Parent and scoped-provider updates are committed in the same frame.
+    // Starting after one layout pass avoids the dead frame that made pinch
+    // reflow feel delayed while still capturing the new tile geometry.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startLayoutTransition(generation));
   }
 
   void _startLayoutTransition(int generation) {
@@ -380,6 +404,23 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     }
   }
 
+  @override
+  void didHaveMemoryPressure() {
+    releaseDenseTimelineMemory();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        setDenseTimelineAppVisible(true);
+      case AppLifecycleState.paused || AppLifecycleState.hidden || AppLifecycleState.detached:
+        setDenseTimelineAppVisible(false);
+      case AppLifecycleState.inactive:
+        break;
+    }
+  }
+
   void _onEvent(Event event) {
     switch (event) {
       case ScrollToTopEvent():
@@ -407,9 +448,10 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
       if (targetSegment != null) {
         final assetIndexInSegment = _restoreAssetIndex! - targetSegment.firstAssetIndex;
         final newColumnCount = ref.read(timelineArgsProvider).columnCount;
-        final childIndexInSegment = (assetIndexInSegment / newColumnCount).floor();
-        final targetChildIndex = targetSegment.firstIndex + 1 + childIndexInSegment;
-        final targetOffset = targetSegment.indexToLayoutOffset(targetChildIndex);
+        final targetOffset = targetSegment is FixedSegment
+            ? targetSegment.gridOffset +
+                  ((assetIndexInSegment ~/ newColumnCount) * (targetSegment.tileHeight + targetSegment.spacing))
+            : targetSegment.indexToLayoutOffset(targetSegment.firstIndex + 1);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             _scrollController.jumpTo(targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent));
@@ -429,12 +471,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     final segment = segments.findByOffset(currentOffset) ?? segments.lastOrNull;
     int? targetAssetIndex;
     if (segment != null) {
-      final rowIndex = segment.getMinChildIndexForScrollOffset(currentOffset);
-      if (rowIndex > segment.firstIndex) {
-        final childIndexInSegment = rowIndex - (segment.firstIndex + 1);
-        final assetsPerRow = ref.read(timelineArgsProvider).columnCount;
-        final assetIndexInSegment = childIndexInSegment * assetsPerRow;
-        targetAssetIndex = segment.firstAssetIndex + assetIndexInSegment;
+      if (segment case FixedSegment fixed when currentOffset >= fixed.gridOffset) {
+        final rowExtent = fixed.tileHeight + fixed.spacing;
+        final rowInSegment = rowExtent <= 0 ? 0 : ((currentOffset - fixed.gridOffset) / rowExtent).floor();
+        final assetIndexInSegment = rowInSegment * fixed.columnCount;
+        targetAssetIndex = segment.firstAssetIndex + math.min(assetIndexInSegment, segment.bucket.assetCount - 1);
       } else {
         targetAssetIndex = segment.firstAssetIndex;
       }
@@ -445,6 +486,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    setDenseTimelineAppVisible(false);
     _scrollIdleTimer?.cancel();
     for (final position in _attachedScrollPositions.toList()) {
       position.isScrollingNotifier.removeListener(_onScrollActivityChanged);
@@ -704,7 +746,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                       };
 
                       scale.onUpdate = (details) {
-                        final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 1.0);
+                        final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 0.22);
                         final newPerRow = calculateTimelineColumnCount(
                           scaleFactor: newScaleFactor,
                           gestureStartScaleFactor: _baseScaleFactor,

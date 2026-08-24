@@ -24,21 +24,34 @@ class FixedSegmentBuilder extends SegmentBuilder {
 
     for (int i = 0; i < buckets.length; i++) {
       final bucket = buckets[i];
+      final batchedGrid = columnCount > 6;
 
       final assetCount = bucket.assetCount;
       final numberOfRows = (assetCount / columnCount).ceil();
-      final segmentCount = numberOfRows + 1;
+      final rowsPerChild = batchedGrid ? denseTimelineRowsPerChild(columnCount) : 1;
+      final numberOfChildren = (numberOfRows / rowsPerChild).ceil();
+      final segmentCount = numberOfChildren + 1;
 
       final segmentFirstIndex = firstIndex;
       firstIndex += segmentCount;
       final segmentLastIndex = firstIndex - 1;
 
-      final timelineHeader = switch (groupBy) {
-        GroupAssetsBy.month => HeaderType.month,
-        GroupAssetsBy.day || GroupAssetsBy.auto =>
-          bucket is TimeBucket && bucket.date.month != previousDate?.month ? HeaderType.monthAndDay : HeaderType.day,
-        GroupAssetsBy.none => HeaderType.none,
-      };
+      // Dense levels remain part of the same timeline, but daily headers would
+      // be taller than the photos and make scrolling needlessly expensive.
+      // Keep the existing day buckets so adding a photo only invalidates its
+      // day, while presenting a compact year label in the continuous grid.
+      final timelineHeader = batchedGrid
+          ? bucket is TimeBucket && bucket.date.year != previousDate?.year
+                ? HeaderType.year
+                : HeaderType.none
+          : switch (groupBy) {
+              GroupAssetsBy.month => HeaderType.month,
+              GroupAssetsBy.day || GroupAssetsBy.auto =>
+                bucket is TimeBucket && bucket.date.month != previousDate?.month
+                    ? HeaderType.monthAndDay
+                    : HeaderType.day,
+              GroupAssetsBy.none => HeaderType.none,
+            };
       final headerExtent = SegmentBuilder.headerExtent(timelineHeader);
 
       final segmentStartOffset = startOffset;
@@ -55,6 +68,8 @@ class FixedSegmentBuilder extends SegmentBuilder {
           bucket: bucket,
           tileHeight: tileHeight,
           columnCount: columnCount,
+          rowsPerChild: rowsPerChild,
+          batchedGrid: batchedGrid,
           headerExtent: headerExtent,
           spacing: spacing,
           header: timelineHeader,

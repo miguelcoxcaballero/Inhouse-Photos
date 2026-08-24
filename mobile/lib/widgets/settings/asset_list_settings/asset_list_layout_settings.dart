@@ -14,11 +14,13 @@ class LayoutSettings extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tilesPerRow = useState(
-      normalizeTimelineTilesPerRow(ref.read(appConfigProvider.select((s) => s.timeline.tilesPerRow))),
+    final initialColumns = normalizeTimelineTilesPerRow(
+      ref.read(appConfigProvider.select((s) => s.timeline.tilesPerRow)),
     );
-    useValueChanged<int, void>(tilesPerRow.value, (_, __) {
-      ref.read(settingsProvider).write(.timelineTilesPerRow, tilesPerRow.value);
+    final selectedStep = useState(timelineTilesPerRowStepIndex(initialColumns));
+    final tilesPerRow = timelineTilesPerRowSteps[selectedStep.value];
+    useValueChanged<int, void>(selectedStep.value, (_, __) {
+      ref.read(settingsProvider).write(.timelineTilesPerRow, timelineTilesPerRowSteps[selectedStep.value]);
     });
 
     return Column(
@@ -29,12 +31,12 @@ class LayoutSettings extends HookConsumerWidget {
           icon: Icons.view_module_outlined,
         ),
         SettingsSliderListTile(
-          valueNotifier: tilesPerRow,
-          text: 'theme_setting_asset_list_tiles_per_row_title'.tr(namedArgs: {'count': "${tilesPerRow.value}"}),
-          label: "${tilesPerRow.value}",
-          maxValue: maxTimelineTilesPerRow.toDouble(),
-          minValue: minTimelineTilesPerRow.toDouble(),
-          noDivisons: 4,
+          valueNotifier: selectedStep,
+          text: 'theme_setting_asset_list_tiles_per_row_title'.tr(namedArgs: {'count': '$tilesPerRow'}),
+          label: '$tilesPerRow',
+          maxValue: (timelineTilesPerRowSteps.length - 1).toDouble(),
+          minValue: 0,
+          noDivisons: timelineTilesPerRowSteps.length - 1,
           onChangeEnd: (value) {
             ref.invalidate(appSettingsServiceProvider);
           },
