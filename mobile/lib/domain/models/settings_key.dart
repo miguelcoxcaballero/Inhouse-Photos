@@ -3,6 +3,7 @@ import 'package:immich_mobile/constants/colors.dart';
 import 'package:immich_mobile/constants/enums.dart';
 import 'package:immich_mobile/domain/models/log.model.dart';
 import 'package:immich_mobile/domain/models/config/backup_config.dart';
+import 'package:immich_mobile/domain/models/config/image_config.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/value_codec.dart';
 import 'package:immich_mobile/providers/album/album_sort_by_options.provider.dart';
@@ -18,6 +19,7 @@ enum SettingsKey<T> {
   // Image
   imagePreferRemote<bool>(),
   imageLoadOriginal<bool>(),
+  imageCacheMode<ImageCacheMode>(codec: EnumCodec(ImageCacheMode.values)),
 
   // Viewer
   viewerLoopVideo<bool>(),
@@ -36,6 +38,7 @@ enum SettingsKey<T> {
   albumSortMode<AlbumSortMode>(codec: EnumCodec(AlbumSortMode.values)),
   albumIsReverse<bool>(),
   albumIsGrid<bool>(),
+  albumOfflineIds<List<String>>(codec: ListCodec(PrimitiveCodec.string)),
 
   // Backup
   backupEnabled<bool>(),
@@ -46,6 +49,8 @@ enum SettingsKey<T> {
   backupSyncAlbums<bool>(),
   backupQuality<BackupQuality>(codec: EnumCodec(BackupQuality.values)),
   backupSpeed<BackupSpeedMode>(codec: EnumCodec(BackupSpeedMode.values)),
+  backupUploadedOriginalBytes<int>(),
+  backupStoredBytes<int>(),
 
   // Timeline
   timelineTilesPerRow<int>(),

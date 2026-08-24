@@ -30,10 +30,11 @@ class UpdateInstaller(
         "restartApp" -> restartApp(result)
         "installUpdate" -> {
           val url = call.argument<String>("url")
+          val sha256 = call.argument<String>("sha256")
           if (url.isNullOrBlank()) {
             result.error("invalid_url", "The update URL is missing.", null)
           } else {
-            installUpdate(url, result)
+            installUpdate(url, sha256, result)
           }
         }
         else -> result.notImplemented()
@@ -54,7 +55,7 @@ class UpdateInstaller(
     )
   }
 
-  private fun installUpdate(url: String, result: MethodChannel.Result) {
+  private fun installUpdate(url: String, expectedSha256: String?, result: MethodChannel.Result) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !activity.packageManager.canRequestPackageInstalls()) {
       activity.startActivity(
         Intent(
@@ -93,7 +94,14 @@ class UpdateInstaller(
             partialFile.deleteOnExit()
           }
         }
-        verifyApk(apkFile)
+        publishStage("verifying")
+        try {
+          verifyApk(apkFile, expectedSha256)
+        } catch (error: Exception) {
+          apkFile.delete()
+          partialFile.delete()
+          throw error
+        }
 
         val apkUri = FileProvider.getUriForFile(
           activity,
@@ -102,6 +110,7 @@ class UpdateInstaller(
         )
         activity.runOnUiThread {
           try {
+            publishStage("installing")
             val installIntent = Intent(Intent.ACTION_VIEW).apply {
               setDataAndType(apkUri, APK_MIME_TYPE)
               addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -214,13 +223,34 @@ class UpdateInstaller(
     }
   }
 
+  private fun publishStage(stage: String) {
+    activity.runOnUiThread {
+      channel.invokeMethod("updateStage", stage)
+    }
+  }
+
   private fun validateUrl(url: URL) {
     if (!url.protocol.equals("https", ignoreCase = true) || url.host.lowercase() !in ALLOWED_HOSTS) {
       throw SecurityException("The update URL is not allowed.")
     }
   }
 
-  private fun verifyApk(apkFile: File) {
+  private fun verifyApk(apkFile: File, expectedSha256: String?) {
+    if (!expectedSha256.isNullOrBlank()) {
+      val actualSha256 = apkFile.inputStream().use { input ->
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+          val count = input.read(buffer)
+          if (count < 0) break
+          digest.update(buffer, 0, count)
+        }
+        digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+      }
+      if (!actualSha256.equals(expectedSha256, ignoreCase = true)) {
+        throw SecurityException("The update checksum did not match the trusted SHA-256 value.")
+      }
+    }
     val archive = getArchivePackageInfo(apkFile)
       ?: throw SecurityException("The downloaded file is not a valid Android package.")
     val installed = getInstalledPackageInfo()

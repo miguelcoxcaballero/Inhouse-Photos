@@ -45,6 +45,9 @@ String formatInhouseInstallerError(String message) {
   if (normalized.contains('parse') || normalized.contains('malformed') || normalized.contains('invalid apk')) {
     return 'The downloaded update was incomplete or invalid. Tap Try again to download a fresh copy.';
   }
+  if (normalized.contains('checksum') || normalized.contains('sha-256')) {
+    return 'The downloaded update failed its security check. The file was removed; tap Try again for a clean download.';
+  }
   return message.isEmpty ? 'The update could not be installed. Please try again.' : message;
 }
 
@@ -73,12 +76,14 @@ class InhouseUpdateManifest {
     required this.versionCode,
     required this.required,
     required this.apkUrl,
+    this.sha256,
   });
 
   final String version;
   final int versionCode;
   final bool required;
   final Uri apkUrl;
+  final String? sha256;
 
   factory InhouseUpdateManifest.fromJson(Map<String, dynamic> json, {String assetKey = 'apkUrl'}) {
     final version = json['version']?.toString() ?? '';
@@ -102,11 +107,18 @@ class InhouseUpdateManifest {
       throw const FormatException('Invalid update download URL');
     }
 
+    final checksumValue = json['sha256']?.toString().trim().toLowerCase();
+    final sha256 = checksumValue == null || checksumValue.isEmpty ? null : checksumValue;
+    if (sha256 != null && !RegExp(r'^[0-9a-f]{64}$').hasMatch(sha256)) {
+      throw const FormatException('Invalid update checksum');
+    }
+
     return InhouseUpdateManifest(
       version: version,
       versionCode: versionCode,
       required: json['required'] != false,
       apkUrl: apkUrl,
+      sha256: sha256,
     );
   }
 }
@@ -269,7 +281,25 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
   }
 
   Future<void> _handleUpdateChannelCall(MethodCall call) async {
-    if (call.method != 'downloadProgress' || !mounted || call.arguments is! Map) {
+    if (!mounted) {
+      return;
+    }
+
+    if (call.method == 'updateStage') {
+      final stage = call.arguments?.toString();
+      setState(() {
+        if (stage == 'verifying') {
+          _downloadProgress = 1;
+          _status = 'Download complete. Verifying file integrity, app identity, version, and signature…';
+        } else if (stage == 'installing') {
+          _downloadProgress = 1;
+          _status = 'Security checks passed. Opening Android installation…';
+        }
+      });
+      return;
+    }
+
+    if (call.method != 'downloadProgress' || call.arguments is! Map) {
       return;
     }
 
@@ -552,7 +582,10 @@ class _RequiredUpdateGateState extends State<RequiredUpdateGate> with WidgetsBin
     });
 
     try {
-      final result = await _updateChannel.invokeMethod<String>('installUpdate', {'url': update.apkUrl.toString()});
+      final result = await _updateChannel.invokeMethod<String>('installUpdate', {
+        'url': update.apkUrl.toString(),
+        if (update.sha256 != null) 'sha256': update.sha256,
+      });
       if (!mounted) {
         return;
       }

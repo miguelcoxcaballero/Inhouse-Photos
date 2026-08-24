@@ -39,6 +39,7 @@ import 'package:immich_mobile/theme/dynamic_theme.dart';
 import 'package:immich_mobile/theme/theme_data.dart';
 import 'package:immich_mobile/utils/bootstrap.dart';
 import 'package:immich_mobile/utils/cache/widgets_binding.dart';
+import 'package:immich_mobile/utils/cache/custom_image_cache.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:immich_mobile/utils/licenses.dart';
 import 'package:immich_mobile/utils/migration.dart';
@@ -68,6 +69,8 @@ void main() async {
 
 Future<void> initApp() async {
   await initializeDateFormatting();
+
+  applyImageCacheMode(PaintingBinding.instance.imageCache, SettingsRepository.instance.appConfig.image.cacheMode);
 
   if (Platform.isAndroid) {
     try {

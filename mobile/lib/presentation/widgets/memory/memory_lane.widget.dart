@@ -15,7 +15,11 @@ class DriftMemoryLane extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final memoryLaneProvider = ref.watch(driftMemoryFutureProvider);
-    final memories = memoryLaneProvider.value ?? const [];
+    // A partially synchronized memory may temporarily have no assets. Hiding
+    // it keeps the lane stable instead of letting an empty card crash or flash.
+    final memories = (memoryLaneProvider.value ?? const <DriftMemory>[])
+        .where((memory) => memory.assets.isNotEmpty)
+        .toList(growable: false);
     if (memories.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -52,33 +56,37 @@ class DriftMemoryCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final yearsAgo = DateTime.now().year - memory.data.year;
     final title = 'years_ago'.t(context: context, args: {'years': yearsAgo.toString()});
-    return Center(
-      child: Stack(
-        children: [
-          ColorFiltered(
-            colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.2), BlendMode.darken),
-            child: SizedBox(
-              width: 205,
-              height: 200,
-              child: Thumbnail.remote(
-                remoteId: memory.assets[0].id,
-                thumbhash: memory.assets[0].thumbHash ?? "",
-                fit: BoxFit.cover,
+    return Semantics(
+      button: true,
+      label: 'Open memory from ${memory.data.year}',
+      child: RepaintBoundary(
+        child: Stack(
+          children: [
+            ColorFiltered(
+              colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.2), BlendMode.darken),
+              child: SizedBox(
+                width: 205,
+                height: 200,
+                child: Thumbnail.remote(
+                  remoteId: memory.assets[0].id,
+                  thumbhash: memory.assets[0].thumbHash ?? "",
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
-          ),
-          Positioned(
-            bottom: 16,
-            left: 16,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 114),
-              child: Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 15),
+            Positioned(
+              bottom: 16,
+              left: 16,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 114),
+                child: Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 15),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

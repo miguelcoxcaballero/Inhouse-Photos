@@ -50,11 +50,15 @@ class SharedLinkEditPage extends HookConsumerWidget {
     final slugController = useTextEditingController(text: existingLink?.slug ?? "");
     final slugFocusNode = useFocusNode();
     useListenable(slugController);
-    final showMetadata = useState(existingLink?.showMetadata ?? true);
-    final allowDownload = useState(existingLink?.allowDownload ?? true);
+    // New links start private and short-lived. Every control remains editable,
+    // while an accidental tap can no longer create an indefinite downloadable link.
+    final showMetadata = useState(existingLink?.showMetadata ?? false);
+    final allowDownload = useState(existingLink?.allowDownload ?? false);
     final allowUpload = useState(existingLink?.allowUpload ?? false);
-    final expiryAfter = useState<DateTime?>(existingLink?.expiresAt?.toLocal());
-    final selectedPresetIndex = useState<int?>(existingLink?.expiresAt == null ? 0 : null);
+    final expiryAfter = useState<DateTime?>(
+      existingLink?.expiresAt?.toLocal() ?? (existingLink == null ? DateTime.now().add(const Duration(days: 7)) : null),
+    );
+    final selectedPresetIndex = useState<int?>(existingLink == null ? 5 : (existingLink?.expiresAt == null ? 0 : null));
     final newShareLink = useState("");
 
     Widget buildSharedLinkRow({required String leading, required String content}) {

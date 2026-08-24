@@ -16,7 +16,10 @@ import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/current_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/repositories/download.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/common/remote_album_sliver_app_bar.dart';
@@ -37,6 +40,77 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
   void initState() {
     super.initState();
     _album = widget.album;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _isAvailableOffline) {
+        unawaited(_enqueueOfflineAssets(showToast: false));
+      }
+    });
+  }
+
+  bool get _isAvailableOffline => ref.read(settingsProvider).appConfig.album.offlineAlbumIds.contains(_album.id);
+
+  Future<void> _syncDownloadedMediaLater() async {
+    await Future<void>.delayed(const Duration(seconds: 20));
+    final manager = ref.read(backgroundSyncProvider);
+    await manager.syncLocal();
+    await manager.hashAssets();
+  }
+
+  Future<int> _enqueueOfflineAssets({required bool showToast}) async {
+    try {
+      final assets = await ref.read(remoteAlbumProvider.notifier).getAssets(_album.id);
+      final missing = assets.where((asset) => asset.isRemoteOnly).toList(growable: false);
+      var queued = 0;
+      const batchSize = 200;
+      for (var start = 0; start < missing.length; start += batchSize) {
+        final end = (start + batchSize).clamp(0, missing.length);
+        final result = await ref.read(downloadRepositoryProvider).downloadAllAssets(missing.sublist(start, end));
+        queued += result.where((accepted) => accepted).length;
+        // Give rendering and download callbacks a frame between very large
+        // albums instead of building one unbounded queue on the UI isolate.
+        await Future<void>.delayed(Duration.zero);
+      }
+      if (queued > 0) {
+        unawaited(_syncDownloadedMediaLater());
+      }
+      if (showToast && mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: queued == 0
+              ? 'This album is already available offline.'
+              : 'Downloading $queued ${queued == 1 ? 'item' : 'items'} for offline use.',
+        );
+      }
+      return queued;
+    } catch (error) {
+      if (showToast && mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: 'Could not prepare this album for offline use.',
+          toastType: ToastType.error,
+        );
+      }
+      return 0;
+    }
+  }
+
+  Future<void> _toggleOfflineAlbum() async {
+    final repository = ref.read(settingsProvider);
+    final currentIds = repository.appConfig.album.offlineAlbumIds.toSet();
+    final enabling = !currentIds.remove(_album.id);
+    if (enabling) {
+      currentIds.add(_album.id);
+    }
+    await repository.write(.albumOfflineIds, currentIds.toList(growable: false));
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
+    if (enabling) {
+      await _enqueueOfflineAssets(showToast: true);
+    } else {
+      ImmichToast.show(context: context, msg: 'Automatic offline downloads stopped. Existing device copies were kept.');
+    }
   }
 
   Future<void> addAssets(BuildContext context) async {
@@ -192,6 +266,8 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
             onEditAlbum: () => showEditTitleAndDescription(context),
             onCreateSharedLink: () => unawaited(context.pushRoute(SharedLinkEditRoute(albumId: _album.id))),
             onShowOptions: () => context.pushRoute(DriftAlbumOptionsRoute(album: _album)),
+            onToggleOffline: () => unawaited(_toggleOfflineAlbum()),
+            isAvailableOffline: _isAvailableOffline,
           ),
           onEditTitle: isOwner ? () => showEditTitleAndDescription(context) : null,
           onActivity: () => showActivity(context),
@@ -368,6 +444,8 @@ class _AlbumKebabMenu extends ConsumerWidget {
   final VoidCallback? onEditAlbum;
   final VoidCallback? onCreateSharedLink;
   final VoidCallback? onShowOptions;
+  final VoidCallback? onToggleOffline;
+  final bool isAvailableOffline;
 
   const _AlbumKebabMenu({
     required this.album,
@@ -378,6 +456,8 @@ class _AlbumKebabMenu extends ConsumerWidget {
     this.onEditAlbum,
     this.onCreateSharedLink,
     this.onShowOptions,
+    this.onToggleOffline,
+    this.isAvailableOffline = false,
   });
 
   double _calculateScrollProgress(FlexibleSpaceBarSettings? settings) {
@@ -427,6 +507,8 @@ class _AlbumKebabMenu extends ConsumerWidget {
           onEditAlbum: isOwner ? onEditAlbum : null,
           onCreateSharedLink: isOwner ? onCreateSharedLink : null,
           onShowOptions: onShowOptions,
+          onToggleOffline: onToggleOffline,
+          isAvailableOffline: isAvailableOffline,
         );
       },
     );

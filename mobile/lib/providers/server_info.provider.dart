@@ -35,7 +35,15 @@ class ServerInfoNotifier extends StateNotifier<ServerInfo> {
     await getServerVersion();
     await getServerFeatures();
     await getServerConfig();
+    await getDiskInfo();
     return state;
+  }
+
+  Future<void> getDiskInfo() async {
+    final diskInfo = await _serverInfoService.getDiskInfo();
+    if (diskInfo != null) {
+      state = state.copyWith(serverDiskInfo: diskInfo);
+    }
   }
 
   Future<void> getServerVersion() async {

@@ -37,6 +37,8 @@ class BackupConfig {
   final bool syncAlbums;
   final BackupQuality quality;
   final BackupSpeedMode speed;
+  final int uploadedOriginalBytes;
+  final int storedBytes;
 
   const BackupConfig({
     this.enabled = false,
@@ -47,6 +49,8 @@ class BackupConfig {
     this.syncAlbums = false,
     this.quality = BackupQuality.storageSaver,
     this.speed = BackupSpeedMode.balanced,
+    this.uploadedOriginalBytes = 0,
+    this.storedBytes = 0,
   });
 
   BackupConfig copyWith({
@@ -58,6 +62,8 @@ class BackupConfig {
     bool? syncAlbums,
     BackupQuality? quality,
     BackupSpeedMode? speed,
+    int? uploadedOriginalBytes,
+    int? storedBytes,
   }) => BackupConfig(
     enabled: enabled ?? this.enabled,
     useCellularForVideos: useCellularForVideos ?? this.useCellularForVideos,
@@ -67,6 +73,8 @@ class BackupConfig {
     syncAlbums: syncAlbums ?? this.syncAlbums,
     quality: quality ?? this.quality,
     speed: speed ?? this.speed,
+    uploadedOriginalBytes: uploadedOriginalBytes ?? this.uploadedOriginalBytes,
+    storedBytes: storedBytes ?? this.storedBytes,
   );
 
   @override
@@ -80,7 +88,9 @@ class BackupConfig {
           other.triggerDelay == triggerDelay &&
           other.syncAlbums == syncAlbums &&
           other.quality == quality &&
-          other.speed == speed);
+          other.speed == speed &&
+          other.uploadedOriginalBytes == uploadedOriginalBytes &&
+          other.storedBytes == storedBytes);
 
   @override
   int get hashCode => Object.hash(
@@ -92,9 +102,11 @@ class BackupConfig {
     syncAlbums,
     quality,
     speed,
+    uploadedOriginalBytes,
+    storedBytes,
   );
 
   @override
   String toString() =>
-      'BackupConfig(enabled: $enabled, useCellularForVideos: $useCellularForVideos, useCellularForPhotos: $useCellularForPhotos, requireCharging: $requireCharging, triggerDelay: $triggerDelay, syncAlbums: $syncAlbums, quality: $quality, speed: $speed)';
+      'BackupConfig(enabled: $enabled, useCellularForVideos: $useCellularForVideos, useCellularForPhotos: $useCellularForPhotos, requireCharging: $requireCharging, triggerDelay: $triggerDelay, syncAlbums: $syncAlbums, quality: $quality, speed: $speed, uploadedOriginalBytes: $uploadedOriginalBytes, storedBytes: $storedBytes)';
 }

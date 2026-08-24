@@ -97,6 +97,27 @@ void main() {
         throwsFormatException,
       );
     });
+
+    test('accepts a valid SHA-256 checksum and rejects a malformed one', () {
+      final manifest = InhouseUpdateManifest.fromJson({
+        'version': '3.1.54',
+        'versionCode': 7112,
+        'required': true,
+        'apkUrl': 'https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.54/app.apk',
+        'sha256': 'a' * 64,
+      });
+      expect(manifest.sha256, 'a' * 64);
+
+      expect(
+        () => InhouseUpdateManifest.fromJson({
+          'version': '3.1.54',
+          'versionCode': 7112,
+          'apkUrl': 'https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.54/app.apk',
+          'sha256': 'not-a-checksum',
+        }),
+        throwsFormatException,
+      );
+    });
   });
 
   test('repository update manifest matches the ARM64 app build', () {

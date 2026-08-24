@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:collection/collection.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:logging/logging.dart';
 
 import 'package:immich_mobile/constants/constants.dart';
@@ -11,6 +12,8 @@ import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/infrastructure/repositories/local_asset.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
+import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/utils/upload_speed_calculator.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
@@ -218,6 +221,7 @@ final driftBackupProvider = StateNotifierProvider<DriftBackupNotifier, DriftBack
     UploadSpeedManager(),
     ref.watch(localAssetRepository),
     ref.watch(remoteAssetRepositoryProvider),
+    SettingsRepository.instance,
   );
 });
 
@@ -228,6 +232,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     this._uploadSpeedManager,
     this._localAssetRepository,
     this._remoteAssetRepository,
+    this._settingsRepository,
   ) : super(
         const DriftBackupState(
           totalCount: 0,
@@ -249,12 +254,15 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   final UploadSpeedManager _uploadSpeedManager;
   final DriftLocalAssetRepository _localAssetRepository;
   final RemoteAssetRepository _remoteAssetRepository;
+  final SettingsRepository _settingsRepository;
   Completer<void>? _cancelToken;
   Future<void>? _activeForegroundBackup;
   bool _restartForegroundBackup = false;
   late final StreamSubscription<ServerCompressionProgressEvent> _compressionSubscription;
   final Map<String, String> _remoteToLocalAssetIds = {};
   final Map<String, ServerCompressionProgressEvent> _pendingCompressionEvents = {};
+  Future<void> _storageStatsWrite = Future.value();
+  bool _failureNotificationSent = false;
 
   final _logger = Logger("DriftBackupNotifier");
 
@@ -302,6 +310,9 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
       return;
     }
     state = state.copyWith(error: error);
+    if (error != BackupError.none) {
+      unawaited(_showBackupHealthNotification());
+    }
   }
 
   void updateSyncing(bool isSyncing) {
@@ -355,6 +366,15 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
         });
     _activeForegroundBackup = backup;
     return backup;
+  }
+
+  Future<void> retryFailedUploads(String userId) {
+    final retainedItems = Map<String, DriftUploadStatus>.fromEntries(
+      state.uploadItems.entries.where((entry) => entry.value.isFailed != true),
+    );
+    state = state.copyWith(error: BackupError.none, uploadItems: retainedItems);
+    _failureNotificationSent = false;
+    return startForegroundBackup(userId);
   }
 
   void stopForegroundBackup() {
@@ -479,6 +499,10 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
       // websocket connection while the server was encoding it.
       Future.delayed(const Duration(minutes: 15), () => _removeUploadItem(localAssetId));
     }
+    if (state.errorCount == 0 && state.remainderCount <= 0) {
+      _failureNotificationSent = false;
+      unawaited(FlutterLocalNotificationsPlugin().cancel(_backupHealthNotificationId));
+    }
   }
 
   bool _isCompressionFinished(String compressionState) =>
@@ -520,6 +544,11 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     );
 
     if (finished) {
+      final originalBytes = event.originalBytes;
+      final outputBytes = event.outputBytes;
+      if (originalBytes != null && outputBytes != null && originalBytes > 0 && outputBytes > 0) {
+        unawaited(_recordStorageResult(originalBytes, outputBytes));
+      }
       _remoteToLocalAssetIds.remove(event.assetId);
       _pendingCompressionEvents.remove(event.assetId);
       _scheduleUploadItemRemoval(localAssetId);
@@ -557,6 +586,42 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     }
 
     _uploadSpeedManager.removeTask(localAssetId);
+    unawaited(_showBackupHealthNotification());
+  }
+
+  Future<void> _recordStorageResult(int originalBytes, int storedBytes) {
+    _storageStatsWrite = _storageStatsWrite.then((_) async {
+      final backup = _settingsRepository.appConfig.backup;
+      await _settingsRepository.write(
+        SettingsKey.backupUploadedOriginalBytes,
+        backup.uploadedOriginalBytes + originalBytes,
+      );
+      await _settingsRepository.write(SettingsKey.backupStoredBytes, backup.storedBytes + storedBytes);
+    });
+    return _storageStatsWrite;
+  }
+
+  Future<void> _showBackupHealthNotification() async {
+    if (_failureNotificationSent) {
+      return;
+    }
+    _failureNotificationSent = true;
+    await FlutterLocalNotificationsPlugin().show(
+      _backupHealthNotificationId,
+      'Inhouse Photos backup needs attention',
+      'Some photos could not be backed up. Open App Health to retry safely.',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'inhouse_backup_health',
+          'Backup health',
+          channelDescription: 'Alerts when photo backup needs attention',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@drawable/notification_icon',
+        ),
+        iOS: DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
+      ),
+    );
   }
 
   Future<void> startBackupWithURLSession(String userId) async {
@@ -582,6 +647,8 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     return _backgroundUploadService.resume();
   }
 }
+
+const _backupHealthNotificationId = 91041;
 
 final driftBackupCandidateProvider = FutureProvider.autoDispose<List<LocalAsset>>((ref) {
   final user = ref.watch(currentUserProvider);

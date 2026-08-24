@@ -1,4 +1,5 @@
 import 'package:flutter/painting.dart';
+import 'package:immich_mobile/domain/models/config/image_config.dart';
 import 'package:immich_mobile/presentation/widgets/images/local_image_provider.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumb_hash_provider.dart';
@@ -9,6 +10,15 @@ final class CustomImageCache implements ImageCache {
   final _thumbhash = ImageCache()..maximumSize = 0;
   final _small = ImageCache();
   final _large = ImageCache()..maximumSize = 5; // Maximum 5 images
+
+  void configure(ImageCacheProfile profile) {
+    _small
+      ..maximumSize = profile.thumbnailCount
+      ..maximumSizeBytes = profile.thumbnailBytes;
+    _large
+      ..maximumSize = profile.fullImageCount
+      ..maximumSizeBytes = profile.fullImageBytes;
+  }
 
   @override
   int get maximumSize => _small.maximumSize + _large.maximumSize;
@@ -74,4 +84,50 @@ final class CustomImageCache implements ImageCache {
 
   @override
   ImageCacheStatus statusForKey(Object key) => _cacheForKey(key).statusForKey(key);
+}
+
+class ImageCacheProfile {
+  final int thumbnailCount;
+  final int thumbnailBytes;
+  final int fullImageCount;
+  final int fullImageBytes;
+
+  const ImageCacheProfile({
+    required this.thumbnailCount,
+    required this.thumbnailBytes,
+    required this.fullImageCount,
+    required this.fullImageBytes,
+  });
+}
+
+ImageCacheProfile imageCacheProfileForMode(ImageCacheMode mode) => switch (mode) {
+  ImageCacheMode.compact => const ImageCacheProfile(
+    thumbnailCount: 160,
+    thumbnailBytes: 64 * 1024 * 1024,
+    fullImageCount: 2,
+    fullImageBytes: 64 * 1024 * 1024,
+  ),
+  ImageCacheMode.automatic => const ImageCacheProfile(
+    thumbnailCount: 320,
+    thumbnailBytes: 128 * 1024 * 1024,
+    fullImageCount: 4,
+    fullImageBytes: 128 * 1024 * 1024,
+  ),
+  ImageCacheMode.performance => const ImageCacheProfile(
+    thumbnailCount: 640,
+    thumbnailBytes: 256 * 1024 * 1024,
+    fullImageCount: 6,
+    fullImageBytes: 256 * 1024 * 1024,
+  ),
+};
+
+void applyImageCacheMode(ImageCache cache, ImageCacheMode mode) {
+  final profile = imageCacheProfileForMode(mode);
+  if (cache is CustomImageCache) {
+    cache.configure(profile);
+    return;
+  }
+  cache
+    ..maximumSize = profile.thumbnailCount
+    ..maximumSizeBytes = profile.thumbnailBytes;
 }
