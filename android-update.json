@@ -1,7 +1,7 @@
 {
-  "version": "3.1.55",
-  "versionCode": 7113,
+  "version": "3.1.56",
+  "versionCode": 7114,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.55-dense-grid-visibility/Inhouse-Photos-3.1.55-arm64.apk",
-  "sha256": "33ff170f300db0c6c3ca430bb4fa3c49d8698a57090df77f9fa9d46c3ccef0f7"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.56-dense-grid-renderer/Inhouse-Photos-3.1.56-arm64.apk",
+  "sha256": "0242d7a029ffd6c80e9e2f3e00fcc038c5c31c318828873506cca76561f4a4fd"
 }

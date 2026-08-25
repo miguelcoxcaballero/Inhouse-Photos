@@ -320,6 +320,21 @@ _DenseAtlasPixelsResult _buildDenseThumbhashAtlas(
   return _DenseAtlasPixelsResult(atlas, tiles);
 }
 
+/// Starts the CPU-heavy placeholder work from a top-level lexical scope.
+///
+/// Keeping this wrapper outside the widget State is important: an Isolate.run
+/// callback nested in a State method can retain the outer closure context,
+/// including the unsendable Element/render tree, even when its body appears to
+/// reference only local variables.
+Future<_DenseAtlasPixelsResult> _buildDenseThumbhashAtlasInBackground({
+  required List<String?> hashes,
+  required int targetPixels,
+  required int columnCount,
+  required List<Uint8List?> cachedTiles,
+}) => Isolate.run(
+  () => _buildDenseThumbhashAtlas(hashes, targetPixels, columnCount: columnCount, cachedTiles: cachedTiles),
+);
+
 Uint8List buildDenseThumbhashAtlasPixels(List<String?> hashes, int targetPixels, {int? columnCount}) {
   return _buildDenseThumbhashAtlas(hashes, targetPixels, columnCount: columnCount ?? hashes.length).pixels;
 }
@@ -1432,7 +1447,6 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   ui.Image? _atlas;
   double? _devicePixelRatio;
   bool _repaintScheduled = false;
-  bool _visibilityCheckScheduled = false;
   bool _metadataAtlasRequested = false;
   Timer? _metadataRetryTimer;
   bool _atlasBuilding = false;
@@ -1525,7 +1539,6 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _finishedActualCount = 0;
     _actualWorkGeneration++;
     _atlasBuilding = false;
-    _visibilityCheckScheduled = false;
     _metadataAtlasRequested = false;
     _metadataRetryTimer?.cancel();
     _metadataRetryTimer = null;
@@ -1666,11 +1679,11 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     if (_persistentExact || !mounted) {
       return;
     }
-    final viewportPriority = _viewportPriority();
-    if (viewportPriority == null) {
-      _scheduleVisibleWorkCheck();
-      return;
-    }
+    // A mounted dense row is already inside the sliver's viewport/cache
+    // window. Custom sliver paint transforms can make its global rectangle
+    // temporarily unavailable (or report no overlap), so visibility must only
+    // affect priority — never whether the atlas is generated at all.
+    final viewportPriority = _viewportPriority() ?? (1 << 20);
     final targetPixels =
         thumbnailTargetPixels ??
         denseTimelineTargetPixels(tileExtent: widget.tileExtent, devicePixelRatio: _devicePixelRatio ?? 1);
@@ -1694,19 +1707,6 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         generation: targetGeneration,
       );
     }
-  }
-
-  void _scheduleVisibleWorkCheck() {
-    if (_visibilityCheckScheduled || !mounted) {
-      return;
-    }
-    _visibilityCheckScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _visibilityCheckScheduled = false;
-      if (mounted && _viewportPriority() != null) {
-        _queueVisibleOverviewWork();
-      }
-    });
   }
 
   int? _viewportPriority() {
@@ -1735,10 +1735,8 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     if (_persistentExact || widget.deferHighResolution || !mounted) {
       return;
     }
-    if (_viewportPriority() == null) {
-      _scheduleVisibleWorkCheck();
-      return;
-    }
+    // See _queueVisibleOverviewWork: mounted sliver children are eligible even
+    // while a custom layout transform cannot provide a global viewport rect.
     final targetPixels =
         thumbnailTargetPixels ??
         denseTimelineTargetPixels(tileExtent: widget.tileExtent, devicePixelRatio: _devicePixelRatio ?? 1);
@@ -1850,18 +1848,21 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         '${widget.assets[index].heroTag}:${hashes[index] ?? ''}',
     ];
     final cachedTiles = tileKeys.map(_denseThumbTileCache.get).toList(growable: false);
+    // Keep the isolate callback completely detached from this State object.
+    // Reading `widget.columnCount` inside it implicitly captured `this`, which
+    // made Isolate.run try to send the whole element/render tree and caused
+    // every dense panel atlas to fail before it was generated.
+    final columnCount = widget.columnCount;
     try {
       final result = await _denseMetadataAtlasQueue.schedule(() {
         if (!mounted || generation != _generation) {
           throw const _DenseLoadCancelled();
         }
-        return Isolate.run(
-          () => _buildDenseThumbhashAtlas(
-            hashes,
-            targetPixels,
-            columnCount: widget.columnCount,
-            cachedTiles: cachedTiles,
-          ),
+        return _buildDenseThumbhashAtlasInBackground(
+          hashes: hashes,
+          targetPixels: targetPixels,
+          columnCount: columnCount,
+          cachedTiles: cachedTiles,
         );
       }, priority: priority);
       if (!mounted || generation != _generation) {
@@ -1880,16 +1881,24 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       final buffer = await ui.ImmutableBuffer.fromUint8List(result.pixels);
       final descriptor = ui.ImageDescriptor.raw(
         buffer,
-        width: targetPixels * widget.columnCount,
-        height: targetPixels * (hashes.length / widget.columnCount).ceil(),
-        rowBytes: targetPixels * widget.columnCount * 4,
+        width: targetPixels * columnCount,
+        height: targetPixels * (hashes.length / columnCount).ceil(),
+        rowBytes: targetPixels * columnCount * 4,
         pixelFormat: ui.PixelFormat.rgba8888,
       );
-      buffer.dispose();
-      final codec = await descriptor.instantiateCodec();
-      final frame = await codec.getNextFrame();
-      descriptor.dispose();
-      codec.dispose();
+      final ui.Codec codec;
+      final ui.FrameInfo frame;
+      try {
+        codec = await descriptor.instantiateCodec();
+        try {
+          frame = await codec.getNextFrame();
+        } finally {
+          codec.dispose();
+        }
+      } finally {
+        descriptor.dispose();
+        buffer.dispose();
+      }
       final atlas = frame.image;
       if (!mounted || generation != _generation) {
         atlas.dispose();
