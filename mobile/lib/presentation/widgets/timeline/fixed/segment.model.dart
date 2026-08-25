@@ -75,6 +75,9 @@ class _DenseAtlasPixelsResult {
   const _DenseAtlasPixelsResult(this.pixels, this.tiles);
 }
 
+@visibleForTesting
+bool denseTimelineMetadataCoverageIsComplete(List<Uint8List?> tiles) => tiles.every((tile) => tile != null);
+
 class _DenseDiskAtlasEntry {
   final int width;
   final int height;
@@ -909,8 +912,8 @@ const int batchedGridMetadataCellPixels = 32;
 /// compressed PNGs and the oldest generated panels are evicted when full.
 const int batchedGridDiskCacheLimitBytes = 256 * 1024 * 1024;
 
-const int _denseThumbnailConcurrency = 1;
-const int _denseMetadataAtlasConcurrency = 1;
+const int _denseThumbnailConcurrency = 2;
+const int _denseMetadataAtlasConcurrency = 2;
 const int _denseMetadataCellPixels = batchedGridMetadataCellPixels;
 // ui.Image.clone shares the underlying GPU texture, so keeping a wider rolling
 // window here does not duplicate pixels. It prevents a fast fling from evicting
@@ -919,7 +922,10 @@ const int _denseMetadataCellPixels = batchedGridMetadataCellPixels;
 const int _denseAtlasCacheBytes = 64 * 1024 * 1024;
 const int _denseThumbTileCacheBytes = 8 * 1024 * 1024;
 final _DenseThumbnailQueue _denseThumbnailQueue = _DenseThumbnailQueue();
-final _DenseAsyncQueue _denseMetadataAtlasQueue = _DenseAsyncQueue(_denseMetadataAtlasConcurrency, maxPending: 48);
+final DenseTimelineTaskQueue _denseMetadataAtlasQueue = DenseTimelineTaskQueue(
+  _denseMetadataAtlasConcurrency,
+  maxPending: 128,
+);
 final _DenseRowAtlasCache _denseRowAtlasCache = _DenseRowAtlasCache();
 final _DenseThumbTileCache _denseThumbTileCache = _DenseThumbTileCache();
 final _DenseDiskAtlasCache _denseDiskAtlasCache = _DenseDiskAtlasCache();
@@ -941,7 +947,9 @@ void releaseDenseTimelineMemory() {
 }
 
 class _DenseLoadCancelled implements Exception {
-  const _DenseLoadCancelled();
+  final bool retry;
+
+  const _DenseLoadCancelled({this.retry = false});
 }
 
 class _DenseThumbnailQueue {
@@ -1035,53 +1043,79 @@ class _DenseThumbnailHandle {
   void cancel() => _task.discard(notify: false);
 }
 
-class _DenseAsyncQueue {
+/// A small priority queue used by the dense gallery's atlas decoder.
+///
+/// Kept public for focused scheduler regression tests. Lower priority values
+/// represent panels nearer the centre of the visible viewport.
+@visibleForTesting
+class DenseTimelineTaskQueue {
   final int concurrency;
   final int maxPending;
-  final Queue<_DenseAsyncTask> _pending = Queue();
+  final List<_DenseAsyncTask> _pending = [];
   int _active = 0;
+  int _sequence = 0;
 
-  _DenseAsyncQueue(this.concurrency, {this.maxPending = 64});
+  DenseTimelineTaskQueue(this.concurrency, {this.maxPending = 64}) : assert(concurrency > 0), assert(maxPending > 0);
 
-  Future<T> schedule<T>(Future<T> Function() task) {
+  Future<T> schedule<T>(Future<T> Function() task, {int priority = 0}) {
     final completer = Completer<T>();
-    if (_pending.length >= maxPending) {
-      _pending.removeFirst().cancel();
-    }
-    _pending.add(
-      _DenseAsyncTask(
-        run: () async {
-          try {
-            final result = await task();
-            if (!completer.isCompleted) {
-              completer.complete(result);
-            }
-          } catch (error, stackTrace) {
-            if (!completer.isCompleted) {
-              completer.completeError(error, stackTrace);
-            }
-          }
-        },
-        cancel: () {
+    final queued = _DenseAsyncTask(
+      priority: priority,
+      sequence: _sequence++,
+      run: () async {
+        try {
+          final result = await task();
           if (!completer.isCompleted) {
-            completer.completeError(const _DenseLoadCancelled());
+            completer.complete(result);
           }
-        },
-      ),
+        } catch (error, stackTrace) {
+          if (!completer.isCompleted) {
+            completer.completeError(error, stackTrace);
+          }
+        }
+      },
+      cancel: (retry) {
+        if (!completer.isCompleted) {
+          completer.completeError(_DenseLoadCancelled(retry: retry));
+        }
+      },
     );
+    if (_pending.length >= maxPending) {
+      var worstIndex = 0;
+      for (var index = 1; index < _pending.length; index++) {
+        final candidate = _pending[index];
+        final worst = _pending[worstIndex];
+        if (candidate.priority > worst.priority ||
+            (candidate.priority == worst.priority && candidate.sequence > worst.sequence)) {
+          worstIndex = index;
+        }
+      }
+      final worst = _pending[worstIndex];
+      if (queued.priority < worst.priority) {
+        _pending.removeAt(worstIndex).cancel(true);
+      } else {
+        queued.cancel(true);
+        return completer.future;
+      }
+    }
+    _pending.add(queued);
     _drain();
     return completer.future;
   }
 
   void cancelPending() {
     while (_pending.isNotEmpty) {
-      _pending.removeFirst().cancel();
+      _pending.removeLast().cancel(false);
     }
   }
 
   void _drain() {
     while (_active < concurrency && _pending.isNotEmpty) {
-      final task = _pending.removeFirst();
+      _pending.sort((a, b) {
+        final priority = a.priority.compareTo(b.priority);
+        return priority != 0 ? priority : a.sequence.compareTo(b.sequence);
+      });
+      final task = _pending.removeAt(0);
       _active++;
       unawaited(
         Future<void>.sync(task.run).whenComplete(() {
@@ -1094,10 +1128,12 @@ class _DenseAsyncQueue {
 }
 
 class _DenseAsyncTask {
+  final int priority;
+  final int sequence;
   final Future<void> Function() run;
-  final void Function() cancel;
+  final void Function(bool retry) cancel;
 
-  const _DenseAsyncTask({required this.run, required this.cancel});
+  const _DenseAsyncTask({required this.priority, required this.sequence, required this.run, required this.cancel});
 }
 
 class _DenseRowAtlasCache {
@@ -1398,6 +1434,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   bool _repaintScheduled = false;
   bool _visibilityCheckScheduled = false;
   bool _metadataAtlasRequested = false;
+  Timer? _metadataRetryTimer;
   bool _atlasBuilding = false;
   bool _instantOverview = false;
   int _atlasTargetPixels = _denseMetadataCellPixels;
@@ -1490,6 +1527,8 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _atlasBuilding = false;
     _visibilityCheckScheduled = false;
     _metadataAtlasRequested = false;
+    _metadataRetryTimer?.cancel();
+    _metadataRetryTimer = null;
     _instantOverview = usesInstantDenseTimelineAtlas(widget.columnCount);
     _persistentExact = false;
     _baseAtlasReady = false;
@@ -1561,7 +1600,9 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   }
 
   String _denseContentIdentity() {
-    final buffer = StringBuffer('v3:${widget.columnCount}:${widget.assets.length};');
+    // v4 invalidates atlases that older builds incorrectly marked as complete
+    // even though local-only cells were transparent while zooming.
+    final buffer = StringBuffer('v4:${widget.columnCount}:${widget.assets.length};');
     for (final asset in widget.assets) {
       buffer
         ..write(asset.remoteId ?? asset.localId ?? asset.checksum ?? asset.heroTag)
@@ -1625,7 +1666,8 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     if (_persistentExact || !mounted) {
       return;
     }
-    if (!_isNearVisibleViewport()) {
+    final viewportPriority = _viewportPriority();
+    if (viewportPriority == null) {
       _scheduleVisibleWorkCheck();
       return;
     }
@@ -1641,9 +1683,9 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
           Object.hashAll(widget.assets.map((asset) => asset.heroTag)),
         );
     final targetGeneration = generation ?? _generation;
-    if (_instantOverview && !_metadataAtlasRequested) {
+    if (_instantOverview && !_metadataAtlasRequested && (_atlas == null || !_baseAtlasReady)) {
       _metadataAtlasRequested = true;
-      unawaited(_buildThumbhashAtlas(_atlasTargetPixels, targetAtlasKey, targetGeneration));
+      unawaited(_buildThumbhashAtlas(_atlasTargetPixels, targetAtlasKey, targetGeneration, priority: viewportPriority));
     }
     if (!widget.deferHighResolution) {
       _queueMissingActualThumbnails(
@@ -1661,28 +1703,39 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _visibilityCheckScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _visibilityCheckScheduled = false;
-      if (mounted && _isNearVisibleViewport()) {
+      if (mounted && _viewportPriority() != null) {
         _queueVisibleOverviewWork();
       }
     });
   }
 
-  bool _isNearVisibleViewport() {
+  int? _viewportPriority() {
     final renderObject = context.findRenderObject();
     final mediaSize = MediaQuery.maybeSizeOf(context);
     if (renderObject is! RenderBox || !renderObject.attached || !renderObject.hasSize || mediaSize == null) {
-      return false;
+      return null;
     }
     final panelRect = MatrixUtils.transformRect(renderObject.getTransformTo(null), Offset.zero & renderObject.size);
     final viewport = (Offset.zero & mediaSize).inflate(mediaSize.height * 0.2);
-    return panelRect.overlaps(viewport);
+    if (!panelRect.overlaps(viewport)) {
+      return null;
+    }
+    // Centre-most panels are the first ones a person sees after the pinch.
+    // Distance-based priority prevents dozens of tiny day rows below the fold
+    // from evicting the actual visible work from the bounded atlas queue.
+    return (panelRect.center.dy - (mediaSize.height * 0.5)).abs().round();
   }
 
-  void _queueMissingActualThumbnails({int? thumbnailTargetPixels, int? atlasKey, int? generation}) {
+  void _queueMissingActualThumbnails({
+    int? thumbnailTargetPixels,
+    int? atlasKey,
+    int? generation,
+    bool includeHashed = false,
+  }) {
     if (_persistentExact || widget.deferHighResolution || !mounted) {
       return;
     }
-    if (!_isNearVisibleViewport()) {
+    if (_viewportPriority() == null) {
       _scheduleVisibleWorkCheck();
       return;
     }
@@ -1702,7 +1755,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       // Remote ThumbHashes are already complete visual previews at this tiny
       // scale. Only assets without one (normally new local-only photos) need
       // an individual decode, and those decodes run only while scrolling is idle.
-      if (_thumbHashFor(widget.assets[index]) != null) {
+      if (!includeHashed && _thumbHashFor(widget.assets[index]) != null) {
         continue;
       }
       _requestActualThumbnail(
@@ -1775,7 +1828,19 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _ => null,
   };
 
-  Future<void> _buildThumbhashAtlas(int targetPixels, int atlasKey, int generation) async {
+  void _scheduleMetadataRetry({Duration delay = const Duration(milliseconds: 80)}) {
+    if (_metadataRetryTimer != null || !mounted || _persistentExact || (_atlas != null && _baseAtlasReady)) {
+      return;
+    }
+    _metadataRetryTimer = Timer(delay, () {
+      _metadataRetryTimer = null;
+      if (mounted && !_metadataAtlasRequested) {
+        _queueVisibleOverviewWork();
+      }
+    });
+  }
+
+  Future<void> _buildThumbhashAtlas(int targetPixels, int atlasKey, int generation, {required int priority}) async {
     if (_persistentExact) {
       return;
     }
@@ -1798,15 +1863,16 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
             cachedTiles: cachedTiles,
           ),
         );
-      });
+      }, priority: priority);
       if (!mounted || generation != _generation) {
         return;
       }
+      final metadataAtlasComplete = denseTimelineMetadataCoverageIsComplete(result.tiles);
       for (var index = 0; index < result.tiles.length; index++) {
         final tile = result.tiles[index];
         if (tile != null && cachedTiles[index] == null) {
           _denseThumbTileCache.put(tileKeys[index], tile);
-        } else if (tile == null && hashes[index] != null && !widget.deferHighResolution) {
+        } else if (tile == null && !widget.deferHighResolution) {
           _requestActualThumbnail(index, targetPixels, atlasKey, generation);
         }
       }
@@ -1842,7 +1908,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
           _atlas!.height == targetPixels * (hashes.length / widget.columnCount).ceil();
       if (keepExistingAtlas) {
         atlas.dispose();
-        if (_requiredActualCount == 0) {
+        if (metadataAtlasComplete && _requiredActualCount == 0) {
           _persistentExact = true;
           _denseRowAtlasCache.put(_completeAtlasKey, _atlas!, signature: _contentSignature);
           _denseRowAtlasCache.put(_slotAtlasKey, _atlas!, signature: _contentSignature);
@@ -1857,7 +1923,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         _replaceAtlas(atlas);
         _baseAtlasReady = true;
       });
-      if (_requiredActualCount == 0) {
+      if (metadataAtlasComplete && _requiredActualCount == 0) {
         _persistentExact = true;
         _denseRowAtlasCache.put(_completeAtlasKey, atlas, signature: _contentSignature);
         _denseRowAtlasCache.put(_slotAtlasKey, atlas, signature: _contentSignature);
@@ -1869,20 +1935,31 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         unawaited(_persistAtlas(atlas, exact: false));
       }
       _maybeBuildCompositeAtlas(atlasKey, generation);
-    } on _DenseLoadCancelled {
+    } on _DenseLoadCancelled catch (error) {
       if (mounted && generation == _generation) {
         _metadataAtlasRequested = false;
+        if (error.retry) {
+          _scheduleMetadataRetry();
+        }
       }
       return;
     } catch (_) {
       if (!mounted || generation != _generation) {
         return;
       }
+      _metadataAtlasRequested = false;
       if (!widget.deferHighResolution) {
-        for (var index = 0; index < hashes.length; index++) {
-          _requestActualThumbnail(index, targetPixels, atlasKey, generation, priority: 0);
-        }
+        // A malformed hash, codec failure, or platform atlas error must never
+        // leave the panel as a permanent empty surface. Resolve real cached
+        // thumbnails while a later metadata-atlas retry repairs the fast path.
+        _queueMissingActualThumbnails(
+          thumbnailTargetPixels: targetPixels,
+          atlasKey: atlasKey,
+          generation: generation,
+          includeHashed: true,
+        );
       }
+      _scheduleMetadataRetry(delay: const Duration(milliseconds: 180));
     }
   }
 
@@ -2211,6 +2288,8 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
 
   void _unsubscribeFromImages({bool preserveAtlas = false}) {
     _generation++;
+    _metadataRetryTimer?.cancel();
+    _metadataRetryTimer = null;
     _cancelActualThumbnailWork();
     _images = const [];
     _streams = const [];

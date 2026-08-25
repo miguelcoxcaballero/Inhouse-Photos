@@ -146,6 +146,29 @@ void main() {
       for (var y = 0; y < 8; y++)
         for (var x = 8; x < 16; x++) atlas[(y * 16 + x) * 4 + 3],
     ], everyElement(0));
+    expect(denseTimelineMetadataCoverageIsComplete([Uint8List(4), null]), isFalse);
+    expect(denseTimelineMetadataCoverageIsComplete([Uint8List(4), Uint8List(4)]), isTrue);
+  });
+
+  test('dense atlas scheduling keeps centre-visible panels ahead of distant queued work', () async {
+    final queue = DenseTimelineTaskQueue(1, maxPending: 2);
+    final releaseActive = Completer<void>();
+    final executionOrder = <String>[];
+
+    final active = queue.schedule(() async {
+      await releaseActive.future;
+      executionOrder.add('active');
+    });
+    final distant = queue.schedule(() async => executionOrder.add('distant'), priority: 900);
+    final distantWasDiscarded = expectLater(distant, throwsA(isA<Object>()));
+    final nearby = queue.schedule(() async => executionOrder.add('nearby'), priority: 120);
+    final centre = queue.schedule(() async => executionOrder.add('centre'), priority: 0);
+
+    await distantWasDiscarded;
+    releaseActive.complete();
+    await Future.wait([active, nearby, centre]);
+
+    expect(executionOrder, ['active', 'centre', 'nearby']);
   });
 
   test('dense day buckets preserve stable asset offsets inside the same timeline', () {

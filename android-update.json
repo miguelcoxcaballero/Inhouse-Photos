@@ -1,7 +1,7 @@
 {
-  "version": "3.1.54",
-  "versionCode": 7112,
+  "version": "3.1.55",
+  "versionCode": 7113,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.54-app-health-offline/Inhouse-Photos-3.1.54-arm64.apk",
-  "sha256": "f1acbf2b67300af75e1ee06436a331cec82f33aa73ff2aca889e59953e8841c8"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.55-dense-grid-visibility/Inhouse-Photos-3.1.55-arm64.apk",
+  "sha256": "33ff170f300db0c6c3ca430bb4fa3c49d8698a57090df77f9fa9d46c3ccef0f7"
 }
