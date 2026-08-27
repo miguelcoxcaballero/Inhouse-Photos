@@ -218,6 +218,7 @@ export type ConcurrentQueueName = Exclude<
   | QueueName.FacialRecognition
   | QueueName.DuplicateDetection
   | QueueName.BackupDatabase
+  | QueueName.StorageSaverCompression
 >;
 
 export type Jobs = { [K in JobItem['name']]: (JobItem & { name: K })['data'] };

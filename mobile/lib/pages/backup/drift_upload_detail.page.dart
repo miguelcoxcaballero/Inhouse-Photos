@@ -26,13 +26,13 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
     final uploadItems = ref.watch(driftBackupProvider.select((state) => state.uploadItems));
     final iCloudProgress = ref.watch(driftBackupProvider.select((state) => state.iCloudDownloadProgress));
 
-    final uploadingItems = uploadItems.values
-        .where(
-          (item) =>
-              item.isFailed != true &&
-              (item.progress < 1.0 || (item.compressionExpected && item.preparationProgress < 1.0)),
-        )
-        .toList();
+    final uploadingItems = uploadItems.values.where((item) => item.isActivelyUploading).toList();
+    final processingItems = uploadItems.values.where((item) => item.isCloudProcessing).toList()
+      ..sort((a, b) {
+        final aActive = a.compressionState == 'compressing' ? 0 : 1;
+        final bActive = b.compressionState == 'compressing' ? 0 : 1;
+        return aActive.compareTo(bActive);
+      });
     final failedItems = uploadItems.values.where((item) => item.isFailed == true).toList();
 
     return Scaffold(
@@ -42,13 +42,14 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
         elevation: 0,
         scrolledUnderElevation: 1,
       ),
-      body: _buildTwoSectionLayout(context, uploadingItems, failedItems, iCloudProgress),
+      body: _buildTwoSectionLayout(context, uploadingItems, processingItems, failedItems, iCloudProgress),
     );
   }
 
   Widget _buildTwoSectionLayout(
     BuildContext context,
     List<DriftUploadStatus> uploadingItems,
+    List<DriftUploadStatus> processingItems,
     List<DriftUploadStatus> failedItems,
     Map<String, double> iCloudProgress,
   ) {
@@ -87,20 +88,50 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
             color: context.colorScheme.primary,
           ),
         ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: uploadingItems.isEmpty
-              ? SliverToBoxAdapter(child: _buildEmptyUploadState(context))
-              : SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: _buildCurrentUploadCard(context, uploadingItems[index]),
-                    ),
-                    childCount: uploadingItems.length,
-                  ),
+        if (uploadingItems.isNotEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: _buildCurrentUploadCard(context, uploadingItems[index]),
                 ),
-        ),
+                childCount: uploadingItems.length,
+              ),
+            ),
+          )
+        else if (processingItems.isEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverToBoxAdapter(child: _buildEmptyUploadState(context)),
+          ),
+
+        // Uploading and server-side optimization are separate stages. A fast
+        // network should never make completed transfers look as if they are
+        // still consuming phone bandwidth.
+        if (processingItems.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: _buildSectionHeader(
+              context,
+              title: 'Optimizing in cloud',
+              count: processingItems.length,
+              color: context.colorScheme.tertiary,
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: _buildCurrentUploadCard(context, processingItems[index]),
+                ),
+                childCount: processingItems.length,
+              ),
+            ),
+          ),
+        ],
 
         // Errors Section
         if (failedItems.isNotEmpty) ...[
@@ -233,7 +264,7 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
   }
 
   Widget _buildCurrentUploadCard(BuildContext context, DriftUploadStatus item) {
-    final isUploading = item.progress < 0.999;
+    final isUploading = item.isActivelyUploading;
     final activeProgress = isUploading ? item.progress : item.preparationProgress;
     final activeColor = isUploading ? context.colorScheme.primary : context.colorScheme.tertiary;
     return Card(
@@ -283,22 +314,21 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
                       const SizedBox(height: 3),
                       _buildCompactSizeSummary(context, item),
                       const SizedBox(height: 6),
-                      _buildCompactStageProgress(
-                        context,
-                        label: "backup_upload_stage".t(context: context),
-                        detail: item.networkSpeedAsString,
-                        progress: item.progress,
-                        color: context.colorScheme.primary,
-                      ),
-                      if (item.compressionExpected && !isUploading) ...[
-                        const SizedBox(height: 4),
+                      if (isUploading)
                         _buildCompactStageProgress(
                           context,
-                          label: 'Cloud compression',
+                          label: "backup_upload_stage".t(context: context),
+                          detail: item.networkSpeedAsString,
+                          progress: item.progress,
+                          color: context.colorScheme.primary,
+                        )
+                      else if (item.compressionExpected)
+                        _buildCompactStageProgress(
+                          context,
+                          label: item.compressionState == 'compressing' ? 'Cloud compression' : 'Queued on server',
                           progress: item.preparationProgress,
                           color: context.colorScheme.tertiary,
                         ),
-                      ],
                     ],
                   ),
                 ),

@@ -187,8 +187,9 @@ export class MediaRepository {
   async compressStorageSaverImage(
     input: string,
     output: string,
+    inputBytes: number,
     onProgress?: (progress: number) => void,
-  ): Promise<void> {
+  ): Promise<boolean> {
     onProgress?.(0.08);
     const metadata = await sharp(input, { failOn: 'none', limitInputPixels: false, unlimited: true }).metadata();
     onProgress?.(0.18);
@@ -196,6 +197,14 @@ export class MediaRepository {
     const height = metadata.height ?? 0;
     const maxPixels = 16_000_000;
     const scale = width > 0 && height > 0 && width * height > maxPixels ? Math.sqrt(maxPixels / (width * height)) : 1;
+
+    // Re-encoding a small, already-efficient JPEG often saves only a few KB
+    // while consuming most of a second of CPU. Keep it as-is so large backup
+    // bursts spend their server budget on media where compression matters.
+    if (metadata.format === 'jpeg' && scale === 1 && inputBytes <= 256 * 1024) {
+      onProgress?.(1);
+      return false;
+    }
 
     await sharp(input, { failOn: 'none', limitInputPixels: false, unlimited: true })
       .rotate()
@@ -205,13 +214,17 @@ export class MediaRepository {
         fit: 'inside',
         withoutEnlargement: true,
       })
-      .jpeg({ quality: 85, progressive: true, mozjpeg: true })
+      // libjpeg-turbo is substantially faster than mozjpeg and produces the
+      // same visual quality target. The caller still rejects any output that
+      // is not smaller than the source.
+      .jpeg({ quality: 85, progressive: true, chromaSubsampling: '4:2:0', mozjpeg: false })
       .toFile(output);
     onProgress?.(0.88);
 
     // Keep capture date, camera and location metadata in the server copy.
     await this.copyTagGroup('all', input, output);
     onProgress?.(0.96);
+    return true;
   }
 
   /** Encode a newly uploaded video to a broadly compatible 1080p Storage Saver copy. */
@@ -224,8 +237,9 @@ export class MediaRepository {
           '-map_metadata 0',
           '-vf scale=1920:1920:force_original_aspect_ratio=decrease:force_divisible_by=2',
           '-c:v libx264',
-          '-preset medium',
+          '-preset faster',
           '-crf 24',
+          '-threads 2',
           '-pix_fmt yuv420p',
           '-c:a aac',
           '-b:a 128k',

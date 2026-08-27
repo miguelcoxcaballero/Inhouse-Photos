@@ -1,7 +1,7 @@
 {
-  "version": "3.1.57",
-  "versionCode": 7115,
+  "version": "3.1.58",
+  "versionCode": 7116,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.57-faster-backup/Inhouse-Photos-3.1.57-arm64.apk",
-  "sha256": "30a23c39adbddc33627010bd0dc2cdbeff312b036711238210994e60f558c609"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.58-balanced-cloud-processing/Inhouse-Photos-3.1.58-arm64.apk",
+  "sha256": "c2042c918842d98c7e9dd85d74d5bd33bc734f9d64bebf8d4f951d169f3905b5"
 }

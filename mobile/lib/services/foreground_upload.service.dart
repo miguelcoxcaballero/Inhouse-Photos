@@ -225,10 +225,21 @@ class ForegroundUploadService {
 
     final speed = SettingsRepository.instance.appConfig.backup.speed;
     final transferPlan = speed.transferPlan(isUnmetered: isUnmetered, itemCount: items.length);
+    final waitsForServerCompression =
+        SettingsRepository.instance.appConfig.backup.quality == BackupQuality.storageSaver &&
+        callbacks.onServerCompressionExpected != null &&
+        callbacks.onSuccess != null;
+    // Keep enough requests in flight to saturate the connection, but do not
+    // let a fast phone create an unbounded server compression backlog. Original
+    // quality uploads retain the full 24-stream Maximum profile.
+    final compressionWindow = isUnmetered ? 12 : 6;
+    final uploadWorkerCount = waitsForServerCompression && transferPlan.uploadWorkers > compressionWindow
+        ? compressionWindow
+        : transferPlan.uploadWorkers;
     _logger.info(
       'Backup transfer plan: speed=$speed, unmetered=$isUnmetered, '
-      'prepare=${transferPlan.preparationWorkers}, upload=${transferPlan.uploadWorkers}, '
-      'acknowledge=${transferPlan.acknowledgementWorkers}',
+      'prepare=${transferPlan.preparationWorkers}, upload=$uploadWorkerCount, '
+      'acknowledge=${transferPlan.acknowledgementWorkers}, compressionGate=$waitsForServerCompression',
     );
     final prepared = _BoundedAsyncQueue<_PreparedAsset>(transferPlan.preparedQueueCapacity);
     final acknowledgements = _BoundedAsyncQueue<_UploadAcknowledgement>(transferPlan.acknowledgementQueueCapacity);
@@ -270,6 +281,20 @@ class ForegroundUploadService {
       }
     }
 
+    Future<void> acknowledgeUpload(_UploadAcknowledgement acknowledgement) async {
+      try {
+        final onSuccess = callbacks.onSuccess;
+        if (onSuccess != null) {
+          await Future<void>.value(onSuccess(acknowledgement.item.asset.localId!, acknowledgement.remoteAssetId));
+        }
+      } catch (error, stackTrace) {
+        _logger.severe(() => 'Error recording uploaded asset: $error', stackTrace);
+        callbacks.onError?.call(acknowledgement.item.asset.localId!, error.toString());
+      } finally {
+        await _cleanupPreparedAsset(acknowledgement.item);
+      }
+    }
+
     Future<void> uploadWorker() async {
       while (true) {
         final item = await prepared.take();
@@ -286,6 +311,13 @@ class ForegroundUploadService {
           await _cleanupPreparedAsset(item);
           continue;
         }
+        if (waitsForServerCompression) {
+          // The success callback completes once the matching websocket event
+          // says server compression has settled. Reusing this worker only then
+          // turns the network pool into a bounded end-to-end pipeline.
+          await acknowledgeUpload(acknowledgement);
+          continue;
+        }
         if (!await acknowledgements.add(acknowledgement)) {
           await _cleanupPreparedAsset(item);
         }
@@ -298,23 +330,15 @@ class ForegroundUploadService {
         if (acknowledgement == null) {
           return;
         }
-        try {
-          final onSuccess = callbacks.onSuccess;
-          if (onSuccess != null) {
-            await Future<void>.value(onSuccess(acknowledgement.item.asset.localId!, acknowledgement.remoteAssetId));
-          }
-        } catch (error, stackTrace) {
-          _logger.severe(() => 'Error recording uploaded asset: $error', stackTrace);
-          callbacks.onError?.call(acknowledgement.item.asset.localId!, error.toString());
-        } finally {
-          await _cleanupPreparedAsset(acknowledgement.item);
-        }
+        await acknowledgeUpload(acknowledgement);
       }
     }
 
     final preparationWorkers = List.generate(transferPlan.preparationWorkers, (_) => prepareWorker());
-    final uploadWorkers = List.generate(transferPlan.uploadWorkers, (_) => uploadWorker());
-    final acknowledgementWorkers = List.generate(transferPlan.acknowledgementWorkers, (_) => acknowledgementWorker());
+    final uploadWorkers = List.generate(uploadWorkerCount, (_) => uploadWorker());
+    final acknowledgementWorkers = waitsForServerCompression
+        ? <Future<void>>[]
+        : List.generate(transferPlan.acknowledgementWorkers, (_) => acknowledgementWorker());
 
     await Future.wait(preparationWorkers);
     prepared.close();

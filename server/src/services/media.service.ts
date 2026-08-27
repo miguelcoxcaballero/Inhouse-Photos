@@ -74,7 +74,7 @@ export class MediaService extends BaseService {
     this.websocketRepository.clientSend('StorageSaverProgressV1', event.userId, event);
   }
 
-  @OnJob({ name: JobName.AssetCompressStorageSaver, queue: QueueName.VideoConversion })
+  @OnJob({ name: JobName.AssetCompressStorageSaver, queue: QueueName.StorageSaverCompression })
   async handleStorageSaverCompression({ id }: JobOf<JobName.AssetCompressStorageSaver>): Promise<JobStatus> {
     const asset = await this.assetRepository.getById(id);
     if (!asset?.originalPath) {
@@ -117,9 +117,16 @@ export class MediaService extends BaseService {
           report(progress, 'compressing'),
         );
       } else if (asset.type === AssetType.Image && !isGif) {
-        await this.mediaRepository.compressStorageSaverImage(sourcePath, outputPath, (progress) =>
-          report(progress, 'compressing'),
+        const encoded = await this.mediaRepository.compressStorageSaverImage(
+          sourcePath,
+          outputPath,
+          sourceStats.size,
+          (progress) => report(progress, 'compressing'),
         );
+        if (!encoded) {
+          report(1, 'skipped', sourceStats.size);
+          return JobStatus.Skipped;
+        }
       } else {
         report(1, 'skipped', sourceStats.size);
         return JobStatus.Skipped;

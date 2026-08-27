@@ -36,6 +36,11 @@ const asNightlyTasksCron = (config: SystemConfig) => {
   return `${minutes} ${hours} * * *`;
 };
 
+const storageSaverConcurrencyValue = Number.parseInt(process.env.INHOUSE_STORAGE_SAVER_CONCURRENCY ?? '4', 10);
+const STORAGE_SAVER_COMPRESSION_CONCURRENCY = Number.isFinite(storageSaverConcurrencyValue)
+  ? Math.min(8, Math.max(1, storageSaverConcurrencyValue))
+  : 4;
+
 @Injectable()
 export class QueueService extends BaseService {
   private services: (new (...args: any[]) => unknown)[] = [];
@@ -93,7 +98,12 @@ export class QueueService extends BaseService {
   private updateConcurrency(config: SystemConfig) {
     this.logger.debug(`Updating queue concurrency settings`);
     for (const queueName of Object.values(QueueName)) {
-      const concurrency = this.isConcurrentQueue(queueName) ? config.job[queueName].concurrency : 1;
+      const concurrency =
+        queueName === QueueName.StorageSaverCompression
+          ? STORAGE_SAVER_COMPRESSION_CONCURRENCY
+          : this.isConcurrentQueue(queueName)
+            ? config.job[queueName].concurrency
+            : 1;
       this.logger.debug(`Setting ${queueName} concurrency to ${concurrency}`);
       this.jobRepository.setConcurrency(queueName, concurrency);
     }
@@ -257,6 +267,7 @@ export class QueueService extends BaseService {
       QueueName.StorageTemplateMigration,
       QueueName.DuplicateDetection,
       QueueName.BackupDatabase,
+      QueueName.StorageSaverCompression,
     ].includes(name);
   }
 

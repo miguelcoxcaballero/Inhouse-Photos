@@ -14,5 +14,7 @@ void main() {
     expect(uploader, contains('transferPlan.uploadWorkers'));
     expect(uploader, contains('transferPlan.preparationWorkers'));
     expect(uploader, contains('transferPlan.acknowledgementWorkers'));
+    expect(uploader, contains('waitsForServerCompression'));
+    expect(uploader, contains('compressionWindow'));
   });
 }

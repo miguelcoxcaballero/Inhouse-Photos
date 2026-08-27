@@ -61,6 +61,11 @@ class DriftUploadStatus {
     this.error,
   });
 
+  bool get isActivelyUploading => isFailed != true && progress < 0.999;
+
+  bool get isCloudProcessing =>
+      isFailed != true && progress >= 0.999 && compressionExpected && preparationProgress < 0.999;
+
   DriftUploadStatus copyWith({
     String? taskId,
     String? filename,
@@ -261,6 +266,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   late final StreamSubscription<ServerCompressionProgressEvent> _compressionSubscription;
   final Map<String, String> _remoteToLocalAssetIds = {};
   final Map<String, ServerCompressionProgressEvent> _pendingCompressionEvents = {};
+  final Map<String, Completer<void>> _compressionWaiters = {};
   Future<void> _storageStatsWrite = Future.value();
   bool _failureNotificationSent = false;
 
@@ -268,8 +274,18 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
 
   @override
   void dispose() {
+    _releaseCompressionWaiters();
     unawaited(_compressionSubscription.cancel());
     super.dispose();
+  }
+
+  void _releaseCompressionWaiters() {
+    for (final waiter in _compressionWaiters.values) {
+      if (!waiter.isCompleted) {
+        waiter.complete();
+      }
+    }
+    _compressionWaiters.clear();
   }
 
   /// Remove upload item from state
@@ -384,6 +400,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     }
     _restartForegroundBackup = false;
     _uploadSpeedManager.clear();
+    _releaseCompressionWaiters();
     _remoteToLocalAssetIds.clear();
     _pendingCompressionEvents.clear();
     state = state.copyWith(uploadItems: {}, iCloudDownloadProgress: {});
@@ -469,6 +486,10 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   }
 
   Future<void> _handleForegroundBackupSuccess(String userId, String localAssetId, String remoteAssetId) async {
+    final expectsCompression = state.uploadItems[localAssetId]?.compressionExpected == true;
+    final compressionWaiter = expectsCompression
+        ? _compressionWaiters.putIfAbsent(remoteAssetId, Completer<void>.new)
+        : null;
     _remoteToLocalAssetIds[remoteAssetId] = localAssetId;
     final pendingCompression = _pendingCompressionEvents.remove(remoteAssetId);
     if (pendingCompression != null) {
@@ -503,6 +524,21 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
       _failureNotificationSent = false;
       unawaited(FlutterLocalNotificationsPlugin().cancel(_backupHealthNotificationId));
     }
+
+    // Keep this upload slot reserved until the server reports that compression
+    // completed, was skipped, or failed. This prevents a fast connection from
+    // continuously outrunning the bounded server encoder queue.
+    if (compressionWaiter != null && !compressionWaiter.isCompleted) {
+      try {
+        await compressionWaiter.future.timeout(const Duration(minutes: 5));
+      } on TimeoutException {
+        _logger.warning('Timed out waiting for server compression of $remoteAssetId; releasing upload slot');
+      } finally {
+        if (identical(_compressionWaiters[remoteAssetId], compressionWaiter)) {
+          _compressionWaiters.remove(remoteAssetId);
+        }
+      }
+    }
   }
 
   bool _isCompressionFinished(String compressionState) =>
@@ -524,12 +560,19 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
       return;
     }
 
+    final finished = event.isFinished;
+    if (finished) {
+      final compressionWaiter = _compressionWaiters.remove(event.assetId);
+      if (compressionWaiter != null && !compressionWaiter.isCompleted) {
+        compressionWaiter.complete();
+      }
+    }
+
     final currentItem = state.uploadItems[localAssetId];
     if (currentItem == null) {
       return;
     }
 
-    final finished = event.isFinished;
     state = state.copyWith(
       uploadItems: {
         ...state.uploadItems,
