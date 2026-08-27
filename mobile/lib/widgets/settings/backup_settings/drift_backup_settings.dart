@@ -131,17 +131,17 @@ class _BackupSpeedSheet extends ConsumerWidget {
                 _BackupSpeedOption(
                   value: BackupSpeedMode.balanced,
                   title: 'Balanced',
-                  subtitle: 'Three uploads at once with a small preparation buffer.',
+                  subtitle: 'Up to 6 uploads at once on Wi-Fi with moderate battery use.',
                 ),
                 _BackupSpeedOption(
                   value: BackupSpeedMode.fast,
                   title: 'Fast',
-                  subtitle: 'Five uploads at once. Best for reliable Wi-Fi.',
+                  subtitle: 'Up to 12 uploads at once. Best for reliable Wi-Fi.',
                 ),
                 _BackupSpeedOption(
                   value: BackupSpeedMode.maximum,
                   title: 'Maximum',
-                  subtitle: 'Up to eight uploads at once. May use more battery and make the phone warm.',
+                  subtitle: 'Up to 24 uploads at once on Wi-Fi. Uses all available bandwidth.',
                 ),
               ],
             ),

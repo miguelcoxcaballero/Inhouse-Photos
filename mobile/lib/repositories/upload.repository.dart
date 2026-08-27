@@ -203,7 +203,10 @@ class UploadRepository {
 class ProgressMultipartRequest extends MultipartRequest with Abortable {
   ProgressMultipartRequest(super.method, super.url, {this.abortTrigger, this.onProgress});
 
-  static const progressUpdateInterval = Duration(milliseconds: 200);
+  // With up to 24 active transfers, emitting progress more often than this can
+  // spend a measurable amount of UI-isolate time rebuilding the details view.
+  // Completion is always emitted immediately, so this does not delay state.
+  static const progressUpdateInterval = Duration(milliseconds: 400);
 
   @override
   final Future<void>? abortTrigger;

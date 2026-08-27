@@ -10,7 +10,9 @@ void main() {
     expect(worker, isNot(contains('useSequentialUpload: true')));
     expect(worker, contains('backup.speed'));
     expect(uploader, contains('_uploadWithPipeline'));
-    expect(uploader, contains('speed.uploadWorkers'));
-    expect(uploader, contains('speed.preparationWorkers'));
+    expect(uploader, contains('speed.transferPlan'));
+    expect(uploader, contains('transferPlan.uploadWorkers'));
+    expect(uploader, contains('transferPlan.preparationWorkers'));
+    expect(uploader, contains('transferPlan.acknowledgementWorkers'));
   });
 }

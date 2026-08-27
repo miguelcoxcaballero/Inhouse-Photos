@@ -78,8 +78,9 @@ private enum class AuthCookie(val cookieName: String, val httpOnly: Boolean) {
 object HttpClientManager {
   private const val CACHE_SIZE_BYTES = 100L * 1024 * 1024  // 100MiB
   const val MEDIA_CACHE_SIZE_BYTES = 1024L * 1024 * 1024  // 1GiB
-  private const val KEEP_ALIVE_CONNECTIONS = 10
+  private const val KEEP_ALIVE_CONNECTIONS = 32
   private const val KEEP_ALIVE_DURATION_MINUTES = 5L
+  private const val MAX_REQUESTS = 64
   private const val MAX_REQUESTS_PER_HOST = 64
 
   private var initialized = false
@@ -373,7 +374,10 @@ object HttpClientManager {
         it.proceed(builder.build())
       }
       .connectionPool(connectionPool)
-      .dispatcher(Dispatcher().apply { maxRequestsPerHost = MAX_REQUESTS_PER_HOST })
+      .dispatcher(Dispatcher().apply {
+        maxRequests = MAX_REQUESTS
+        maxRequestsPerHost = MAX_REQUESTS_PER_HOST
+      })
       .cache(Cache(cacheDir.apply { mkdirs() }, CACHE_SIZE_BYTES))
       .sslSocketFactory(sslContext.socketFactory, trustManager)
       .build()

@@ -198,6 +198,7 @@ class ForegroundUploadService {
       await _uploadWithPipeline(
         items: candidates,
         cancelToken: cancelToken,
+        isUnmetered: hasWifi,
         shouldSkip: (asset) {
           final requireWifi = _shouldRequireWiFi(asset);
           return requireWifi && !hasWifi;
@@ -215,6 +216,7 @@ class ForegroundUploadService {
   Future<void> _uploadWithPipeline({
     required List<LocalAsset> items,
     required Completer<void>? cancelToken,
+    required bool isUnmetered,
     required bool Function(LocalAsset) shouldSkip,
     required UploadCallbacks callbacks,
   }) async {
@@ -222,8 +224,14 @@ class ForegroundUploadService {
     shouldAbortUpload = false;
 
     final speed = SettingsRepository.instance.appConfig.backup.speed;
-    final prepared = _BoundedAsyncQueue<_PreparedAsset>(speed.preparedQueueCapacity);
-    final acknowledgements = _BoundedAsyncQueue<_UploadAcknowledgement>(speed.uploadWorkers * 2);
+    final transferPlan = speed.transferPlan(isUnmetered: isUnmetered, itemCount: items.length);
+    _logger.info(
+      'Backup transfer plan: speed=$speed, unmetered=$isUnmetered, '
+      'prepare=${transferPlan.preparationWorkers}, upload=${transferPlan.uploadWorkers}, '
+      'acknowledge=${transferPlan.acknowledgementWorkers}',
+    );
+    final prepared = _BoundedAsyncQueue<_PreparedAsset>(transferPlan.preparedQueueCapacity);
+    final acknowledgements = _BoundedAsyncQueue<_UploadAcknowledgement>(transferPlan.acknowledgementQueueCapacity);
     var currentIndex = 0;
 
     // Wake producers blocked on a full preparation queue. Existing uploads are
@@ -304,9 +312,9 @@ class ForegroundUploadService {
       }
     }
 
-    final preparationWorkers = List.generate(speed.preparationWorkers, (_) => prepareWorker());
-    final uploadWorkers = List.generate(speed.uploadWorkers, (_) => uploadWorker());
-    final acknowledgementWorkers = List.generate(2, (_) => acknowledgementWorker());
+    final preparationWorkers = List.generate(transferPlan.preparationWorkers, (_) => prepareWorker());
+    final uploadWorkers = List.generate(transferPlan.uploadWorkers, (_) => uploadWorker());
+    final acknowledgementWorkers = List.generate(transferPlan.acknowledgementWorkers, (_) => acknowledgementWorker());
 
     await Future.wait(preparationWorkers);
     prepared.close();
@@ -476,7 +484,13 @@ class ForegroundUploadService {
     File? temporaryLivePhotoFile;
 
     try {
-      final entity = await _storageRepository.getAssetEntityForAsset(asset);
+      // These media-provider/database lookups are independent. Start them
+      // together so preparation can keep up with a high-bandwidth connection.
+      final (entity, isAvailableLocally, originalFilename) = await (
+        _storageRepository.getAssetEntityForAsset(asset),
+        _storageRepository.isAssetAvailableLocally(asset.id),
+        _assetMediaRepository.getOriginalFilename(asset.id),
+      ).wait;
       if (entity == null) {
         callbacks.onError?.call(
           asset.localId!,
@@ -484,8 +498,6 @@ class ForegroundUploadService {
         );
         return null;
       }
-
-      final isAvailableLocally = await _storageRepository.isAssetAvailableLocally(asset.id);
 
       if (!isAvailableLocally && CurrentPlatform.isIOS) {
         _logger.info("Loading iCloud asset ${asset.id} - ${asset.name}");
@@ -544,7 +556,7 @@ class ForegroundUploadService {
       sourceFile = file;
       sourceLivePhotoFile = livePhotoFile;
 
-      final fileName = await _assetMediaRepository.getOriginalFilename(asset.id) ?? asset.name;
+      final fileName = originalFilename ?? asset.name;
       // Some apps (e.g. DJI/Fusion) return names without an extension; fall back to the asset name for those.
       final extension = p.extension(file.path).isNotEmpty ? p.extension(file.path) : p.extension(asset.name);
       var originalFileName = p.setExtension(fileName, extension);

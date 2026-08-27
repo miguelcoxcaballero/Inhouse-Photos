@@ -46,6 +46,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 android/app/.cxx
+/android/.kotlin/
 
 # Fastlane
 ios/fastlane/report.xml

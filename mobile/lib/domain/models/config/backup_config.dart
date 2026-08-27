@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 enum BackupQuality { original, storageSaver }
 
 /// Controls how aggressively the backup pipeline uses device and network
@@ -5,27 +7,78 @@ enum BackupQuality { original, storageSaver }
 /// without touching the server or already backed-up assets.
 enum BackupSpeedMode { balanced, fast, maximum }
 
+/// Resolved concurrency for one backup run.
+///
+/// Keeping this as a value object makes the throughput policy deterministic
+/// and testable. Worker counts are capped by the number of pending assets, and
+/// both queues stay bounded so a large library cannot exhaust memory or file
+/// descriptors while the network is busy.
+class BackupTransferPlan {
+  final int preparationWorkers;
+  final int uploadWorkers;
+  final int acknowledgementWorkers;
+  final int preparedQueueCapacity;
+  final int acknowledgementQueueCapacity;
+
+  const BackupTransferPlan({
+    required this.preparationWorkers,
+    required this.uploadWorkers,
+    required this.acknowledgementWorkers,
+    required this.preparedQueueCapacity,
+    required this.acknowledgementQueueCapacity,
+  });
+
+  static const empty = BackupTransferPlan(
+    preparationWorkers: 0,
+    uploadWorkers: 0,
+    acknowledgementWorkers: 0,
+    preparedQueueCapacity: 0,
+    acknowledgementQueueCapacity: 0,
+  );
+}
+
 extension BackupSpeedModeProfile on BackupSpeedMode {
-  /// Number of compression/file-acquisition workers.
-  int get preparationWorkers => switch (this) {
-    .balanced => 2,
-    .fast => 3,
-    .maximum => 4,
-  };
+  /// Builds an adaptive plan for the current network and remaining library.
+  ///
+  /// HTTPS request latency is significant when backing up many small photos.
+  /// Wi-Fi therefore uses enough concurrent requests to keep the connection
+  /// saturated. Metered networks remain deliberately more conservative.
+  BackupTransferPlan transferPlan({required bool isUnmetered, required int itemCount}) {
+    if (itemCount <= 0) {
+      return BackupTransferPlan.empty;
+    }
 
-  /// Number of concurrent network requests. This is deliberately independent
-  /// from preparation workers so the network stays busy while later assets are
-  /// being compressed.
-  int get uploadWorkers => switch (this) {
-    .balanced => 3,
-    .fast => 5,
-    .maximum => 8,
-  };
+    final uploadLimit = switch (this) {
+      .balanced => isUnmetered ? 6 : 3,
+      .fast => isUnmetered ? 12 : 6,
+      .maximum => isUnmetered ? 24 : 12,
+    };
+    final preparationLimit = switch (this) {
+      .balanced => isUnmetered ? 4 : 2,
+      .fast => isUnmetered ? 6 : 3,
+      .maximum => isUnmetered ? 8 : 4,
+    };
+    final acknowledgementLimit = switch (this) {
+      .balanced => 2,
+      .fast => isUnmetered ? 3 : 2,
+      .maximum => isUnmetered ? 6 : 3,
+    };
 
-  /// Prepared files are held on disk, so keeping this bounded prevents a large
-  /// library from filling temporary storage while still giving upload workers a
-  /// useful read-ahead buffer.
-  int get preparedQueueCapacity => uploadWorkers * 2;
+    final uploadWorkers = math.min(itemCount, uploadLimit);
+    final preparationWorkers = math.min(itemCount, preparationLimit);
+    final acknowledgementWorkers = math.min(itemCount, acknowledgementLimit);
+
+    return BackupTransferPlan(
+      preparationWorkers: preparationWorkers,
+      uploadWorkers: uploadWorkers,
+      acknowledgementWorkers: acknowledgementWorkers,
+      // A deeper read-ahead queue prevents slow Android media-provider lookups
+      // from starving a fast connection. The queue implementation also caps
+      // capacities at 64 as a final safety net.
+      preparedQueueCapacity: math.min(64, uploadWorkers * 3),
+      acknowledgementQueueCapacity: math.min(64, uploadWorkers * 4),
+    );
+  }
 }
 
 class BackupConfig {
@@ -48,7 +101,7 @@ class BackupConfig {
     this.triggerDelay = 30,
     this.syncAlbums = false,
     this.quality = BackupQuality.storageSaver,
-    this.speed = BackupSpeedMode.balanced,
+    this.speed = BackupSpeedMode.maximum,
     this.uploadedOriginalBytes = 0,
     this.storedBytes = 0,
   });

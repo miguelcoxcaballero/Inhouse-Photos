@@ -1,7 +1,7 @@
 {
-  "version": "3.1.56",
-  "versionCode": 7114,
+  "version": "3.1.57",
+  "versionCode": 7115,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.56-dense-grid-renderer/Inhouse-Photos-3.1.56-arm64.apk",
-  "sha256": "0242d7a029ffd6c80e9e2f3e00fcc038c5c31c318828873506cca76561f4a4fd"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.57-faster-backup/Inhouse-Photos-3.1.57-arm64.apk",
+  "sha256": "30a23c39adbddc33627010bd0dc2cdbeff312b036711238210994e60f558c609"
 }
