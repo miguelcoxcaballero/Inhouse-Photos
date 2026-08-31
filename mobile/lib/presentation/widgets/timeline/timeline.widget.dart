@@ -676,6 +676,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
             onLoading: widget.loadingWidget != null ? () => widget.loadingWidget! : null,
             onData: (segments) {
               final childCount = (segments.lastOrNull?.lastIndex ?? -1) + 1;
+              final denseChildIndexes = usesBatchedTimelineGrid(_perRow) ? segments.childIndexesByKey() : null;
               final double appBarExpandedHeight = widget.appBar != null && widget.appBar is MesmerizingSliverAppBar
                   ? 200
                   : 0;
@@ -704,9 +705,16 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                           return null;
                         }
                         final segment = segments.findByIndex(index);
-                        return segment?.builder(ctx, index) ?? const SizedBox.shrink();
+                        if (segment == null) {
+                          return const SizedBox.shrink();
+                        }
+                        final child = segment.builder(ctx, index);
+                        return denseChildIndexes == null
+                            ? child
+                            : KeyedSubtree(key: segment.childKey(index), child: child);
                       },
                       childCount: childCount,
+                      findChildIndexCallback: denseChildIndexes == null ? null : (key) => denseChildIndexes[key],
                       addAutomaticKeepAlives: false,
                       // We add repaint boundary around tiles, so skip the auto boundaries
                       addRepaintBoundaries: false,

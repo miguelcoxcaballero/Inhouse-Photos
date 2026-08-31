@@ -48,6 +48,13 @@ abstract class Segment {
   int getMaxChildIndexForScrollOffset(double scrollOffset);
   double indexToLayoutOffset(int index);
 
+  /// Stable identity for a sliver child across timeline refreshes.
+  ///
+  /// Uploading a new photo changes the global child indexes of every later
+  /// bucket. Giving the sliver a bucket-relative key lets it move the existing
+  /// render/state objects instead of briefly recycling them for another day.
+  Key childKey(int index);
+
   Widget builder(BuildContext context, int index);
 
   @override
@@ -94,4 +101,16 @@ extension SegmentListExtension on List<Segment> {
   Segment? findByIndex(int index) => firstWhereOrNull((s) => s.containsIndex(index));
 
   Segment? findByOffset(double offset) => firstWhereOrNull((s) => s.isWithinOffset(offset)) ?? lastOrNull;
+
+  /// Reverse lookup used by [SliverChildBuilderDelegate] to move an existing
+  /// dense row when an earlier day gains or loses children.
+  Map<Key, int> childIndexesByKey() {
+    final indexes = <Key, int>{};
+    for (final segment in this) {
+      for (var index = segment.firstIndex; index <= segment.lastIndex; index++) {
+        indexes[segment.childKey(index)] = index;
+      }
+    }
+    return indexes;
+  }
 }

@@ -11,6 +11,7 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment_builder.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_layout_transition.dart';
@@ -146,8 +147,44 @@ void main() {
       for (var y = 0; y < 8; y++)
         for (var x = 8; x < 16; x++) atlas[(y * 16 + x) * 4 + 3],
     ], everyElement(0));
-    expect(denseTimelineMetadataCoverageIsComplete([Uint8List(4), null]), isFalse);
-    expect(denseTimelineMetadataCoverageIsComplete([Uint8List(4), Uint8List(4)]), isTrue);
+    expect(denseTimelineMetadataCoverageIsComplete([true, false]), isFalse);
+    expect(denseTimelineMetadataCoverageIsComplete([true, true]), isTrue);
+  });
+
+  test('cells without a ThumbHash are painted opaque instead of punching a hole', () {
+    const placeholder = 0x30405060;
+    final atlas = buildDenseThumbhashAtlasPixels([null, null], 4, placeholderColor: placeholder);
+
+    expect(atlas, hasLength(4 * 8 * 4));
+    expect([
+      for (var y = 0; y < 4; y++)
+        for (var x = 0; x < 8; x++) atlas[(y * 8 + x) * 4 + 3],
+    ], everyElement(0x60));
+    expect(atlas.sublist(0, 4), [0x30, 0x40, 0x50, 0x60]);
+  });
+
+  test('the ThumbHash fallback texture never grows past its own level of detail', () {
+    // A ThumbHash carries a handful of DCT coefficients. Expanding it to a
+    // 3x phone cell costs sixteen times the memory for no extra information,
+    // while the real thumbnails still composite at full physical resolution.
+    expect(denseTimelineTargetPixels(tileExtent: 35.8, devicePixelRatio: 3), 108);
+    expect(denseTimelineMetadataPixels(108), batchedGridMetadataCellPixels);
+    expect(denseTimelineMetadataPixels(batchedGridMetadataCellPixels), batchedGridMetadataCellPixels);
+  });
+
+  test('a dense cell is upgraded exactly when its physical size outgrows a ThumbHash', () {
+    // 390pt phone at 3x: 12, 18 and 24 columns all deserve real thumbnails.
+    for (final columnCount in [12, 18, 24]) {
+      final targetPixels = denseTimelineTargetPixels(tileExtent: 390 / columnCount, devicePixelRatio: 3);
+      expect(denseTimelineNeedsThumbnailUpgrade(targetPixels), isTrue, reason: '$columnCount columns');
+    }
+    // At 36 and 48 columns a tile is smaller than the fallback texture cell,
+    // so upgrading would cost thousands of requests for no visible detail.
+    for (final columnCount in [36, 48]) {
+      final targetPixels = denseTimelineTargetPixels(tileExtent: 390 / columnCount, devicePixelRatio: 3);
+      expect(targetPixels, lessThan((batchedGridMetadataCellPixels * 3) ~/ 2));
+      expect(denseTimelineNeedsThumbnailUpgrade(targetPixels), isFalse, reason: '$columnCount columns');
+    }
   });
 
   test('dense atlas scheduling keeps centre-visible panels ahead of distant queued work', () async {
@@ -189,6 +226,29 @@ void main() {
     expect(segments[1].firstAssetIndex, 2);
     expect(segments.last.header, HeaderType.year);
     expect(segments.last.firstAssetIndex, 5);
+  });
+
+  test('dense day rows keep their sliver identity when an earlier day grows', () {
+    List<Segment> build(int newestDayCount) => FixedSegmentBuilder(
+      buckets: [
+        TimeBucket(date: DateTime(2026, 8, 14), assetCount: newestDayCount),
+        TimeBucket(date: DateTime(2026, 8, 13), assetCount: 3),
+      ],
+      tileHeight: 24,
+      columnCount: 12,
+      spacing: 0,
+    ).generate();
+
+    final before = build(1);
+    final after = build(120);
+    final beforeRow = before[1].gridIndex;
+    final afterRow = after[1].gridIndex;
+    final stableKey = before[1].childKey(beforeRow);
+
+    expect(afterRow, isNot(beforeRow), reason: 'the global sliver index must actually have shifted');
+    expect(after[1].childKey(afterRow), stableKey);
+    expect(before.childIndexesByKey()[stableKey], beforeRow);
+    expect(after.childIndexesByKey()[stableKey], afterRow);
   });
 
   test('asset transition moves and resizes a tile into its new grid rectangle', () {

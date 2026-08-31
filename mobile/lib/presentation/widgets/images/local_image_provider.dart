@@ -44,13 +44,13 @@ class LocalThumbProvider extends CancellableImageProvider<LocalThumbProvider>
       return true;
     }
     if (other is LocalThumbProvider) {
-      return id == other.id;
+      return id == other.id && size == other.size && assetType == other.assetType;
     }
     return false;
   }
 
   @override
-  int get hashCode => id.hashCode;
+  int get hashCode => Object.hash(id, size, assetType);
 }
 
 class LocalFullImageProvider extends CancellableImageProvider<LocalFullImageProvider>

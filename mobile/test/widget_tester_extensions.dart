@@ -15,11 +15,15 @@ extension PumpConsumerWidget on WidgetTester {
   ///       |-Material
   ///         |-[widget]
   ///
+  /// Set [settle] to false when the test needs to observe an intermediate
+  /// state, such as a timeline whose rows are still loading; `pumpAndSettle`
+  /// would otherwise wait for exactly the state under test to disappear.
   Future<void> pumpConsumerWidget(
     Widget widget, {
     Duration? duration,
     EnginePhase phase = EnginePhase.sendSemanticsUpdate,
     List<Override> overrides = const [],
+    bool settle = true,
   }) async {
     await pumpWidget(
       EasyLocalization(
@@ -46,6 +50,8 @@ extension PumpConsumerWidget on WidgetTester {
       duration: duration,
       phase: phase,
     );
-    await pumpAndSettle();
+    if (settle) {
+      await pumpAndSettle();
+    }
   }
 }

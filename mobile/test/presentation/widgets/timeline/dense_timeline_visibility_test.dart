@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -22,7 +23,7 @@ String _testThumbHash() {
   return base64Encode(thumbhash.rgbaToThumbHash(4, 4, rgba));
 }
 
-TimelineService _denseService(int assetCount) {
+TimelineService _denseService(int assetCount, {int assetsPerBucket = 1}) {
   final hash = _testThumbHash();
   final now = DateTime(2026, 8, 25);
   final assets = List<BaseAsset>.generate(
@@ -42,9 +43,13 @@ TimelineService _denseService(int assetCount) {
     ),
     growable: false,
   );
+  final bucketCount = (assetCount / assetsPerBucket).ceil();
   final buckets = List<Bucket>.generate(
-    assetCount,
-    (index) => TimeBucket(date: now.subtract(Duration(days: index)), assetCount: 1),
+    bucketCount,
+    (index) => TimeBucket(
+      date: now.subtract(Duration(days: index)),
+      assetCount: math.min(assetsPerBucket, assetCount - (index * assetsPerBucket)),
+    ),
     growable: false,
   );
   return TimelineService((
@@ -89,4 +94,61 @@ void main() {
     expect(densePainters.where((painter) => (painter as dynamic).atlas != null), hasLength(densePainters.length));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('scrolling past the resident asset window leaves no blank panels', (tester) async {
+    tester.view.devicePixelRatio = 3;
+    tester.view.physicalSize = const Size(1206, 2619);
+    addTearDown(tester.view.reset);
+
+    // Well past `kTimelineAssetLoadBatchSize`, so the panels below the fold
+    // are built before their rows are resident and have to fall back to the
+    // cached atlas instead of to a separate placeholder widget.
+    final service = _denseService(3600, assetsPerBucket: 400);
+    addTearDown(service.dispose);
+
+    await tester.runAsync(() async {
+      await tester.pumpConsumerWidget(
+        const Timeline(
+          withScrubber: false,
+          readOnly: true,
+          appBar: SliverToBoxAdapter(child: SizedBox.shrink()),
+          bottomSheet: null,
+        ),
+        overrides: [
+          timelineServiceProvider.overrideWithValue(service),
+          appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 24))),
+        ],
+      );
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await tester.pump();
+
+      await tester.drag(find.byType(Timeline), const Offset(0, -1800));
+      await _settle(tester, const Duration(seconds: 2));
+      await tester.drag(find.byType(Timeline), const Offset(0, 900));
+      await _settle(tester, const Duration(seconds: 2));
+    });
+    await tester.pump();
+
+    final densePainters = tester
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .map((paint) => paint.painter)
+        .where((painter) => painter.runtimeType.toString() == '_DenseAssetRowPainter')
+        .toList(growable: false);
+    expect(densePainters, isNotEmpty);
+    expect(
+      densePainters.where((painter) => (painter as dynamic).atlas != null),
+      hasLength(densePainters.length),
+      reason: 'every panel that survived the scroll must still have something to paint',
+    );
+    expect(tester.takeException(), isNull);
+  });
+}
+
+Future<void> _settle(WidgetTester tester, Duration total) async {
+  const step = Duration(milliseconds: 50);
+  for (var elapsed = Duration.zero; elapsed < total; elapsed += step) {
+    await tester.pump(step);
+    await Future<void>.delayed(step);
+  }
+  await tester.pump();
 }
