@@ -95,53 +95,58 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('scrolling past the resident asset window leaves no blank panels', (tester) async {
-    tester.view.devicePixelRatio = 3;
-    tester.view.physicalSize = const Size(1206, 2619);
-    addTearDown(tester.view.reset);
+  for (final columnCount in [24, 48]) {
+    testWidgets('scrolling past the resident asset window leaves no blank panels at $columnCount columns', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 3;
+      tester.view.physicalSize = const Size(1206, 2619);
+      addTearDown(tester.view.reset);
 
-    // Well past `kTimelineAssetLoadBatchSize`, so the panels below the fold
-    // are built before their rows are resident and have to fall back to the
-    // cached atlas instead of to a separate placeholder widget.
-    final service = _denseService(3600, assetsPerBucket: 400);
-    addTearDown(service.dispose);
+      // Well past `kTimelineAssetLoadBatchSize`, so the panels below the fold
+      // are built before their rows are resident and have to fall back to the
+      // cached atlas instead of to a separate placeholder widget. 48 columns is
+      // the level the blurry/grey/flicker reports came from.
+      final service = _denseService(3600, assetsPerBucket: 400);
+      addTearDown(service.dispose);
 
-    await tester.runAsync(() async {
-      await tester.pumpConsumerWidget(
-        const Timeline(
-          withScrubber: false,
-          readOnly: true,
-          appBar: SliverToBoxAdapter(child: SizedBox.shrink()),
-          bottomSheet: null,
-        ),
-        overrides: [
-          timelineServiceProvider.overrideWithValue(service),
-          appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 24))),
-        ],
-      );
-      await Future<void>.delayed(const Duration(seconds: 1));
+      await tester.runAsync(() async {
+        await tester.pumpConsumerWidget(
+          const Timeline(
+            withScrubber: false,
+            readOnly: true,
+            appBar: SliverToBoxAdapter(child: SizedBox.shrink()),
+            bottomSheet: null,
+          ),
+          overrides: [
+            timelineServiceProvider.overrideWithValue(service),
+            appConfigProvider.overrideWithValue(AppConfig(timeline: TimelineConfig(tilesPerRow: columnCount))),
+          ],
+        );
+        await Future<void>.delayed(const Duration(seconds: 1));
+        await tester.pump();
+
+        await tester.drag(find.byType(Timeline), const Offset(0, -1800));
+        await _settle(tester, const Duration(seconds: 2));
+        await tester.drag(find.byType(Timeline), const Offset(0, 900));
+        await _settle(tester, const Duration(seconds: 2));
+      });
       await tester.pump();
 
-      await tester.drag(find.byType(Timeline), const Offset(0, -1800));
-      await _settle(tester, const Duration(seconds: 2));
-      await tester.drag(find.byType(Timeline), const Offset(0, 900));
-      await _settle(tester, const Duration(seconds: 2));
+      final densePainters = tester
+          .widgetList<CustomPaint>(find.byType(CustomPaint))
+          .map((paint) => paint.painter)
+          .where((painter) => painter.runtimeType.toString() == '_DenseAssetRowPainter')
+          .toList(growable: false);
+      expect(densePainters, isNotEmpty);
+      expect(
+        densePainters.where((painter) => (painter as dynamic).atlas != null),
+        hasLength(densePainters.length),
+        reason: 'every panel that survived the scroll must still have something to paint',
+      );
+      expect(tester.takeException(), isNull);
     });
-    await tester.pump();
-
-    final densePainters = tester
-        .widgetList<CustomPaint>(find.byType(CustomPaint))
-        .map((paint) => paint.painter)
-        .where((painter) => painter.runtimeType.toString() == '_DenseAssetRowPainter')
-        .toList(growable: false);
-    expect(densePainters, isNotEmpty);
-    expect(
-      densePainters.where((painter) => (painter as dynamic).atlas != null),
-      hasLength(densePainters.length),
-      reason: 'every panel that survived the scroll must still have something to paint',
-    );
-    expect(tester.takeException(), isNull);
-  });
+  }
 }
 
 Future<void> _settle(WidgetTester tester, Duration total) async {

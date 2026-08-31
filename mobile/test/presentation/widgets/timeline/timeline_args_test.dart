@@ -172,19 +172,34 @@ void main() {
     expect(denseTimelineMetadataPixels(batchedGridMetadataCellPixels), batchedGridMetadataCellPixels);
   });
 
-  test('a dense cell is upgraded exactly when its physical size outgrows a ThumbHash', () {
-    // 390pt phone at 3x: 12, 18 and 24 columns all deserve real thumbnails.
-    for (final columnCount in [12, 18, 24]) {
-      final targetPixels = denseTimelineTargetPixels(tileExtent: 390 / columnCount, devicePixelRatio: 3);
-      expect(denseTimelineNeedsThumbnailUpgrade(targetPixels), isTrue, reason: '$columnCount columns');
+  test('every dense cell is upgraded to a real thumbnail, including the densest levels', () {
+    // 3.1.59 only upgraded cells above a 48px threshold, which on a 1440px
+    // display left 36 and 48 columns permanently showing a ThumbHash smear.
+    // A ThumbHash carries a handful of DCT coefficients, so it is never a
+    // substitute for real pixels at any level a person actually browses.
+    for (final screenWidth in [1080.0, 1440.0]) {
+      for (final devicePixelRatio in [2.0, 3.0, 3.5]) {
+        for (final columnCount in timelineTilesPerRowSteps.where((count) => count > 6)) {
+          final targetPixels = denseTimelineTargetPixels(
+            tileExtent: screenWidth / devicePixelRatio / columnCount,
+            devicePixelRatio: devicePixelRatio,
+          );
+          expect(
+            denseTimelineNeedsThumbnailUpgrade(targetPixels),
+            isTrue,
+            reason: '$columnCount columns on ${screenWidth}px/$devicePixelRatio must not stay on the fallback',
+          );
+        }
+      }
     }
-    // At 36 and 48 columns a tile is smaller than the fallback texture cell,
-    // so upgrading would cost thousands of requests for no visible detail.
-    for (final columnCount in [36, 48]) {
-      final targetPixels = denseTimelineTargetPixels(tileExtent: 390 / columnCount, devicePixelRatio: 3);
-      expect(targetPixels, lessThan((batchedGridMetadataCellPixels * 3) ~/ 2));
-      expect(denseTimelineNeedsThumbnailUpgrade(targetPixels), isFalse, reason: '$columnCount columns');
-    }
+  });
+
+  test('the fallback texture stays small even when the cell is much larger', () {
+    // The fallback is upscaled by the painter rather than decoded at cell size:
+    // expanding a ThumbHash to a 120px cell costs 16x the memory and isolate
+    // transfer for no additional detail.
+    expect(denseTimelineMetadataPixels(denseTimelineTargetPixels(tileExtent: 40, devicePixelRatio: 3)), 32);
+    expect(denseTimelineMetadataPixels(denseTimelineTargetPixels(tileExtent: 8.6, devicePixelRatio: 3.5)), 32);
   });
 
   test('dense atlas scheduling keeps centre-visible panels ahead of distant queued work', () async {

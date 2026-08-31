@@ -68,15 +68,16 @@ int denseTimelineTargetPixels({required double tileExtent, required double devic
 /// [denseTimelineTargetPixels].
 int denseTimelineMetadataPixels(int targetPixels) => math.min(targetPixels, batchedGridMetadataCellPixels);
 
-/// Whether every cell of a panel has to be replaced by a real thumbnail.
+/// Every batched cell is backed by a real thumbnail, at every zoom level.
 ///
-/// A cell is upgraded once its physical size is meaningfully larger than the
-/// detail a ThumbHash carries. At the two densest levels a tile is roughly 25
-/// physical pixels on a phone, which the fallback texture already covers at
-/// full resolution, and upgrading them would mean several thousand thumbnail
-/// requests for a single screen. Cells with no ThumbHash at all are always
-/// upgraded, at every zoom level.
-bool denseTimelineNeedsThumbnailUpgrade(int targetPixels) => targetPixels >= (batchedGridMetadataCellPixels * 3) ~/ 2;
+/// An earlier build only upgraded cells whose physical size exceeded the
+/// fallback texture, on the theory that a 30px tile is too small to show more
+/// detail than a ThumbHash carries. That is wrong in practice: a ThumbHash is
+/// a handful of DCT coefficients, so a 30px tile renders as a colour smear
+/// while a real 32px thumbnail is recognisable. The densest levels are exactly
+/// where someone is scanning for a photo by its shape, so they need real
+/// pixels the most.
+bool denseTimelineNeedsThumbnailUpgrade(int targetPixels) => targetPixels > 0;
 
 int denseTimelineRowsPerChild(int columnCount) => switch (columnCount) {
   >= 48 => 4,
@@ -114,7 +115,7 @@ class _DenseDiskAtlasEntry {
 /// the memory LRU, while PNG keeps the offline cache small enough to retain
 /// many years of photos on ordinary phones.
 class _DenseDiskAtlasCache {
-  static const _magic = 'IHDPANL4';
+  static const _magic = 'IHDPANL5';
   static const _headerBytes = 80;
   static const _maxBytes = batchedGridDiskCacheLimitBytes;
   static const _trimToBytes = 224 * 1024 * 1024;
@@ -132,11 +133,11 @@ class _DenseDiskAtlasCache {
   Future<Directory?> _getDirectory() => _directory ??= () async {
     try {
       final support = await getApplicationSupportDirectory();
-      final directory = Directory(path.join(support.path, 'inhouse_grid_panels_v5'));
+      final directory = Directory(path.join(support.path, 'inhouse_grid_panels_v6'));
       await directory.create(recursive: true);
-      // v3 stored uncompressed RGBA. Keep it during the first v4 generation so
-      // an interrupted upgrade never destroys the previous offline cache; once
-      // at least one v4 panel exists, remove the legacy cache on a later launch.
+      // v5 persisted pure-ThumbHash panels as final at the densest zoom levels,
+      // so those panels could never be upgraded again. Keep the old cache until
+      // at least one v6 panel exists, then drop it on a later launch.
       unawaited(_removeLegacyDenseCacheWhenReady(support, directory));
       unawaited(_trim(directory));
       return directory;
@@ -279,7 +280,7 @@ Future<void> _removeLegacyDenseCacheWhenReady(Directory support, Directory curre
     if (hasNoCurrentCache) {
       return;
     }
-    await Directory(path.join(support.path, 'inhouse_year_panels_v3')).delete(recursive: true);
+    await Directory(path.join(support.path, 'inhouse_grid_panels_v5')).delete(recursive: true);
   } catch (_) {
     // The legacy cache may already have been removed or be in use by an older
     // process; either case is safe and the new cache remains independent.
@@ -1048,19 +1049,31 @@ const int batchedGridMetadataCellPixels = 32;
 /// compressed PNGs and the oldest generated panels are evicted when full.
 const int batchedGridDiskCacheLimitBytes = 256 * 1024 * 1024;
 
-// Small native thumbnails are inexpensive, but keeping this bounded prevents
-// a fast fling from competing with raster/UI work on mid-range phones.
-const int _denseThumbnailConcurrency = 4;
-const int _denseMetadataAtlasConcurrency = 2;
+// At the densest zoom levels a single screen legitimately wants thousands of
+// 32px thumbnails, and nearly all of them are small reads from the shared
+// thumbnail disk cache rather than fresh downloads. Four at a time made that
+// crawl; the work itself is tiny, so the limit only needs to stop a fling from
+// starving raster/UI work on mid-range phones.
+const int _denseThumbnailConcurrency = 8;
+const int _denseMetadataAtlasConcurrency = 3;
 // ui.Image.clone shares the underlying GPU texture, so keeping a wider rolling
 // window here does not duplicate pixels. It prevents a fast fling from evicting
 // every nearby panel and falling back to an asynchronous disk decode (visible
 // as a brief blank row). Android memory-pressure callbacks still clear it.
-const int _denseAtlasCacheBytes = 64 * 1024 * 1024;
+//
+// A finished panel is held under both its content key and its positional slot
+// key, and the budget counts each clone separately even though they share one
+// texture. The accounting therefore over-reports by roughly 2x, which at 48
+// columns left barely one screen of headroom and made scrolling back flash
+// blank rows. The budget below is the accounted figure, not real memory.
+const int _denseAtlasCacheBytes = 96 * 1024 * 1024;
 final _DenseThumbnailQueue _denseThumbnailQueue = _DenseThumbnailQueue();
 final DenseTimelineTaskQueue _denseMetadataAtlasQueue = DenseTimelineTaskQueue(
   _denseMetadataAtlasConcurrency,
-  maxPending: 128,
+  // A 48-column screen plus its cache extent is well over a hundred panels.
+  // Rejecting them at schedule time turned into a retry storm that competed
+  // with the panels actually on screen.
+  maxPending: 512,
 );
 final _DenseRowAtlasCache _denseRowAtlasCache = _DenseRowAtlasCache();
 final _DenseDiskAtlasCache _denseDiskAtlasCache = _DenseDiskAtlasCache();
@@ -1371,10 +1384,20 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   static const int _offscreenPriority = 1 << 20;
   static const int _maxUpgradeAttempts = 3;
   static const Duration _compositeDebounce = Duration(milliseconds: 700);
+  static const Duration _compositeIdleDebounce = Duration(milliseconds: 2500);
   static const Duration _upgradeRetryDelay = Duration(milliseconds: 900);
 
   final ValueNotifier<int> _repaint = ValueNotifier(0);
   late List<Object> _assetKeys;
+
+  /// Last rows seen for [_DenseAssetRow.cacheSlot].
+  ///
+  /// The parent hands over a null list whenever the service buffer slides off
+  /// this panel, which happens constantly while scrolling a dense grid. Keeping
+  /// the rows here means a transient null no longer cancels every in-flight
+  /// thumbnail and discards the panel's progress, which is what stopped the
+  /// densest levels from ever converging on a sharp image.
+  List<BaseAsset>? _assets;
   List<ImageInfo?> _images = const [];
   List<ImageStream?> _streams = const [];
   List<ImageStreamListener?> _listeners = const [];
@@ -1388,6 +1411,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   int _placeholderColor = 0;
   bool _repaintScheduled = false;
   bool _metadataAtlasRequested = false;
+  int _metadataRetries = 0;
   Timer? _metadataRetryTimer;
   Timer? _compositeTimer;
   Timer? _upgradeRetryTimer;
@@ -1444,12 +1468,13 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     }
     if (oldWidget.cacheSlot != widget.cacheSlot) {
       _slotAtlasKey = Object.hash('persistent-slot', widget.cacheSlot);
+      _assets = null;
     }
     if (oldWidget.cacheSlot != widget.cacheSlot ||
         oldWidget.tileExtent != widget.tileExtent ||
         oldWidget.columnCount != widget.columnCount ||
         oldWidget.itemCount != widget.itemCount ||
-        !_sameAssets(oldWidget.assets, widget.assets)) {
+        (widget.assets != null && !_sameAssets(_assets, widget.assets))) {
       _resetPanel();
     } else if (oldWidget.deferHighResolution && !widget.deferHighResolution) {
       _queueVisibleOverviewWork();
@@ -1531,13 +1556,15 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _persistentExact = false;
     _baseAtlasReady = false;
     _metadataAtlasRequested = false;
+    _metadataRetries = 0;
     _upgradeAttempts = 0;
     _upgradeIndexes.clear();
     _pendingIndexes.clear();
     _mergedIndexes.clear();
     _didReportVisualReady = false;
 
-    final assets = widget.assets;
+    final assets = widget.assets ?? _assets;
+    _assets = assets;
     if (assets == null) {
       _contentSignature = '';
       _baseAtlasKey = 0;
@@ -1568,9 +1595,9 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _completeAtlasKey = Object.hash('dense-complete', _targetPixels, widget.columnCount, identity);
     final upgradeEveryCell = denseTimelineNeedsThumbnailUpgrade(_targetPixels);
     for (var index = 0; index < assets.length; index++) {
-      // Cells whose ThumbHash already covers the physical cell need no network
-      // or disk round trip; everything else must be backed by a real thumbnail
-      // before the panel can be considered final.
+      // Every cell must carry a real thumbnail before the panel counts as
+      // final. The ThumbHash is only ever the instant first paint, and a cell
+      // with no ThumbHash at all has nothing else to show.
       if (upgradeEveryCell || _thumbHashFor(assets[index]) == null) {
         _upgradeIndexes.add(index);
       }
@@ -1699,9 +1726,10 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   }
 
   String _denseContentIdentity(List<BaseAsset> assets) {
-    // v6 invalidates atlases from builds that expanded the ThumbHash fallback
-    // to the full cell size and could mark a partially upgraded panel final.
-    final buffer = StringBuffer('v6:${widget.columnCount}:${assets.length}:$_targetPixels;');
+    // v7 invalidates atlases that 3.1.59 persisted as final while they were
+    // still pure ThumbHash, which happened at every zoom level dense enough to
+    // fall under the old upgrade threshold.
+    final buffer = StringBuffer('v7:${widget.columnCount}:${assets.length}:$_targetPixels;');
     for (final asset in assets) {
       buffer
         ..write(asset.remoteId ?? asset.localId ?? asset.checksum ?? asset.heroTag)
@@ -1719,14 +1747,13 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   }
 
   void _queueVisibleOverviewWork({int? generation}) {
-    if (_persistentExact || !mounted || widget.assets == null) {
+    if (_persistentExact || !mounted || _assets == null) {
       return;
     }
-    // A mounted dense row is already inside the sliver's viewport/cache
-    // window. Custom sliver paint transforms can make its global rectangle
-    // temporarily unavailable (or report no overlap), so visibility must only
-    // affect priority — never whether the atlas is generated at all.
-    final priority = _viewportPriority() ?? _offscreenPriority;
+    // The instant ThumbHash texture is still built for the whole sliver cache
+    // window, so a panel is never blank when it scrolls in. Only the expensive
+    // per-asset upgrade below is restricted to what is actually on screen.
+    final priority = _viewportState().priority;
     final targetGeneration = generation ?? _generation;
     if (!_baseAtlasReady && !_metadataAtlasRequested) {
       _metadataAtlasRequested = true;
@@ -1735,30 +1762,44 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _queueMissingActualThumbnails(generation: targetGeneration);
   }
 
-  int? _viewportPriority() {
+  /// Where this panel sits relative to the visible viewport.
+  ///
+  /// `measured` is false when the sliver's paint transform is unavailable. Such
+  /// a panel is treated as visible on purpose: a custom layout transform must
+  /// never be able to stop a panel from loading at all, which is what used to
+  /// leave panels permanently blank during a zoom reflow.
+  ({bool measured, bool visible, int priority}) _viewportState() {
     final renderObject = context.findRenderObject();
     final mediaSize = MediaQuery.maybeSizeOf(context);
     if (renderObject is! RenderBox || !renderObject.attached || !renderObject.hasSize || mediaSize == null) {
-      return null;
+      return (measured: false, visible: true, priority: _offscreenPriority);
     }
     final panelRect = MatrixUtils.transformRect(renderObject.getTransformTo(null), Offset.zero & renderObject.size);
     final viewport = (Offset.zero & mediaSize).inflate(mediaSize.height * 0.2);
     if (!panelRect.overlaps(viewport)) {
-      return null;
+      return (measured: true, visible: false, priority: _offscreenPriority);
     }
     // Centre-most panels are the first ones a person sees after the pinch.
     // Distance-based priority prevents dozens of tiny day rows below the fold
     // from evicting the actual visible work from the bounded atlas queue.
-    return (panelRect.center.dy - (mediaSize.height * 0.5)).abs().round();
+    return (measured: true, visible: true, priority: (panelRect.center.dy - (mediaSize.height * 0.5)).abs().round());
   }
 
   void _queueMissingActualThumbnails({int? generation}) {
-    final assets = widget.assets;
+    final assets = _assets;
     if (_persistentExact || widget.deferHighResolution || assets == null || !mounted || _upgradeIndexes.isEmpty) {
       return;
     }
+    final viewport = _viewportState();
+    if (!viewport.visible) {
+      // Queueing the whole cache extent buries the rows the person is looking
+      // at under thousands of requests they cannot see. The retry pass picks
+      // this panel up as soon as it scrolls into view.
+      _scheduleUpgradeRetry();
+      return;
+    }
     final targetGeneration = generation ?? _generation;
-    final panelPriority = _viewportPriority() ?? _offscreenPriority;
+    final panelPriority = viewport.priority;
     for (final index in _upgradeIndexes) {
       if (_mergedIndexes.contains(index)) {
         continue;
@@ -1817,19 +1858,13 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         _scheduleUpgradeRetry();
         return;
       }
-      if (widget.deferHighResolution || _viewportPriority() == null) {
+      if (widget.deferHighResolution || !_viewportState().visible) {
         // Still off-screen or still being flung: try again later instead of
         // competing with the panels the person is actually looking at.
         _scheduleUpgradeRetry();
         return;
       }
       _upgradeAttempts++;
-      if (_upgradeAttempts >= _maxUpgradeAttempts) {
-        // Some assets simply cannot be resolved on this device. Bank the work
-        // already done instead of re-decoding the whole panel forever.
-        _finalizeAtlas(_generation, force: true);
-        return;
-      }
       _actualThumbnailRequestsReset();
       _queueMissingActualThumbnails();
     });
@@ -1877,11 +1912,16 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _ => null,
   };
 
-  void _scheduleMetadataRetry({Duration delay = const Duration(milliseconds: 80)}) {
+  void _scheduleMetadataRetry({Duration? delay}) {
     if (_metadataRetryTimer != null || !mounted || _persistentExact || _baseAtlasReady) {
       return;
     }
-    _metadataRetryTimer = Timer(delay, () {
+    // A full screen of dense panels can all be rejected by the bounded atlas
+    // queue at once. Retrying every 80ms turned that into a storm that starved
+    // the very panels it was waiting on, so back off instead.
+    final backoff = delay ?? Duration(milliseconds: math.min(80 << _metadataRetries, 1600));
+    _metadataRetries++;
+    _metadataRetryTimer = Timer(backoff, () {
       _metadataRetryTimer = null;
       if (mounted && !_metadataAtlasRequested) {
         _queueVisibleOverviewWork();
@@ -1890,7 +1930,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   }
 
   Future<void> _buildThumbhashAtlas(int generation, {required int priority}) async {
-    final assets = widget.assets;
+    final assets = _assets;
     if (assets == null || _persistentExact) {
       return;
     }
@@ -1999,7 +2039,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   }
 
   Future<void> _loadAssetImage(int index, int generation, int actualWorkGeneration) async {
-    final assets = widget.assets;
+    final assets = _assets;
     if (!mounted ||
         generation != _generation ||
         actualWorkGeneration != _actualWorkGeneration ||
@@ -2049,7 +2089,13 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     if (!mounted || generation != _generation || _persistentExact) {
       return;
     }
-    if (!_images.any((image) => image != null)) {
+    var ready = 0;
+    for (final image in _images) {
+      if (image != null) {
+        ready++;
+      }
+    }
+    if (ready == 0) {
       if (_pendingIndexes.isEmpty) {
         _finalizeAtlas(generation);
       }
@@ -2062,10 +2108,12 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       unawaited(_buildCompositeAtlas(generation));
       return;
     }
-    // Merge partial progress on a timer so a large panel sharpens while the
-    // rest of its thumbnails are still arriving, instead of staying blurry
-    // until the very last cell resolves.
-    _compositeTimer ??= Timer(_compositeDebounce, () {
+    // Every composite re-rasterises the whole panel. At 48 columns two dozen
+    // panels are filling at once, so compositing on each arriving thumbnail
+    // buried the raster thread. Wait for a full row of new cells before
+    // sharpening, with a slower safety pass so a trickle still lands.
+    final delay = ready >= widget.columnCount ? _compositeDebounce : _compositeIdleDebounce;
+    _compositeTimer ??= Timer(delay, () {
       _compositeTimer = null;
       if (mounted && generation == _generation) {
         unawaited(_buildCompositeAtlas(generation));
@@ -2074,7 +2122,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   }
 
   Future<void> _buildCompositeAtlas(int generation) async {
-    final assets = widget.assets;
+    final assets = _assets;
     if (_atlasBuilding || _persistentExact || assets == null || !mounted || generation != _generation) {
       return;
     }
@@ -2159,20 +2207,19 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     }
   }
 
-  /// Marks a panel final once every cell it can resolve has been merged.
-  void _finalizeAtlas(int generation, {bool force = false}) {
+  /// Marks a panel final once every one of its cells carries a real thumbnail.
+  ///
+  /// A panel is never marked final on a partial result. An earlier build forced
+  /// this after a few failed retries to avoid redoing work, which meant one
+  /// offline moment could bake a blurry or grey panel into the on-disk cache
+  /// permanently. Redoing the work is cheap by comparison, because the
+  /// thumbnails that did succeed are still in the shared thumbnail disk cache.
+  void _finalizeAtlas(int generation) {
     final atlas = _atlas;
     if (!mounted || generation != _generation || _persistentExact || atlas == null || _atlasBuilding) {
       return;
     }
-    if (_atlasCellPixels != _targetPixels) {
-      // The panel is still showing the coarse fallback, so it cannot be final.
-      if (!force) {
-        _scheduleUpgradeRetry();
-      }
-      return;
-    }
-    if (!force && !(_baseAtlasReady && _mergedIndexes.containsAll(_upgradeIndexes))) {
+    if (_atlasCellPixels != _targetPixels || !_baseAtlasReady || !_mergedIndexes.containsAll(_upgradeIndexes)) {
       _scheduleUpgradeRetry();
       return;
     }
@@ -2301,7 +2348,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   }
 
   void _handleTap(TapUpDetails details, TextDirection textDirection) {
-    final assets = widget.assets;
+    final assets = _assets;
     if (assets == null) {
       return;
     }
