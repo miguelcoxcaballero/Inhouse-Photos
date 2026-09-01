@@ -1,7 +1,7 @@
 {
-  "version": "3.1.66",
-  "versionCode": 7124,
+  "version": "3.1.67",
+  "versionCode": 7125,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.66-restore-indexed-timeline/Inhouse-Photos-3.1.66-arm64.apk",
-  "sha256": "ec30f6dad35b2e21899ad8115a5ced508e9827131c175f2e0c4e841537490872"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.67-timezone-correct-days/Inhouse-Photos-3.1.67-arm64.apk",
+  "sha256": "b2d8fc7ef1a5dac5a935f983dd5ff68ab1ca6d16d5e4d11da36ab480b8c58812"
 }
