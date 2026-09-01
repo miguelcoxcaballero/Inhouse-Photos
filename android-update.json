@@ -1,7 +1,7 @@
 {
-  "version": "3.1.71",
-  "versionCode": 7129,
+  "version": "3.1.72",
+  "versionCode": 7130,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.71-revive-disk-cache/Inhouse-Photos-3.1.71-arm64.apk",
-  "sha256": "53f27b376dad804d4b38556d83bc1c9676c89c35218696a100798dd84b2bc167"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.72-local-photo-previews/Inhouse-Photos-3.1.72-arm64.apk",
+  "sha256": "bf66115868e91f0a35323a95f7bc49ee1f3b51c38a4e518424934bc32a5548a5"
 }
