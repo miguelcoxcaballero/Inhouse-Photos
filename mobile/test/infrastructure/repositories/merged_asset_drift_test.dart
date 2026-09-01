@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:async/async.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -186,74 +188,26 @@ void main() {
     expect(assets.first.createdAt.isAfter(assets.last.createdAt), isTrue);
   });
 
-  test('assets are grouped into the same day their bucket counts them in', () async {
-    const userId = 'bucket-slice-user';
+  test('the asset query orders on a bare indexed column', () {
+    // `idx_remote_asset_owner_visibility_deleted_created` ends in
+    // `created_at DESC` and `idx_local_asset_created_at` covers the other arm,
+    // so this ordering can be served from an index. Ordering on a computed date
+    // expression instead cannot use either, and turns every chunk read into a
+    // full scan and sort with string formatting per row, behind the single
+    // mutex the whole grid waits on. That shipped in 3.1.65 and came back as a
+    // report of severe lag, so the shape of this ORDER BY is load-bearing.
+    final generated = File('lib/infrastructure/entities/merged_asset.drift.dart').readAsStringSync();
+    final orderings = RegExp("ORDER BY [^']*").allMatches(generated).map((m) => m.group(0)!).toList();
 
-    // A photo taken abroad late in the day and one taken at home earlier that
-    // evening. By capture instant the home photo is the newer of the two, but
-    // by wall clock the travelling photo already belongs to the next day. The
-    // timeline hands each bucket a contiguous slice of the asset list, so if
-    // the list is not partitioned the same way the buckets are, the photos are
-    // drawn under each other's date headers.
-    final abroadInstant = DateTime.parse('2024-05-10T16:00:00Z');
-    final homeInstant = DateTime.parse('2024-05-10T18:00:00Z');
-    final abroadWallClock = DateTime.utc(2024, 5, 11, 1); // UTC+9
-    final homeWallClock = DateTime.utc(2024, 5, 10, 20); // UTC+2
-
-    await db.into(db.userEntity).insert(UserEntityCompanion.insert(id: userId, email: 'slice@test.dev', name: 'Slice'));
-    await db.batch((batch) {
-      batch.insert(
-        db.remoteAssetEntity,
-        RemoteAssetEntityCompanion.insert(
-          id: 'abroad',
-          name: 'abroad.jpg',
-          type: AssetType.image,
-          checksum: 'abroad-checksum',
-          ownerId: userId,
-          visibility: AssetVisibility.timeline,
-          createdAt: Value(abroadInstant),
-          updatedAt: Value(abroadInstant),
-          localDateTime: Value(abroadWallClock),
-        ),
-      );
-      batch.insert(
-        db.remoteAssetEntity,
-        RemoteAssetEntityCompanion.insert(
-          id: 'home',
-          name: 'home.jpg',
-          type: AssetType.image,
-          checksum: 'home-checksum',
-          ownerId: userId,
-          visibility: AssetVisibility.timeline,
-          createdAt: Value(homeInstant),
-          updatedAt: Value(homeInstant),
-          localDateTime: Value(homeWallClock),
-        ),
-      );
-    });
-
-    final buckets = await db.mergedAssetDrift.mergedBucket(userIds: [userId], groupBy: 0).get();
-    final assets = await db.mergedAssetDrift.mergedAsset(userIds: [userId], limit: (_) => Limit(20, 0)).get();
-
-    // Newest day first, one photo each.
-    expect(buckets.map((b) => b.bucketDate.substring(0, 10)), ['2024-05-11', '2024-05-10']);
-    expect(buckets.map((b) => b.assetCount), [1, 1]);
-
-    // Walking the buckets in order must consume the asset list in order.
-    var cursor = 0;
-    for (final bucket in buckets) {
-      final slice = assets.skip(cursor).take(bucket.assetCount);
-      for (final asset in slice) {
-        expect(
-          asset.timelineAt.toIso8601String().substring(0, 10),
-          bucket.bucketDate.substring(0, 10),
-          reason: '${asset.remoteId} is drawn under ${bucket.bucketDate} but is not from that day',
-        );
-      }
-      cursor += bucket.assetCount;
+    expect(orderings, isNotEmpty);
+    expect(
+      orderings.first,
+      startsWith('ORDER BY created_at DESC'),
+      reason: 'the leading sort term must stay a bare column so the covering indexes apply',
+    );
+    for (final ordering in orderings) {
+      expect(ordering, isNot(contains('STRFTIME')), reason: 'no computed expression may lead an ORDER BY here');
     }
-    expect(cursor, assets.length);
-    expect(assets.map((asset) => asset.remoteId), ['abroad', 'home']);
   });
 
   test('mergedBucket emits when a local asset is replaced by its remote copy', () async {

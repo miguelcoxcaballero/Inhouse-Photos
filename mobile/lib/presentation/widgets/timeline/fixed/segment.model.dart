@@ -1563,12 +1563,30 @@ class _DenseAssetRow extends StatefulWidget {
 
 class _DenseAssetRowState extends State<_DenseAssetRow> {
   static const int _offscreenPriority = 1 << 20;
-  static const double _viewportPrefetchFactor = 0.75;
+  /// How far beyond the visible viewport a panel may resolve thumbnails.
+  ///
+  /// 3.1.65 widened this to 0.75 of a viewport either side so panels would
+  /// arrive already sharp. On a 48-column screen that took the number of cells
+  /// eligible to resolve, decode and composite from roughly one viewport to two
+  /// and a half, all of it running while the finger is still moving, and the
+  /// next thing reported was heavy lag. It is speculative work that was never
+  /// measured on a device, so it goes back to the viewport-only behaviour that
+  /// shipped in 3.1.60 through 3.1.64. Sharpening is slightly more visible;
+  /// scrolling is what has to come first.
+  static const double _viewportPrefetchFactor = 0.0;
 
   /// Longest gap between attempts to finish a panel that is still missing
-  /// cells. Attempts are never abandoned: a panel that gave up permanently is
-  /// a panel that stays a placeholder for as long as it is on screen.
+  /// cells, and how many attempts it gets.
+  ///
+  /// Three attempts at a fixed cadence was too few: the thumbnail queue sheds
+  /// its newest work when full and reports it as finished, so a busy moment
+  /// burned every attempt in a couple of seconds and left the panel a
+  /// placeholder for good. Retrying forever is the opposite mistake, because a
+  /// panel that genuinely cannot resolve would then re-queue its cells for as
+  /// long as it stayed mounted. Backing off to eight seconds over eight
+  /// attempts recovers from a shortage lasting around a minute and then stops.
   static const Duration _maxUpgradeRetryDelay = Duration(seconds: 8);
+  static const int _maxUpgradeAttempts = 8;
   // Tier 1 collapses the first cells of a panel almost immediately, so the
   // per-cell draws above are short lived. Later tiers batch more aggressively
   // because by then the panel already looks sharp.
@@ -2044,7 +2062,11 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   /// out, which costs nothing once a panel is complete because the guard below
   /// stops scheduling entirely.
   void _scheduleUpgradeRetry() {
-    if (_persistentExact || !mounted || _upgradeRetryTimer != null || _mergedIndexes.containsAll(_upgradeIndexes)) {
+    if (_persistentExact ||
+        !mounted ||
+        _upgradeRetryTimer != null ||
+        _upgradeAttempts >= _maxUpgradeAttempts ||
+        _mergedIndexes.containsAll(_upgradeIndexes)) {
       return;
     }
     final backoff = _upgradeRetryDelay * (1 << _upgradeAttempts.clamp(0, 4));
