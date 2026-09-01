@@ -96,11 +96,68 @@ abstract class Segment {
 }
 
 extension SegmentListExtension on List<Segment> {
-  bool equals(List<Segment> other) => length == other.length && lastOrNull?.endOffset == other.lastOrNull?.endOffset;
+  /// Whether two segment lists describe the same layout.
+  ///
+  /// This gates `markNeedsLayout` on the sliver. It used to compare only the
+  /// list length and the final offset, so any reshuffle that preserved both -
+  /// assets moving between buckets during a backup, for instance - left the
+  /// render object positioning children with stale geometry while the delegate
+  /// built them from the new list. The element-wise walk only runs when the
+  /// list instance actually changed, which is rare.
+  bool equals(List<Segment> other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (length != other.length) {
+      return false;
+    }
+    for (var index = 0; index < length; index++) {
+      if (this[index] != other[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
 
-  Segment? findByIndex(int index) => firstWhereOrNull((s) => s.containsIndex(index));
+  /// Segments are built in ascending, contiguous index order, so both lookups
+  /// binary search. They are called several times per child per layout, and a
+  /// linear scan over a library with thousands of day buckets was one of the
+  /// larger per-frame costs while scrolling.
+  Segment? findByIndex(int index) {
+    var low = 0;
+    var high = length;
+    while (low < high) {
+      final middle = (low + high) >> 1;
+      if (this[middle].lastIndex < index) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    if (low < length && this[low].firstIndex <= index) {
+      return this[low];
+    }
+    return null;
+  }
 
-  Segment? findByOffset(double offset) => firstWhereOrNull((s) => s.isWithinOffset(offset)) ?? lastOrNull;
+  /// Matches the previous `firstWhereOrNull` semantics: an offset that lands
+  /// exactly on a boundary belongs to the earlier segment.
+  Segment? findByOffset(double offset) {
+    var low = 0;
+    var high = length;
+    while (low < high) {
+      final middle = (low + high) >> 1;
+      if (this[middle].endOffset < offset) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    if (low < length && this[low].startOffset <= offset) {
+      return this[low];
+    }
+    return lastOrNull;
+  }
 
   /// Reverse lookup used by [SliverChildBuilderDelegate] to move an existing
   /// dense row when an earlier day gains or loses children.

@@ -79,6 +79,41 @@ int denseTimelineMetadataPixels(int targetPixels) => math.min(targetPixels, batc
 /// pixels the most.
 bool denseTimelineNeedsThumbnailUpgrade(int targetPixels) => targetPixels > 0;
 
+/// The rectangles a panel's cells occupy: the full rows, plus the partial last
+/// row when the bucket does not divide evenly into columns.
+///
+/// A dense panel always reserves its full layout extent, so a panel with no
+/// texture yet used to paint literally nothing and read as a hole in the
+/// timeline several screens tall. Filling these keeps a loading panel visible
+/// while leaving the unused trailing cells transparent, as before.
+@visibleForTesting
+List<Rect> denseTimelineOccupiedRects({
+  required int itemCount,
+  required int columnCount,
+  required double tileExtent,
+  required double containerWidth,
+  required TextDirection textDirection,
+}) {
+  if (itemCount <= 0 || columnCount <= 0 || tileExtent <= 0) {
+    return const [];
+  }
+  final isRtl = textDirection == TextDirection.rtl;
+  final gridWidth = columnCount * tileExtent;
+  final gridLeft = isRtl ? containerWidth - gridWidth : 0.0;
+  final fullRows = itemCount ~/ columnCount;
+  final remainder = itemCount % columnCount;
+  return [
+    if (fullRows > 0) Rect.fromLTWH(gridLeft, 0, gridWidth, fullRows * tileExtent),
+    if (remainder > 0)
+      Rect.fromLTWH(
+        isRtl ? containerWidth - (remainder * tileExtent) : gridLeft,
+        fullRows * tileExtent,
+        remainder * tileExtent,
+        tileExtent,
+      ),
+  ];
+}
+
 int denseTimelineRowsPerChild(int columnCount) => switch (columnCount) {
   >= 48 => 4,
   >= 36 => 6,
@@ -404,8 +439,15 @@ final Expando<_DenseAssetChunkStore> _denseAssetStores = Expando<_DenseAssetChun
 
 class _DenseAssetChunkStore {
   static const int _chunkSize = 2048;
-  static const int _maxResidentChunks = 4;
-  static const int _maxResidentRows = 128;
+  // A 48-column screen keeps roughly 15,000 assets mounted once the sliver's
+  // cache extent either side is counted, which is over seven chunks. Holding
+  // only four meant a chunk was evicted while panels still needed it and was
+  // re-read immediately, and every re-read queues behind the timeline
+  // service's single mutex. Panels then never received their rows at all,
+  // which is what left whole screens of the grid empty while scrolling.
+  // These hold asset references, not pixels.
+  static const int _maxResidentChunks = 10;
+  static const int _maxResidentRows = 512;
 
   final LinkedHashMap<int, Future<List<BaseAsset>>> _chunks = LinkedHashMap();
   final Map<int, List<BaseAsset>> _resolvedChunks = {};
@@ -499,7 +541,22 @@ class _DenseAssetChunkStore {
     return future;
   }
 
+  /// Assembles a row, retrying once when the timeline revision moved underneath.
+  ///
+  /// A backup finishing mid-scroll bumps the revision and clears the chunk
+  /// cache, so a row already in flight fails to assemble. That failure used to
+  /// surface as a permanently empty panel, because nothing rebuilt the row
+  /// afterwards. Retrying against the refreshed revision resolves it instead.
   Future<List<BaseAsset>> _loadRow(TimelineService service, {required int index, required int count}) async {
+    try {
+      return await _assembleRow(service, index: index, count: count);
+    } on StateError {
+      _resetIfNeeded(service);
+      return _assembleRow(service, index: index, count: count);
+    }
+  }
+
+  Future<List<BaseAsset>> _assembleRow(TimelineService service, {required int index, required int count}) async {
     final end = index + count;
     final loadedChunks = <int, List<BaseAsset>>{};
     var cursor = index;
@@ -1413,6 +1470,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   int? _atlasCellPixels;
   double? _devicePixelRatio;
   int _placeholderColor = 0;
+  Color _placeholderTone = const Color(0x00000000);
   bool _repaintScheduled = false;
   bool _metadataAtlasRequested = false;
   int _metadataRetries = 0;
@@ -1457,7 +1515,8 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     // The placeholder only fills cells that have neither a ThumbHash nor a
     // resolvable thumbnail, so a theme switch updates it for future panels
     // rather than reloading every atlas in the gallery.
-    _placeholderColor = _rgbaOf(context.colorScheme.surfaceContainerHighest);
+    _placeholderTone = context.colorScheme.surfaceContainerHighest;
+    _placeholderColor = _rgbaOf(_placeholderTone);
     if (_devicePixelRatio == devicePixelRatio) {
       return;
     }
@@ -2418,6 +2477,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
           assetKeys: _assetKeys,
           columnCount: widget.columnCount,
           tileExtent: widget.tileExtent,
+          placeholderColor: _placeholderTone,
           textDirection: textDirection,
           layoutAnimation: reflowActive ? layoutTransition?.animation : null,
           previousRects: reflowActive ? layoutTransition!.previousRects : const {},
@@ -2449,6 +2509,7 @@ class _DenseAssetRowPainter extends CustomPainter {
   final List<Object> assetKeys;
   final int columnCount;
   final double tileExtent;
+  final Color placeholderColor;
   final TextDirection textDirection;
   final Animation<double>? layoutAnimation;
   final Map<Object, Rect> previousRects;
@@ -2468,6 +2529,7 @@ class _DenseAssetRowPainter extends CustomPainter {
     required this.assetKeys,
     required this.columnCount,
     required this.tileExtent,
+    required this.placeholderColor,
     required this.textDirection,
     required this.layoutAnimation,
     required this.previousRects,
@@ -2575,6 +2637,21 @@ class _DenseAssetRowPainter extends CustomPainter {
     final animationProgress = layoutAnimation?.value ?? 1;
     final isReflowing = previousRects.isNotEmpty && animationProgress < 1;
     final reflowProgress = isReflowing ? timelineLayoutTransitionProgress(animationProgress) : 1.0;
+    if (!isReflowing) {
+      // Painted under everything else so a panel is never invisible, whatever
+      // stage of loading it is in. During a zoom reflow the cells are moving,
+      // so a static fill would not line up and is skipped.
+      final fill = Paint()..color = placeholderColor;
+      for (final rect in denseTimelineOccupiedRects(
+        itemCount: itemCount,
+        columnCount: columnCount,
+        tileExtent: tileExtent,
+        containerWidth: size.width,
+        textDirection: textDirection,
+      )) {
+        canvas.drawRect(rect, fill);
+      }
+    }
     if (atlas != null) {
       if (isReflowing) {
         _paintReflowAtlas(canvas, size, atlas, reflowProgress);
@@ -2611,6 +2688,7 @@ class _DenseAssetRowPainter extends CustomPainter {
       oldDelegate.assetKeys != assetKeys ||
       oldDelegate.columnCount != columnCount ||
       oldDelegate.tileExtent != tileExtent ||
+      oldDelegate.placeholderColor != placeholderColor ||
       oldDelegate.textDirection != textDirection ||
       oldDelegate.layoutAnimation != layoutAnimation ||
       oldDelegate.previousRects != previousRects;

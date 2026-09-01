@@ -228,6 +228,29 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   ScrollPhysics? _scrollPhysics;
 
   int _perRow = 4;
+  List<Segment>? _childIndexSource;
+  Map<Key, int>? _childIndexes;
+
+  /// Reverse key lookup for the sliver delegate, rebuilt only when the segment
+  /// list actually changes.
+  ///
+  /// This allocates one interpolated string and one key per timeline child, so
+  /// recomputing it on every build - which includes every scroll-driven
+  /// provider change - was pure overhead on a large library.
+  Map<Key, int>? _denseChildIndexesFor(List<Segment> segments, bool dense) {
+    if (!dense) {
+      _childIndexSource = null;
+      _childIndexes = null;
+      return null;
+    }
+    final cached = _childIndexes;
+    if (cached != null && identical(_childIndexSource, segments)) {
+      return cached;
+    }
+    _childIndexSource = segments;
+    return _childIndexes = segments.childIndexesByKey();
+  }
+
   double _scaleFactor = 3.0;
   double _baseScaleFactor = 3.0;
   int? _pendingPerRow;
@@ -685,7 +708,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
               onLoading: widget.loadingWidget != null ? () => widget.loadingWidget! : null,
               onData: (segments) {
                 final childCount = (segments.lastOrNull?.lastIndex ?? -1) + 1;
-                final denseChildIndexes = usesBatchedTimelineGrid(_perRow) ? segments.childIndexesByKey() : null;
+                final denseChildIndexes = _denseChildIndexesFor(segments, usesBatchedTimelineGrid(_perRow));
                 final double appBarExpandedHeight = widget.appBar != null && widget.appBar is MesmerizingSliverAppBar
                     ? 200
                     : 0;

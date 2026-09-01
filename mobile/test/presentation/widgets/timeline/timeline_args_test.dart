@@ -172,6 +172,132 @@ void main() {
     expect(denseTimelineMetadataPixels(batchedGridMetadataCellPixels), batchedGridMetadataCellPixels);
   });
 
+  test('a dense panel always paints the cells it occupies', () {
+    // A panel reserves its full layout extent before it has any texture. When
+    // the painter drew nothing for that state the timeline showed holes several
+    // screens tall while scrolling, so the occupied cells must be fillable.
+    final rects = denseTimelineOccupiedRects(
+      itemCount: 100,
+      columnCount: 48,
+      tileExtent: 10,
+      containerWidth: 480,
+      textDirection: TextDirection.ltr,
+    );
+
+    expect(rects, hasLength(2));
+    expect(rects.first, const Rect.fromLTWH(0, 0, 480, 20), reason: 'two full rows of 48');
+    expect(rects.last, const Rect.fromLTWH(0, 20, 40, 10), reason: 'the remaining four cells only');
+    expect(rects.map((r) => r.width * r.height).reduce((a, b) => a + b), 100 * 10 * 10);
+  });
+
+  test('an exactly filled panel has no partial row and an empty one paints nothing', () {
+    expect(
+      denseTimelineOccupiedRects(
+        itemCount: 96,
+        columnCount: 48,
+        tileExtent: 10,
+        containerWidth: 480,
+        textDirection: TextDirection.ltr,
+      ),
+      [const Rect.fromLTWH(0, 0, 480, 20)],
+    );
+    expect(
+      denseTimelineOccupiedRects(
+        itemCount: 0,
+        columnCount: 48,
+        tileExtent: 10,
+        containerWidth: 480,
+        textDirection: TextDirection.ltr,
+      ),
+      isEmpty,
+    );
+  });
+
+  test('a right-to-left panel fills its partial row from the right edge', () {
+    final rects = denseTimelineOccupiedRects(
+      itemCount: 100,
+      columnCount: 48,
+      tileExtent: 10,
+      containerWidth: 600,
+      textDirection: TextDirection.rtl,
+    );
+
+    expect(rects.first, const Rect.fromLTWH(120, 0, 480, 20));
+    expect(rects.last, const Rect.fromLTWH(560, 20, 40, 10));
+  });
+
+  test('a reshuffle that keeps the length and total height still invalidates the layout', () {
+    List<Segment> build(int newestCount, int olderCount) => FixedSegmentBuilder(
+      buckets: [
+        TimeBucket(date: DateTime(2026, 8, 14), assetCount: newestCount),
+        TimeBucket(date: DateTime(2026, 8, 13), assetCount: olderCount),
+      ],
+      tileHeight: 10,
+      columnCount: 12,
+      spacing: 0,
+    ).generate();
+
+    final before = build(96, 48);
+    final after = build(48, 96);
+
+    // The old comparison looked only at the list length and the final offset,
+    // both of which survive this reshuffle, so the sliver kept positioning
+    // children with stale geometry while the delegate built the new ones.
+    expect(before, hasLength(after.length));
+    expect(before.last.endOffset, after.last.endOffset);
+    expect(before.equals(after), isFalse, reason: 'the segments genuinely moved');
+    expect(before.equals(before), isTrue);
+    expect(before.equals([...before]), isTrue, reason: 'equal content must not force a relayout');
+  });
+
+  test('segment lookups binary search without changing their contract', () {
+    final segments = FixedSegmentBuilder(
+      buckets: [
+        for (var day = 0; day < 40; day++)
+          TimeBucket(
+            date: DateTime(2026, 8, 20).subtract(Duration(days: day)),
+            assetCount: 7 + (day * 3),
+          ),
+      ],
+      tileHeight: 10,
+      columnCount: 12,
+      spacing: 0,
+    ).generate();
+
+    Segment? linearByIndex(int index) => segments.where((s) => s.containsIndex(index)).firstOrNull;
+    Segment? linearByOffset(double offset) =>
+        segments.where((s) => s.isWithinOffset(offset)).firstOrNull ?? segments.last;
+
+    for (var index = -3; index <= segments.last.lastIndex + 3; index++) {
+      expect(segments.findByIndex(index), same(linearByIndex(index)), reason: 'index $index');
+    }
+    final end = segments.last.endOffset;
+    for (var step = 0; step <= 200; step++) {
+      final offset = (end + 40) * step / 200;
+      expect(segments.findByOffset(offset), same(linearByOffset(offset)), reason: 'offset $offset');
+    }
+  });
+
+  test('dense child keys are unique across the whole timeline', () {
+    final segments = FixedSegmentBuilder(
+      buckets: [
+        for (var day = 0; day < 120; day++)
+          TimeBucket(
+            date: DateTime(2026, 8, 20).subtract(Duration(days: day)),
+            assetCount: 5 + day,
+          ),
+      ],
+      tileHeight: 8,
+      columnCount: 48,
+      spacing: 0,
+    ).generate();
+
+    final total = segments.fold<int>(0, (sum, s) => sum + (s.lastIndex - s.firstIndex + 1));
+    // A collision would silently overwrite an entry and hand the sliver the
+    // wrong index for an existing child.
+    expect(segments.childIndexesByKey(), hasLength(total));
+  });
+
   test('every dense cell is upgraded to a real thumbnail, including the densest levels', () {
     // 3.1.59 only upgraded cells above a 48px threshold, which on a 1440px
     // display left 36 and 48 columns permanently showing a ThumbHash smear.
