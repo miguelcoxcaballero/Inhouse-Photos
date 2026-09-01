@@ -415,9 +415,12 @@ class _DenseAtlasJob {
 /// Every panel used to call `Isolate.run`, which spawns and tears down an
 /// isolate per panel. Flinging a 48-column screen streams panels in constantly,
 /// so that was a steady churn of isolate setup and collection behind the
-/// scrolling. These workers are started once and reused; only the hash strings
-/// and the finished pixel buffer cross the boundary, and the buffer comes back
-/// by transfer rather than by copy.
+/// scrolling. These workers are started once and reused.
+///
+/// `Isolate.run` returned its result through `Isolate.exit`, which hands the
+/// buffer over without copying. A plain `SendPort.send` does copy, and at 48
+/// columns that is most of a megabyte per panel, so the pixels travel back as
+/// [TransferableTypedData] to keep the hand-off free.
 class _DenseAtlasWorkerPool {
   _DenseAtlasWorkerPool(this.size);
 
@@ -437,9 +440,16 @@ class _DenseAtlasWorkerPool {
         return;
       }
       final completer = _pending.remove(message[0] as int);
-      if (completer != null && !completer.isCompleted) {
-        completer.complete(_DenseAtlasPixelsResult(message[1] as Uint8List, (message[2] as List).cast<bool>()));
+      if (completer == null || completer.isCompleted) {
+        return;
       }
+      final pixels = message[1];
+      completer.complete(
+        _DenseAtlasPixelsResult(
+          pixels is TransferableTypedData ? pixels.materialize().asUint8List() : pixels as Uint8List,
+          (message[2] as List).cast<bool>(),
+        ),
+      );
     });
     for (var index = 0; index < size; index++) {
       final ready = ReceivePort();
@@ -496,7 +506,11 @@ void _denseAtlasWorkerMain(SendPort ready) {
     }
     try {
       final result = _buildDenseThumbhashAtlas(message.hashes, message.targetPixels, columnCount: message.columnCount);
-      message.reply.send([message.id, result.pixels, result.covered]);
+      message.reply.send([
+        message.id,
+        TransferableTypedData.fromList([result.pixels]),
+        result.covered,
+      ]);
     } catch (_) {
       message.reply.send([message.id, Uint8List(0), <bool>[]]);
     }
@@ -1550,7 +1564,11 @@ class _DenseAssetRow extends StatefulWidget {
 class _DenseAssetRowState extends State<_DenseAssetRow> {
   static const int _offscreenPriority = 1 << 20;
   static const double _viewportPrefetchFactor = 0.75;
-  static const int _maxUpgradeAttempts = 3;
+
+  /// Longest gap between attempts to finish a panel that is still missing
+  /// cells. Attempts are never abandoned: a panel that gave up permanently is
+  /// a panel that stays a placeholder for as long as it is on screen.
+  static const Duration _maxUpgradeRetryDelay = Duration(seconds: 8);
   // Tier 1 collapses the first cells of a panel almost immediately, so the
   // per-cell draws above are short lived. Later tiers batch more aggressively
   // because by then the panel already looks sharp.
@@ -2015,16 +2033,22 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   }
 
   /// Re-queues cells the bounded scheduler dropped, or that failed while the
-  /// panel was off-screen, so a panel is never left permanently half upgraded.
+  /// panel was off-screen.
+  ///
+  /// This used to stop after three attempts to avoid re-decoding a panel
+  /// forever. That turned a transient shortage into a permanent one: the
+  /// thumbnail queue drops its newest work when full, and each drop counts as
+  /// an attempt, so a run of panels competing for device thumbnails could burn
+  /// all three attempts in a couple of seconds and then sit as placeholders for
+  /// as long as they stayed mounted. Attempts now back off instead of running
+  /// out, which costs nothing once a panel is complete because the guard below
+  /// stops scheduling entirely.
   void _scheduleUpgradeRetry() {
-    if (_persistentExact ||
-        !mounted ||
-        _upgradeRetryTimer != null ||
-        _upgradeAttempts >= _maxUpgradeAttempts ||
-        _mergedIndexes.containsAll(_upgradeIndexes)) {
+    if (_persistentExact || !mounted || _upgradeRetryTimer != null || _mergedIndexes.containsAll(_upgradeIndexes)) {
       return;
     }
-    _upgradeRetryTimer = Timer(_upgradeRetryDelay * (1 << _upgradeAttempts.clamp(0, 3)), () {
+    final backoff = _upgradeRetryDelay * (1 << _upgradeAttempts.clamp(0, 4));
+    _upgradeRetryTimer = Timer(backoff > _maxUpgradeRetryDelay ? _maxUpgradeRetryDelay : backoff, () {
       _upgradeRetryTimer = null;
       if (!mounted || _persistentExact) {
         return;

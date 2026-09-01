@@ -253,6 +253,24 @@ void main() {
     expect(keys.toSet(), hasLength(keys.length));
   });
 
+  test('the thumbnail scheduler drops work rather than blocking, so panels must retry', () {
+    // The queue sheds its newest work once full and reports it as finished, so
+    // a panel can be told every cell is done while none of them resolved. A
+    // panel that gave up after a fixed number of attempts therefore stayed a
+    // placeholder for as long as it remained on screen. This documents the
+    // shedding behaviour that makes an unbounded, backed-off retry necessary.
+    final queue = DenseTimelineTaskQueue(1, maxPending: 1);
+    final blocked = Completer<void>();
+    final active = queue.schedule(() => blocked.future);
+    final queued = queue.schedule(() async {});
+    final shed = queue.schedule(() async {}, priority: 900);
+
+    expect(shed, throwsA(isA<Object>()));
+    blocked.complete();
+    expect(active, completes);
+    expect(queued, completes);
+  });
+
   test('a dense panel always paints the cells it occupies', () {
     // A panel reserves its full layout extent before it has any texture. When
     // the painter drew nothing for that state the timeline showed holes several
