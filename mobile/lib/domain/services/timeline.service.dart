@@ -1,4 +1,6 @@
 import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'dart:math' as math;
 
 import 'package:collection/collection.dart';
@@ -16,6 +18,20 @@ typedef TimelineAssetSource = Future<List<BaseAsset>> Function(int index, int co
 typedef TimelineBucketSource = Stream<List<Bucket>> Function();
 
 typedef TimelineQuery = ({TimelineAssetSource assetSource, TimelineBucketSource bucketSource, TimelineOrigin origin});
+
+/// Folds day buckets into the single bucket a continuous grid needs.
+///
+/// The asset list keeps its order, so the grid stays chronological; it simply
+/// has no day boundary to break a row at. Local-only assets are already part of
+/// the same list and are counted here like any other.
+@visibleForTesting
+List<Bucket> collapseTimelineBuckets(List<Bucket> buckets) {
+  var total = 0;
+  for (final bucket in buckets) {
+    total += bucket.assetCount;
+  }
+  return total == 0 ? const [] : [Bucket(assetCount: total)];
+}
 
 enum TimelineOrigin {
   main,
@@ -45,48 +61,69 @@ class TimelineFactory {
 
   GroupAssetsBy get groupBy {
     final group = _settingsRepository.appConfig.timeline.groupAssetsBy;
-    // We do not support auto grouping in the new timeline yet, fallback to day grouping
-    return group == GroupAssetsBy.auto ? GroupAssetsBy.day : group;
+    // Auto grouping is not supported in the new timeline yet, and "no grouping"
+    // is applied on top of day buckets rather than in SQL, so both fall back to
+    // day here.
+    return group == GroupAssetsBy.month ? GroupAssetsBy.month : GroupAssetsBy.day;
   }
 
-  TimelineService main(List<String> timelineUsers) => TimelineService(_timelineRepository.main(timelineUsers, groupBy));
+  bool get _isUngrouped => _settingsRepository.appConfig.timeline.groupAssetsBy == GroupAssetsBy.none;
 
-  TimelineService localAlbum({required String albumId}) =>
-      TimelineService(_timelineRepository.localAlbum(albumId, groupBy));
+  /// Wraps a query so the timeline renders as one continuous grid.
+  ///
+  /// The queries always group by day; collapsing the buckets here keeps the
+  /// asset ordering, the local/remote merge and every timeline origin exactly
+  /// as they are, and simply removes the day boundaries the grid draws headers
+  /// and row breaks at. Doing it in SQL instead would mean a separate bucket
+  /// path per origin and a date column that has nothing to hold.
+  TimelineService _timeline(TimelineQuery query) {
+    if (!_isUngrouped) {
+      return TimelineService(query);
+    }
+    return TimelineService((
+      assetSource: query.assetSource,
+      bucketSource: () => query.bucketSource().map(collapseTimelineBuckets),
+      origin: query.origin,
+    ));
+  }
+
+  TimelineService main(List<String> timelineUsers) => _timeline(_timelineRepository.main(timelineUsers, groupBy));
+
+  TimelineService localAlbum({required String albumId}) => _timeline(_timelineRepository.localAlbum(albumId, groupBy));
 
   TimelineService remoteAlbum({required String albumId}) =>
-      TimelineService(_timelineRepository.remoteAlbum(albumId, groupBy));
+      _timeline(_timelineRepository.remoteAlbum(albumId, groupBy));
 
-  TimelineService remoteAssets(String userId) => TimelineService(_timelineRepository.remote(userId, groupBy));
+  TimelineService remoteAssets(String userId) => _timeline(_timelineRepository.remote(userId, groupBy));
 
-  TimelineService recentlyAdded(String userId) => TimelineService(_timelineRepository.recentlyAdded(userId, groupBy));
+  TimelineService recentlyAdded(String userId) => _timeline(_timelineRepository.recentlyAdded(userId, groupBy));
 
-  TimelineService favorite(String userId) => TimelineService(_timelineRepository.favorite(userId, groupBy));
+  TimelineService favorite(String userId) => _timeline(_timelineRepository.favorite(userId, groupBy));
 
-  TimelineService trash(String userId) => TimelineService(_timelineRepository.trash(userId, groupBy));
+  TimelineService trash(String userId) => _timeline(_timelineRepository.trash(userId, groupBy));
 
-  TimelineService archive(String userId) => TimelineService(_timelineRepository.archived(userId, groupBy));
+  TimelineService archive(String userId) => _timeline(_timelineRepository.archived(userId, groupBy));
 
-  TimelineService lockedFolder(String userId) => TimelineService(_timelineRepository.locked(userId, groupBy));
+  TimelineService lockedFolder(String userId) => _timeline(_timelineRepository.locked(userId, groupBy));
 
-  TimelineService video(String userId) => TimelineService(_timelineRepository.video(userId, groupBy));
+  TimelineService video(String userId) => _timeline(_timelineRepository.video(userId, groupBy));
 
-  TimelineService place(String place) => TimelineService(_timelineRepository.place(place, groupBy));
+  TimelineService place(String place) => _timeline(_timelineRepository.place(place, groupBy));
 
   TimelineService person(String userId, String personId) =>
-      TimelineService(_timelineRepository.person(userId, personId, groupBy));
+      _timeline(_timelineRepository.person(userId, personId, groupBy));
 
   TimelineService fromAssets(List<BaseAsset> assets, TimelineOrigin type) =>
-      TimelineService(_timelineRepository.fromAssets(assets, type));
+      _timeline(_timelineRepository.fromAssets(assets, type));
 
   TimelineService fromAssetStream(List<BaseAsset> Function() getAssets, Stream<int> assetCount, TimelineOrigin type) =>
-      TimelineService(_timelineRepository.fromAssetStream(getAssets, assetCount, type));
+      _timeline(_timelineRepository.fromAssetStream(getAssets, assetCount, type));
 
   TimelineService fromAssetsWithBuckets(List<BaseAsset> assets, TimelineOrigin type) =>
-      TimelineService(_timelineRepository.fromAssetsWithBuckets(assets, type));
+      _timeline(_timelineRepository.fromAssetsWithBuckets(assets, type));
 
   TimelineService map(List<String> userIds, TimelineMapOptions options) =>
-      TimelineService(_timelineRepository.map(userIds, options, groupBy));
+      _timeline(_timelineRepository.map(userIds, options, groupBy));
 }
 
 class TimelineService {

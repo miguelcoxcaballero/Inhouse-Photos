@@ -211,6 +211,48 @@ void main() {
     }
   });
 
+  test('turning grouping off collapses the day buckets into one continuous grid', () {
+    final days = [
+      TimeBucket(date: DateTime(2026, 8, 14), assetCount: 7),
+      TimeBucket(date: DateTime(2026, 8, 13), assetCount: 3),
+      TimeBucket(date: DateTime(2026, 8, 12), assetCount: 11),
+    ];
+
+    final collapsed = collapseTimelineBuckets(days);
+
+    expect(collapsed, hasLength(1));
+    expect(collapsed.single.assetCount, 21, reason: 'every asset, local ones included, stays in the grid');
+    expect(collapsed.single, isNot(isA<TimeBucket>()), reason: 'nothing left to draw a date header from');
+    expect(collapseTimelineBuckets(const []), isEmpty);
+    expect(collapseTimelineBuckets([const Bucket(assetCount: 0)]), isEmpty);
+  });
+
+  test('an ungrouped timeline builds one headerless segment', () {
+    final segments = FixedSegmentBuilder(
+      buckets: collapseTimelineBuckets([
+        TimeBucket(date: DateTime(2026, 8, 14), assetCount: 100),
+        TimeBucket(date: DateTime(2026, 8, 13), assetCount: 44),
+      ]),
+      tileHeight: 10,
+      columnCount: 48,
+      spacing: 0,
+    ).generate();
+
+    expect(segments, hasLength(1));
+    expect(segments.single.header, HeaderType.none);
+    expect(segments.single.headerExtent, 0);
+    // 144 assets over 48 columns is three rows, with no day boundary able to
+    // break a row part way across.
+    expect(segments.single.endOffset - segments.single.gridOffset, 3 * 10);
+
+    // Child keys must still be unique without a date to build them from.
+    final keys = [
+      for (var index = segments.single.firstIndex; index <= segments.single.lastIndex; index++)
+        segments.single.childKey(index),
+    ];
+    expect(keys.toSet(), hasLength(keys.length));
+  });
+
   test('a dense panel always paints the cells it occupies', () {
     // A panel reserves its full layout extent before it has any texture. When
     // the painter drew nothing for that state the timeline showed holes several

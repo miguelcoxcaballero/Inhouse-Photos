@@ -48,6 +48,11 @@ class GroupSettings extends HookConsumerWidget {
               title: 'month'.t(context: context),
               value: GroupAssetsBy.month,
             ),
+            // One continuous grid with no day headers or row breaks.
+            SettingsRadioGroup(
+              title: 'group_no'.t(context: context),
+              value: GroupAssetsBy.none,
+            ),
           ],
           groupBy: groupBy.value,
           onRadioChanged: changeGroupValue,

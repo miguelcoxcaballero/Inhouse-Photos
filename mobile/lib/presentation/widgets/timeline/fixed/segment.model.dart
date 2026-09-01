@@ -393,16 +393,123 @@ _DenseAtlasPixelsResult _buildDenseThumbhashAtlas(List<String?> hashes, int targ
 /// callback nested in a State method can retain the outer closure context,
 /// including the unsendable Element/render tree, even when its body appears to
 /// reference only local variables.
+/// One job for the fallback-texture workers.
+class _DenseAtlasJob {
+  final int id;
+  final List<String?> hashes;
+  final int targetPixels;
+  final int columnCount;
+  final SendPort reply;
+
+  const _DenseAtlasJob({
+    required this.id,
+    required this.hashes,
+    required this.targetPixels,
+    required this.columnCount,
+    required this.reply,
+  });
+}
+
+/// Long-lived isolates that build fallback textures.
+///
+/// Every panel used to call `Isolate.run`, which spawns and tears down an
+/// isolate per panel. Flinging a 48-column screen streams panels in constantly,
+/// so that was a steady churn of isolate setup and collection behind the
+/// scrolling. These workers are started once and reused; only the hash strings
+/// and the finished pixel buffer cross the boundary, and the buffer comes back
+/// by transfer rather than by copy.
+class _DenseAtlasWorkerPool {
+  _DenseAtlasWorkerPool(this.size);
+
+  final int size;
+  final List<SendPort> _workers = [];
+  final Map<int, Completer<_DenseAtlasPixelsResult>> _pending = {};
+  Future<void>? _starting;
+  ReceivePort? _responses;
+  int _nextJobId = 0;
+  int _nextWorker = 0;
+
+  Future<void> _start() => _starting ??= () async {
+    final responses = ReceivePort();
+    _responses = responses;
+    responses.listen((message) {
+      if (message is! List || message.length != 3) {
+        return;
+      }
+      final completer = _pending.remove(message[0] as int);
+      if (completer != null && !completer.isCompleted) {
+        completer.complete(_DenseAtlasPixelsResult(message[1] as Uint8List, (message[2] as List).cast<bool>()));
+      }
+    });
+    for (var index = 0; index < size; index++) {
+      final ready = ReceivePort();
+      await Isolate.spawn(
+        _denseAtlasWorkerMain,
+        ready.sendPort,
+        errorsAreFatal: false,
+        debugName: 'dense-atlas-$index',
+      );
+      _workers.add(await ready.first as SendPort);
+      ready.close();
+    }
+  }();
+
+  Future<_DenseAtlasPixelsResult> run({
+    required List<String?> hashes,
+    required int targetPixels,
+    required int columnCount,
+  }) async {
+    try {
+      await _start();
+    } catch (_) {
+      // A device that cannot spawn isolates still gets its gallery, just with
+      // the decode happening inline.
+      return _buildDenseThumbhashAtlas(hashes, targetPixels, columnCount: columnCount);
+    }
+    if (_workers.isEmpty) {
+      return _buildDenseThumbhashAtlas(hashes, targetPixels, columnCount: columnCount);
+    }
+    final id = _nextJobId++;
+    final completer = Completer<_DenseAtlasPixelsResult>();
+    _pending[id] = completer;
+    final worker = _workers[_nextWorker++ % _workers.length];
+    worker.send(
+      _DenseAtlasJob(
+        id: id,
+        hashes: hashes,
+        targetPixels: targetPixels,
+        columnCount: columnCount,
+        reply: _responses!.sendPort,
+      ),
+    );
+    return completer.future;
+  }
+}
+
+/// Entry point for a fallback-texture worker. Must stay top level.
+void _denseAtlasWorkerMain(SendPort ready) {
+  final jobs = ReceivePort();
+  ready.send(jobs.sendPort);
+  jobs.listen((message) {
+    if (message is! _DenseAtlasJob) {
+      return;
+    }
+    try {
+      final result = _buildDenseThumbhashAtlas(message.hashes, message.targetPixels, columnCount: message.columnCount);
+      message.reply.send([message.id, result.pixels, result.covered]);
+    } catch (_) {
+      message.reply.send([message.id, Uint8List(0), <bool>[]]);
+    }
+  });
+}
+
+final _DenseAtlasWorkerPool _denseAtlasWorkers = _DenseAtlasWorkerPool(_denseMetadataAtlasConcurrency);
+
 Future<_DenseAtlasPixelsResult> _buildDenseThumbhashAtlasInBackground({
   required List<String?> hashes,
   required int targetPixels,
   required int columnCount,
-}) => Isolate.run(
-  // Only the hash strings cross the isolate boundary. Sending pre-decoded RGBA
-  // tiles here copied several megabytes per panel on the platform thread and
-  // was the dominant cost of generating a batched grid screen.
-  () => _buildDenseThumbhashAtlas(hashes, targetPixels, columnCount: columnCount),
-);
+}) => _denseAtlasWorkers.run(hashes: hashes, targetPixels: targetPixels, columnCount: columnCount);
 
 @visibleForTesting
 Uint8List buildDenseThumbhashAtlasPixels(List<String?> hashes, int targetPixels, {int? columnCount}) =>
@@ -1442,6 +1549,7 @@ class _DenseAssetRow extends StatefulWidget {
 
 class _DenseAssetRowState extends State<_DenseAssetRow> {
   static const int _offscreenPriority = 1 << 20;
+  static const double _viewportPrefetchFactor = 0.75;
   static const int _maxUpgradeAttempts = 3;
   // Tier 1 collapses the first cells of a panel almost immediately, so the
   // per-cell draws above are short lived. Later tiers batch more aggressively
@@ -1836,7 +1944,13 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       return (measured: false, visible: true, priority: _offscreenPriority);
     }
     final panelRect = MatrixUtils.transformRect(renderObject.getTransformTo(null), Offset.zero & renderObject.size);
-    final viewport = (Offset.zero & mediaSize).inflate(mediaSize.height * 0.2);
+    // Upgrading only what is already on screen means every panel starts
+    // resolving thumbnails at the moment it becomes visible, so the sharpening
+    // happens in front of the person scrolling. Reaching most of the way into
+    // the sliver's cache extent instead lets a panel arrive already sharp.
+    // Priority is still distance-based, so visible rows are always served
+    // first and this band only consumes genuinely idle capacity.
+    final viewport = (Offset.zero & mediaSize).inflate(mediaSize.height * _viewportPrefetchFactor);
     if (!panelRect.overlaps(viewport)) {
       return (measured: true, visible: false, priority: _offscreenPriority);
     }
@@ -1910,7 +2024,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         _mergedIndexes.containsAll(_upgradeIndexes)) {
       return;
     }
-    _upgradeRetryTimer = Timer(_upgradeRetryDelay, () {
+    _upgradeRetryTimer = Timer(_upgradeRetryDelay * (1 << _upgradeAttempts.clamp(0, 3)), () {
       _upgradeRetryTimer = null;
       if (!mounted || _persistentExact) {
         return;
