@@ -1,7 +1,7 @@
 {
-  "version": "3.1.67",
-  "versionCode": 7125,
+  "version": "3.1.68",
+  "versionCode": 7126,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.67-timezone-correct-days/Inhouse-Photos-3.1.67-arm64.apk",
-  "sha256": "b2d8fc7ef1a5dac5a935f983dd5ff68ab1ca6d16d5e4d11da36ab480b8c58812"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.68-instant-dense-previews/Inhouse-Photos-3.1.68-arm64.apk",
+  "sha256": "046c107973eea6a9e148df71ef86cd49d7cd5d0fd74ea3b5949adbd8782d4cde"
 }
