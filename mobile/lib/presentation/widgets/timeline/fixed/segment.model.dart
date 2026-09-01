@@ -1383,8 +1383,12 @@ class _DenseAssetRow extends StatefulWidget {
 class _DenseAssetRowState extends State<_DenseAssetRow> {
   static const int _offscreenPriority = 1 << 20;
   static const int _maxUpgradeAttempts = 3;
-  static const Duration _compositeDebounce = Duration(milliseconds: 700);
-  static const Duration _compositeIdleDebounce = Duration(milliseconds: 2500);
+  // Tier 1 collapses the first cells of a panel almost immediately, so the
+  // per-cell draws above are short lived. Later tiers batch more aggressively
+  // because by then the panel already looks sharp.
+  static const Duration _compositeFirstDebounce = Duration(milliseconds: 150);
+  static const Duration _compositeDebounce = Duration(milliseconds: 300);
+  static const Duration _compositeIdleDebounce = Duration(milliseconds: 2000);
   static const Duration _upgradeRetryDelay = Duration(milliseconds: 900);
 
   final ValueNotifier<int> _repaint = ValueNotifier(0);
@@ -1417,6 +1421,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   Timer? _upgradeRetryTimer;
   bool _atlasBuilding = false;
   bool _compositeDirty = false;
+  int _compositeTier = 0;
   int _targetPixels = batchedGridMetadataCellPixels;
   int _metadataPixels = batchedGridMetadataCellPixels;
   int _completeAtlasKey = 0;
@@ -2078,11 +2083,12 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _images[index]?.dispose();
     _images[index] = image;
     _reportVisualReady();
-    if (_atlas == null) {
-      // Nothing else is painting this panel yet, so show the decoded cells
-      // directly until the first atlas is composited.
-      _scheduleRepaint();
-    }
+    // The painter already draws decoded cells over the fallback texture, so a
+    // thumbnail can be on screen the frame after it resolves. Waiting for the
+    // composite to run was what made sharpening take seconds; the composite is
+    // now only an optimisation that collapses these draws into one texture.
+    // Repaints coalesce to at most one per frame.
+    _scheduleRepaint();
   }
 
   void _scheduleCompositeAtlas(int generation) {
@@ -2102,19 +2108,40 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       return;
     }
     _compositeDirty = true;
-    if (_pendingIndexes.isEmpty) {
+    // Until a cell is composited the painter draws it individually, so collapse
+    // them as soon as a meaningful batch exists. Thumbnails normally arrive far
+    // slower than this, but a warm disk cache can deliver a whole panel at once.
+    if (_pendingIndexes.isEmpty || ready >= widget.columnCount * 2) {
       _compositeTimer?.cancel();
       _compositeTimer = null;
+      _compositeTier = 0;
       unawaited(_buildCompositeAtlas(generation));
       return;
     }
-    // Every composite re-rasterises the whole panel. At 48 columns two dozen
-    // panels are filling at once, so compositing on each arriving thumbnail
-    // buried the raster thread. Wait for a full row of new cells before
-    // sharpening, with a slower safety pass so a trickle still lands.
-    final delay = ready >= widget.columnCount ? _compositeDebounce : _compositeIdleDebounce;
-    _compositeTimer ??= Timer(delay, () {
+    // Every composite re-rasterises the whole panel, so they are batched. The
+    // tier must be able to move *down*: an armed idle pass previously stayed
+    // armed even when the rest of the panel landed milliseconds later, which
+    // is what turned a fast load into a visible multi-second sharpen.
+    final int tier;
+    final Duration delay;
+    if (_mergedIndexes.isEmpty) {
+      tier = 1;
+      delay = _compositeFirstDebounce;
+    } else if (ready >= widget.columnCount) {
+      tier = 2;
+      delay = _compositeDebounce;
+    } else {
+      tier = 3;
+      delay = _compositeIdleDebounce;
+    }
+    if (_compositeTimer != null && tier >= _compositeTier) {
+      return;
+    }
+    _compositeTimer?.cancel();
+    _compositeTier = tier;
+    _compositeTimer = Timer(delay, () {
       _compositeTimer = null;
+      _compositeTier = 0;
       if (mounted && generation == _generation) {
         unawaited(_buildCompositeAtlas(generation));
       }
@@ -2306,6 +2333,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   void _cancelActualThumbnailWork() {
     _compositeTimer?.cancel();
     _compositeTimer = null;
+    _compositeTier = 0;
     _upgradeRetryTimer?.cancel();
     _upgradeRetryTimer = null;
     _actualThumbnailRequestsReset();
@@ -2571,7 +2599,7 @@ class _DenseAssetRowPainter extends CustomPainter {
         rect: isReflowing ? _reflowRect(index, reflowProgress, size) : _currentRect(index, size),
         image: image,
         fit: BoxFit.cover,
-        filterQuality: FilterQuality.none,
+        filterQuality: FilterQuality.low,
       );
     }
   }

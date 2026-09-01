@@ -672,146 +672,156 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
           primary: false,
           resizeToAvoidBottomInset: false,
           floatingActionButton: const DownloadStatusFloatingButton(),
-          body: asyncSegments.widgetWhen(
-            onLoading: widget.loadingWidget != null ? () => widget.loadingWidget! : null,
-            onData: (segments) {
-              final childCount = (segments.lastOrNull?.lastIndex ?? -1) + 1;
-              final denseChildIndexes = usesBatchedTimelineGrid(_perRow) ? segments.childIndexesByKey() : null;
-              final double appBarExpandedHeight = widget.appBar != null && widget.appBar is MesmerizingSliverAppBar
-                  ? 200
-                  : 0;
-              final topPadding = context.padding.top + (widget.appBar == null ? 0 : kToolbarHeight) + 10;
+          // Paint the app's own surface behind the scroll view. Whenever the
+          // slivers do not cover the full viewport - a zoom that shortens the
+          // content under the current scroll offset, a surface resize, a frame
+          // where the segment list is shorter than the scroll extent - the gap
+          // showed whatever sat underneath, which on some devices is a light
+          // system grey that looks nothing like the app.
+          backgroundColor: context.colorScheme.surface,
+          body: ColoredBox(
+            color: context.colorScheme.surface,
+            child: asyncSegments.widgetWhen(
+              onLoading: widget.loadingWidget != null ? () => widget.loadingWidget! : null,
+              onData: (segments) {
+                final childCount = (segments.lastOrNull?.lastIndex ?? -1) + 1;
+                final denseChildIndexes = usesBatchedTimelineGrid(_perRow) ? segments.childIndexesByKey() : null;
+                final double appBarExpandedHeight = widget.appBar != null && widget.appBar is MesmerizingSliverAppBar
+                    ? 200
+                    : 0;
+                final topPadding = context.padding.top + (widget.appBar == null ? 0 : kToolbarHeight) + 10;
 
-              const bottomSheetOpenModifier = 120.0;
-              final contentBottomPadding =
-                  context.padding.bottom + (isMultiSelectEnabled ? bottomSheetOpenModifier : 0);
-              final scrubberBottomPadding = contentBottomPadding + kScrubberThumbHeight;
+                const bottomSheetOpenModifier = 120.0;
+                final contentBottomPadding =
+                    context.padding.bottom + (isMultiSelectEnabled ? bottomSheetOpenModifier : 0);
+                final scrubberBottomPadding = contentBottomPadding + kScrubberThumbHeight;
 
-              final grid = CustomScrollView(
-                primary: true,
-                physics: _scrollPhysics,
-                // One viewport is enough to keep the next rows ready without
-                // decoding and compositing several screens of thumbnails while
-                // the user is actively scrolling.
-                scrollCacheExtent: .pixels(maxHeight),
-                slivers: [
-                  if (isSelectionMode) const SelectionSliverAppBar() else if (widget.appBar != null) widget.appBar!,
-                  if (widget.topSliverWidget != null) widget.topSliverWidget!,
-                  _SliverSegmentedList(
-                    segments: segments,
-                    delegate: SliverChildBuilderDelegate(
-                      (ctx, index) {
-                        if (index >= childCount) {
-                          return null;
-                        }
-                        final segment = segments.findByIndex(index);
-                        if (segment == null) {
-                          return const SizedBox.shrink();
-                        }
-                        final child = segment.builder(ctx, index);
-                        return denseChildIndexes == null
-                            ? child
-                            : KeyedSubtree(key: segment.childKey(index), child: child);
+                final grid = CustomScrollView(
+                  primary: true,
+                  physics: _scrollPhysics,
+                  // One viewport is enough to keep the next rows ready without
+                  // decoding and compositing several screens of thumbnails while
+                  // the user is actively scrolling.
+                  scrollCacheExtent: .pixels(maxHeight),
+                  slivers: [
+                    if (isSelectionMode) const SelectionSliverAppBar() else if (widget.appBar != null) widget.appBar!,
+                    if (widget.topSliverWidget != null) widget.topSliverWidget!,
+                    _SliverSegmentedList(
+                      segments: segments,
+                      delegate: SliverChildBuilderDelegate(
+                        (ctx, index) {
+                          if (index >= childCount) {
+                            return null;
+                          }
+                          final segment = segments.findByIndex(index);
+                          if (segment == null) {
+                            return const SizedBox.shrink();
+                          }
+                          final child = segment.builder(ctx, index);
+                          return denseChildIndexes == null
+                              ? child
+                              : KeyedSubtree(key: segment.childKey(index), child: child);
+                        },
+                        childCount: childCount,
+                        findChildIndexCallback: denseChildIndexes == null ? null : (key) => denseChildIndexes[key],
+                        addAutomaticKeepAlives: false,
+                        // We add repaint boundary around tiles, so skip the auto boundaries
+                        addRepaintBoundaries: false,
+                      ),
+                    ),
+                    if (widget.bottomSliverWidget != null) widget.bottomSliverWidget!,
+                    SliverPadding(padding: EdgeInsets.only(bottom: contentBottomPadding)),
+                  ],
+                );
+
+                final Widget timeline;
+                if (widget.withScrubber) {
+                  timeline = Scrubber(
+                    snapToMonth: widget.snapToMonth,
+                    layoutSegments: segments,
+                    timelineHeight: maxHeight,
+                    topPadding: topPadding,
+                    bottomPadding: scrubberBottomPadding,
+                    monthSegmentSnappingOffset: widget.topSliverWidgetHeight ?? 0 + appBarExpandedHeight,
+                    hasAppBar: widget.appBar != null,
+                    child: grid,
+                  );
+                } else {
+                  timeline = grid;
+                }
+
+                return RawGestureDetector(
+                  gestures: {
+                    CustomScaleGestureRecognizer: GestureRecognizerFactoryWithHandlers<CustomScaleGestureRecognizer>(
+                      () => CustomScaleGestureRecognizer(),
+                      (CustomScaleGestureRecognizer scale) {
+                        scale.onStart = (details) {
+                          _finishLayoutTransitionImmediately();
+                          _baseScaleFactor = _scaleFactor;
+                          _pendingPerRow = _perRow;
+                          ref.read(timelineStateProvider.notifier).setZooming(true);
+                        };
+
+                        scale.onUpdate = (details) {
+                          final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 0.22);
+                          final newPerRow = calculateTimelineColumnCount(
+                            scaleFactor: newScaleFactor,
+                            gestureStartScaleFactor: _baseScaleFactor,
+                          );
+                          _scaleFactor = newScaleFactor;
+                          _pendingPerRow = newPerRow;
+                        };
+                        scale.onEnd = (_) {
+                          final targetColumns = _pendingPerRow ?? _perRow;
+                          _pendingPerRow = null;
+                          _scaleFactor = timelineScaleFactorForColumnCount(targetColumns);
+                          _baseScaleFactor = _scaleFactor;
+                          if (targetColumns == _perRow) {
+                            ref.read(timelineStateProvider.notifier).setZooming(false);
+                            return;
+                          }
+
+                          final targetAssetIndex = _getCurrentAssetIndex(segments);
+                          _prepareLayoutTransition();
+                          _commitColumnCount(targetColumns, targetAssetIndex);
+                          ref.read(timelineStateProvider.notifier).setZooming(false);
+                        };
                       },
-                      childCount: childCount,
-                      findChildIndexCallback: denseChildIndexes == null ? null : (key) => denseChildIndexes[key],
-                      addAutomaticKeepAlives: false,
-                      // We add repaint boundary around tiles, so skip the auto boundaries
-                      addRepaintBoundaries: false,
+                    ),
+                  },
+                  child: TimelineDragRegion(
+                    onStart: !isReadonlyModeEnabled ? _setDragStartIndex : null,
+                    onAssetEnter: _handleDragAssetEnter,
+                    onEnd: !isReadonlyModeEnabled ? _stopDrag : null,
+                    onScroll: _dragScroll,
+                    onScrollStart: () {
+                      // Minimize the bottom sheet when drag selection starts
+                      ref.read(timelineStateProvider.notifier).setScrolling(true);
+                    },
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        TimelineLayoutTransitionScope(
+                          animation: _layoutTransitionController,
+                          previousRects: _previousTileRects,
+                          child: timeline,
+                        ),
+                        if (isBottomWidgetVisible)
+                          Positioned(
+                            top: MediaQuery.paddingOf(context).top,
+                            left: 25,
+                            child: const SizedBox(
+                              height: kToolbarHeight,
+                              child: Center(child: _MultiSelectStatusButton()),
+                            ),
+                          ),
+                        if (isBottomWidgetVisible) widget.bottomSheet!,
+                      ],
                     ),
                   ),
-                  if (widget.bottomSliverWidget != null) widget.bottomSliverWidget!,
-                  SliverPadding(padding: EdgeInsets.only(bottom: contentBottomPadding)),
-                ],
-              );
-
-              final Widget timeline;
-              if (widget.withScrubber) {
-                timeline = Scrubber(
-                  snapToMonth: widget.snapToMonth,
-                  layoutSegments: segments,
-                  timelineHeight: maxHeight,
-                  topPadding: topPadding,
-                  bottomPadding: scrubberBottomPadding,
-                  monthSegmentSnappingOffset: widget.topSliverWidgetHeight ?? 0 + appBarExpandedHeight,
-                  hasAppBar: widget.appBar != null,
-                  child: grid,
                 );
-              } else {
-                timeline = grid;
-              }
-
-              return RawGestureDetector(
-                gestures: {
-                  CustomScaleGestureRecognizer: GestureRecognizerFactoryWithHandlers<CustomScaleGestureRecognizer>(
-                    () => CustomScaleGestureRecognizer(),
-                    (CustomScaleGestureRecognizer scale) {
-                      scale.onStart = (details) {
-                        _finishLayoutTransitionImmediately();
-                        _baseScaleFactor = _scaleFactor;
-                        _pendingPerRow = _perRow;
-                        ref.read(timelineStateProvider.notifier).setZooming(true);
-                      };
-
-                      scale.onUpdate = (details) {
-                        final newScaleFactor = math.max(math.min(5.0, _baseScaleFactor * details.scale), 0.22);
-                        final newPerRow = calculateTimelineColumnCount(
-                          scaleFactor: newScaleFactor,
-                          gestureStartScaleFactor: _baseScaleFactor,
-                        );
-                        _scaleFactor = newScaleFactor;
-                        _pendingPerRow = newPerRow;
-                      };
-                      scale.onEnd = (_) {
-                        final targetColumns = _pendingPerRow ?? _perRow;
-                        _pendingPerRow = null;
-                        _scaleFactor = timelineScaleFactorForColumnCount(targetColumns);
-                        _baseScaleFactor = _scaleFactor;
-                        if (targetColumns == _perRow) {
-                          ref.read(timelineStateProvider.notifier).setZooming(false);
-                          return;
-                        }
-
-                        final targetAssetIndex = _getCurrentAssetIndex(segments);
-                        _prepareLayoutTransition();
-                        _commitColumnCount(targetColumns, targetAssetIndex);
-                        ref.read(timelineStateProvider.notifier).setZooming(false);
-                      };
-                    },
-                  ),
-                },
-                child: TimelineDragRegion(
-                  onStart: !isReadonlyModeEnabled ? _setDragStartIndex : null,
-                  onAssetEnter: _handleDragAssetEnter,
-                  onEnd: !isReadonlyModeEnabled ? _stopDrag : null,
-                  onScroll: _dragScroll,
-                  onScrollStart: () {
-                    // Minimize the bottom sheet when drag selection starts
-                    ref.read(timelineStateProvider.notifier).setScrolling(true);
-                  },
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      TimelineLayoutTransitionScope(
-                        animation: _layoutTransitionController,
-                        previousRects: _previousTileRects,
-                        child: timeline,
-                      ),
-                      if (isBottomWidgetVisible)
-                        Positioned(
-                          top: MediaQuery.paddingOf(context).top,
-                          left: 25,
-                          child: const SizedBox(
-                            height: kToolbarHeight,
-                            child: Center(child: _MultiSelectStatusButton()),
-                          ),
-                        ),
-                      if (isBottomWidgetVisible) widget.bottomSheet!,
-                    ],
-                  ),
-                ),
-              );
-            },
+              },
+            ),
           ),
         ),
       ),
