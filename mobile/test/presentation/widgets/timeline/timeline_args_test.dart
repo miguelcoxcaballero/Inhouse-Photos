@@ -111,7 +111,10 @@ void main() {
     expect(denseTimelineAssetChunkSize(columnCount: 48, viewportHeight: 800, tileExtent: 8.34), 2048);
     expect(denseTimelineAssetChunkSize(columnCount: 24, viewportHeight: 800, tileExtent: 16.67), 2048);
     expect(denseTimelineAssetChunkSize(columnCount: 12, viewportHeight: 0, tileExtent: 32), 1024);
-    expect(denseTimelineTargetPixels(tileExtent: 8.34, devicePixelRatio: 3), 32);
+    // Exactly the cell's size on screen, never more. A dense tile occupies 26
+    // physical pixels here; giving it 32 meant decoding, transferring and
+    // rescaling 1.9x the pixels every frame for detail the display cannot show.
+    expect(denseTimelineTargetPixels(tileExtent: 8.34, devicePixelRatio: 3), 26);
     expect(denseTimelineTargetPixels(tileExtent: 18, devicePixelRatio: 3), 54);
     expect(batchedGridMetadataCellPixels, 32);
     expect(batchedGridDiskCacheLimitBytes, 256 * 1024 * 1024);
@@ -424,7 +427,9 @@ void main() {
     // expanding a ThumbHash to a 120px cell costs 16x the memory and isolate
     // transfer for no additional detail.
     expect(denseTimelineMetadataPixels(denseTimelineTargetPixels(tileExtent: 40, devicePixelRatio: 3)), 32);
-    expect(denseTimelineMetadataPixels(denseTimelineTargetPixels(tileExtent: 8.6, devicePixelRatio: 3.5)), 32);
+    // Below that ceiling the fallback simply matches the cell, so the atlas
+    // blits one to one instead of being rescaled on every frame.
+    expect(denseTimelineMetadataPixels(denseTimelineTargetPixels(tileExtent: 8.6, devicePixelRatio: 3.5)), 31);
   });
 
   test('dense atlas scheduling keeps centre-visible panels ahead of distant queued work', () async {

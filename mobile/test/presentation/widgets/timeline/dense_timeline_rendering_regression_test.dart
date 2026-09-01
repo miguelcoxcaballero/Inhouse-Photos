@@ -121,6 +121,32 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test('the per-asset cell cache does not change what an atlas contains', () {
+    // The cache short-circuits decoding, so a cached panel and a freshly
+    // decoded one must be indistinguishable. Regrouping the same photos under a
+    // different column count exercises the case the cache exists for: the cells
+    // are identical across zoom levels even though the panels are not.
+    const columnCount = 24;
+    const cell = batchedGridMetadataCellPixels;
+    final hashes = List<String>.generate(144, (index) => _testThumbHash(index + 500), growable: false);
+
+    final cold = buildDenseThumbhashAtlasPixels(hashes, cell, columnCount: columnCount);
+    final warm = buildDenseThumbhashAtlasPixels(hashes, cell, columnCount: columnCount);
+    expect(warm, orderedEquals(cold), reason: 'a cached rebuild must be byte-identical to a decoded one');
+
+    final regrouped = buildDenseThumbhashAtlasPixels(hashes, cell, columnCount: 48);
+    for (var index = 0; index < hashes.length; index++) {
+      final coldOffset =
+          (((index ~/ columnCount) * cell + cell ~/ 2) * (columnCount * cell) + (index % columnCount) * cell + cell ~/ 2) * 4;
+      final warmOffset = (((index ~/ 48) * cell + cell ~/ 2) * (48 * cell) + (index % 48) * cell + cell ~/ 2) * 4;
+      expect(
+        regrouped.sublist(warmOffset, warmOffset + 4),
+        orderedEquals(cold.sublist(coldOffset, coldOffset + 4)),
+        reason: 'photo $index must decode to the same cell whatever the column count',
+      );
+    }
+  });
+
   test('timeline transition keys are deterministic and collision-free for a large viewport', () {
     final firstBuild = List<Object>.generate(4096, timelineAssetLayoutKey, growable: false);
     final secondBuild = List<Object>.generate(4096, timelineAssetLayoutKey, growable: false);
