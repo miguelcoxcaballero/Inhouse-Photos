@@ -629,12 +629,7 @@ Future<_DenseAtlasPixelsResult> _buildDenseThumbhashAtlasInBackground({
   required int targetPixels,
   required int columnCount,
   required Object affinity,
-}) => _denseAtlasWorkers.run(
-  hashes: hashes,
-  targetPixels: targetPixels,
-  columnCount: columnCount,
-  affinity: affinity,
-);
+}) => _denseAtlasWorkers.run(hashes: hashes, targetPixels: targetPixels, columnCount: columnCount, affinity: affinity);
 
 @visibleForTesting
 Uint8List buildDenseThumbhashAtlasPixels(List<String?> hashes, int targetPixels, {int? columnCount}) =>
@@ -1684,6 +1679,7 @@ class _DenseAssetRow extends StatefulWidget {
 
 class _DenseAssetRowState extends State<_DenseAssetRow> {
   static const int _offscreenPriority = 1 << 20;
+
   /// How far beyond the visible viewport a panel may resolve thumbnails.
   ///
   /// 3.1.65 widened this to 0.75 of a viewport either side so panels would
@@ -1707,6 +1703,9 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   /// long as it stayed mounted. Backing off to eight seconds over eight
   /// attempts recovers from a shortage lasting around a minute and then stops.
   static const Duration _maxUpgradeRetryDelay = Duration(seconds: 8);
+
+  /// Consecutive retries that achieve nothing, not retries in total: any cell
+  /// merging resets this. A panel still making progress is never cut off.
   static const int _maxUpgradeAttempts = 8;
   // Tier 1 collapses the first cells of a panel almost immediately, so the
   // per-cell draws above are short lived. Later tiers batch more aggressively
@@ -2021,32 +2020,43 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   }
 
   Future<void> _restoreThenBuild(int generation, {required bool skipDiskRestore}) async {
-    if (!skipDiskRestore) {
-      final entry = await _denseDiskAtlasCache.get(widget.cacheSlot);
-      if (!mounted || generation != _generation) {
-        return;
-      }
-      final cellPixels = entry == null ? null : _cellPixelsForSize(entry.width, entry.height);
-      if (entry != null && cellPixels != null) {
-        final image = await _decodeDiskAtlas(entry);
+    // Restoring is an optimisation; building is the guarantee. This runs
+    // unawaited, so anything thrown while reading or decoding a cached texture
+    // would otherwise vanish into an unhandled async error and take the call
+    // below with it - leaving a panel that is laid out and painting its
+    // placeholder colour with nothing queued and no retry pending. The early
+    // returns inside still skip the rebuild, because those are the cases where
+    // the panel already has what it needs or no longer wants it.
+    try {
+      if (!skipDiskRestore) {
+        final entry = await _denseDiskAtlasCache.get(widget.cacheSlot);
         if (!mounted || generation != _generation) {
-          image?.dispose();
           return;
         }
-        if (image != null) {
-          setState(() => _replaceAtlas(image, signature: entry.signature, cellPixels: cellPixels));
-          _denseRowAtlasCache.put(_slotAtlasKey, image, signature: entry.signature);
-          if (entry.signature == _contentSignature) {
-            _baseAtlasReady = true;
-            if (cellPixels == _targetPixels) {
-              _persistentExact = true;
-              _mergedIndexes.addAll(_upgradeIndexes);
-              _denseRowAtlasCache.put(_completeAtlasKey, image, signature: _contentSignature);
-              return;
+        final cellPixels = entry == null ? null : _cellPixelsForSize(entry.width, entry.height);
+        if (entry != null && cellPixels != null) {
+          final image = await _decodeDiskAtlas(entry);
+          if (!mounted || generation != _generation) {
+            image?.dispose();
+            return;
+          }
+          if (image != null) {
+            setState(() => _replaceAtlas(image, signature: entry.signature, cellPixels: cellPixels));
+            _denseRowAtlasCache.put(_slotAtlasKey, image, signature: entry.signature);
+            if (entry.signature == _contentSignature) {
+              _baseAtlasReady = true;
+              if (cellPixels == _targetPixels) {
+                _persistentExact = true;
+                _mergedIndexes.addAll(_upgradeIndexes);
+                _denseRowAtlasCache.put(_completeAtlasKey, image, signature: _contentSignature);
+                return;
+              }
             }
           }
         }
       }
+    } catch (_) {
+      // Fall through and build the panel from scratch.
     }
 
     _queueVisibleOverviewWork(generation: generation);
@@ -2112,13 +2122,21 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     }
     final targetGeneration = generation ?? _generation;
     final panelPriority = viewport.priority;
-    for (final index in _upgradeIndexes) {
-      if (_mergedIndexes.contains(index)) {
-        continue;
+    // The retry is this panel's only route back from a failed or rejected
+    // request, so it must not be reachable only by the happy path. A throw from
+    // inside the loop used to skip it and strand the panel: mounted, sized and
+    // painting its placeholder, with nothing left that would ever try again.
+    // Whatever goes wrong for one cell, the panel still gets another go.
+    try {
+      for (final index in _upgradeIndexes) {
+        if (_mergedIndexes.contains(index)) {
+          continue;
+        }
+        _requestActualThumbnail(index, targetGeneration, priority: panelPriority + (index ~/ widget.columnCount));
       }
-      _requestActualThumbnail(index, targetGeneration, priority: panelPriority + (index ~/ widget.columnCount));
+    } finally {
+      _scheduleUpgradeRetry();
     }
-    _scheduleUpgradeRetry();
   }
 
   void _requestActualThumbnail(int index, int generation, {required int priority}) {
@@ -2258,7 +2276,10 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     // A full screen of dense panels can all be rejected by the bounded atlas
     // queue at once. Retrying every 80ms turned that into a storm that starved
     // the very panels it was waiting on, so back off instead.
-    final backoff = delay ?? Duration(milliseconds: math.min(80 << _metadataRetries, 1600));
+    // Clamped before the shift: `80 << retries` overflows to a negative number
+    // past sixty-odd retries, and a negative Duration fires the timer at once,
+    // turning the backoff into the retry storm it exists to prevent.
+    final backoff = delay ?? Duration(milliseconds: 80 << math.min(_metadataRetries, 4));
     _metadataRetries++;
     _metadataRetryTimer = Timer(backoff, () {
       _metadataRetryTimer = null;
@@ -2349,8 +2370,15 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       // leave the panel as a permanent empty surface. Resolve real cached
       // thumbnails while a later metadata-atlas retry repairs the fast path.
       _upgradeIndexes.addAll(Iterable<int>.generate(assets.length));
-      _queueMissingActualThumbnails(generation: generation);
-      _scheduleMetadataRetry(delay: const Duration(milliseconds: 180));
+      // Same reasoning as the upgrade loop: the metadata retry is what repairs
+      // the fast path, so resolving thumbnails must not be able to cost the
+      // panel its retry. Without this, one throw here left a panel showing
+      // nothing but placeholder colour for as long as it stayed on screen.
+      try {
+        _queueMissingActualThumbnails(generation: generation);
+      } finally {
+        _scheduleMetadataRetry(delay: const Duration(milliseconds: 180));
+      }
     }
   }
 
@@ -2548,6 +2576,16 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       _images[index] = null;
     }
     _mergedIndexes.addAll(merged);
+    if (merged.isNotEmpty) {
+      // Progress refunds the retry budget. The bound exists to stop a panel
+      // that genuinely cannot resolve from re-queueing itself forever, not to
+      // cap how long a panel that is still filling in may take. A dense screen
+      // asks for more cells than the thumbnail queue holds, so a panel can burn
+      // attempts on requests that were discarded rather than tried - which is
+      // how a bound of three became a permanent blur before, and how a bound of
+      // eight could do the same.
+      _upgradeAttempts = 0;
+    }
     final isComplete = _pendingIndexes.isEmpty && _mergedIndexes.containsAll(_upgradeIndexes);
     setState(() {
       _replaceAtlas(atlas, signature: isComplete ? _contentSignature : _provisionalSignature, cellPixels: targetPixels);

@@ -246,7 +246,21 @@ void main() {
       }
     }
 
+    // The reported symptom, as a check: a panel that is mounted, sized and
+    // painting its placeholder colour but holding no texture at all. Screenshot
+    // evidence showed whole screens of these, and every one of them is a panel
+    // whose retry was skipped. Give the grid a settling window, then insist.
+    for (var step = 0; step < 60; step++) {
+      final stranded = _panels(tester).where((panel) => panel.atlas == null).length;
+      if (stranded == 0) {
+        break;
+      }
+      await _realDelay(tester, const Duration(milliseconds: 100));
+    }
+    final stranded = _panels(tester).where((panel) => panel.atlas == null).toList();
+
     print('GRIDFLICK ===== real thumbnails, 48 columns =====');
+    print('GRIDFLICK panels stranded without atlas: ${stranded.length} of ${_panels(tester).length}');
     print('GRIDFLICK thumbnail requests served    : $served');
     print('GRIDFLICK peak loose images on screen  : $peakLoose');
     print('GRIDFLICK atlas changes                : $atlasChanges');
@@ -255,5 +269,13 @@ void main() {
     print('GRIDFLICK ===== end =====');
 
     expect(tester.takeException(), isNull);
+    expect(
+      stranded,
+      isEmpty,
+      reason:
+          'every mounted panel must end up with a texture; a panel with none is '
+          'the flat placeholder-coloured block seen in the bug reports',
+    );
+    expect(regressions, 0, reason: 'a cell must never lose a thumbnail it already resolved');
   }, timeout: const Timeout(Duration(minutes: 6)));
 }
