@@ -1,7 +1,7 @@
 {
-  "version": "3.1.65",
-  "versionCode": 7123,
+  "version": "3.1.66",
+  "versionCode": 7124,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.65-flexible-grouping-smooth-grid/Inhouse-Photos-3.1.65-arm64.apk",
-  "sha256": "5bed9261d7dfb23a9ef3dfcd05dc7fea88646fb0ec87382e607a9c3d8dbd4813"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.66-restore-indexed-timeline/Inhouse-Photos-3.1.66-arm64.apk",
+  "sha256": "ec30f6dad35b2e21899ad8115a5ced508e9827131c175f2e0c4e841537490872"
 }
