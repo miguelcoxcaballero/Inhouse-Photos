@@ -1359,7 +1359,7 @@ const int _denseMetadataAtlasConcurrency = 3;
 // columns left barely one screen of headroom and made scrolling back flash
 // blank rows. The budget below is the accounted figure, not real memory.
 const int _denseAtlasCacheBytes = 96 * 1024 * 1024;
-final _DenseThumbnailQueue _denseThumbnailQueue = _DenseThumbnailQueue();
+final DenseThumbnailQueue _denseThumbnailQueue = DenseThumbnailQueue();
 final DenseTimelineTaskQueue _denseMetadataAtlasQueue = DenseTimelineTaskQueue(
   _denseMetadataAtlasConcurrency,
   // A 48-column screen plus its cache extent is well over a hundred panels.
@@ -1391,12 +1391,19 @@ class _DenseLoadCancelled implements Exception {
   const _DenseLoadCancelled({this.retry = false});
 }
 
-class _DenseThumbnailQueue {
+@visibleForTesting
+class DenseThumbnailQueue {
+  DenseThumbnailQueue({this.maxPending = 4096});
+
   // A whole batched-grid screen can legitimately want a few thousand cells, so
   // the queue is ordered by a heap instead of re-sorting a list on every
   // dequeue. Re-sorting made scheduling quadratic and stalled the UI isolate
   // exactly when the gallery was trying to fill in.
-  static const int _maxPending = 4096;
+  //
+  // A dense screen routinely asks for more than this, so the discard path below
+  // is ordinary behaviour rather than an edge case, and callers must expect
+  // `onDiscard` to run before `schedule` returns.
+  final int maxPending;
   final HeapPriorityQueue<_DenseThumbnailTask> _pending = HeapPriorityQueue(_compareTasks);
   int _active = 0;
   int _sequence = 0;
@@ -1406,10 +1413,10 @@ class _DenseThumbnailQueue {
     return priority == 0 ? a.sequence.compareTo(b.sequence) : priority;
   }
 
-  _DenseThumbnailHandle schedule(Future<void> Function() task, {int priority = 1, void Function()? onDiscard}) {
+  DenseThumbnailHandle schedule(Future<void> Function() task, {int priority = 1, void Function()? onDiscard}) {
     final item = _DenseThumbnailTask(task: task, priority: priority, sequence: _sequence++, onDiscard: onDiscard);
-    final handle = _DenseThumbnailHandle(item);
-    if (_pending.length >= _maxPending) {
+    final handle = DenseThumbnailHandle._(item);
+    if (_pending.length >= maxPending) {
       // Dropping the newest request keeps the already-prioritised backlog
       // intact; the owning panel re-queues what is still missing once it has
       // drained.
@@ -1477,10 +1484,13 @@ class _DenseThumbnailTask {
   }
 }
 
-class _DenseThumbnailHandle {
+/// Opaque reference to one queued thumbnail request, so a panel can cancel the
+/// work it asked for. Only [DenseThumbnailQueue] constructs these.
+@visibleForTesting
+class DenseThumbnailHandle {
   final _DenseThumbnailTask _task;
 
-  const _DenseThumbnailHandle(this._task);
+  const DenseThumbnailHandle._(this._task);
 
   void cancel() => _task.discard(notify: false);
 }
@@ -1753,7 +1763,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   final Set<int> _upgradeIndexes = {};
   final Set<int> _pendingIndexes = {};
   final Set<int> _mergedIndexes = {};
-  final Set<_DenseThumbnailHandle> _thumbnailHandles = {};
+  final Set<DenseThumbnailHandle> _thumbnailHandles = {};
 
   int get _rowCount => (widget.itemCount / widget.columnCount).ceil();
 
@@ -2116,10 +2126,24 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       return;
     }
     final actualWorkGeneration = _actualWorkGeneration;
-    late final _DenseThumbnailHandle handle;
+    // Not `late final`. A full queue discards the newest request from inside
+    // `schedule`, so `onDiscard` can run before `schedule` has returned - and a
+    // dense screen wants more cells than the queue holds, so that is the normal
+    // case here, not an edge one. Reading a `late` local from that callback
+    // threw, and the throw escaped the loop in `_queueMissingActualThumbnails`,
+    // so the rest of the panel's cells were never requested and the retry that
+    // would have recovered them was never scheduled. The index also stayed in
+    // `_pendingIndexes`, which stops a panel ever counting as complete. That is
+    // a panel stuck on its ThumbHash for as long as it stays on screen.
+    DenseThumbnailHandle? handle;
+    var settled = false;
 
     void finish() {
-      _thumbnailHandles.remove(handle);
+      settled = true;
+      final scheduled = handle;
+      if (scheduled != null) {
+        _thumbnailHandles.remove(scheduled);
+      }
       if (!mounted || generation != _generation || actualWorkGeneration != _actualWorkGeneration) {
         return;
       }
@@ -2138,7 +2162,10 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       priority: priority,
       onDiscard: finish,
     );
-    _thumbnailHandles.add(handle);
+    // Already discarded, and never tracked, so there is nothing to hold on to.
+    if (!settled) {
+      _thumbnailHandles.add(handle);
+    }
   }
 
   /// Re-queues cells the bounded scheduler dropped, or that failed while the
