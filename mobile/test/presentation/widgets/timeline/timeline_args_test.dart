@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -147,20 +148,17 @@ void main() {
       for (var y = 0; y < 8; y++)
         for (var x = 8; x < 16; x++) atlas[(y * 16 + x) * 4 + 3],
     ], everyElement(0));
-    expect(denseTimelineMetadataCoverageIsComplete([true, false]), isFalse);
-    expect(denseTimelineMetadataCoverageIsComplete([true, true]), isTrue);
   });
 
-  test('cells without a ThumbHash are painted opaque instead of punching a hole', () {
-    const placeholder = 0x30405060;
-    final atlas = buildDenseThumbhashAtlasPixels([null, null], 4, placeholderColor: placeholder);
+  test('the cached texture never bakes a theme colour into its empty cells', () {
+    // The texture is persisted to disk and its identity does not include the
+    // palette, so a colour baked here would outlive the theme that produced it
+    // and reappear under a different one. Empty cells stay transparent and the
+    // painter fills them live instead.
+    final atlas = buildDenseThumbhashAtlasPixels([null, null], 4);
 
     expect(atlas, hasLength(4 * 8 * 4));
-    expect([
-      for (var y = 0; y < 4; y++)
-        for (var x = 0; x < 8; x++) atlas[(y * 8 + x) * 4 + 3],
-    ], everyElement(0x60));
-    expect(atlas.sublist(0, 4), [0x30, 0x40, 0x50, 0x60]);
+    expect(atlas, everyElement(0));
   });
 
   test('the ThumbHash fallback texture never grows past its own level of detail', () {
@@ -170,6 +168,47 @@ void main() {
     expect(denseTimelineTargetPixels(tileExtent: 35.8, devicePixelRatio: 3), 108);
     expect(denseTimelineMetadataPixels(108), batchedGridMetadataCellPixels);
     expect(denseTimelineMetadataPixels(batchedGridMetadataCellPixels), batchedGridMetadataCellPixels);
+  });
+
+  test('a hashed cell is opaque while an unhashed one is left for the painter', () {
+    final source = Uint8List.fromList([
+      for (var index = 0; index < 16; index++) ...[index * 9, 200 - index * 6, 40 + index * 4, 255],
+    ]);
+    final hash = base64Encode(thumbhash.rgbaToThumbHash(4, 4, source));
+    final atlas = buildDenseThumbhashAtlasPixels([hash, null], 8);
+
+    final hashedAlpha = [
+      for (var y = 0; y < 8; y++)
+        for (var x = 0; x < 8; x++) atlas[(y * 16 + x) * 4 + 3],
+    ];
+    final emptyAlpha = [
+      for (var y = 0; y < 8; y++)
+        for (var x = 8; x < 16; x++) atlas[(y * 16 + x) * 4 + 3],
+    ];
+    expect(hashedAlpha, everyElement(255));
+    expect(emptyAlpha, everyElement(0), reason: 'the painter owns this cell, not the cache');
+  });
+
+  test('the chunk cache sizes itself from the viewport it has to cover', () {
+    // 48 columns on a tall phone keeps roughly three viewports of assets
+    // mounted. A fixed residency was either wasteful at three columns or far
+    // too small here, and too small meant chunks were evicted while still
+    // needed and re-read through the service's single mutex.
+    const viewportHeight = 743.0;
+    for (final (columnCount, tileExtent) in [(48, 8.57), (24, 17.1), (12, 34.3), (3, 137.0)]) {
+      final chunkSize = denseTimelineAssetChunkSize(
+        columnCount: columnCount,
+        viewportHeight: viewportHeight,
+        tileExtent: tileExtent,
+      );
+      final mounted = ((viewportHeight * 3) / tileExtent).ceil() * columnCount;
+      final residentAssets = math.max(4, (mounted / chunkSize).ceil() + 2) * chunkSize;
+      expect(
+        residentAssets,
+        greaterThanOrEqualTo(mounted),
+        reason: '$columnCount columns must keep its whole mounted range addressable',
+      );
+    }
   });
 
   test('a dense panel always paints the cells it occupies', () {

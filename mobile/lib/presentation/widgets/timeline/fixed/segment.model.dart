@@ -129,9 +129,6 @@ class _DenseAtlasPixelsResult {
   const _DenseAtlasPixelsResult(this.pixels, this.covered);
 }
 
-@visibleForTesting
-bool denseTimelineMetadataCoverageIsComplete(List<bool> covered) => covered.every((cell) => cell);
-
 class _DenseDiskAtlasEntry {
   final int width;
   final int height;
@@ -150,7 +147,7 @@ class _DenseDiskAtlasEntry {
 /// the memory LRU, while PNG keeps the offline cache small enough to retain
 /// many years of photos on ordinary phones.
 class _DenseDiskAtlasCache {
-  static const _magic = 'IHDPANL5';
+  static const _magic = 'IHDPANL6';
   static const _headerBytes = 80;
   static const _maxBytes = batchedGridDiskCacheLimitBytes;
   static const _trimToBytes = 224 * 1024 * 1024;
@@ -168,11 +165,11 @@ class _DenseDiskAtlasCache {
   Future<Directory?> _getDirectory() => _directory ??= () async {
     try {
       final support = await getApplicationSupportDirectory();
-      final directory = Directory(path.join(support.path, 'inhouse_grid_panels_v6'));
+      final directory = Directory(path.join(support.path, 'inhouse_grid_panels_v7'));
       await directory.create(recursive: true);
-      // v5 persisted pure-ThumbHash panels as final at the densest zoom levels,
-      // so those panels could never be upgraded again. Keep the old cache until
-      // at least one v6 panel exists, then drop it on a later launch.
+      // v6 baked the placeholder colour into the texture, so a panel kept
+      // whatever palette was active when it was first generated. Keep the old
+      // cache until at least one v7 panel exists, then drop it on a later launch.
       unawaited(_removeLegacyDenseCacheWhenReady(support, directory));
       unawaited(_trim(directory));
       return directory;
@@ -315,7 +312,7 @@ Future<void> _removeLegacyDenseCacheWhenReady(Directory support, Directory curre
     if (hasNoCurrentCache) {
       return;
     }
-    await Directory(path.join(support.path, 'inhouse_grid_panels_v5')).delete(recursive: true);
+    await Directory(path.join(support.path, 'inhouse_grid_panels_v6')).delete(recursive: true);
   } catch (_) {
     // The legacy cache may already have been removed or be in use by an older
     // process; either case is safe and the new cache remains independent.
@@ -348,21 +345,20 @@ Uint8List _decodeThumbhashSquare(Uint8List hash, int size) {
   return output;
 }
 
-_DenseAtlasPixelsResult _buildDenseThumbhashAtlas(
-  List<String?> hashes,
-  int targetPixels, {
-  required int columnCount,
-  int placeholderColor = 0,
-}) {
+/// Builds the instant fallback texture.
+///
+/// Cells with no usable ThumbHash are left fully transparent on purpose. This
+/// texture is cached in memory and persisted to disk, so baking a theme colour
+/// into it made a panel keep whatever palette happened to be active when it was
+/// first generated - the colour is not part of the cache identity, so a panel
+/// baked under one theme was restored and treated as valid under another one
+/// forever. The painter fills those cells live instead, underneath the atlas.
+_DenseAtlasPixelsResult _buildDenseThumbhashAtlas(List<String?> hashes, int targetPixels, {required int columnCount}) {
   final columns = columnCount;
   final rows = (hashes.length / columns).ceil();
   final atlasWidth = columns * targetPixels;
   final atlas = Uint8List(atlasWidth * rows * targetPixels * 4);
   final covered = List<bool>.filled(hashes.length, false);
-  // A cell nobody can fill must still read as an empty tile rather than as a
-  // hole punched through the gallery, so occupied cells fall back to an opaque
-  // placeholder while the real thumbnail is resolved.
-  final placeholder = placeholderColor == 0 ? null : _solidThumbnailTile(placeholderColor, targetPixels);
 
   for (var index = 0; index < hashes.length; index++) {
     final hash = hashes[index];
@@ -376,7 +372,6 @@ _DenseAtlasPixelsResult _buildDenseThumbhashAtlas(
       }
     }
 
-    tile ??= placeholder;
     if (tile == null) {
       continue;
     }
@@ -392,17 +387,6 @@ _DenseAtlasPixelsResult _buildDenseThumbhashAtlas(
   return _DenseAtlasPixelsResult(atlas, covered);
 }
 
-Uint8List _solidThumbnailTile(int rgba, int size) {
-  final tile = Uint8List(size * size * 4);
-  for (var offset = 0; offset < tile.length; offset += 4) {
-    tile[offset] = (rgba >> 24) & 0xFF;
-    tile[offset + 1] = (rgba >> 16) & 0xFF;
-    tile[offset + 2] = (rgba >> 8) & 0xFF;
-    tile[offset + 3] = rgba & 0xFF;
-  }
-  return tile;
-}
-
 /// Starts the CPU-heavy placeholder work from a top-level lexical scope.
 ///
 /// Keeping this wrapper outside the widget State is important: an Isolate.run
@@ -413,41 +397,55 @@ Future<_DenseAtlasPixelsResult> _buildDenseThumbhashAtlasInBackground({
   required List<String?> hashes,
   required int targetPixels,
   required int columnCount,
-  required int placeholderColor,
 }) => Isolate.run(
   // Only the hash strings cross the isolate boundary. Sending pre-decoded RGBA
   // tiles here copied several megabytes per panel on the platform thread and
   // was the dominant cost of generating a batched grid screen.
-  () => _buildDenseThumbhashAtlas(hashes, targetPixels, columnCount: columnCount, placeholderColor: placeholderColor),
+  () => _buildDenseThumbhashAtlas(hashes, targetPixels, columnCount: columnCount),
 );
 
-Uint8List buildDenseThumbhashAtlasPixels(
-  List<String?> hashes,
-  int targetPixels, {
-  int? columnCount,
-  int placeholderColor = 0,
-}) {
-  return _buildDenseThumbhashAtlas(
-    hashes,
-    targetPixels,
-    columnCount: columnCount ?? hashes.length,
-    placeholderColor: placeholderColor,
-  ).pixels;
-}
+@visibleForTesting
+Uint8List buildDenseThumbhashAtlasPixels(List<String?> hashes, int targetPixels, {int? columnCount}) =>
+    _buildDenseThumbhashAtlas(hashes, targetPixels, columnCount: columnCount ?? hashes.length).pixels;
 
 final Expando<_DenseAssetChunkStore> _denseAssetStores = Expando<_DenseAssetChunkStore>();
 
 class _DenseAssetChunkStore {
-  static const int _chunkSize = 2048;
-  // A 48-column screen keeps roughly 15,000 assets mounted once the sliver's
-  // cache extent either side is counted, which is over seven chunks. Holding
-  // only four meant a chunk was evicted while panels still needed it and was
-  // re-read immediately, and every re-read queues behind the timeline
-  // service's single mutex. Panels then never received their rows at all,
-  // which is what left whole screens of the grid empty while scrolling.
-  // These hold asset references, not pixels.
-  static const int _maxResidentChunks = 10;
-  static const int _maxResidentRows = 512;
+  // Both are derived from the live viewport by [configure] rather than being
+  // guessed, because the right values differ by an order of magnitude between
+  // three columns and forty-eight. Holding too few chunks meant one was evicted
+  // while panels still needed it and re-read immediately, and every re-read
+  // queues behind the timeline service's single mutex, so panels never received
+  // their rows at all. These hold asset references, not pixels.
+  int _chunkSize = kTimelineAssetLoadBatchSize;
+  int _maxResidentChunks = 4;
+  int _maxResidentRows = 128;
+
+  /// Sizes the cache for the range the sliver actually keeps mounted.
+  ///
+  /// The sliver holds one viewport of cache extent either side of the visible
+  /// one, so roughly three viewports of assets are live at any moment.
+  void configure({required int columnCount, required double viewportHeight, required double tileExtent}) {
+    final chunkSize = denseTimelineAssetChunkSize(
+      columnCount: columnCount,
+      viewportHeight: viewportHeight,
+      tileExtent: tileExtent,
+    );
+    final mountedAssets = tileExtent > 0 && viewportHeight > 0
+        ? ((viewportHeight * 3) / tileExtent).ceil() * columnCount
+        : chunkSize;
+    _maxResidentChunks = math.max(4, (mountedAssets / chunkSize).ceil() + 2);
+    _maxResidentRows = math.max(128, (mountedAssets / math.max(1, columnCount)).ceil() * 2);
+    if (chunkSize == _chunkSize) {
+      return;
+    }
+    // Chunk boundaries moved, so every cached slice is addressed differently.
+    _chunkSize = chunkSize;
+    _chunks.clear();
+    _resolvedChunks.clear();
+    _rows.clear();
+    _resolvedRows.clear();
+  }
 
   final LinkedHashMap<int, Future<List<BaseAsset>>> _chunks = LinkedHashMap();
   final Map<int, List<BaseAsset>> _resolvedChunks = {};
@@ -918,6 +916,11 @@ class _FixedSegmentRow extends ConsumerWidget {
     required bool isScrubbing,
   }) {
     final denseStore = _denseAssetStores[timelineService] ??= _DenseAssetChunkStore();
+    denseStore.configure(
+      columnCount: columnCount,
+      viewportHeight: ref.read(timelineArgsProvider).maxHeight,
+      tileExtent: tileHeight,
+    );
     final resident = timelineService.hasRange(assetIndex, assetCount)
         ? timelineService.getAssets(assetIndex, assetCount)
         : denseStore.getRow(timelineService, index: assetIndex, count: assetCount);
@@ -1469,7 +1472,6 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   String? _atlasSignature;
   int? _atlasCellPixels;
   double? _devicePixelRatio;
-  int _placeholderColor = 0;
   Color _placeholderTone = const Color(0x00000000);
   bool _repaintScheduled = false;
   bool _metadataAtlasRequested = false;
@@ -1516,7 +1518,6 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     // resolvable thumbnail, so a theme switch updates it for future panels
     // rather than reloading every atlas in the gallery.
     _placeholderTone = context.colorScheme.surfaceContainerHighest;
-    _placeholderColor = _rgbaOf(_placeholderTone);
     if (_devicePixelRatio == devicePixelRatio) {
       return;
     }
@@ -1566,11 +1567,6 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       }
     }
     return true;
-  }
-
-  int _rgbaOf(Color color) {
-    final argb = color.toARGB32();
-    return ((argb << 8) | ((argb >> 24) & 0xFF)) & 0xFFFFFFFF;
   }
 
   /// Cell size of [image] when it belongs to this panel, otherwise null.
@@ -1790,10 +1786,9 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   }
 
   String _denseContentIdentity(List<BaseAsset> assets) {
-    // v7 invalidates atlases that 3.1.59 persisted as final while they were
-    // still pure ThumbHash, which happened at every zoom level dense enough to
-    // fall under the old upgrade threshold.
-    final buffer = StringBuffer('v7:${widget.columnCount}:${assets.length}:$_targetPixels;');
+    // v8 invalidates atlases that baked a theme colour into their empty cells
+    // and therefore kept showing a palette the app is no longer using.
+    final buffer = StringBuffer('v8:${widget.columnCount}:${assets.length}:$_targetPixels;');
     for (final asset in assets) {
       buffer
         ..write(asset.remoteId ?? asset.localId ?? asset.checksum ?? asset.heroTag)
@@ -2005,7 +2000,6 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     // every dense panel atlas to fail before it was generated.
     final columnCount = widget.columnCount;
     final metadataPixels = _metadataPixels;
-    final placeholderColor = _placeholderColor;
     try {
       final result = await _denseMetadataAtlasQueue.schedule(() {
         if (!mounted || generation != _generation) {
@@ -2015,7 +2009,6 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
           hashes: hashes,
           targetPixels: metadataPixels,
           columnCount: columnCount,
-          placeholderColor: placeholderColor,
         );
       }, priority: priority);
       if (!mounted || generation != _generation) {
