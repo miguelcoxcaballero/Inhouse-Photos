@@ -2,6 +2,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/config/backup_config.dart';
 
 void main() {
+  test('the compression window bounds the server backlog, not the upload speed', () {
+    for (final mode in BackupSpeedMode.values) {
+      for (final isUnmetered in [true, false]) {
+        final plan = mode.transferPlan(isUnmetered: isUnmetered, itemCount: 5000);
+        final window = plan.compressionWindow(isUnmetered: isUnmetered);
+
+        // Waiting for the server used to pin an upload worker per asset, so the
+        // window and the worker count were the same number and the network sat
+        // idle whenever the server was slow. The window must stay comfortably
+        // larger than the pool it protects, or it goes straight back to being
+        // the thing that decides throughput.
+        expect(window, greaterThanOrEqualTo(plan.uploadWorkers * 2), reason: '$mode unmetered=$isUnmetered');
+        expect(window, greaterThanOrEqualTo(isUnmetered ? 24 : 12), reason: '$mode unmetered=$isUnmetered');
+      }
+    }
+  });
   group('Backup transfer plan', () {
     test('defaults to maximum throughput', () {
       expect(const BackupConfig().speed, BackupSpeedMode.maximum);

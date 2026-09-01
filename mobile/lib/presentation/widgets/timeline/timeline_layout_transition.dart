@@ -227,6 +227,14 @@ class RenderTimelineDenseAssetLayoutMarker extends RenderProxyBox {
     }
 
     final transform = getTransformTo(null);
+    // Only panels on screen can contribute a rect, and at the densest zoom the
+    // sliver keeps roughly three viewports of them mounted with up to a hundred
+    // and ninety-two cells each. Testing the panel once instead of every one of
+    // its cells removes most of the matrix work from the pinch commit, which
+    // runs synchronously on the UI thread.
+    if (!MatrixUtils.transformRect(transform, Offset.zero & size).overlaps(visibleBounds)) {
+      return;
+    }
     for (var index = 0; index < assetKeys.length; index++) {
       final localRect = calculateTimelineDenseAssetRect(
         index: index,

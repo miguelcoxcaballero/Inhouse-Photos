@@ -78,6 +78,46 @@ class _UploadAcknowledgement {
 
 /// A small async queue with disk-safe back pressure. [close] stops producers
 /// but permits consumers to drain items that were already prepared.
+/// Bounds how many assets may be awaiting server-side compression at once.
+///
+/// A permit is held from just before an upload starts until that asset's
+/// compression has settled. With a limit of zero the gate is inert, which is
+/// the original-quality path where nothing waits on the server at all.
+class _CountingGate {
+  _CountingGate(this.limit);
+
+  final int limit;
+  int _held = 0;
+  final List<Completer<void>> _waiting = [];
+
+  Future<void> acquire() {
+    if (limit <= 0) {
+      return Future.value();
+    }
+    if (_held < limit) {
+      _held++;
+      return Future.value();
+    }
+    final completer = Completer<void>();
+    _waiting.add(completer);
+    return completer.future;
+  }
+
+  void release() {
+    if (limit <= 0) {
+      return;
+    }
+    if (_waiting.isNotEmpty) {
+      // Hand the permit straight to the next waiter instead of returning it.
+      _waiting.removeAt(0).complete();
+      return;
+    }
+    if (_held > 0) {
+      _held--;
+    }
+  }
+}
+
 class _BoundedAsyncQueue<T> {
   final int capacity;
   final Queue<T> _items = Queue<T>();
@@ -229,17 +269,25 @@ class ForegroundUploadService {
         SettingsRepository.instance.appConfig.backup.quality == BackupQuality.storageSaver &&
         callbacks.onServerCompressionExpected != null &&
         callbacks.onSuccess != null;
-    // Keep enough requests in flight to saturate the connection, but do not
-    // let a fast phone create an unbounded server compression backlog. Original
-    // quality uploads retain the full 24-stream Maximum profile.
-    final compressionWindow = isUnmetered ? 12 : 6;
-    final uploadWorkerCount = waitsForServerCompression && transferPlan.uploadWorkers > compressionWindow
-        ? compressionWindow
-        : transferPlan.uploadWorkers;
+    // Waiting for the server to finish compressing used to happen on the
+    // upload worker itself, which made the phone's upload concurrency equal to
+    // the server's compression latency: a worker that had already pushed its
+    // bytes sat idle until a websocket said the server was done, and the pool
+    // was clamped to the size of that window. Pushing bytes and waiting for
+    // compression are now separate concerns. Workers upload at whatever
+    // concurrency the network profile allows, and a semaphore bounds only how
+    // many assets may be awaiting compression at once. Sized well above the
+    // worker count, it is a backstop against an unbounded server queue rather
+    // than the thing that decides upload speed.
+    final uploadWorkerCount = transferPlan.uploadWorkers;
+    final compressionWindow = waitsForServerCompression ? transferPlan.compressionWindow(isUnmetered: isUnmetered) : 0;
+    final compressionGate = _CountingGate(compressionWindow);
+    final outstandingAcknowledgements = <Future<void>>{};
     _logger.info(
       'Backup transfer plan: speed=$speed, unmetered=$isUnmetered, '
       'prepare=${transferPlan.preparationWorkers}, upload=$uploadWorkerCount, '
-      'acknowledge=${transferPlan.acknowledgementWorkers}, compressionGate=$waitsForServerCompression',
+      'acknowledge=${transferPlan.acknowledgementWorkers}, '
+      'compressionWindow=${waitsForServerCompression ? compressionWindow : 'off'}',
     );
     final prepared = _BoundedAsyncQueue<_PreparedAsset>(transferPlan.preparedQueueCapacity);
     final acknowledgements = _BoundedAsyncQueue<_UploadAcknowledgement>(transferPlan.acknowledgementQueueCapacity);
@@ -306,16 +354,28 @@ class ForegroundUploadService {
           continue;
         }
 
+        if (waitsForServerCompression) {
+          // Only blocks once the server is genuinely behind by several times
+          // the worker count, so the steady state is limited by the network.
+          await compressionGate.acquire();
+        }
+
         final acknowledgement = await _uploadPreparedAsset(item, cancelToken, callbacks: callbacks);
         if (acknowledgement == null) {
+          compressionGate.release();
           await _cleanupPreparedAsset(item);
           continue;
         }
         if (waitsForServerCompression) {
-          // The success callback completes once the matching websocket event
-          // says server compression has settled. Reusing this worker only then
-          // turns the network pool into a bounded end-to-end pipeline.
-          await acknowledgeUpload(acknowledgement);
+          // The bytes are up. Recording the asset waits on the compression
+          // websocket, but it does so off this worker so the next transfer can
+          // start immediately.
+          late final Future<void> pending;
+          pending = acknowledgeUpload(acknowledgement).whenComplete(() {
+            outstandingAcknowledgements.remove(pending);
+            compressionGate.release();
+          });
+          outstandingAcknowledgements.add(pending);
           continue;
         }
         if (!await acknowledgements.add(acknowledgement)) {
@@ -345,6 +405,11 @@ class ForegroundUploadService {
     await Future.wait(uploadWorkers);
     acknowledgements.close();
     await Future.wait(acknowledgementWorkers);
+    // Compression waits outlive their upload worker, so the run is only over
+    // once each one has recorded its asset.
+    while (outstandingAcknowledgements.isNotEmpty) {
+      await Future.wait(outstandingAcknowledgements.toList());
+    }
   }
 
   /// Sequential upload - used for background isolate where concurrent HTTP clients may cause issues
