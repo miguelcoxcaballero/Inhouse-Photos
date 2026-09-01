@@ -149,133 +149,147 @@ Future<void> _realDelay(WidgetTester tester, Duration duration) async {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('dense panels do not lose resolved thumbnails while loading', (tester) async {
-    tester.view.devicePixelRatio = 3;
-    tester.view.physicalSize = const Size(1080, 2400);
-    addTearDown(tester.view.reset);
+  // One server and one store for the whole file. `StoreService` is a singleton
+  // and the endpoint lives in its cache, so tearing this down per test left the
+  // next test pointing at a closed port - every thumbnail then failed and the
+  // run reported an app problem that was entirely the harness's doing.
+  late HttpServer server;
+  late List<Uint8List> bytes;
+  late Drift db;
+  var served = 0;
 
-    late HttpServer server;
-    late List<Uint8List> bytes;
-    var served = 0;
-
-    await tester.runAsync(() async {
-      bytes = await _thumbnailBytes();
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      server.listen((request) async {
-        served++;
-        final body = bytes[served % bytes.length];
-        request.response
-          ..statusCode = HttpStatus.ok
-          ..headers.contentType = ContentType('image', 'png')
-          ..add(body);
-        await request.response.close().catchError((_) {});
-      });
-
-      final db = Drift(DatabaseConnection(NativeDatabase.memory()));
-      await StoreService.init(storeRepository: DriftStoreRepository(db));
-      await Store.put(StoreKey.serverEndpoint, 'http://127.0.0.1:${server.port}/api');
-      await Store.put(StoreKey.accessToken, 'integration-test');
-      addTearDown(() async {
-        await server.close(force: true);
-        await db.close();
-      });
+  setUpAll(() async {
+    bytes = await _thumbnailBytes();
+    server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((request) async {
+      served++;
+      final body = bytes[served % bytes.length];
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType('image', 'png')
+        ..add(body);
+      await request.response.close().catchError((_) {});
     });
 
-    final service = _service(6000, assetsPerBucket: 500);
-    addTearDown(service.dispose);
+    db = Drift(DatabaseConnection(NativeDatabase.memory()));
+    await StoreService.init(storeRepository: DriftStoreRepository(db));
+    await Store.put(StoreKey.serverEndpoint, 'http://127.0.0.1:${server.port}/api');
+    await Store.put(StoreKey.accessToken, 'integration-test');
+  });
 
-    await tester.pumpConsumerWidget(
-      const Timeline(
-        withScrubber: false,
-        readOnly: true,
-        appBar: SliverToBoxAdapter(child: SizedBox.shrink()),
-        bottomSheet: null,
-      ),
-      overrides: [
-        timelineServiceProvider.overrideWithValue(service),
-        appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 48))),
-      ],
-      settle: false,
-    );
+  tearDownAll(() async {
+    await server.close(force: true);
+    await db.close();
+  });
 
-    // A cell that has a real thumbnail must never go back to showing the blurry
-    // placeholder. Loose images dropping while the atlas is unchanged means
-    // exactly that: the thumbnails were released without a new texture
-    // containing them taking their place.
-    var regressions = 0;
-    var merges = 0;
-    var atlasChanges = 0;
-    final lastLoose = <Object, int>{};
-    final lastAtlas = <Object, ui.Image?>{};
+  for (final columnCount in [18, 48]) {
+    testWidgets(
+      'dense panels do not lose resolved thumbnails while loading at $columnCount columns',
+      (tester) async {
+        tester.view.devicePixelRatio = 3;
+        tester.view.physicalSize = const Size(1080, 2400);
+        addTearDown(tester.view.reset);
 
-    void sample() {
-      for (final panel in _panels(tester)) {
-        final hadLoose = lastLoose[panel.key];
-        final hadAtlas = lastAtlas.containsKey(panel.key) ? lastAtlas[panel.key] : null;
-        final atlasChanged = lastAtlas.containsKey(panel.key) && !identical(hadAtlas, panel.atlas);
-        if (atlasChanged) {
-          atlasChanges++;
-        }
-        if (hadLoose != null && panel.loose < hadLoose) {
-          if (atlasChanged) {
-            merges++;
-          } else {
-            regressions++;
+        final servedBefore = served;
+
+        final service = _service(6000, assetsPerBucket: 500);
+        addTearDown(service.dispose);
+
+        await tester.pumpConsumerWidget(
+          const Timeline(
+            withScrubber: false,
+            readOnly: true,
+            appBar: SliverToBoxAdapter(child: SizedBox.shrink()),
+            bottomSheet: null,
+          ),
+          overrides: [
+            timelineServiceProvider.overrideWithValue(service),
+            appConfigProvider.overrideWithValue(AppConfig(timeline: TimelineConfig(tilesPerRow: columnCount))),
+          ],
+          settle: false,
+        );
+
+        // A cell that has a real thumbnail must never go back to showing the blurry
+        // placeholder. Loose images dropping while the atlas is unchanged means
+        // exactly that: the thumbnails were released without a new texture
+        // containing them taking their place.
+        var regressions = 0;
+        var merges = 0;
+        var atlasChanges = 0;
+        final lastLoose = <Object, int>{};
+        final lastAtlas = <Object, ui.Image?>{};
+
+        void sample() {
+          for (final panel in _panels(tester)) {
+            final hadLoose = lastLoose[panel.key];
+            final hadAtlas = lastAtlas.containsKey(panel.key) ? lastAtlas[panel.key] : null;
+            final atlasChanged = lastAtlas.containsKey(panel.key) && !identical(hadAtlas, panel.atlas);
+            if (atlasChanged) {
+              atlasChanges++;
+            }
+            if (hadLoose != null && panel.loose < hadLoose) {
+              if (atlasChanged) {
+                merges++;
+              } else {
+                regressions++;
+              }
+            }
+            lastLoose[panel.key] = panel.loose;
+            lastAtlas[panel.key] = panel.atlas;
           }
         }
-        lastLoose[panel.key] = panel.loose;
-        lastAtlas[panel.key] = panel.atlas;
-      }
-    }
 
-    var peakLoose = 0;
-    for (var step = 0; step < 80; step++) {
-      await _realDelay(tester, const Duration(milliseconds: 50));
-      sample();
-      final loose = _panels(tester).fold<int>(0, (sum, panel) => sum + panel.loose);
-      peakLoose = math.max(peakLoose, loose);
-    }
+        var peakLoose = 0;
+        for (var step = 0; step < 80; step++) {
+          await _realDelay(tester, const Duration(milliseconds: 50));
+          sample();
+          final loose = _panels(tester).fold<int>(0, (sum, panel) => sum + panel.loose);
+          peakLoose = math.max(peakLoose, loose);
+        }
 
-    for (var fling = 0; fling < 4; fling++) {
-      await tester.fling(find.byType(Timeline), const Offset(0, -900), 2400);
-      for (var step = 0; step < 16; step++) {
-        await _realDelay(tester, const Duration(milliseconds: 50));
-        sample();
-        final loose = _panels(tester).fold<int>(0, (sum, panel) => sum + panel.loose);
-        peakLoose = math.max(peakLoose, loose);
-      }
-    }
+        for (var fling = 0; fling < 4; fling++) {
+          await tester.fling(find.byType(Timeline), const Offset(0, -900), 2400);
+          for (var step = 0; step < 16; step++) {
+            await _realDelay(tester, const Duration(milliseconds: 50));
+            sample();
+            final loose = _panels(tester).fold<int>(0, (sum, panel) => sum + panel.loose);
+            peakLoose = math.max(peakLoose, loose);
+          }
+        }
 
-    // The reported symptom, as a check: a panel that is mounted, sized and
-    // painting its placeholder colour but holding no texture at all. Screenshot
-    // evidence showed whole screens of these, and every one of them is a panel
-    // whose retry was skipped. Give the grid a settling window, then insist.
-    for (var step = 0; step < 60; step++) {
-      final stranded = _panels(tester).where((panel) => panel.atlas == null).length;
-      if (stranded == 0) {
-        break;
-      }
-      await _realDelay(tester, const Duration(milliseconds: 100));
-    }
-    final stranded = _panels(tester).where((panel) => panel.atlas == null).toList();
+        // The reported symptom, as a check: a panel that is mounted, sized and
+        // painting its placeholder colour but holding no texture at all. Screenshot
+        // evidence showed whole screens of these, and every one of them is a panel
+        // whose retry was skipped. Give the grid a settling window, then insist.
+        for (var step = 0; step < 60; step++) {
+          final stranded = _panels(tester).where((panel) => panel.atlas == null).length;
+          if (stranded == 0) {
+            break;
+          }
+          await _realDelay(tester, const Duration(milliseconds: 100));
+        }
+        final stranded = _panels(tester).where((panel) => panel.atlas == null).toList();
 
-    print('GRIDFLICK ===== real thumbnails, 48 columns =====');
-    print('GRIDFLICK panels stranded without atlas: ${stranded.length} of ${_panels(tester).length}');
-    print('GRIDFLICK thumbnail requests served    : $served');
-    print('GRIDFLICK peak loose images on screen  : $peakLoose');
-    print('GRIDFLICK atlas changes                : $atlasChanges');
-    print('GRIDFLICK merges (loose -> new atlas)  : $merges');
-    print('GRIDFLICK REGRESSIONS (lost, no atlas) : $regressions');
-    print('GRIDFLICK ===== end =====');
+        print('GRIDFLICK ===== real thumbnails, $columnCount columns =====');
+        print('GRIDFLICK panels stranded without atlas: ${stranded.length} of ${_panels(tester).length}');
+        print('GRIDFLICK thumbnail requests served    : ${served - servedBefore}');
+        print('GRIDFLICK peak loose images on screen  : $peakLoose');
+        print('GRIDFLICK atlas changes                : $atlasChanges');
+        print('GRIDFLICK merges (loose -> new atlas)  : $merges');
+        print('GRIDFLICK REGRESSIONS (lost, no atlas) : $regressions');
+        print('GRIDFLICK ===== end =====');
 
-    expect(tester.takeException(), isNull);
-    expect(
-      stranded,
-      isEmpty,
-      reason:
-          'every mounted panel must end up with a texture; a panel with none is '
-          'the flat placeholder-coloured block seen in the bug reports',
+        expect(tester.takeException(), isNull);
+        expect(
+          stranded,
+          isEmpty,
+          reason:
+              'every mounted panel must end up with a texture; a panel with none is '
+              'the flat placeholder-coloured block seen in the bug reports',
+        );
+        expect(regressions, 0, reason: 'a cell must never lose a thumbnail it already resolved');
+      },
+      timeout: const Timeout(Duration(minutes: 6)),
     );
-    expect(regressions, 0, reason: 'a cell must never lose a thumbnail it already resolved');
-  }, timeout: const Timeout(Duration(minutes: 6)));
+  }
 }

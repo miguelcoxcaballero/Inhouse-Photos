@@ -109,7 +109,10 @@ Future<void> _realDelay(WidgetTester tester, Duration duration) async {
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  for (final columnCount in [12, 48]) {
+  // 18 is the level the reported screenshot was taken at, and it is not just a
+  // point between the other two: there the composite atlas is 80px cells built
+  // by upscaling a 32px ThumbHash atlas, while at 48 the two sizes are equal.
+  for (final columnCount in [12, 18, 48]) {
     testWidgets('dense grid scroll at $columnCount columns', (tester) async {
       tester.view.devicePixelRatio = 3;
       tester.view.physicalSize = const Size(1080, 2400);

@@ -123,6 +123,14 @@ List<Rect> denseTimelineOccupiedRects({
   ];
 }
 
+/// Hex characters a panel fingerprint must have.
+///
+/// The on-disk atlas header reserves a fixed-width field for it, and a
+/// fingerprint of any other width is refused by the cache rather than stored.
+/// That coupling used to be an unnamed `64` in three places; a change to the
+/// digest then disabled the entire disk cache without a single failure.
+const int denseAtlasSignatureLength = 64;
+
 int denseTimelineRowsPerChild(int columnCount) => switch (columnCount) {
   >= 48 => 4,
   >= 36 => 6,
@@ -149,14 +157,21 @@ int denseTimelineRowsPerChild(int columnCount) => switch (columnCount) {
 /// fingerprint algorithm requires anyway.
 @visibleForTesting
 String denseContentSignature(List<BaseAsset> assets, {required int columnCount, required int targetPixels}) {
-  const prime1 = 0x100000001b3;
-  const prime2 = 0x88b6a51b1d2c9;
-  var lane1 = 0xcbf29ce484222325;
-  var lane2 = 0x9e3779b97f4a7c15;
+  const primes = [0x100000001b3, 0x88b6a51b1d2c9, 0x1000193, 0xa24baed4963ee4];
+  // Four lanes, because [denseAtlasSignatureLength] hex characters is what the
+  // on-disk header reserves for this field. Emitting anything else makes the
+  // disk cache silently refuse to store the panel, which is not a fallback -
+  // it is the difference between scrolling back over photos already seen and
+  // fetching every one of them again.
+  //
+  // The leading lane also folds in a format version, so changing the mix retires
+  // stale entries without needing a separate prefix that would break the width.
+  final lanes = <int>[0xcbf29ce484222325 ^ 9, 0x9e3779b97f4a7c15, 0x27d4eb2f165667c5, 0xff51afd7ed558ccd];
 
   void mixInt(int value) {
-    lane1 = (lane1 ^ value) * prime1;
-    lane2 = (lane2 ^ (value ^ (value >> 32))) * prime2;
+    for (var i = 0; i < lanes.length; i++) {
+      lanes[i] = (lanes[i] ^ (i.isEven ? value : value ^ (value >> 32))) * primes[i];
+    }
   }
 
   void mixString(String? value) {
@@ -164,9 +179,11 @@ String denseContentSignature(List<BaseAsset> assets, {required int columnCount, 
       mixInt(0);
       return;
     }
-    for (var i = 0; i < value.length; i++) {
-      lane1 = (lane1 ^ value.codeUnitAt(i)) * prime1;
-      lane2 = (lane2 ^ value.codeUnitAt(i)) * prime2;
+    for (var c = 0; c < value.length; c++) {
+      final unit = value.codeUnitAt(c);
+      for (var i = 0; i < lanes.length; i++) {
+        lanes[i] = (lanes[i] ^ unit) * primes[i];
+      }
     }
     // Length is mixed separately so that "ab" + "c" and "a" + "bc" in adjacent
     // fields cannot collapse to the same state.
@@ -186,8 +203,16 @@ String denseContentSignature(List<BaseAsset> assets, {required int columnCount, 
       _ => null,
     });
   }
-  return 'v9${lane1.toUnsigned(64).toRadixString(16).padLeft(16, '0')}'
-      '${lane2.toUnsigned(64).toRadixString(16).padLeft(16, '0')}';
+  final buffer = StringBuffer();
+  for (final lane in lanes) {
+    // Halves, because Dart ints are 64-bit signed: `toUnsigned(64)` cannot
+    // widen them, so a negative lane would render with a minus sign and blow
+    // the fixed-width field the disk header expects.
+    buffer
+      ..write(((lane >> 32) & 0xFFFFFFFF).toRadixString(16).padLeft(8, '0'))
+      ..write((lane & 0xFFFFFFFF).toRadixString(16).padLeft(8, '0'));
+  }
+  return buffer.toString();
 }
 
 class _DenseAtlasPixelsResult {
@@ -217,6 +242,7 @@ class _DenseDiskAtlasEntry {
 class _DenseDiskAtlasCache {
   static const _magic = 'IHDPANL6';
   static const _headerBytes = 80;
+  static const _signatureBytes = denseAtlasSignatureLength;
   static const _maxBytes = batchedGridDiskCacheLimitBytes;
   static const _trimToBytes = 224 * 1024 * 1024;
 
@@ -272,7 +298,7 @@ class _DenseDiskAtlasCache {
             if (width <= 0 || height <= 0 || encodedBytes.isEmpty) {
               return null;
             }
-            final signature = ascii.decode(bytes.sublist(16, 80));
+            final signature = ascii.decode(bytes.sublist(16, 16 + _signatureBytes));
             return _DenseDiskAtlasEntry(width: width, height: height, signature: signature, encodedBytes: encodedBytes);
           } catch (_) {
             return null;
@@ -290,7 +316,8 @@ class _DenseDiskAtlasCache {
   }
 
   Future<void> put(String slot, String signature, int width, int height, Uint8List encodedBytes) {
-    if (signature.length != 64 || width <= 0 || height <= 0 || encodedBytes.isEmpty) {
+    if (signature.length != _signatureBytes || width <= 0 || height <= 0 || encodedBytes.isEmpty) {
+      DenseGridStats.diskWritesRefused++;
       return Future.value();
     }
     final previous = _writes[slot] ?? Future.value();
@@ -298,6 +325,7 @@ class _DenseDiskAtlasCache {
       try {
         final directory = await _getDirectory();
         if (directory == null) {
+          DenseGridStats.diskDirectoryUnavailable++;
           return;
         }
         final file = File(path.join(directory.path, _fileName(slot)));
@@ -306,7 +334,7 @@ class _DenseDiskAtlasCache {
         final header = ByteData.sublistView(bytes, 8, 16);
         header.setUint32(0, width, Endian.little);
         header.setUint32(4, height, Endian.little);
-        bytes.setRange(16, 80, ascii.encode(signature));
+        bytes.setRange(16, 16 + _signatureBytes, ascii.encode(signature));
         bytes.setRange(_headerBytes, bytes.length, encodedBytes);
         final temporary = File('${file.path}.${DateTime.now().microsecondsSinceEpoch}.tmp');
         await temporary.writeAsBytes(bytes, flush: false);
@@ -314,6 +342,7 @@ class _DenseDiskAtlasCache {
           await file.delete();
         }
         await temporary.rename(file.path);
+        DenseGridStats.diskAtlasWrites++;
       } catch (_) {
         // The in-memory atlas remains valid if Android denies or runs out of
         // cache storage; the next successful render can retry the write.
@@ -879,6 +908,7 @@ class _DenseAtlasPersistenceQueue {
     required ui.Image image,
     required bool allowWhileVisible,
   }) {
+    DenseGridStats.diskWritesScheduled++;
     final snapshot = image.clone();
     _pending.remove(slot)?.image.dispose();
     _pending[slot] = _DenseAtlasPersistenceTask(
@@ -888,6 +918,7 @@ class _DenseAtlasPersistenceQueue {
       allowWhileVisible: allowWhileVisible,
     );
     while (_pending.length > _maxPending) {
+      DenseGridStats.diskWritesEvicted++;
       _pending.remove(_pending.keys.first)?.image.dispose();
     }
     if (_appVisible && allowWhileVisible) {
@@ -1354,6 +1385,48 @@ const int _denseMetadataAtlasConcurrency = 3;
 // columns left barely one screen of headroom and made scrolling back flash
 // blank rows. The budget below is the accounted figure, not real memory.
 const int _denseAtlasCacheBytes = 96 * 1024 * 1024;
+
+/// Where a dense panel's texture came from, counted so that scrolling back over
+/// ground already covered can be measured rather than assumed.
+///
+/// A revisited panel should be served by memory, or failing that by disk. Any
+/// thumbnail refetch or ThumbHash rebuild on the way back is work that should
+/// not be happening.
+@visibleForTesting
+class DenseGridStats {
+  static int memoryAtlasHits = 0;
+  static int memoryAtlasMisses = 0;
+  static int diskAtlasHits = 0;
+  static int diskAtlasMisses = 0;
+  static int thumbhashAtlasBuilds = 0;
+  static int compositeAtlasBuilds = 0;
+  static int diskAtlasWrites = 0;
+  static int diskDirectoryUnavailable = 0;
+  static int diskWritesScheduled = 0;
+  static int diskWritesEvicted = 0;
+  static int diskWritesRefused = 0;
+
+  static void reset() {
+    memoryAtlasHits = 0;
+    memoryAtlasMisses = 0;
+    diskAtlasHits = 0;
+    diskAtlasMisses = 0;
+    thumbhashAtlasBuilds = 0;
+    compositeAtlasBuilds = 0;
+    diskAtlasWrites = 0;
+    diskDirectoryUnavailable = 0;
+    diskWritesScheduled = 0;
+    diskWritesEvicted = 0;
+    diskWritesRefused = 0;
+  }
+
+  static String summary() =>
+      'memory ${memoryAtlasHits}h/${memoryAtlasMisses}m  '
+      'disk ${diskAtlasHits}h/${diskAtlasMisses}m  '
+      'thumbhashBuilds $thumbhashAtlasBuilds  compositeBuilds $compositeAtlasBuilds  '
+      'diskWrite sched $diskWritesScheduled/evicted $diskWritesEvicted/'
+      'refused $diskWritesRefused/written $diskAtlasWrites  noDir $diskDirectoryUnavailable';
+}
 final DenseThumbnailQueue _denseThumbnailQueue = DenseThumbnailQueue();
 final DenseTimelineTaskQueue _denseMetadataAtlasQueue = DenseTimelineTaskQueue(
   _denseMetadataAtlasConcurrency,
@@ -1362,7 +1435,7 @@ final DenseTimelineTaskQueue _denseMetadataAtlasQueue = DenseTimelineTaskQueue(
   // with the panels actually on screen.
   maxPending: 512,
 );
-final _DenseRowAtlasCache _denseRowAtlasCache = _DenseRowAtlasCache();
+final DenseRowAtlasCache _denseRowAtlasCache = DenseRowAtlasCache();
 final _DenseDiskAtlasCache _denseDiskAtlasCache = _DenseDiskAtlasCache();
 final _DenseAtlasPersistenceQueue _denseAtlasPersistenceQueue = _DenseAtlasPersistenceQueue();
 
@@ -1583,7 +1656,12 @@ class _DenseAsyncTask {
   const _DenseAsyncTask({required this.priority, required this.sequence, required this.run, required this.cancel});
 }
 
-class _DenseRowAtlasCache {
+/// Rolling window of recently painted panel textures.
+///
+/// Public for the accounting regression test below it; the app uses the single
+/// shared instance.
+@visibleForTesting
+class DenseRowAtlasCache {
   final LinkedHashMap<Object, ui.Image> _images = LinkedHashMap();
   final Map<Object, String> _signatures = {};
   int _bytes = 0;
@@ -1591,8 +1669,10 @@ class _DenseRowAtlasCache {
   ui.Image? get(Object key) {
     final image = _images.remove(key);
     if (image == null) {
+      DenseGridStats.memoryAtlasMisses++;
       return null;
     }
+    DenseGridStats.memoryAtlasHits++;
     _images[key] = image;
     return image.clone();
   }
@@ -1602,7 +1682,7 @@ class _DenseRowAtlasCache {
   void put(Object key, ui.Image image, {String? signature}) {
     final previous = _images.remove(key);
     if (previous != null) {
-      _bytes -= _imageBytes(previous);
+      _bytes -= _uniqueBytes(previous);
       previous.dispose();
     }
     if (signature == null) {
@@ -1611,18 +1691,39 @@ class _DenseRowAtlasCache {
       _signatures[key] = signature;
     }
     final cached = image.clone();
+    _bytes += _uniqueBytes(cached);
     _images[key] = cached;
-    _bytes += _imageBytes(cached);
     while (_bytes > _denseAtlasCacheBytes && _images.isNotEmpty) {
       final oldestKey = _images.keys.first;
       final oldest = _images.remove(oldestKey)!;
       _signatures.remove(oldestKey);
-      _bytes -= _imageBytes(oldest);
+      _bytes -= _uniqueBytes(oldest);
       oldest.dispose();
     }
   }
 
-  int _imageBytes(ui.Image image) => image.width * image.height * 4;
+  /// The bytes [image] actually costs, which is nothing if another entry
+  /// already holds the same texture.
+  ///
+  /// A finished panel is deliberately held under two keys - its position and
+  /// its content - so it survives both scrolling back to the same place and the
+  /// same photos appearing elsewhere. `clone` shares one texture between them,
+  /// but the budget used to charge for both, so the cache evicted at half the
+  /// memory it was configured for. At eighteen columns a panel atlas is 3.7MB,
+  /// which is the difference between holding about thirteen panels and about
+  /// twenty-six - between a scroll back over three screens hitting cache and
+  /// refetching every thumbnail on it.
+  int _uniqueBytes(ui.Image image) {
+    for (final other in _images.values) {
+      if (!identical(other, image) && other.isCloneOf(image)) {
+        return 0;
+      }
+    }
+    return image.width * image.height * 4;
+  }
+
+  @visibleForTesting
+  int get accountedBytes => _bytes;
 
   void clear() {
     for (final image in _images.values) {
@@ -2030,6 +2131,11 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     try {
       if (!skipDiskRestore) {
         final entry = await _denseDiskAtlasCache.get(widget.cacheSlot);
+        if (entry == null) {
+          DenseGridStats.diskAtlasMisses++;
+        } else {
+          DenseGridStats.diskAtlasHits++;
+        }
         if (!mounted || generation != _generation) {
           return;
         }
@@ -2305,6 +2411,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     // this State from inside the closure.
     final signature = _contentSignature;
     try {
+      DenseGridStats.thumbhashAtlasBuilds++;
       final result = await _denseMetadataAtlasQueue.schedule(() {
         if (!mounted || generation != _generation) {
           throw const _DenseLoadCancelled();
@@ -2522,6 +2629,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     }
     _atlasBuilding = true;
     _compositeDirty = false;
+    DenseGridStats.compositeAtlasBuilds++;
     final targetPixels = _targetPixels;
     final rows = _rowCount;
     final width = targetPixels * widget.columnCount;
@@ -2798,6 +2906,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
           tileExtent: widget.tileExtent,
           backgroundColor: _surfaceTone,
           placeholderColor: _placeholderTone,
+          atlasHidesPlaceholder: _persistentExact && _atlas != null,
           textDirection: textDirection,
           layoutAnimation: reflowActive ? layoutTransition?.animation : null,
           previousRects: reflowActive ? layoutTransition!.previousRects : const {},
@@ -2831,6 +2940,13 @@ class _DenseAssetRowPainter extends CustomPainter {
   final double tileExtent;
   final Color backgroundColor;
   final Color placeholderColor;
+  /// Whether the atlas is known to be opaque over every cell the panel fills.
+  ///
+  /// True only for a finished panel, where every occupied cell carries a real
+  /// thumbnail. The placeholder fill underneath is then covered pixel for pixel
+  /// and painting it is pure overdraw - a third full pass over the panel on
+  /// every frame it is on screen, on top of the background and the atlas.
+  final bool atlasHidesPlaceholder;
   final TextDirection textDirection;
   final Animation<double>? layoutAnimation;
   final Map<Object, Rect> previousRects;
@@ -2852,6 +2968,7 @@ class _DenseAssetRowPainter extends CustomPainter {
     required this.tileExtent,
     required this.backgroundColor,
     required this.placeholderColor,
+    required this.atlasHidesPlaceholder,
     required this.textDirection,
     required this.layoutAnimation,
     required this.previousRects,
@@ -2964,7 +3081,7 @@ class _DenseAssetRowPainter extends CustomPainter {
     // showed whatever the compositor had beneath - which on some devices is a
     // light grey that belongs to no palette in this app.
     canvas.drawRect(Offset.zero & size, Paint()..color = backgroundColor);
-    if (!isReflowing) {
+    if (!isReflowing && !atlasHidesPlaceholder) {
       // Painted under everything else so a panel is never invisible, whatever
       // stage of loading it is in. During a zoom reflow the cells are moving,
       // so a static fill would not line up and is skipped.
@@ -3017,6 +3134,7 @@ class _DenseAssetRowPainter extends CustomPainter {
       oldDelegate.tileExtent != tileExtent ||
       oldDelegate.backgroundColor != backgroundColor ||
       oldDelegate.placeholderColor != placeholderColor ||
+      oldDelegate.atlasHidesPlaceholder != atlasHidesPlaceholder ||
       oldDelegate.textDirection != textDirection ||
       oldDelegate.layoutAnimation != layoutAnimation ||
       oldDelegate.previousRects != previousRects;

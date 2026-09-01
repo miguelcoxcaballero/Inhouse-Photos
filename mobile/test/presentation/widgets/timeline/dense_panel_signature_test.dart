@@ -68,6 +68,23 @@ void main() {
     expect(_sign(a), isNot(_sign(b)));
   });
 
+  test('the fingerprint is exactly the width the disk cache stores', () {
+    // Not cosmetic. The on-disk atlas header reserves a fixed-width field, and
+    // the cache refuses - silently, with no error anywhere - to store a panel
+    // whose fingerprint is any other length. Emitting a shorter digest disabled
+    // the disk cache completely, so scrolling back over photos already seen
+    // refetched every thumbnail instead of reading one file.
+    for (final count in [1, 8, 144, 192]) {
+      final signature = _sign(List<BaseAsset>.generate(count, _asset));
+      expect(
+        signature,
+        hasLength(denseAtlasSignatureLength),
+        reason: '$count assets produced a fingerprint the disk cache will drop',
+      );
+      expect(RegExp(r'^[0-9a-f]+$').hasMatch(signature), isTrue, reason: 'the header field is ASCII hex');
+    }
+  });
+
   test('distinct panels across a large library do not collide', () {
     final signatures = <String>{};
     for (var panel = 0; panel < 400; panel++) {
