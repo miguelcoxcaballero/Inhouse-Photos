@@ -1,7 +1,7 @@
 {
-  "version": "3.1.69",
-  "versionCode": 7127,
+  "version": "3.1.70",
+  "versionCode": 7128,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.69-unstick-dense-panels/Inhouse-Photos-3.1.69-arm64.apk",
-  "sha256": "d455e0c045fbddaf9fa3664a6a3bb07a4da8475238e1b3d42d7910e27fb187c0"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.70-no-stranded-panels/Inhouse-Photos-3.1.70-arm64.apk",
+  "sha256": "004a510e46f918388a048fd06423bf6f229bf8dd3bb6a5b8b1ce6f57de3ade94"
 }
