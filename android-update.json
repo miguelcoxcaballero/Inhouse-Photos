@@ -1,7 +1,7 @@
 {
-  "version": "3.1.63",
-  "versionCode": 7121,
+  "version": "3.1.64",
+  "versionCode": 7122,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.63-theme-consistent-grid/Inhouse-Photos-3.1.63-arm64.apk",
-  "sha256": "682572e0151a9c1c25003146fdf623b3a7b63d5c758c6735994d2eeec3a12cf8"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.64-opaque-grid-lean-backup/Inhouse-Photos-3.1.64-arm64.apk",
+  "sha256": "84c49ca4380fb07335651cc8de1ccadbd66d3b7a436bbdb8b4904050661782ee"
 }
