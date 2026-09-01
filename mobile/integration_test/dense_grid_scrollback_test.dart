@@ -187,11 +187,23 @@ void main() {
 
       // Outbound: three screens down, settling at each stop so every panel
       // passed over gets a chance to finish and be cached.
+      //
+      // Also samples the signal that background preview generation yields to.
+      // This is the harness where it can be checked at all: thumbnails here are
+      // really fetched, so the queue is really occupied. In the perf harness
+      // there is no server, requests fail instantly and the signal never fires,
+      // which says nothing about the app.
+      var busySamples = 0;
+      var totalSamples = 0;
       const screens = 3;
       for (var i = 0; i < screens; i++) {
         await tester.fling(find.byType(Timeline), const Offset(0, -760), 1800);
         for (var step = 0; step < 20; step++) {
           await _realDelay(tester, const Duration(milliseconds: 100));
+          if (denseGridIsResolvingThumbnails()) {
+            busySamples++;
+          }
+          totalSamples++;
         }
       }
 
@@ -216,6 +228,7 @@ void main() {
       print('GRIDBACK cache on the way out         : $outbound');
       print('GRIDBACK cache on the way back        : ${DenseGridStats.summary()}');
       print('GRIDBACK panels showing a texture     : $withAtlas');
+      print('GRIDBACK grid busy while loading      : $busySamples/$totalSamples samples');
       print('GRIDBACK ===== end $columnCount =====');
 
       expect(tester.takeException(), isNull);

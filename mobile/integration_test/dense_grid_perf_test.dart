@@ -20,6 +20,7 @@ import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/config/timeline_config.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -256,11 +257,21 @@ void main() {
 
     final sweepRaster = <double>[];
     final sweepWork = <double>[];
+    // Background preview generation stands aside whenever this is true. The
+    // unit tests prove it obeys the signal; this checks the signal actually
+    // fires while somebody is scrolling, which is the only thing that makes
+    // obeying it worth anything.
+    var busySamples = 0;
+    var totalSamples = 0;
     for (var sweep = 0; sweep < 6; sweep++) {
       frames.clear();
       for (var step = 0; step < 45; step++) {
         await tester.drag(find.byType(Timeline), const Offset(0, -140));
         await tester.pump(const Duration(milliseconds: 16));
+        if (denseGridIsResolvingThumbnails()) {
+          busySamples++;
+        }
+        totalSamples++;
       }
       await _realDelay(tester, const Duration(milliseconds: 300));
       sweepRaster.add(median(frames.map((f) => f.rasterDuration.inMicroseconds / 1000).toList()));
@@ -286,6 +297,7 @@ void main() {
     print('GRIDSWEEP steady work median       : ${median(steadyWork).toStringAsFixed(2)} ms');
     print('GRIDSWEEP steady spread            : ${spread.toStringAsFixed(2)} ms');
     print('GRIDSWEEP => a change must beat that spread to be believable');
+    print('GRIDSWEEP grid busy during scroll   : $busySamples/$totalSamples samples');
 
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(minutes: 6)));
