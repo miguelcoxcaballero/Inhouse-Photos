@@ -1,7 +1,7 @@
 {
-  "version": "3.1.59",
-  "versionCode": 7117,
+  "version": "3.1.60",
+  "versionCode": 7118,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.59-crisp-stable-zoomout/Inhouse-Photos-3.1.59-arm64.apk",
-  "sha256": "031b4852e994c53fb6bc584977fd3e535cf5217a9b62e90dca8ca7882c0fd842"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.60-full-resolution-zoomout/Inhouse-Photos-3.1.60-arm64.apk",
+  "sha256": "9386f81085f19c5c1823e3970314e518ab3af85bf93c5c8a467edb42e6f8ea4c"
 }
