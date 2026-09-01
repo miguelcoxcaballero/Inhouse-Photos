@@ -1,7 +1,7 @@
 {
-  "version": "3.1.61",
-  "versionCode": 7119,
+  "version": "3.1.62",
+  "versionCode": 7120,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.61-instant-sharpening/Inhouse-Photos-3.1.61-arm64.apk",
-  "sha256": "613d816ade77101bd25fb5fffb7b05e674bc3d7a5c6307c9d898a22ca17fca2f"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.62-continuous-dense-grid/Inhouse-Photos-3.1.62-arm64.apk",
+  "sha256": "96a58a4955cba6556f8b6a156bc145931fe3370f1fbcf74d0741ab48ca78b4cf"
 }
