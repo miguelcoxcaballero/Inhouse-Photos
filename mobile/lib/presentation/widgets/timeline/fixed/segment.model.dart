@@ -1473,6 +1473,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   int? _atlasCellPixels;
   double? _devicePixelRatio;
   Color _placeholderTone = const Color(0x00000000);
+  Color _surfaceTone = const Color(0x00000000);
   bool _repaintScheduled = false;
   bool _metadataAtlasRequested = false;
   int _metadataRetries = 0;
@@ -1518,6 +1519,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     // resolvable thumbnail, so a theme switch updates it for future panels
     // rather than reloading every atlas in the gallery.
     _placeholderTone = context.colorScheme.surfaceContainerHighest;
+    _surfaceTone = context.colorScheme.surface;
     if (_devicePixelRatio == devicePixelRatio) {
       return;
     }
@@ -2462,7 +2464,11 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       onTapUp: (details) => _handleTap(details, textDirection),
       child: CustomPaint(
         size: Size(double.infinity, _rowCount * widget.tileExtent),
-        isComplex: true,
+        // Deliberately not flagged complex. The painter collapsed to a single
+        // atlas draw, so hinting the raster cache only allocated an offscreen
+        // surface per panel - two dozen of them at 48 columns - and the region
+        // of that surface the painter did not cover is where a foreign light
+        // grey was surfacing.
         willChange: reflowActive,
         painter: _DenseAssetRowPainter(
           images: _images,
@@ -2470,6 +2476,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
           assetKeys: _assetKeys,
           columnCount: widget.columnCount,
           tileExtent: widget.tileExtent,
+          backgroundColor: _surfaceTone,
           placeholderColor: _placeholderTone,
           textDirection: textDirection,
           layoutAnimation: reflowActive ? layoutTransition?.animation : null,
@@ -2502,6 +2509,7 @@ class _DenseAssetRowPainter extends CustomPainter {
   final List<Object> assetKeys;
   final int columnCount;
   final double tileExtent;
+  final Color backgroundColor;
   final Color placeholderColor;
   final TextDirection textDirection;
   final Animation<double>? layoutAnimation;
@@ -2522,6 +2530,7 @@ class _DenseAssetRowPainter extends CustomPainter {
     required this.assetKeys,
     required this.columnCount,
     required this.tileExtent,
+    required this.backgroundColor,
     required this.placeholderColor,
     required this.textDirection,
     required this.layoutAnimation,
@@ -2630,6 +2639,11 @@ class _DenseAssetRowPainter extends CustomPainter {
     final animationProgress = layoutAnimation?.value ?? 1;
     final isReflowing = previousRects.isNotEmpty && animationProgress < 1;
     final reflowProgress = isReflowing ? timelineLayoutTransitionProgress(animationProgress) : 1.0;
+    // A panel owns every pixel it is given. The cells a bucket does not fill
+    // are still part of this surface, and leaving them transparent meant they
+    // showed whatever the compositor had beneath - which on some devices is a
+    // light grey that belongs to no palette in this app.
+    canvas.drawRect(Offset.zero & size, Paint()..color = backgroundColor);
     if (!isReflowing) {
       // Painted under everything else so a panel is never invisible, whatever
       // stage of loading it is in. During a zoom reflow the cells are moving,
@@ -2681,6 +2695,7 @@ class _DenseAssetRowPainter extends CustomPainter {
       oldDelegate.assetKeys != assetKeys ||
       oldDelegate.columnCount != columnCount ||
       oldDelegate.tileExtent != tileExtent ||
+      oldDelegate.backgroundColor != backgroundColor ||
       oldDelegate.placeholderColor != placeholderColor ||
       oldDelegate.textDirection != textDirection ||
       oldDelegate.layoutAnimation != layoutAnimation ||

@@ -21,6 +21,20 @@ class DriftUploadDetailPage extends ConsumerStatefulWidget {
 class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
   static const double _uploadCardContentHeight = 82;
 
+  // The parent backup page states this app's card language: a flat card, a 20
+  // radius and a single hairline in outlineVariant. This screen had drifted to
+  // three different radii and three different border tints, so it read as a
+  // different app. One set of metrics keeps every section on the same grid.
+  static const double _cardRadius = 20;
+  static const double _sectionInset = 16;
+  static const double _cardGap = 10;
+  static const BorderRadius _cardBorderRadius = BorderRadius.all(Radius.circular(_cardRadius));
+
+  ShapeBorder _cardShape(BuildContext context, {Color? border}) => RoundedRectangleBorder(
+    borderRadius: _cardBorderRadius,
+    side: BorderSide(color: border ?? context.colorScheme.outlineVariant, width: 1),
+  );
+
   @override
   Widget build(BuildContext context) {
     final uploadItems = ref.watch(driftBackupProvider.select((state) => state.uploadItems));
@@ -46,6 +60,80 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
     );
   }
 
+  /// A single line of totals above the lists.
+  ///
+  /// Without it the screen opens on an undifferentiated stack of cards and the
+  /// overall state of the backup has to be inferred by counting them.
+  Widget _buildSummary(
+    BuildContext context,
+    List<DriftUploadStatus> uploadingItems,
+    List<DriftUploadStatus> processingItems,
+    List<DriftUploadStatus> failedItems,
+  ) {
+    final entries = <(IconData, String, int, Color)>[
+      (Icons.cloud_upload_rounded, "uploading".t(context: context), uploadingItems.length, context.colorScheme.primary),
+      if (processingItems.isNotEmpty)
+        (Icons.auto_awesome_rounded, 'Optimizing', processingItems.length, context.colorScheme.tertiary),
+      if (failedItems.isNotEmpty)
+        (Icons.error_rounded, "errors_text".t(context: context), failedItems.length, context.colorScheme.error),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_sectionInset, 12, _sectionInset, 4),
+      child: Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        color: context.colorScheme.surfaceContainerLow,
+        shape: _cardShape(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          child: Row(
+            children: [
+              for (var index = 0; index < entries.length; index++) ...[
+                if (index > 0)
+                  Container(
+                    width: 1,
+                    height: 34,
+                    margin: const EdgeInsets.symmetric(horizontal: 14),
+                    color: context.colorScheme.outlineVariant,
+                  ),
+                Expanded(child: _buildSummaryEntry(context, entries[index])),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryEntry(BuildContext context, (IconData, String, int, Color) entry) {
+    final (icon, label, count, color) = entry;
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: color),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                count.toString(),
+                style: context.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: color),
+              ),
+              Text(
+                label,
+                style: context.textTheme.labelSmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTwoSectionLayout(
     BuildContext context,
     List<DriftUploadStatus> uploadingItems,
@@ -55,6 +143,8 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
   ) {
     return CustomScrollView(
       slivers: [
+        SliverToBoxAdapter(child: _buildSummary(context, uploadingItems, processingItems, failedItems)),
+
         // iCloud Downloads Section
         if (iCloudProgress.isNotEmpty) ...[
           SliverToBoxAdapter(
@@ -66,12 +156,12 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: _sectionInset),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate((context, index) {
                 final entry = iCloudProgress.entries.elementAt(index);
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.only(bottom: _cardGap),
                   child: _buildICloudDownloadCard(context, entry.key, entry.value),
                 );
               }, childCount: iCloudProgress.length),
@@ -90,11 +180,11 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
         ),
         if (uploadingItems.isNotEmpty)
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: _sectionInset),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.only(bottom: _cardGap),
                   child: _buildCurrentUploadCard(context, uploadingItems[index]),
                 ),
                 childCount: uploadingItems.length,
@@ -103,7 +193,7 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
           )
         else if (processingItems.isEmpty)
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: _sectionInset),
             sliver: SliverToBoxAdapter(child: _buildEmptyUploadState(context)),
           ),
 
@@ -120,11 +210,11 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: _sectionInset),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.only(bottom: _cardGap),
                   child: _buildCurrentUploadCard(context, processingItems[index]),
                 ),
                 childCount: processingItems.length,
@@ -144,11 +234,14 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: _sectionInset),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate((context, index) {
                 final item = failedItems[index];
-                return Padding(padding: const EdgeInsets.only(bottom: 8), child: _buildErrorCard(context, item));
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: _cardGap),
+                  child: _buildErrorCard(context, item),
+                );
               }, childCount: failedItems.length),
             ),
           ),
@@ -162,7 +255,7 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
 
   Widget _buildSectionHeader(BuildContext context, {required String title, int? count, required Color color}) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.fromLTRB(_sectionInset, 18, _sectionInset, 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -194,13 +287,11 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
 
     return Card(
       elevation: 0,
-      color: context.colorScheme.tertiaryContainer.withValues(alpha: 0.5),
-      shape: RoundedRectangleBorder(
-        borderRadius: const BorderRadius.all(Radius.circular(12)),
-        side: BorderSide(color: context.colorScheme.tertiary.withValues(alpha: 0.3), width: 1),
-      ),
+      margin: EdgeInsets.zero,
+      color: context.colorScheme.tertiaryContainer.withValues(alpha: 0.4),
+      shape: _cardShape(context, border: context.colorScheme.tertiary.withValues(alpha: 0.3)),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Row(
           children: [
             Container(
@@ -271,17 +362,14 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
       margin: EdgeInsets.zero,
       elevation: 0,
       color: context.colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: const BorderRadius.all(Radius.circular(10)),
-        side: BorderSide(color: context.colorScheme.outline.withValues(alpha: 0.14), width: 1),
-      ),
+      shape: _cardShape(context),
       child: InkWell(
         onTap: () => _showFileDetailDialog(context, item),
-        borderRadius: const BorderRadius.all(Radius.circular(10)),
+        borderRadius: _cardBorderRadius,
         child: SizedBox(
           height: _uploadCardContentHeight,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -408,16 +496,14 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
   Widget _buildErrorCard(BuildContext context, DriftUploadStatus item) {
     return Card(
       elevation: 0,
+      margin: EdgeInsets.zero,
       color: context.colorScheme.errorContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: const BorderRadius.all(Radius.circular(12)),
-        side: BorderSide(color: context.colorScheme.error.withValues(alpha: 0.3), width: 1),
-      ),
+      shape: _cardShape(context, border: context.colorScheme.error.withValues(alpha: 0.3)),
       child: InkWell(
         onTap: () => _showFileDetailDialog(context, item),
-        borderRadius: const BorderRadius.all(Radius.circular(12)),
+        borderRadius: _cardBorderRadius,
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(14),
           child: Row(
             children: [
               _CurrentUploadThumbnail(taskId: item.taskId),
@@ -458,12 +544,19 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: context.colorScheme.surfaceContainerLow,
-        borderRadius: const BorderRadius.all(Radius.circular(10)),
-        border: Border.all(color: context.colorScheme.outline.withValues(alpha: 0.12)),
+        borderRadius: _cardBorderRadius,
+        border: Border.all(color: context.colorScheme.outlineVariant),
       ),
-      child: Text(
-        'No active uploads',
-        style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.cloud_done_rounded, size: 22, color: context.colorScheme.onSurfaceVariant),
+          const SizedBox(height: 6),
+          Text(
+            'No active uploads',
+            style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }

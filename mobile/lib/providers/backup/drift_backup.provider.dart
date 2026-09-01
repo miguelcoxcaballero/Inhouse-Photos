@@ -270,14 +270,50 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   Future<void> _storageStatsWrite = Future.value();
   bool _failureNotificationSent = false;
 
+  /// Transfer progress is buffered rather than written straight to state.
+  ///
+  /// Each transfer reports at most every 400ms, but with two dozen of them in
+  /// flight that is still around sixty state writes a second, and every write
+  /// copied the whole upload map and rebuilt each listener. Coalescing them
+  /// into one write per [_progressFlushInterval] leaves the reported numbers
+  /// identical while removing almost all of that work. Anything that is not a
+  /// progress tick - a success, a failure, a stage change - flushes first so
+  /// ordering is never observable.
+  static const Duration _progressFlushInterval = Duration(milliseconds: 350);
+  final Map<String, DriftUploadStatus> _pendingProgress = {};
+  Timer? _progressFlushTimer;
+
   final _logger = Logger("DriftBackupNotifier");
 
   @override
   void dispose() {
+    _progressFlushTimer?.cancel();
+    _progressFlushTimer = null;
+    _pendingProgress.clear();
     _releaseCompressionWaiters();
     unawaited(_compressionSubscription.cancel());
     super.dispose();
   }
+
+  void _scheduleProgressFlush() {
+    _progressFlushTimer ??= Timer(_progressFlushInterval, _flushPendingProgress);
+  }
+
+  void _flushPendingProgress() {
+    _progressFlushTimer?.cancel();
+    _progressFlushTimer = null;
+    if (_pendingProgress.isEmpty || !mounted) {
+      _pendingProgress.clear();
+      return;
+    }
+    final merged = {...state.uploadItems, ..._pendingProgress};
+    _pendingProgress.clear();
+    state = state.copyWith(uploadItems: merged);
+  }
+
+  /// The item as the UI will see it, including a progress tick not yet flushed.
+  DriftUploadStatus? _currentUploadItem(String localAssetId) =>
+      _pendingProgress[localAssetId] ?? state.uploadItems[localAssetId];
 
   void _releaseCompressionWaiters() {
     for (final waiter in _compressionWaiters.values) {
@@ -294,6 +330,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
       _logger.warning("Skip _removeUploadItem: notifier disposed");
       return;
     }
+    _pendingProgress.remove(taskId);
     if (state.uploadItems.containsKey(taskId)) {
       final updatedItems = Map<String, DriftUploadStatus>.from(state.uploadItems);
       updatedItems.remove(taskId);
@@ -385,6 +422,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   }
 
   Future<void> retryFailedUploads(String userId) {
+    _flushPendingProgress();
     final retainedItems = Map<String, DriftUploadStatus>.fromEntries(
       state.uploadItems.entries.where((entry) => entry.value.isFailed != true),
     );
@@ -403,6 +441,9 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     _releaseCompressionWaiters();
     _remoteToLocalAssetIds.clear();
     _pendingCompressionEvents.clear();
+    _progressFlushTimer?.cancel();
+    _progressFlushTimer = null;
+    _pendingProgress.clear();
     state = state.copyWith(uploadItems: {}, iCloudDownloadProgress: {});
   }
 
@@ -425,35 +466,24 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
 
     final progress = totalBytes > 0 ? bytes / totalBytes : 0.0;
     final networkSpeedAsString = _uploadSpeedManager.updateProgress(localAssetId, bytes, totalBytes);
-    final currentItem = state.uploadItems[localAssetId];
-    if (currentItem != null) {
-      state = state.copyWith(
-        uploadItems: {
-          ...state.uploadItems,
-          localAssetId: currentItem.copyWith(
-            filename: filename,
-            progress: progress,
-            fileSize: currentItem.compressionExpected ? currentItem.fileSize : totalBytes,
-            networkSpeedAsString: networkSpeedAsString,
-          ),
-        },
-      );
-    } else {
-      state = state.copyWith(
-        uploadItems: {
-          ...state.uploadItems,
-          localAssetId: DriftUploadStatus(
-            taskId: localAssetId,
-            filename: filename,
-            preparationProgress: 1,
-            progress: progress,
-            originalFileSize: totalBytes,
-            fileSize: totalBytes,
-            networkSpeedAsString: networkSpeedAsString,
-          ),
-        },
-      );
-    }
+    final currentItem = _currentUploadItem(localAssetId);
+    _pendingProgress[localAssetId] =
+        currentItem?.copyWith(
+          filename: filename,
+          progress: progress,
+          fileSize: currentItem.compressionExpected ? currentItem.fileSize : totalBytes,
+          networkSpeedAsString: networkSpeedAsString,
+        ) ??
+        DriftUploadStatus(
+          taskId: localAssetId,
+          filename: filename,
+          preparationProgress: 1,
+          progress: progress,
+          originalFileSize: totalBytes,
+          fileSize: totalBytes,
+          networkSpeedAsString: networkSpeedAsString,
+        );
+    _scheduleProgressFlush();
   }
 
   void _handleServerCompressionExpected(String localAssetId, String filename, int originalBytes) {
@@ -461,6 +491,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
       return;
     }
 
+    _flushPendingProgress();
     final currentItem = state.uploadItems[localAssetId];
     final item =
         currentItem?.copyWith(
@@ -486,6 +517,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   }
 
   Future<void> _handleForegroundBackupSuccess(String userId, String localAssetId, String remoteAssetId) async {
+    _flushPendingProgress();
     final expectsCompression = state.uploadItems[localAssetId]?.compressionExpected == true;
     final compressionWaiter = expectsCompression
         ? _compressionWaiters.putIfAbsent(remoteAssetId, Completer<void>.new)
@@ -568,6 +600,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
       }
     }
 
+    _flushPendingProgress();
     final currentItem = state.uploadItems[localAssetId];
     if (currentItem == null) {
       return;
@@ -601,6 +634,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   void _handleForegroundBackupError(String localAssetId, String errorMessage) {
     _logger.severe("Upload failed for $localAssetId: $errorMessage");
 
+    _flushPendingProgress();
     final currentItem = state.uploadItems[localAssetId];
     if (currentItem != null) {
       state = state.copyWith(
