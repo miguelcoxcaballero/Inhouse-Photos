@@ -1,7 +1,7 @@
 {
-  "version": "3.1.60",
-  "versionCode": 7118,
+  "version": "3.1.61",
+  "versionCode": 7119,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.60-full-resolution-zoomout/Inhouse-Photos-3.1.60-arm64.apk",
-  "sha256": "9386f81085f19c5c1823e3970314e518ab3af85bf93c5c8a467edb42e6f8ea4c"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.61-instant-sharpening/Inhouse-Photos-3.1.61-arm64.apk",
+  "sha256": "613d816ade77101bd25fb5fffb7b05e674bc3d7a5c6307c9d898a22ca17fca2f"
 }
