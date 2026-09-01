@@ -16,6 +16,7 @@ import 'package:immich_mobile/infrastructure/entities/asset_ocr.entity.drift.dar
 import 'package:immich_mobile/infrastructure/entities/auth_user.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/exif.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/local_album.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/local_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/memory.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/memory_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/partner.entity.drift.dart';
@@ -33,6 +34,10 @@ import 'package:immich_mobile/infrastructure/utils/exif.converter.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart' as api show AssetVisibility, AlbumUserRole, UserMetadataKey, AssetEditAction;
 import 'package:openapi/api.dart' hide UserMetadataKey, AssetEditAction, AssetVisibility, AlbumUserRole;
+
+/// The wall-clock form of a capture instant, or null when there is no instant
+/// to derive it from.
+DateTime? _wallClockOf(DateTime? instant) => instant == null ? null : timelineLocalDateTime(instant);
 
 class SyncStreamRepository extends DriftDatabaseRepository {
   final Logger _logger = Logger('DriftSyncStreamRepository');
@@ -209,7 +214,12 @@ class SyncStreamRepository extends DriftDatabaseRepository {
             checksum: Value(asset.checksum),
             isFavorite: Value(asset.isFavorite),
             ownerId: Value(asset.ownerId),
-            localDateTime: Value(asset.localDateTime),
+            // The timeline orders on this column directly, so a null would sink
+            // the asset to the end of the gallery. Servers normally supply it;
+            // derive it from the capture time when they do not.
+            localDateTime: Value(
+              asset.localDateTime ?? _wallClockOf(asset.fileCreatedAt ?? asset.createdAt),
+            ),
             thumbHash: Value(asset.thumbhash),
             deletedAt: Value(asset.deletedAt),
             visibility: Value(asset.visibility.toAssetVisibility()),
@@ -248,7 +258,12 @@ class SyncStreamRepository extends DriftDatabaseRepository {
             checksum: Value(asset.checksum),
             isFavorite: Value(asset.isFavorite),
             ownerId: Value(asset.ownerId),
-            localDateTime: Value(asset.localDateTime),
+            // The timeline orders on this column directly, so a null would sink
+            // the asset to the end of the gallery. Servers normally supply it;
+            // derive it from the capture time when they do not.
+            localDateTime: Value(
+              asset.localDateTime ?? _wallClockOf(asset.fileCreatedAt ?? asset.createdAt),
+            ),
             thumbHash: Value(asset.thumbhash),
             deletedAt: Value(asset.deletedAt),
             visibility: Value(asset.visibility.toAssetVisibility()),

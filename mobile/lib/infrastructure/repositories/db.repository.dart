@@ -119,7 +119,12 @@ class Drift extends $Drift {
     }
   }
 
-  Future<void> _backfillLocalDateTimes(GeneratedDatabase database) async {
+  /// Fills `local_date_time` for rows that predate it.
+  ///
+  /// The timeline orders on this column directly so that its indexes apply, so
+  /// a null would sort the row to the very end of the gallery. Every writer
+  /// sets it now; this repairs rows written before that was true.
+  Future<void> _backfillLocalDateTimes(GeneratedDatabase database, {String table = 'local_asset_entity'}) async {
     const pageSize = 250;
     String? lastId;
 
@@ -129,14 +134,14 @@ class Drift extends $Drift {
             lastId == null
                 ? '''
           SELECT id, created_at
-          FROM local_asset_entity
+          FROM $table
           WHERE local_date_time IS NULL
           ORDER BY id
           LIMIT $pageSize
         '''
                 : '''
           SELECT id, created_at
-          FROM local_asset_entity
+          FROM $table
           WHERE local_date_time IS NULL AND id > ?
           ORDER BY id
           LIMIT $pageSize
@@ -168,7 +173,7 @@ class Drift extends $Drift {
       }
 
       await database.customStatement(
-        'UPDATE local_asset_entity SET local_date_time = CASE id$cases END WHERE id IN ($ids)',
+        'UPDATE $table SET local_date_time = CASE id$cases END WHERE id IN ($ids)',
         arguments,
       );
       lastId = rows.last.read<String>('id');
@@ -176,7 +181,7 @@ class Drift extends $Drift {
   }
 
   @override
-  int get schemaVersion => 32;
+  int get schemaVersion => 33;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -376,6 +381,20 @@ class Drift extends $Drift {
               },
               from31To32: (m, v32) async {
                 await m.addColumn(v32.localAssetEntity, v32.localAssetEntity.localDateTime);
+                await _backfillLocalDateTimes(m.database);
+              },
+              from32To33: (m, v33) async {
+                // The timeline groups by the wall clock but could only order by
+                // the capture instant, so photos taken in another time zone were
+                // counted into one day and drawn under another. Ordering on the
+                // wall clock needs these two indexes: EXPLAIN QUERY PLAN shows
+                // that without them the merged query degrades to a full sort and
+                // a full scan of the local arm, which is what made 3.1.65 lag.
+                await m.createIndex(v33.idxRemoteAssetOwnerVisibilityDeletedLocalDateTime);
+                await m.createIndex(v33.idxLocalAssetLocalDateTime);
+                // Ordering on the column directly means a null would sink the
+                // row to the end of the gallery, so repair any that are unset.
+                await _backfillLocalDateTimes(m.database, table: 'remote_asset_entity');
                 await _backfillLocalDateTimes(m.database);
               },
             ),

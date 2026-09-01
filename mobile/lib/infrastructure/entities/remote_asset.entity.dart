@@ -22,6 +22,13 @@ CREATE INDEX IF NOT EXISTS idx_remote_asset_owner_visibility_deleted_created
 ON remote_asset_entity (owner_id, visibility, deleted_at, created_at DESC)
 ''')
 @TableIndex.sql('CREATE INDEX IF NOT EXISTS idx_remote_asset_uploaded ON remote_asset_entity (uploaded_at)')
+// Mirrors idx_remote_asset_owner_visibility_deleted_created for the timeline's
+// wall-clock ordering. Measured with EXPLAIN QUERY PLAN: without it the merged
+// timeline query falls back to a full sort of the whole result set.
+@TableIndex.sql('''
+CREATE INDEX IF NOT EXISTS idx_remote_asset_owner_visibility_deleted_local_date_time
+ON remote_asset_entity (owner_id, visibility, deleted_at, local_date_time DESC)
+''')
 class RemoteAssetEntity extends Table with DriftDefaultsMixin, AssetEntityMixin {
   const RemoteAssetEntity();
 

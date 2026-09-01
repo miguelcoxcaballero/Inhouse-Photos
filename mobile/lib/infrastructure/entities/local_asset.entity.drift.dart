@@ -1432,3 +1432,7 @@ i0.Index get idxLocalAssetCreatedAt => i0.Index(
   'idx_local_asset_created_at',
   'CREATE INDEX IF NOT EXISTS idx_local_asset_created_at ON local_asset_entity (created_at)',
 );
+i0.Index get idxLocalAssetLocalDateTime => i0.Index(
+  'idx_local_asset_local_date_time',
+  'CREATE INDEX IF NOT EXISTS idx_local_asset_local_date_time ON local_asset_entity (local_date_time DESC)',
+);
