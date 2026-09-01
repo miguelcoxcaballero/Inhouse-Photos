@@ -1,5 +1,6 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/services/asset.service.dart';
+import 'package:immich_mobile/domain/services/local_thumbhash.service.dart';
 import 'package:immich_mobile/infrastructure/repositories/local_asset.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_exif.repository.dart';
@@ -11,6 +12,17 @@ import 'package:immich_mobile/repositories/asset_api.repository.dart';
 final localAssetRepository = Provider<DriftLocalAssetRepository>(
   (ref) => DriftLocalAssetRepository(ref.watch(driftProvider)),
 );
+
+/// Generates the blurry previews local photos need to appear instantly.
+///
+/// Kept alive for the session and stopped when the provider is disposed; the
+/// service itself yields to the grid whenever a person is looking at
+/// thumbnails, so it only ever uses capacity nothing else wants.
+final localThumbHashServiceProvider = Provider<LocalThumbHashService>((ref) {
+  final service = LocalThumbHashService(ref.watch(localAssetRepository));
+  ref.onDispose(service.stop);
+  return service;
+});
 
 final remoteAssetRepositoryProvider = Provider<RemoteAssetRepository>(
   (ref) => RemoteAssetRepository(ref.watch(driftProvider)),

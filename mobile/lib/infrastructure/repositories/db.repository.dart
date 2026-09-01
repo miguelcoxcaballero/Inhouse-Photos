@@ -181,7 +181,7 @@ class Drift extends $Drift {
   }
 
   @override
-  int get schemaVersion => 33;
+  int get schemaVersion => 34;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -396,6 +396,16 @@ class Drift extends $Drift {
                 // row to the end of the gallery, so repair any that are unset.
                 await _backfillLocalDateTimes(m.database, table: 'remote_asset_entity');
                 await _backfillLocalDateTimes(m.database);
+              },
+              from33To34: (m, v34) async {
+                // Local photos had no blurry preview of their own, so their
+                // tiles were the ones visibly loading in the grid. The column
+                // holds one generated on device; null means "not generated
+                // yet", and the partial index below indexes only those, so
+                // finding the backlog stays cheap and the index disappears once
+                // it is drained.
+                await m.addColumn(v34.localAssetEntity, v34.localAssetEntity.thumbHash);
+                await m.createIndex(v34.idxLocalAssetMissingThumbHash);
               },
             ),
           ),

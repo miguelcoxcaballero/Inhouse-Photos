@@ -129,6 +129,22 @@ List<Rect> denseTimelineOccupiedRects({
 /// fingerprint of any other width is refused by the cache rather than stored.
 /// That coupling used to be an unnamed `64` in three places; a change to the
 /// digest then disabled the entire disk cache without a single failure.
+/// The blurry preview to draw for [asset] before its real thumbnail arrives.
+///
+/// A remote photo carries one from the server. A photo still waiting to be
+/// backed up carries one generated on device, which is what stops it being the
+/// only kind of tile that shows nothing at all while it loads.
+///
+/// Both the fallback texture and the panel fingerprint read this, and they must
+/// agree: a panel whose fingerprint ignored a preview that the texture used
+/// would keep a stale, blank-celled atlas after generation filled it in.
+@visibleForTesting
+String? denseThumbHashOf(BaseAsset asset) => switch (asset) {
+  RemoteAsset(thumbHash: final hash?) when hash.isNotEmpty => hash,
+  LocalAsset(thumbHash: final hash?) when hash.isNotEmpty => hash,
+  _ => null,
+};
+
 const int denseAtlasSignatureLength = 64;
 
 int denseTimelineRowsPerChild(int columnCount) => switch (columnCount) {
@@ -198,10 +214,7 @@ String denseContentSignature(List<BaseAsset> assets, {required int columnCount, 
     mixInt(asset.updatedAt.toUtc().microsecondsSinceEpoch);
     mixInt(asset.width ?? 0);
     mixInt(asset.height ?? 0);
-    mixString(switch (asset) {
-      RemoteAsset(thumbHash: final hash?) when hash.isNotEmpty => hash,
-      _ => null,
-    });
+    mixString(denseThumbHashOf(asset));
   }
   final buffer = StringBuffer();
   for (final lane in lanes) {
@@ -1427,7 +1440,14 @@ class DenseGridStats {
       'diskWrite sched $diskWritesScheduled/evicted $diskWritesEvicted/'
       'refused $diskWritesRefused/written $diskAtlasWrites  noDir $diskDirectoryUnavailable';
 }
+
 final DenseThumbnailQueue _denseThumbnailQueue = DenseThumbnailQueue();
+
+/// True while the dense grid is loading thumbnails for something on screen.
+///
+/// Exposed so background work can stand aside for it without reaching into the
+/// widget layer.
+bool denseGridIsResolvingThumbnails() => _denseThumbnailQueue.isBusy;
 final DenseTimelineTaskQueue _denseMetadataAtlasQueue = DenseTimelineTaskQueue(
   _denseMetadataAtlasConcurrency,
   // A 48-column screen plus its cache extent is well over a hundred panels.
@@ -1480,6 +1500,13 @@ class DenseThumbnailQueue {
     final priority = a.priority.compareTo(b.priority);
     return priority == 0 ? a.sequence.compareTo(b.sequence) : priority;
   }
+
+  /// Whether the grid is currently resolving thumbnails somebody can see.
+  ///
+  /// Background preview generation asks this before every batch, because a
+  /// preview for a photo further down the library is worth nothing if producing
+  /// it delays the photo on screen.
+  bool get isBusy => _active > 0 || _pending.isNotEmpty;
 
   DenseThumbnailHandle schedule(Future<void> Function() task, {int priority = 1, void Function()? onDiscard}) {
     final item = _DenseThumbnailTask(task: task, priority: priority, sequence: _sequence++, onDiscard: onDiscard);
@@ -2370,10 +2397,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     });
   }
 
-  String? _thumbHashFor(BaseAsset asset) => switch (asset) {
-    RemoteAsset(thumbHash: final hash?) when hash.isNotEmpty => hash,
-    _ => null,
-  };
+  String? _thumbHashFor(BaseAsset asset) => denseThumbHashOf(asset);
 
   void _scheduleMetadataRetry({Duration? delay}) {
     if (_metadataRetryTimer != null || !mounted || _persistentExact || _baseAtlasReady) {

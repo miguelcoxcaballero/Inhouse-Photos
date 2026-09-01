@@ -12,6 +12,12 @@ class LocalAsset extends BaseAsset {
   final double? latitude;
   final double? longitude;
 
+  /// Blurry preview generated on device, or null while it is still pending.
+  ///
+  /// The remote counterpart comes from the server. Without one, a local photo
+  /// has nothing to show in the grid until its real thumbnail decodes.
+  final String? thumbHash;
+
   const LocalAsset({
     required this.id,
     String? remoteId,
@@ -30,6 +36,7 @@ class LocalAsset extends BaseAsset {
     this.adjustmentTime,
     this.latitude,
     this.longitude,
+    this.thumbHash,
     required super.isEdited,
   }) : remoteAssetId = remoteId;
 

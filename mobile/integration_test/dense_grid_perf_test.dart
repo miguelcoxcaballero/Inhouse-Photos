@@ -209,4 +209,84 @@ void main() {
       expect(tester.takeException(), isNull);
     }, timeout: const Timeout(Duration(minutes: 5)));
   }
+
+  // A deterministic sweep, repeated, so the spread is visible instead of being
+  // guessed at. `fling` was the wrong instrument: its physics and settling time
+  // differ every run, which put single-run differences of 30-50% inside the
+  // noise and made small changes unmeasurable. Fixed-size drags pumped at a
+  // fixed interval remove that, and repeating within one app launch removes
+  // start-up variance too, so the numbers below can be compared to each other.
+  testWidgets('deterministic scroll sweep at 18 columns', (tester) async {
+    tester.view.devicePixelRatio = 3;
+    tester.view.physicalSize = const Size(1080, 2400);
+    addTearDown(tester.view.reset);
+
+    final service = _service(6000, assetsPerBucket: 500);
+    addTearDown(service.dispose);
+
+    final frames = <FrameTiming>[];
+    void collect(List<FrameTiming> timings) => frames.addAll(timings);
+    binding.addTimingsCallback(collect);
+    addTearDown(() => binding.removeTimingsCallback(collect));
+
+    await tester.pumpConsumerWidget(
+      const Timeline(
+        withScrubber: false,
+        readOnly: true,
+        appBar: SliverToBoxAdapter(child: SizedBox.shrink()),
+        bottomSheet: null,
+      ),
+      overrides: [
+        timelineServiceProvider.overrideWithValue(service),
+        appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 18))),
+      ],
+      settle: false,
+    );
+    for (var step = 0; step < 40; step++) {
+      await _realDelay(tester, const Duration(milliseconds: 100));
+    }
+
+    double median(List<double> values) {
+      if (values.isEmpty) {
+        return 0;
+      }
+      final sorted = [...values]..sort();
+      return sorted[sorted.length ~/ 2];
+    }
+
+    final sweepRaster = <double>[];
+    final sweepWork = <double>[];
+    for (var sweep = 0; sweep < 6; sweep++) {
+      frames.clear();
+      for (var step = 0; step < 45; step++) {
+        await tester.drag(find.byType(Timeline), const Offset(0, -140));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await _realDelay(tester, const Duration(milliseconds: 300));
+      sweepRaster.add(median(frames.map((f) => f.rasterDuration.inMicroseconds / 1000).toList()));
+      sweepWork.add(
+        median(
+          frames.map((f) => (f.buildDuration.inMicroseconds + f.rasterDuration.inMicroseconds) / 1000).toList(),
+        ),
+      );
+    }
+
+    String fmt(List<double> v) => v.map((x) => x.toStringAsFixed(1)).join(' ');
+    // The first sweep pays for everything that only happens once - worker
+    // isolates starting, caches filling - and runs about twice the rest. Mixing
+    // it in is what made earlier numbers look noisier than the app actually is,
+    // so it is reported separately rather than averaged away.
+    final steady = sweepRaster.skip(1).toList();
+    final steadyWork = sweepWork.skip(1).toList();
+    final spread = steady.reduce(math.max) - steady.reduce(math.min);
+    print('GRIDSWEEP raster medians per sweep : ${fmt(sweepRaster)}');
+    print('GRIDSWEEP work medians per sweep   : ${fmt(sweepWork)}');
+    print('GRIDSWEEP warm-up sweep (excluded) : ${sweepRaster.first.toStringAsFixed(2)} ms');
+    print('GRIDSWEEP steady raster median     : ${median(steady).toStringAsFixed(2)} ms');
+    print('GRIDSWEEP steady work median       : ${median(steadyWork).toStringAsFixed(2)} ms');
+    print('GRIDSWEEP steady spread            : ${spread.toStringAsFixed(2)} ms');
+    print('GRIDSWEEP => a change must beat that spread to be believable');
+
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 6)));
 }

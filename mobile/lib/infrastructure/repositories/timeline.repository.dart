@@ -110,6 +110,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
                   longitude: row.longitude,
                   adjustmentTime: row.adjustmentTime,
                   isEdited: row.isEdited,
+                  thumbHash: row.thumbHash,
                 ),
         )
         .get();

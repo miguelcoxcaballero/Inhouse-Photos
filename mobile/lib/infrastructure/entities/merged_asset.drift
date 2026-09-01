@@ -71,7 +71,7 @@ SELECT
 	lae.height,
 	lae.duration_ms,
 	lae.is_favorite,
-	NULL as thumb_hash,
+	lae.thumb_hash,
 	lae.checksum,
 	NULL as owner_id,
 	NULL as live_photo_video_id,

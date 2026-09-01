@@ -68,6 +68,56 @@ void main() {
     expect(_sign(a), isNot(_sign(b)));
   });
 
+  test('a local photo uses its generated preview, exactly like a remote one', () {
+    // The whole point of the local preview: before this, `denseThumbHashOf`
+    // matched only RemoteAsset, so a photo waiting to be backed up had nothing
+    // to draw and its tile stayed flat until a full thumbnail decoded. That is
+    // why not-yet-uploaded photos were the ones visibly loading.
+    final hash = _thumbHash(3);
+    final local = LocalAsset(
+      id: 'local-3',
+      name: 'photo-3.jpg',
+      checksum: 'checksum-3',
+      type: AssetType.image,
+      createdAt: DateTime.utc(2024),
+      updatedAt: DateTime.utc(2024),
+      playbackStyle: AssetPlaybackStyle.image,
+      isEdited: false,
+      thumbHash: hash,
+    );
+    expect(denseThumbHashOf(local), hash);
+
+    final pending = LocalAsset(
+      id: 'local-4',
+      name: 'photo-4.jpg',
+      checksum: 'checksum-4',
+      type: AssetType.image,
+      createdAt: DateTime.utc(2024),
+      updatedAt: DateTime.utc(2024),
+      playbackStyle: AssetPlaybackStyle.image,
+      isEdited: false,
+    );
+    expect(denseThumbHashOf(pending), isNull, reason: 'not generated yet is not the same as having none');
+    expect(denseThumbHashOf(_asset(3)), _thumbHash(3), reason: 'remote assets are unaffected');
+  });
+
+  test('a preview appearing changes the panel fingerprint', () {
+    // Otherwise a panel cached while its photos had no previews would keep its
+    // blank-celled texture forever, and generation would never become visible.
+    LocalAsset local({String? thumbHash}) => LocalAsset(
+      id: 'local-1',
+      name: 'photo-1.jpg',
+      checksum: 'checksum-1',
+      type: AssetType.image,
+      createdAt: DateTime.utc(2024),
+      updatedAt: DateTime.utc(2024),
+      playbackStyle: AssetPlaybackStyle.image,
+      isEdited: false,
+      thumbHash: thumbHash,
+    );
+    expect(_sign([local()]), isNot(_sign([local(thumbHash: _thumbHash(7))])));
+  });
+
   test('the fingerprint is exactly the width the disk cache stores', () {
     // Not cosmetic. The on-disk atlas header reserves a fixed-width field, and
     // the cache refuses - silently, with no error anywhere - to store a panel

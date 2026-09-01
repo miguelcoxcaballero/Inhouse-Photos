@@ -64,6 +64,34 @@ class DriftLocalAssetRepository extends DriftDatabaseRepository {
     });
   }
 
+  /// Photos still waiting for a generated preview.
+  ///
+  /// The `IS NULL` predicate matches `idx_local_asset_missing_thumb_hash`, which
+  /// is partial on exactly that condition, so this reads only the backlog rather
+  /// than scanning a library that is almost entirely done.
+  Future<List<({String id, bool isVideo})>> getAssetsMissingThumbHash({required int limit}) {
+    final query = _db.localAssetEntity.select()
+      ..where((row) => row.thumbHash.isNull())
+      ..limit(limit);
+    return query.map((row) => (id: row.id, isVideo: row.type == AssetType.video)).get();
+  }
+
+  Future<void> updateThumbHashes(Map<String, String> hashes) {
+    if (hashes.isEmpty) {
+      return Future.value();
+    }
+
+    return _db.batch((batch) {
+      for (final entry in hashes.entries) {
+        batch.update(
+          _db.localAssetEntity,
+          LocalAssetEntityCompanion(thumbHash: Value(entry.value)),
+          where: (e) => e.id.equals(entry.key),
+        );
+      }
+    });
+  }
+
   Future<void> delete(List<String> ids) {
     if (ids.isEmpty) {
       return Future.value();

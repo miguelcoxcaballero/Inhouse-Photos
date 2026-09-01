@@ -34,6 +34,9 @@ import 'package:immich_mobile/providers/routes.provider.dart';
 import 'package:immich_mobile/providers/theme.provider.dart';
 import 'package:immich_mobile/routing/app_navigation_observer.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:immich_mobile/domain/services/local_thumbhash.service.dart';
+import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment.model.dart';
+import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/services/deep_link.service.dart';
 import 'package:immich_mobile/theme/dynamic_theme.dart';
 import 'package:immich_mobile/theme/theme_data.dart';
@@ -138,6 +141,7 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
         dPrint(() => "[APP STATE] resumed");
         ref.read(appStateProvider.notifier).handleAppResume();
         unawaited(ref.read(viewIntentHandlerProvider).onAppResumed());
+        unawaited(ref.read(localThumbHashServiceProvider).start());
         break;
       case AppLifecycleState.inactive:
         dPrint(() => "[APP STATE] inactive");
@@ -146,10 +150,12 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
       case AppLifecycleState.paused:
         dPrint(() => "[APP STATE] paused");
         ref.read(appStateProvider.notifier).handleAppPause();
+        ref.read(localThumbHashServiceProvider).stop();
         break;
       case AppLifecycleState.detached:
         dPrint(() => "[APP STATE] detached");
         ref.read(appStateProvider.notifier).handleAppDetached();
+        ref.read(localThumbHashServiceProvider).stop();
         break;
       case AppLifecycleState.hidden:
         dPrint(() => "[APP STATE] hidden");
@@ -181,6 +187,12 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
         iOS: DarwinInitializationSettings(),
       ),
     );
+
+    // Photos waiting to be backed up have no preview from a server, so one is
+    // generated here. It stands aside whenever the grid is fetching thumbnails
+    // somebody is looking at, and stops while the app is not in front.
+    LocalThumbHashService.foregroundIsBusy = denseGridIsResolvingThumbnails;
+    unawaited(ref.read(localThumbHashServiceProvider).start());
   }
 
   Future<DeepLink> _deepLinkBuilder(PlatformDeepLink deepLink) async {

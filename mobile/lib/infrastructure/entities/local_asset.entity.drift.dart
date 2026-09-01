@@ -20,6 +20,7 @@ typedef $$LocalAssetEntityTableCreateCompanionBuilder =
       required String id,
       i0.Value<String?> checksum,
       i0.Value<DateTime?> localDateTime,
+      i0.Value<String?> thumbHash,
       i0.Value<bool> isFavorite,
       i0.Value<int> orientation,
       i0.Value<String?> iCloudId,
@@ -40,6 +41,7 @@ typedef $$LocalAssetEntityTableUpdateCompanionBuilder =
       i0.Value<String> id,
       i0.Value<String?> checksum,
       i0.Value<DateTime?> localDateTime,
+      i0.Value<String?> thumbHash,
       i0.Value<bool> isFavorite,
       i0.Value<int> orientation,
       i0.Value<String?> iCloudId,
@@ -106,6 +108,11 @@ class $$LocalAssetEntityTableFilterComposer
 
   i0.ColumnFilters<DateTime> get localDateTime => $composableBuilder(
     column: $table.localDateTime,
+    builder: (column) => i0.ColumnFilters(column),
+  );
+
+  i0.ColumnFilters<String> get thumbHash => $composableBuilder(
+    column: $table.thumbHash,
     builder: (column) => i0.ColumnFilters(column),
   );
 
@@ -209,6 +216,11 @@ class $$LocalAssetEntityTableOrderingComposer
     builder: (column) => i0.ColumnOrderings(column),
   );
 
+  i0.ColumnOrderings<String> get thumbHash => $composableBuilder(
+    column: $table.thumbHash,
+    builder: (column) => i0.ColumnOrderings(column),
+  );
+
   i0.ColumnOrderings<bool> get isFavorite => $composableBuilder(
     column: $table.isFavorite,
     builder: (column) => i0.ColumnOrderings(column),
@@ -287,6 +299,9 @@ class $$LocalAssetEntityTableAnnotationComposer
     column: $table.localDateTime,
     builder: (column) => column,
   );
+
+  i0.GeneratedColumn<String> get thumbHash =>
+      $composableBuilder(column: $table.thumbHash, builder: (column) => column);
 
   i0.GeneratedColumn<bool> get isFavorite => $composableBuilder(
     column: $table.isFavorite,
@@ -369,6 +384,7 @@ class $$LocalAssetEntityTableTableManager
                 i0.Value<String> id = const i0.Value.absent(),
                 i0.Value<String?> checksum = const i0.Value.absent(),
                 i0.Value<DateTime?> localDateTime = const i0.Value.absent(),
+                i0.Value<String?> thumbHash = const i0.Value.absent(),
                 i0.Value<bool> isFavorite = const i0.Value.absent(),
                 i0.Value<int> orientation = const i0.Value.absent(),
                 i0.Value<String?> iCloudId = const i0.Value.absent(),
@@ -388,6 +404,7 @@ class $$LocalAssetEntityTableTableManager
                 id: id,
                 checksum: checksum,
                 localDateTime: localDateTime,
+                thumbHash: thumbHash,
                 isFavorite: isFavorite,
                 orientation: orientation,
                 iCloudId: iCloudId,
@@ -408,6 +425,7 @@ class $$LocalAssetEntityTableTableManager
                 required String id,
                 i0.Value<String?> checksum = const i0.Value.absent(),
                 i0.Value<DateTime?> localDateTime = const i0.Value.absent(),
+                i0.Value<String?> thumbHash = const i0.Value.absent(),
                 i0.Value<bool> isFavorite = const i0.Value.absent(),
                 i0.Value<int> orientation = const i0.Value.absent(),
                 i0.Value<String?> iCloudId = const i0.Value.absent(),
@@ -427,6 +445,7 @@ class $$LocalAssetEntityTableTableManager
                 id: id,
                 checksum: checksum,
                 localDateTime: localDateTime,
+                thumbHash: thumbHash,
                 isFavorite: isFavorite,
                 orientation: orientation,
                 iCloudId: iCloudId,
@@ -585,6 +604,17 @@ class $LocalAssetEntityTable extends i3.LocalAssetEntity
         type: i0.DriftSqlType.dateTime,
         requiredDuringInsert: false,
       );
+  static const i0.VerificationMeta _thumbHashMeta = const i0.VerificationMeta(
+    'thumbHash',
+  );
+  @override
+  late final i0.GeneratedColumn<String> thumbHash = i0.GeneratedColumn<String>(
+    'thumb_hash',
+    aliasedName,
+    true,
+    type: i0.DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const i0.VerificationMeta _isFavoriteMeta = const i0.VerificationMeta(
     'isFavorite',
   );
@@ -681,6 +711,7 @@ class $LocalAssetEntityTable extends i3.LocalAssetEntity
     id,
     checksum,
     localDateTime,
+    thumbHash,
     isFavorite,
     orientation,
     iCloudId,
@@ -757,6 +788,12 @@ class $LocalAssetEntityTable extends i3.LocalAssetEntity
           data['local_date_time']!,
           _localDateTimeMeta,
         ),
+      );
+    }
+    if (data.containsKey('thumb_hash')) {
+      context.handle(
+        _thumbHashMeta,
+        thumbHash.isAcceptableOrUnknown(data['thumb_hash']!, _thumbHashMeta),
       );
     }
     if (data.containsKey('is_favorite')) {
@@ -855,6 +892,10 @@ class $LocalAssetEntityTable extends i3.LocalAssetEntity
         i0.DriftSqlType.dateTime,
         data['${effectivePrefix}local_date_time'],
       ),
+      thumbHash: attachedDatabase.typeMapping.read(
+        i0.DriftSqlType.string,
+        data['${effectivePrefix}thumb_hash'],
+      ),
       isFavorite: attachedDatabase.typeMapping.read(
         i0.DriftSqlType.bool,
         data['${effectivePrefix}is_favorite'],
@@ -923,6 +964,15 @@ class LocalAssetEntityData extends i0.DataClass
   /// `localDateTime` so a device asset stays in the same timeline position when
   /// its local row is replaced by the uploaded remote row.
   final DateTime? localDateTime;
+
+  /// A ThumbHash of this photo, generated on device.
+  ///
+  /// Remote assets get one from the server, which is what lets the grid paint a
+  /// blurry preview the instant a panel appears. Local photos had no equivalent,
+  /// so their cells stayed blank until a real thumbnail decoded - which is why
+  /// not-yet-backed-up photos were the ones visibly loading. Filled in by a
+  /// background pass; null means "not generated yet", never "has none".
+  final String? thumbHash;
   final bool isFavorite;
   final int orientation;
   final String? iCloudId;
@@ -941,6 +991,7 @@ class LocalAssetEntityData extends i0.DataClass
     required this.id,
     this.checksum,
     this.localDateTime,
+    this.thumbHash,
     required this.isFavorite,
     required this.orientation,
     this.iCloudId,
@@ -975,6 +1026,9 @@ class LocalAssetEntityData extends i0.DataClass
     }
     if (!nullToAbsent || localDateTime != null) {
       map['local_date_time'] = i0.Variable<DateTime>(localDateTime);
+    }
+    if (!nullToAbsent || thumbHash != null) {
+      map['thumb_hash'] = i0.Variable<String>(thumbHash);
     }
     map['is_favorite'] = i0.Variable<bool>(isFavorite);
     map['orientation'] = i0.Variable<int>(orientation);
@@ -1016,6 +1070,7 @@ class LocalAssetEntityData extends i0.DataClass
       id: serializer.fromJson<String>(json['id']),
       checksum: serializer.fromJson<String?>(json['checksum']),
       localDateTime: serializer.fromJson<DateTime?>(json['localDateTime']),
+      thumbHash: serializer.fromJson<String?>(json['thumbHash']),
       isFavorite: serializer.fromJson<bool>(json['isFavorite']),
       orientation: serializer.fromJson<int>(json['orientation']),
       iCloudId: serializer.fromJson<String?>(json['iCloudId']),
@@ -1043,6 +1098,7 @@ class LocalAssetEntityData extends i0.DataClass
       'id': serializer.toJson<String>(id),
       'checksum': serializer.toJson<String?>(checksum),
       'localDateTime': serializer.toJson<DateTime?>(localDateTime),
+      'thumbHash': serializer.toJson<String?>(thumbHash),
       'isFavorite': serializer.toJson<bool>(isFavorite),
       'orientation': serializer.toJson<int>(orientation),
       'iCloudId': serializer.toJson<String?>(iCloudId),
@@ -1066,6 +1122,7 @@ class LocalAssetEntityData extends i0.DataClass
     String? id,
     i0.Value<String?> checksum = const i0.Value.absent(),
     i0.Value<DateTime?> localDateTime = const i0.Value.absent(),
+    i0.Value<String?> thumbHash = const i0.Value.absent(),
     bool? isFavorite,
     int? orientation,
     i0.Value<String?> iCloudId = const i0.Value.absent(),
@@ -1086,6 +1143,7 @@ class LocalAssetEntityData extends i0.DataClass
     localDateTime: localDateTime.present
         ? localDateTime.value
         : this.localDateTime,
+    thumbHash: thumbHash.present ? thumbHash.value : this.thumbHash,
     isFavorite: isFavorite ?? this.isFavorite,
     orientation: orientation ?? this.orientation,
     iCloudId: iCloudId.present ? iCloudId.value : this.iCloudId,
@@ -1112,6 +1170,7 @@ class LocalAssetEntityData extends i0.DataClass
       localDateTime: data.localDateTime.present
           ? data.localDateTime.value
           : this.localDateTime,
+      thumbHash: data.thumbHash.present ? data.thumbHash.value : this.thumbHash,
       isFavorite: data.isFavorite.present
           ? data.isFavorite.value
           : this.isFavorite,
@@ -1143,6 +1202,7 @@ class LocalAssetEntityData extends i0.DataClass
           ..write('id: $id, ')
           ..write('checksum: $checksum, ')
           ..write('localDateTime: $localDateTime, ')
+          ..write('thumbHash: $thumbHash, ')
           ..write('isFavorite: $isFavorite, ')
           ..write('orientation: $orientation, ')
           ..write('iCloudId: $iCloudId, ')
@@ -1166,6 +1226,7 @@ class LocalAssetEntityData extends i0.DataClass
     id,
     checksum,
     localDateTime,
+    thumbHash,
     isFavorite,
     orientation,
     iCloudId,
@@ -1188,6 +1249,7 @@ class LocalAssetEntityData extends i0.DataClass
           other.id == this.id &&
           other.checksum == this.checksum &&
           other.localDateTime == this.localDateTime &&
+          other.thumbHash == this.thumbHash &&
           other.isFavorite == this.isFavorite &&
           other.orientation == this.orientation &&
           other.iCloudId == this.iCloudId &&
@@ -1209,6 +1271,7 @@ class LocalAssetEntityCompanion
   final i0.Value<String> id;
   final i0.Value<String?> checksum;
   final i0.Value<DateTime?> localDateTime;
+  final i0.Value<String?> thumbHash;
   final i0.Value<bool> isFavorite;
   final i0.Value<int> orientation;
   final i0.Value<String?> iCloudId;
@@ -1227,6 +1290,7 @@ class LocalAssetEntityCompanion
     this.id = const i0.Value.absent(),
     this.checksum = const i0.Value.absent(),
     this.localDateTime = const i0.Value.absent(),
+    this.thumbHash = const i0.Value.absent(),
     this.isFavorite = const i0.Value.absent(),
     this.orientation = const i0.Value.absent(),
     this.iCloudId = const i0.Value.absent(),
@@ -1246,6 +1310,7 @@ class LocalAssetEntityCompanion
     required String id,
     this.checksum = const i0.Value.absent(),
     this.localDateTime = const i0.Value.absent(),
+    this.thumbHash = const i0.Value.absent(),
     this.isFavorite = const i0.Value.absent(),
     this.orientation = const i0.Value.absent(),
     this.iCloudId = const i0.Value.absent(),
@@ -1267,6 +1332,7 @@ class LocalAssetEntityCompanion
     i0.Expression<String>? id,
     i0.Expression<String>? checksum,
     i0.Expression<DateTime>? localDateTime,
+    i0.Expression<String>? thumbHash,
     i0.Expression<bool>? isFavorite,
     i0.Expression<int>? orientation,
     i0.Expression<String>? iCloudId,
@@ -1286,6 +1352,7 @@ class LocalAssetEntityCompanion
       if (id != null) 'id': id,
       if (checksum != null) 'checksum': checksum,
       if (localDateTime != null) 'local_date_time': localDateTime,
+      if (thumbHash != null) 'thumb_hash': thumbHash,
       if (isFavorite != null) 'is_favorite': isFavorite,
       if (orientation != null) 'orientation': orientation,
       if (iCloudId != null) 'i_cloud_id': iCloudId,
@@ -1307,6 +1374,7 @@ class LocalAssetEntityCompanion
     i0.Value<String>? id,
     i0.Value<String?>? checksum,
     i0.Value<DateTime?>? localDateTime,
+    i0.Value<String?>? thumbHash,
     i0.Value<bool>? isFavorite,
     i0.Value<int>? orientation,
     i0.Value<String?>? iCloudId,
@@ -1326,6 +1394,7 @@ class LocalAssetEntityCompanion
       id: id ?? this.id,
       checksum: checksum ?? this.checksum,
       localDateTime: localDateTime ?? this.localDateTime,
+      thumbHash: thumbHash ?? this.thumbHash,
       isFavorite: isFavorite ?? this.isFavorite,
       orientation: orientation ?? this.orientation,
       iCloudId: iCloudId ?? this.iCloudId,
@@ -1371,6 +1440,9 @@ class LocalAssetEntityCompanion
     if (localDateTime.present) {
       map['local_date_time'] = i0.Variable<DateTime>(localDateTime.value);
     }
+    if (thumbHash.present) {
+      map['thumb_hash'] = i0.Variable<String>(thumbHash.value);
+    }
     if (isFavorite.present) {
       map['is_favorite'] = i0.Variable<bool>(isFavorite.value);
     }
@@ -1412,6 +1484,7 @@ class LocalAssetEntityCompanion
           ..write('id: $id, ')
           ..write('checksum: $checksum, ')
           ..write('localDateTime: $localDateTime, ')
+          ..write('thumbHash: $thumbHash, ')
           ..write('isFavorite: $isFavorite, ')
           ..write('orientation: $orientation, ')
           ..write('iCloudId: $iCloudId, ')
@@ -1435,4 +1508,8 @@ i0.Index get idxLocalAssetCreatedAt => i0.Index(
 i0.Index get idxLocalAssetLocalDateTime => i0.Index(
   'idx_local_asset_local_date_time',
   'CREATE INDEX IF NOT EXISTS idx_local_asset_local_date_time ON local_asset_entity (local_date_time DESC)',
+);
+i0.Index get idxLocalAssetMissingThumbHash => i0.Index(
+  'idx_local_asset_missing_thumb_hash',
+  'CREATE INDEX IF NOT EXISTS idx_local_asset_missing_thumb_hash ON local_asset_entity (id) WHERE thumb_hash IS NULL',
 );
