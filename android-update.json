@@ -1,7 +1,7 @@
 {
-  "version": "3.1.72",
-  "versionCode": 7130,
+  "version": "3.1.73",
+  "versionCode": 7131,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.72-local-photo-previews/Inhouse-Photos-3.1.72-arm64.apk",
-  "sha256": "bf66115868e91f0a35323a95f7bc49ee1f3b51c38a4e518424934bc32a5548a5"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.73-resume-partial-panels/Inhouse-Photos-3.1.73-arm64.apk",
+  "sha256": "6ca27d460c6d79a85600c94b1fffd1f819611a8c19662cfc53982a6c72202995"
 }
