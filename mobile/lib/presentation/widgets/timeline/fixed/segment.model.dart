@@ -2998,6 +2998,12 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       columnCount: widget.columnCount,
       tileExtent: widget.tileExtent,
       textDirection: textDirection,
+      // Measured, not assumed. Removing this lowers the median frame cost at
+      // eighteen columns from about 5.6ms to 4.7ms, but the spread across
+      // repeated identical sweeps goes from 1.8ms to 4.8ms, with one sweep at
+      // 9.1ms. Without a boundary any panel repainting dirties all of them, so
+      // frames become cheap or expensive depending on what happened to change -
+      // and stutter is the expensive tail, not the median. Kept deliberately.
       child: reflowActive ? paintSurface : RepaintBoundary(child: paintSurface),
     );
   }

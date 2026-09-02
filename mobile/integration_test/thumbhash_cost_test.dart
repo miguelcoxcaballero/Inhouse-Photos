@@ -86,4 +86,44 @@ void main() {
     });
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(minutes: 4)));
+
+  testWidgets('cost of persisting one panel texture to disk', (tester) async {
+    await tester.runAsync(() async {
+      // The write queue is throttled to roughly one panel per 450ms in the
+      // foreground, which is why only about a tenth of scheduled writes land
+      // during a scroll. Whether that throttle can safely be loosened depends
+      // entirely on what a single write costs, so measure it rather than guess.
+      //
+      // Atlas sizes are the real ones: eighteen columns is 18x80 by 8x80, and
+      // forty-eight columns is 48x26 by 4x26.
+      for (final size in [(1440, 640), (1248, 104)]) {
+        final recorder = ui.PictureRecorder();
+        final canvas = Canvas(recorder);
+        canvas.drawRect(
+          Rect.fromLTWH(0, 0, size.$1.toDouble(), size.$2.toDouble()),
+          Paint()..color = const Color(0xFF404040),
+        );
+        for (var i = 0; i < 400; i++) {
+          canvas.drawRect(
+            Rect.fromLTWH((i * 37 % size.$1).toDouble(), (i * 53 % size.$2).toDouble(), 24, 24),
+            Paint()..color = Color.fromARGB(255, (i * 7) % 256, (i * 13) % 256, (i * 29) % 256),
+          );
+        }
+        final picture = recorder.endRecording();
+        final atlas = await picture.toImage(size.$1, size.$2);
+        picture.dispose();
+
+        await atlas.toByteData(format: ui.ImageByteFormat.png);
+        const reps = 8;
+        final sw = Stopwatch()..start();
+        for (var i = 0; i < reps; i++) {
+          await atlas.toByteData(format: ui.ImageByteFormat.png);
+        }
+        sw.stop();
+        atlas.dispose();
+        print('THCOST atlas ${size.$1}x${size.$2} png encode ${(sw.elapsedMicroseconds / reps / 1000).toStringAsFixed(1)} ms');
+      }
+    });
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 4)));
 }
