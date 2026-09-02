@@ -100,21 +100,33 @@ class ImageCacheProfile {
   });
 }
 
+/// Thumbnail counts are deliberately far above what the byte budgets allow for
+/// a large thumbnail, so that the bytes do the bounding.
+///
+/// The two limits are not interchangeable, and a count tuned for full-size
+/// thumbnails is meaningless in the zoomed-out grid. A tile at forty-eight
+/// columns is 26 pixels square, which is 2.7KB decoded, so the old count of 320
+/// capped the cache at under a megabyte of a budget that allowed 128 - while one
+/// screen at that density wants around five thousand thumbnails. Everything
+/// beyond the first 320 was evicted immediately and refetched on the way back.
+///
+/// At the other end nothing changes: an 80-pixel tile is 25.6KB, so the byte
+/// budget still binds first and memory stays where it was.
 ImageCacheProfile imageCacheProfileForMode(ImageCacheMode mode) => switch (mode) {
   ImageCacheMode.compact => const ImageCacheProfile(
-    thumbnailCount: 160,
+    thumbnailCount: 3072,
     thumbnailBytes: 64 * 1024 * 1024,
     fullImageCount: 2,
     fullImageBytes: 64 * 1024 * 1024,
   ),
   ImageCacheMode.automatic => const ImageCacheProfile(
-    thumbnailCount: 320,
+    thumbnailCount: 8192,
     thumbnailBytes: 128 * 1024 * 1024,
     fullImageCount: 4,
     fullImageBytes: 128 * 1024 * 1024,
   ),
   ImageCacheMode.performance => const ImageCacheProfile(
-    thumbnailCount: 640,
+    thumbnailCount: 16384,
     thumbnailBytes: 256 * 1024 * 1024,
     fullImageCount: 6,
     fullImageBytes: 256 * 1024 * 1024,

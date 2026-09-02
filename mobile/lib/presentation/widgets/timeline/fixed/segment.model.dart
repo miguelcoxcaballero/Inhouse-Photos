@@ -1691,6 +1691,12 @@ class _DenseAsyncTask {
 class DenseRowAtlasCache {
   final LinkedHashMap<Object, ui.Image> _images = LinkedHashMap();
   final Map<Object, String> _signatures = {};
+  /// Which cells a stored texture already carries a real thumbnail for.
+  ///
+  /// Only meaningful for a partially finished panel. Without it a restored
+  /// partial texture would have to re-request every cell to find out what it
+  /// already had, which is most of the cost it exists to avoid.
+  final Map<Object, Set<int>> _merged = {};
   int _bytes = 0;
 
   ui.Image? get(Object key) {
@@ -1706,7 +1712,9 @@ class DenseRowAtlasCache {
 
   String? signature(Object key) => _signatures[key];
 
-  void put(Object key, ui.Image image, {String? signature}) {
+  Set<int>? merged(Object key) => _merged[key];
+
+  void put(Object key, ui.Image image, {String? signature, Set<int>? merged}) {
     final previous = _images.remove(key);
     if (previous != null) {
       _bytes -= _uniqueBytes(previous);
@@ -1717,6 +1725,11 @@ class DenseRowAtlasCache {
     } else {
       _signatures[key] = signature;
     }
+    if (merged == null) {
+      _merged.remove(key);
+    } else {
+      _merged[key] = merged;
+    }
     final cached = image.clone();
     _bytes += _uniqueBytes(cached);
     _images[key] = cached;
@@ -1724,6 +1737,7 @@ class DenseRowAtlasCache {
       final oldestKey = _images.keys.first;
       final oldest = _images.remove(oldestKey)!;
       _signatures.remove(oldestKey);
+      _merged.remove(oldestKey);
       _bytes -= _uniqueBytes(oldest);
       oldest.dispose();
     }
@@ -1758,6 +1772,7 @@ class DenseRowAtlasCache {
     }
     _images.clear();
     _signatures.clear();
+    _merged.clear();
     _bytes = 0;
   }
 }
@@ -1878,6 +1893,13 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   int _targetPixels = batchedGridMetadataCellPixels;
   int _metadataPixels = batchedGridMetadataCellPixels;
   int _completeAtlasKey = 0;
+  /// Where a partly finished panel is kept, addressed by its content.
+  ///
+  /// The slot key is positional, so scrolling recycles it away almost at once.
+  /// Without a content-addressed home, a panel that had resolved most of its
+  /// photos but not all of them was thrown away entirely on the way past, and
+  /// coming back re-fetched every one of them.
+  int _partialAtlasKey = 0;
   int _baseAtlasKey = 0;
   late Object _slotAtlasKey;
   String _contentSignature = '';
@@ -2023,6 +2045,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       _contentSignature = '';
       _baseAtlasKey = 0;
       _completeAtlasKey = 0;
+      _partialAtlasKey = 0;
       _images = const [];
       _streams = const [];
       _listeners = const [];
@@ -2047,6 +2070,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     final identity = Object.hashAll(assets.map((asset) => asset.heroTag));
     _baseAtlasKey = Object.hash('dense-base', _metadataPixels, widget.columnCount, identity);
     _completeAtlasKey = Object.hash('dense-complete', _targetPixels, widget.columnCount, identity);
+    _partialAtlasKey = Object.hash('dense-partial', _targetPixels, widget.columnCount, identity);
     final upgradeEveryCell = denseTimelineNeedsThumbnailUpgrade(_targetPixels);
     for (var index = 0; index < assets.length; index++) {
       // Every cell must carry a real thumbnail before the panel counts as
@@ -2080,9 +2104,28 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       complete.image.dispose();
     }
 
+    // Not finished, but the work already done for exactly these photos is worth
+    // resuming: it shows sharp immediately instead of blurring back, and only
+    // the cells it never got are requested again.
+    final partial = _takeCachedAtlas(_partialAtlasKey);
+    if (partial != null) {
+      final resumable = partial.signature == 'partial:$_contentSignature' && partial.cellPixels == _targetPixels;
+      if (resumable) {
+        _replaceAtlas(partial.image, signature: _provisionalSignature, cellPixels: partial.cellPixels);
+        _baseAtlasReady = true;
+        _mergedIndexes.addAll(_denseRowAtlasCache.merged(_partialAtlasKey) ?? const <int>{});
+        _scheduleRepaint();
+      } else {
+        partial.image.dispose();
+      }
+    }
+
     final base = _takeCachedAtlas(_baseAtlasKey);
     if (base != null) {
-      if (base.signature == _contentSignature && _atlasSignature != _contentSignature) {
+      // `_baseAtlasReady` already true means a partial composite was adopted
+      // just above; overwriting it with the blurry texture would undo exactly
+      // the work this is meant to preserve.
+      if (base.signature == _contentSignature && _atlasSignature != _contentSignature && !_baseAtlasReady) {
         _replaceAtlas(base.image, signature: _contentSignature, cellPixels: base.cellPixels);
         _baseAtlasReady = true;
         _scheduleRepaint();
@@ -2728,6 +2771,17 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     _denseRowAtlasCache.put(_slotAtlasKey, atlas, signature: isComplete ? _contentSignature : _provisionalSignature);
     if (isComplete) {
       _denseRowAtlasCache.put(_completeAtlasKey, atlas, signature: _contentSignature);
+    } else {
+      // Keep the unfinished work under its content as well, with a record of
+      // which cells it already holds, so coming back to it resumes instead of
+      // starting over. Tagged rather than signed with the content signature so
+      // it can never be mistaken for a finished panel.
+      _denseRowAtlasCache.put(
+        _partialAtlasKey,
+        atlas,
+        signature: 'partial:$_contentSignature',
+        merged: Set<int>.of(_mergedIndexes),
+      );
     }
     unawaited(_persistAtlas(atlas, exact: isComplete));
     if (isComplete) {
