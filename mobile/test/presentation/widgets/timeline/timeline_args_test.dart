@@ -427,9 +427,13 @@ void main() {
     // expanding a ThumbHash to a 120px cell costs 16x the memory and isolate
     // transfer for no additional detail.
     expect(denseTimelineMetadataPixels(denseTimelineTargetPixels(tileExtent: 40, devicePixelRatio: 3)), 32);
-    // Below that ceiling the fallback simply matches the cell, so the atlas
-    // blits one to one instead of being rescaled on every frame.
-    expect(denseTimelineMetadataPixels(denseTimelineTargetPixels(tileExtent: 8.6, devicePixelRatio: 3.5)), 31);
+    // The same at every zoom level, including the densest, where the cell is
+    // smaller than this. Decoded previews are cached per photo at this size, so
+    // one size means one cache shared by every zoom; making the densest level
+    // 30px instead made it the one zoom that shared nothing, and entering or
+    // leaving it re-decoded every preview on screen.
+    expect(denseTimelineMetadataPixels(denseTimelineTargetPixels(tileExtent: 8.6, devicePixelRatio: 3.5)), 32);
+    expect(denseTimelineMetadataPixels(denseTimelineTargetPixels(tileExtent: 40, devicePixelRatio: 3)), 32);
   });
 
   test('dense atlas scheduling keeps centre-visible panels ahead of distant queued work', () async {

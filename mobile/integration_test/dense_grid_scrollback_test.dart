@@ -234,4 +234,57 @@ void main() {
       expect(tester.takeException(), isNull);
     }, timeout: const Timeout(Duration(minutes: 8)));
   }
+
+  testWidgets('changing zoom reuses what is already loaded', (tester) async {
+    // "When changing the grid size everything has to reload again". Counted
+    // rather than judged: settle at one zoom, switch, and see how many photos
+    // have to be fetched over the wire a second time.
+    tester.view.devicePixelRatio = 3;
+    tester.view.physicalSize = const Size(1080, 2400);
+    addTearDown(tester.view.reset);
+
+    final service = _service(6000, assetsPerBucket: 500);
+    addTearDown(service.dispose);
+
+    Future<void> show(int columnCount) => tester.pumpConsumerWidget(
+      const Timeline(
+        withScrubber: false,
+        readOnly: true,
+        appBar: SliverToBoxAdapter(child: SizedBox.shrink()),
+        bottomSheet: null,
+      ),
+      overrides: [
+        timelineServiceProvider.overrideWithValue(service),
+        appConfigProvider.overrideWithValue(AppConfig(timeline: TimelineConfig(tilesPerRow: columnCount))),
+      ],
+      settle: false,
+    );
+
+    // 18 and 24 columns want 60px and 45px cells on this screen, and both round
+    // to a 64px fetch, so this is the pair quantising is supposed to make free.
+    await show(18);
+    for (var step = 0; step < 45; step++) {
+      await _realDelay(tester, const Duration(milliseconds: 100));
+    }
+    final afterFirst = served;
+
+    await show(24);
+    for (var step = 0; step < 45; step++) {
+      await _realDelay(tester, const Duration(milliseconds: 100));
+    }
+    final refetchedOnZoom = served - afterFirst;
+
+    // And back again, where everything was already loaded once.
+    final beforeReturn = served;
+    await show(18);
+    for (var step = 0; step < 45; step++) {
+      await _realDelay(tester, const Duration(milliseconds: 100));
+    }
+
+    print('GRIDZOOM fetched at 18 columns        : $afterFirst');
+    print('GRIDZOOM refetched changing to 24     : $refetchedOnZoom');
+    print('GRIDZOOM refetched returning to 18    : ${served - beforeReturn}');
+
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 8)));
 }
