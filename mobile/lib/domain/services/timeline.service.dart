@@ -1,9 +1,8 @@
 import 'dart:async';
-
-import 'package:flutter/foundation.dart';
 import 'dart:math' as math;
 
 import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart';
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
@@ -253,6 +252,25 @@ class TimelineService {
   }
 
   Future<void> _applyBuckets(List<Bucket> buckets) async {
+    // A refresh that changes nothing must not reset the grid. Bumping the
+    // revision invalidates every cached asset chunk and resets every panel, so
+    // a write that leaves the buckets identical - the same days holding the same
+    // counts - would throw away work for no reason.
+    //
+    // That is not hypothetical. Generated local previews are written to
+    // `local_asset_entity`, which the bucket query reads, so every batch of them
+    // re-fires this watch. Sixteen rows every four hundred milliseconds meant the
+    // whole timeline being invalidated roughly twice a second for as long as
+    // generation ran, which is long enough on a large library to look like rows
+    // that never finish loading.
+    final published = _latestBucketSnapshot?.buckets;
+    if (published != null &&
+        _buffer.isNotEmpty &&
+        published.length == buckets.length &&
+        const ListEquality<Bucket>().equals(published, buckets)) {
+      return;
+    }
+
     final totalAssets = buckets.fold<int>(0, (acc, bucket) => acc + bucket.assetCount);
 
     if (totalAssets == 0) {
