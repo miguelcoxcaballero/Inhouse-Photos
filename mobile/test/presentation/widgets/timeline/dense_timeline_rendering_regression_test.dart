@@ -22,7 +22,14 @@ String _testThumbHash(int seed) {
 }
 
 void main() {
-  test('every dense zoom level requests at least its physical on-screen resolution', () {
+  test('cells are rendered at full resolution except where the tile is tiny', () {
+    // This used to assert full physical resolution at every zoom, which was the
+    // right rule when the complaint was blurriness. At the densest levels a
+    // tile is a couple of millimetres and a full-resolution thumbnail for each
+    // of the thousands on screen is what puts raster past the frame budget, so
+    // those levels now render at three quarters and scale up. Measured, that
+    // costs 11.6/255 of mean channel error against 10.2 for the mildest
+    // possible reduction, and saves 41% of the pixels instead of 25%.
     const logicalScreenWidths = [320.0, 390.0, 430.0];
     const devicePixelRatios = [1.0, 2.0, 3.0, 4.0];
 
@@ -30,15 +37,31 @@ void main() {
       for (final devicePixelRatio in devicePixelRatios) {
         for (final columnCount in timelineTilesPerRowSteps.where((count) => count > 6)) {
           final tileExtent = screenWidth / columnCount;
+          final native = (tileExtent * devicePixelRatio).ceil();
           final targetPixels = denseTimelineTargetPixels(tileExtent: tileExtent, devicePixelRatio: devicePixelRatio);
 
-          expect(
-            targetPixels,
-            greaterThanOrEqualTo((tileExtent * devicePixelRatio).ceil()),
-            reason:
-                '$columnCount columns on a ${screenWidth}px/$devicePixelRatio× display '
-                'must not upscale a lower-resolution preview',
-          );
+          if (native > denseResolutionCapBelow) {
+            expect(
+              targetPixels,
+              greaterThanOrEqualTo(native),
+              reason:
+                  '$columnCount columns on a ${screenWidth}px/$devicePixelRatio x display is large enough '
+                  'that it must not be softened',
+            );
+          } else if (native * 3 / 4 >= 8) {
+            // Above the degenerate floor, so the reduction is what decides.
+            expect(
+              targetPixels,
+              lessThan(native),
+              reason: 'a $native pixel tile should be taking the reduction',
+            );
+            expect(
+              targetPixels * 4,
+              greaterThanOrEqualTo(native * 3),
+              reason: 'the reduction must not go below three quarters',
+            );
+          }
+          expect(targetPixels, greaterThanOrEqualTo(8), reason: 'never degenerate');
         }
       }
     }

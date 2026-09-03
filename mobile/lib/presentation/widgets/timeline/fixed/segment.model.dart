@@ -65,8 +65,32 @@ int denseTimelineAssetChunkSize({
 /// because a cell is never drawn larger than this.
 ///
 /// The lower bound is only a guard against a degenerate viewport measurement.
-int denseTimelineTargetPixels({required double tileExtent, required double devicePixelRatio}) =>
-    math.max(8, (tileExtent * devicePixelRatio).ceil());
+///
+/// At or below [denseResolutionCapBelow] the cell is rendered at three quarters
+/// of its physical size and scaled up. At forty-eight columns a tile is about
+/// thirty physical pixels - a couple of millimetres - and a full-resolution
+/// thumbnail for each of the roughly forty-eight hundred on screen is what puts
+/// raster at 14.7ms against the 8.3ms a 120Hz display allows.
+///
+/// Three quarters rather than a rounder number, because of what it measures.
+/// Rendering at any reduced size and scaling back costs about 10/255 of mean
+/// channel error on its own, from the resampling alone; going from 88% to 75%
+/// takes that to 11.6 while saving 41% of the pixels rather than 25%, and 67%
+/// costs 13.3 for 56%. The error climbs far more slowly than the saving until
+/// it does not, and this is that knee.
+int denseTimelineTargetPixels({required double tileExtent, required double devicePixelRatio}) {
+  final native = (tileExtent * devicePixelRatio).ceil();
+  if (native > denseResolutionCapBelow) {
+    return math.max(8, native);
+  }
+  return math.max(8, (native * 3 / 4).ceil());
+}
+
+/// Cell sizes at or below this are rendered at reduced resolution.
+///
+/// Chosen to catch the two densest levels and nothing else: on a 1440px screen
+/// those are thirty and forty physical pixels, while the next step up is sixty.
+const int denseResolutionCapBelow = 48;
 
 /// Cell size of the instant ThumbHash fallback texture.
 ///

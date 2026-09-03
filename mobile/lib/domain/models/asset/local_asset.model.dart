@@ -30,6 +30,7 @@ class LocalAsset extends BaseAsset {
     super.width,
     super.height,
     super.durationMs,
+    super.timelineAt,
     super.isFavorite = false,
     this.orientation = 0,
     required this.playbackStyle,

@@ -5,7 +5,7 @@ import 'local_album.entity.dart';
 import 'local_album_asset.entity.dart';
 import 'remote_asset_cloud_id.entity.dart';
 
-mergedAsset:
+mergedAsset AS MergedAssetRow:
 SELECT
 	rae.id as remote_id,
 	COALESCE(
@@ -107,6 +107,138 @@ AND NOT EXISTS (
     INNER JOIN local_album_entity la on laa.album_id = la.id
     WHERE laa.asset_id = lae.id AND la.backup_selection = 2 -- excluded
 )
+-- The timeline hands each bucket a contiguous slice of this list, so the list
+-- has to be partitioned by the key the buckets group on: the wall clock. That
+-- is what `timeline_at` is, and `mergedBucket.bucket_date` is its date part.
+-- Ordering by the capture instant instead looks reasonable but breaks the
+-- correspondence for anything shot in another time zone, where the two
+-- orderings cross and a photo is counted into one day but drawn under another.
+--
+-- This has to be a bare column, not COALESCE. Measured with EXPLAIN QUERY
+-- PLAN: with `idx_remote_asset_owner_visibility_deleted_local_date_time` and
+-- `idx_local_asset_local_date_time` the plan sorts only the last term, exactly
+-- as ordering by created_at did. Wrapping the same column in COALESCE defeats
+-- both indexes even when they exist - a full sort plus a full scan of the local
+-- arm - which is the regression 3.1.65 shipped. `local_date_time` is backfilled
+-- and written by every path, so there is nothing left for a fallback to catch.
+ORDER BY timeline_at DESC, created_at DESC
+LIMIT $limit;
+
+-- Same rows as `mergedAsset`, but continuing from a position rather than
+-- counting to it.
+--
+-- `LIMIT n OFFSET k` makes SQLite produce and discard every row before the
+-- offset, so a chunk read costs 40ms at the top of a sixty thousand photo
+-- library and 111ms fifty-five thousand rows down, growing with depth - and
+-- those reads are serialised behind the one mutex every panel waits on. Bounding
+-- on the ordering key instead lets each arm seek straight to its position.
+--
+-- The bound has to be a row value rather than `a < x OR (a = x AND b < y)`:
+-- the latter is the same set but SQLite cannot drive an index from it.
+mergedAssetAfter(:after_timeline_at AS DATETIME, :after_created_at AS DATETIME) AS MergedAssetRow:
+SELECT
+	rae.id as remote_id,
+	COALESCE(
+		(
+			SELECT lae.id FROM local_asset_entity lae
+			WHERE lae.checksum = rae.checksum
+			LIMIT 1
+		),
+		(
+			SELECT lae.id
+			FROM remote_asset_cloud_id_entity raci
+			INNER JOIN local_asset_entity lae ON lae.checksum = raci.cloud_id
+			WHERE raci.asset_id = rae.id
+			LIMIT 1
+		)
+	) as local_id,
+	rae.name,
+	rae."type",
+	rae.created_at as created_at,
+	rae.local_date_time as timeline_at,
+	rae.updated_at,
+	rae.width,
+	rae.height,
+	rae.duration_ms,
+	rae.is_favorite,
+	rae.thumb_hash,
+	rae.checksum,
+	rae.owner_id,
+	rae.live_photo_video_id,
+	0 as orientation,
+	rae.stack_id,
+	NULL as i_cloud_id,
+	NULL as latitude,
+	NULL as longitude,
+	NULL as adjustmentTime,
+	rae.is_edited,
+	0 as playback_style,
+	rae.uploaded_at
+FROM
+	remote_asset_entity rae
+LEFT JOIN
+	stack_entity se ON rae.stack_id = se.id
+WHERE
+	rae.deleted_at IS NULL
+	AND rae.visibility = 0 -- timeline visibility
+	AND rae.owner_id IN :user_ids
+	AND (
+		rae.stack_id IS NULL
+		OR rae.id = se.primary_asset_id
+	)
+	AND (rae.local_date_time, rae.created_at) < (:after_timeline_at, :after_created_at)
+
+UNION ALL
+
+SELECT
+	NULL as remote_id,
+	lae.id as local_id,
+	lae.name,
+	lae."type",
+	lae.created_at as created_at,
+	lae.local_date_time as timeline_at,
+	lae.updated_at,
+	lae.width,
+	lae.height,
+	lae.duration_ms,
+	lae.is_favorite,
+	lae.thumb_hash,
+	lae.checksum,
+	NULL as owner_id,
+	NULL as live_photo_video_id,
+	lae.orientation,
+	NULL as stack_id,
+	lae.i_cloud_id,
+	lae.latitude,
+	lae.longitude,
+	lae.adjustment_time,
+	0 as is_edited,
+	lae.playback_style,
+	NULL as uploaded_at
+FROM
+	local_asset_entity lae
+WHERE NOT EXISTS (
+	SELECT 1
+	FROM remote_asset_entity rae
+	WHERE rae.owner_id IN :user_ids AND rae.checksum = lae.checksum
+)
+AND NOT EXISTS (
+	SELECT 1
+	FROM remote_asset_cloud_id_entity raci
+	INNER JOIN remote_asset_entity rae ON rae.id = raci.asset_id
+	WHERE raci.cloud_id = lae.checksum AND rae.owner_id IN :user_ids
+)
+AND EXISTS (
+	SELECT 1 FROM local_album_asset_entity laa
+	INNER JOIN local_album_entity la on laa.album_id = la.id
+	WHERE laa.asset_id = lae.id AND la.backup_selection = 0 -- selected
+)
+AND NOT EXISTS (
+    SELECT 1 FROM local_album_asset_entity laa
+    INNER JOIN local_album_entity la on laa.album_id = la.id
+    WHERE laa.asset_id = lae.id AND la.backup_selection = 2 -- excluded
+)
+AND (lae.local_date_time, lae.created_at) < (:after_timeline_at, :after_created_at)
 -- The timeline hands each bucket a contiguous slice of this list, so the list
 -- has to be partitioned by the key the buckets group on: the wall clock. That
 -- is what `timeline_at` is, and `mergedBucket.bucket_date` is its date part.

@@ -55,6 +55,7 @@ TimelineService _denseService(int assetCount, {int assetsPerBucket = 1}) {
   return TimelineService((
     assetSource: (offset, count) async => assets.skip(offset).take(count).toList(growable: false),
     bucketSource: () => Stream.value(buckets),
+    assetSourceAfter: null,
     origin: TimelineOrigin.main,
   ));
 }

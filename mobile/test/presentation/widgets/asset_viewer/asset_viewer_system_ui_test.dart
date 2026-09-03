@@ -28,6 +28,7 @@ TimelineService _stubTimelineService() {
   return TimelineService((
     assetSource: (index, count) async => [LocalAssetStub.image1],
     bucketSource: () => Stream.value(const [Bucket(assetCount: 1)]),
+    assetSourceAfter: null,
     origin: TimelineOrigin.main,
   ));
 }

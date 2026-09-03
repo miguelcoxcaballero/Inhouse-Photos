@@ -254,6 +254,7 @@ TimelineService _timelineServiceFromAssets(List<BaseAsset> assets, TimelineOrigi
   return TimelineService((
     assetSource: (index, count) async => assets.skip(index).take(count).toList(),
     bucketSource: () => Stream.value([Bucket(assetCount: assets.length)]),
+    assetSourceAfter: null,
     origin: origin,
   ));
 }

@@ -29,6 +29,14 @@ sealed class BaseAsset {
   final bool isFavorite;
   final bool isEdited;
 
+  /// The wall clock the timeline orders and groups by, when this asset came
+  /// from a timeline query.
+  ///
+  /// Null for assets built anywhere else, which is why every consumer treats it
+  /// as optional: it exists so a query can continue from where the last one
+  /// stopped instead of counting rows to get there.
+  final DateTime? timelineAt;
+
   const BaseAsset({
     required this.name,
     required this.checksum,
@@ -38,6 +46,7 @@ sealed class BaseAsset {
     this.width,
     this.height,
     this.durationMs,
+    this.timelineAt,
     this.isFavorite = false,
     required this.isEdited,
   });

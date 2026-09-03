@@ -27,6 +27,7 @@ class RemoteAsset extends BaseAsset {
     super.width,
     super.height,
     super.durationMs,
+    super.timelineAt,
     super.isFavorite = false,
     this.thumbHash,
     this.visibility = AssetVisibility.timeline,

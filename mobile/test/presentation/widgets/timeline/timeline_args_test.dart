@@ -111,10 +111,11 @@ void main() {
     expect(denseTimelineAssetChunkSize(columnCount: 48, viewportHeight: 800, tileExtent: 8.34), 2048);
     expect(denseTimelineAssetChunkSize(columnCount: 24, viewportHeight: 800, tileExtent: 16.67), 2048);
     expect(denseTimelineAssetChunkSize(columnCount: 12, viewportHeight: 0, tileExtent: 32), 1024);
-    // Exactly the cell's size on screen, never more. A dense tile occupies 26
-    // physical pixels here; giving it 32 meant decoding, transferring and
-    // rescaling 1.9x the pixels every frame for detail the display cannot show.
-    expect(denseTimelineTargetPixels(tileExtent: 8.34, devicePixelRatio: 3), 26);
+    // A 26-pixel tile is below the cap, so it renders at three quarters and is
+    // scaled up: at that size the softening is not what costs, the thousands of
+    // full-resolution thumbnails are. A 54-pixel tile is above it and keeps
+    // every pixel it displays.
+    expect(denseTimelineTargetPixels(tileExtent: 8.34, devicePixelRatio: 3), 20);
     expect(denseTimelineTargetPixels(tileExtent: 18, devicePixelRatio: 3), 54);
     expect(batchedGridMetadataCellPixels, 32);
     expect(batchedGridDiskCacheLimitBytes, 256 * 1024 * 1024);

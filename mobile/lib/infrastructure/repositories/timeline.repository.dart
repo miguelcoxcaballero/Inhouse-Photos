@@ -7,6 +7,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/time_range.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
+import 'package:immich_mobile/infrastructure/entities/merged_asset.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/local_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
@@ -53,6 +54,10 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
   TimelineQuery main(List<String> userIds, GroupAssetsBy groupBy) => (
     bucketSource: () => _watchMainBucket(userIds, groupBy: groupBy),
     assetSource: (offset, count) => _getMainBucketAssets(userIds, offset: offset, count: count),
+    // Only the main timeline goes tens of thousands of rows deep, which is
+    // where counting to an offset starts to cost more than the read itself.
+    assetSourceAfter: (afterTimelineAt, afterCreatedAt, count) =>
+        _getMainBucketAssetsAfter(userIds, timelineAt: afterTimelineAt, createdAt: afterCreatedAt, count: count),
     origin: TimelineOrigin.main,
   );
 
@@ -67,58 +72,82 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
     }).watch();
   }
 
-  Future<List<BaseAsset>> _getMainBucketAssets(List<String> userIds, {required int offset, required int count}) {
+  /// The rows immediately after a position in the timeline's ordering.
+  ///
+  /// Same rows as [_getMainBucketAssets] would return from the equivalent
+  /// offset, reached by seeking rather than by counting: verified by
+  /// `deep_offset_cost_test.dart`, which reads both ways and compares.
+  Future<List<BaseAsset>> _getMainBucketAssetsAfter(
+    List<String> userIds, {
+    required DateTime timelineAt,
+    required DateTime createdAt,
+    required int count,
+  }) {
     return _db.mergedAssetDrift
-        .mergedAsset(userIds: userIds, limit: (_) => Limit(count, offset))
-        .map(
-          (row) => row.remoteId != null && row.ownerId != null
-              ? RemoteAsset(
-                  id: row.remoteId!,
-                  localId: row.localId,
-                  name: row.name,
-                  ownerId: row.ownerId!,
-                  checksum: row.checksum,
-                  type: row.type,
-                  createdAt: row.createdAt,
-                  updatedAt: row.updatedAt,
-                  uploadedAt: row.uploadedAt,
-                  thumbHash: row.thumbHash,
-                  width: row.width,
-                  height: row.height,
-                  isFavorite: row.isFavorite,
-                  durationMs: row.durationMs,
-                  livePhotoVideoId: row.livePhotoVideoId,
-                  stackId: row.stackId,
-                  isEdited: row.isEdited,
-                )
-              : LocalAsset(
-                  id: row.localId!,
-                  remoteId: row.remoteId,
-                  name: row.name,
-                  checksum: row.checksum,
-                  type: row.type,
-                  createdAt: row.createdAt,
-                  updatedAt: row.updatedAt,
-                  width: row.width,
-                  height: row.height,
-                  isFavorite: row.isFavorite,
-                  durationMs: row.durationMs,
-                  orientation: row.orientation,
-                  playbackStyle: AssetPlaybackStyle.values[row.playbackStyle],
-                  cloudId: row.iCloudId,
-                  latitude: row.latitude,
-                  longitude: row.longitude,
-                  adjustmentTime: row.adjustmentTime,
-                  isEdited: row.isEdited,
-                  thumbHash: row.thumbHash,
-                ),
+        .mergedAssetAfter(
+          userIds: userIds,
+          afterTimelineAt: timelineAt,
+          afterCreatedAt: createdAt,
+          limit: (_) => Limit(count, null),
         )
+        .map(_toAsset)
         .get();
   }
+
+  Future<List<BaseAsset>> _getMainBucketAssets(List<String> userIds, {required int offset, required int count}) {
+    return _db.mergedAssetDrift.mergedAsset(userIds: userIds, limit: (_) => Limit(count, offset)).map(_toAsset).get();
+  }
+
+  /// One mapper for both reads, so the counted and the continued form cannot
+  /// drift apart into returning subtly different assets.
+  BaseAsset _toAsset(MergedAssetRow row) => row.remoteId != null && row.ownerId != null
+      ? RemoteAsset(
+          id: row.remoteId!,
+          localId: row.localId,
+          name: row.name,
+          ownerId: row.ownerId!,
+          checksum: row.checksum,
+          type: row.type,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+          uploadedAt: row.uploadedAt,
+          thumbHash: row.thumbHash,
+          width: row.width,
+          height: row.height,
+          isFavorite: row.isFavorite,
+          durationMs: row.durationMs,
+          livePhotoVideoId: row.livePhotoVideoId,
+          stackId: row.stackId,
+          isEdited: row.isEdited,
+          timelineAt: row.timelineAt,
+        )
+      : LocalAsset(
+          id: row.localId!,
+          remoteId: row.remoteId,
+          name: row.name,
+          checksum: row.checksum,
+          type: row.type,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+          width: row.width,
+          height: row.height,
+          isFavorite: row.isFavorite,
+          durationMs: row.durationMs,
+          orientation: row.orientation,
+          playbackStyle: AssetPlaybackStyle.values[row.playbackStyle],
+          cloudId: row.iCloudId,
+          latitude: row.latitude,
+          longitude: row.longitude,
+          adjustmentTime: row.adjustmentTime,
+          isEdited: row.isEdited,
+          thumbHash: row.thumbHash,
+          timelineAt: row.timelineAt,
+        );
 
   TimelineQuery localAlbum(String albumId, GroupAssetsBy groupBy) => (
     bucketSource: () => _watchLocalAlbumBucket(albumId, groupBy: groupBy),
     assetSource: (offset, count) => _getLocalAlbumBucketAssets(albumId, offset: offset, count: count),
+    assetSourceAfter: null,
     origin: TimelineOrigin.localAlbum,
   );
 
@@ -185,6 +214,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
   TimelineQuery remoteAlbum(String albumId, GroupAssetsBy groupBy) => (
     bucketSource: () => _watchRemoteAlbumBucket(albumId, groupBy: groupBy),
     assetSource: (offset, count) => _getRemoteAlbumBucketAssets(albumId, offset: offset, count: count),
+    assetSourceAfter: null,
     origin: TimelineOrigin.remoteAlbum,
   );
 
@@ -279,6 +309,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
   TimelineQuery fromAssets(List<BaseAsset> assets, TimelineOrigin origin) => (
     bucketSource: () => Stream.value(_generateBuckets(assets.length)),
     assetSource: (offset, count) => Future.value(assets.skip(offset).take(count).toList(growable: false)),
+    assetSourceAfter: null,
     origin: origin,
   );
 
@@ -292,6 +323,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
           final assets = getAssets();
           return Future.value(assets.skip(offset).take(count).toList(growable: false));
         },
+        assetSourceAfter: null,
         origin: origin,
       );
 
@@ -310,6 +342,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
     return (
       bucketSource: () => Stream.value(buckets),
       assetSource: (offset, count) => Future.value(sorted.skip(offset).take(count).toList(growable: false)),
+      assetSourceAfter: null,
       origin: origin,
     );
   }
@@ -377,12 +410,14 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
   TimelineQuery place(String place, GroupAssetsBy groupBy) => (
     bucketSource: () => _watchPlaceBucket(place, groupBy: groupBy),
     assetSource: (offset, count) => _getPlaceBucketAssets(place, offset: offset, count: count),
+    assetSourceAfter: null,
     origin: TimelineOrigin.place,
   );
 
   TimelineQuery person(String userId, String personId, GroupAssetsBy groupBy) => (
     bucketSource: () => _watchPersonBucket(userId, personId, groupBy: groupBy),
     assetSource: (offset, count) => _getPersonBucketAssets(userId, personId, offset: offset, count: count),
+    assetSourceAfter: null,
     origin: TimelineOrigin.person,
   );
 
@@ -515,6 +550,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
   TimelineQuery map(List<String> userIds, TimelineMapOptions options, GroupAssetsBy groupBy) => (
     bucketSource: () => _watchMapBucket(userIds, options, groupBy: groupBy),
     assetSource: (offset, count) => _getMapBucketAssets(userIds, options, offset: offset, count: count),
+    assetSourceAfter: null,
     origin: TimelineOrigin.map,
   );
 
@@ -644,6 +680,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
       bucketSource: () => _watchRemoteBucket(filter: filter, groupBy: groupBy, sortBy: sortBy),
       assetSource: (offset, count) =>
           _getRemoteAssets(filter: filter, offset: offset, count: count, joinLocal: joinLocal, sortBy: sortBy),
+      assetSourceAfter: null,
       origin: origin,
     );
   }

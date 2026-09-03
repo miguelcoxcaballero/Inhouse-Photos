@@ -34,6 +34,7 @@ void main() {
         return List<BaseAsset>.generate(count, (i) => _asset(offset + i), growable: false);
       },
       bucketSource: () => controller.stream,
+      assetSourceAfter: null,
       origin: TimelineOrigin.main,
     ), bucketRefreshInterval: const Duration(milliseconds: 50));
     addTearDown(service.dispose);

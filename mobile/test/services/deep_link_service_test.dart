@@ -78,6 +78,7 @@ void main() {
       final timelineService = TimelineService((
         assetSource: (index, count) async => assets.skip(index).take(count).toList(),
         bucketSource: () => Stream.value([Bucket(assetCount: assets.length)]),
+        assetSourceAfter: null,
         origin: TimelineOrigin.deepLink,
       ));
       createdTimelineServices.add(timelineService);

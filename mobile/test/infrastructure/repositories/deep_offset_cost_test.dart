@@ -47,6 +47,25 @@ void main() {
       });
     }
 
+    Future<int> timeKeysetAt(int offset) async {
+      // The row the caller would have stopped at, fetched once and not timed.
+      final boundary = await db.mergedAssetDrift
+          .mergedAsset(userIds: [userId], limit: (_) => Limit(1, offset - 1))
+          .getSingle();
+      final sw = Stopwatch()..start();
+      final rows = await db.mergedAssetDrift
+          .mergedAssetAfter(
+            userIds: [userId],
+            afterTimelineAt: boundary.timelineAt!,
+            afterCreatedAt: boundary.createdAt,
+            limit: (_) => Limit(2048, null),
+          )
+          .get();
+      sw.stop();
+      expect(rows, hasLength(2048));
+      return sw.elapsedMilliseconds;
+    }
+
     Future<int> timeAt(int offset) async {
       final sw = Stopwatch()..start();
       final rows = await db.mergedAssetDrift
@@ -66,6 +85,41 @@ void main() {
       print('OFFSETCOST reading 2048 assets at offset ${offset.toString().padLeft(6)} : $ms ms');
     }
     print('');
+
+    // Not an assertion that it is fast - it is not, and that is the finding.
+    // This is a ceiling, so that a change which makes deep reads dramatically
+    // worse fails here rather than being discovered from a screenshot.
+    for (final offset in [10000, 25000, 40000, 55000]) {
+      final ms = await timeKeysetAt(offset);
+      print('OFFSETCOST   same read continuing from a key : $ms ms  (offset form ${timings[offset]} ms)');
+    }
+    print('');
+
+    // The two reads are separate SQL, so the only thing stopping them drifting
+    // apart is this: continuing from a key must return exactly what counting to
+    // the equivalent offset returns, including across the boundary between the
+    // remote and local arms.
+    for (final offset in [1, 2048, 20000, 55000]) {
+      final boundary = await db.mergedAssetDrift
+          .mergedAsset(userIds: [userId], limit: (_) => Limit(1, offset - 1))
+          .getSingle();
+      final counted = await db.mergedAssetDrift
+          .mergedAsset(userIds: [userId], limit: (_) => Limit(500, offset))
+          .get();
+      final continued = await db.mergedAssetDrift
+          .mergedAssetAfter(
+            userIds: [userId],
+            afterTimelineAt: boundary.timelineAt!,
+            afterCreatedAt: boundary.createdAt,
+            limit: (_) => Limit(500, null),
+          )
+          .get();
+      expect(
+        continued.map((row) => row.remoteId ?? row.localId).toList(),
+        counted.map((row) => row.remoteId ?? row.localId).toList(),
+        reason: 'continuing from offset $offset returned different rows than counting to it',
+      );
+    }
 
     // Not an assertion that it is fast - it is not, and that is the finding.
     // This is a ceiling, so that a change which makes deep reads dramatically

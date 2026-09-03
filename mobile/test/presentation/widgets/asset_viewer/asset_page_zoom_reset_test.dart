@@ -22,6 +22,7 @@ class _SwappableTimelineService extends TimelineService {
     : super((
         assetSource: (_, __) async => [],
         bucketSource: () => Stream.value(const [Bucket(assetCount: 1)]),
+        assetSourceAfter: null,
         origin: TimelineOrigin.main,
       ));
 

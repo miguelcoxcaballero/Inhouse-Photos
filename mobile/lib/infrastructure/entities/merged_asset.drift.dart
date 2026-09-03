@@ -18,7 +18,7 @@ import 'package:immich_mobile/infrastructure/entities/local_album.entity.drift.d
 
 class MergedAssetDrift extends i1.ModularAccessor {
   MergedAssetDrift(i0.GeneratedDatabase db) : super(db);
-  i0.Selectable<MergedAssetResult> mergedAsset({
+  i0.Selectable<MergedAssetRow> mergedAsset({
     required List<String> userIds,
     required MergedAsset$limit limit,
   }) {
@@ -46,7 +46,70 @@ class MergedAssetDrift extends i1.ModularAccessor {
         ...generatedlimit.watchedTables,
       },
     ).map(
-      (i0.QueryRow row) => MergedAssetResult(
+      (i0.QueryRow row) => MergedAssetRow(
+        remoteId: row.readNullable<String>('remote_id'),
+        localId: row.readNullable<String>('local_id'),
+        name: row.read<String>('name'),
+        type: i4.$RemoteAssetEntityTable.$convertertype.fromSql(
+          row.read<int>('type'),
+        ),
+        createdAt: row.read<DateTime>('created_at'),
+        timelineAt: row.readNullable<DateTime>('timeline_at'),
+        updatedAt: row.read<DateTime>('updated_at'),
+        width: row.readNullable<int>('width'),
+        height: row.readNullable<int>('height'),
+        durationMs: row.readNullable<int>('duration_ms'),
+        isFavorite: row.read<bool>('is_favorite'),
+        thumbHash: row.readNullable<String>('thumb_hash'),
+        checksum: row.readNullable<String>('checksum'),
+        ownerId: row.readNullable<String>('owner_id'),
+        livePhotoVideoId: row.readNullable<String>('live_photo_video_id'),
+        orientation: row.read<int>('orientation'),
+        stackId: row.readNullable<String>('stack_id'),
+        iCloudId: row.readNullable<String>('i_cloud_id'),
+        latitude: row.readNullable<double>('latitude'),
+        longitude: row.readNullable<double>('longitude'),
+        adjustmentTime: row.readNullable<DateTime>('adjustmentTime'),
+        isEdited: row.read<bool>('is_edited'),
+        playbackStyle: row.read<int>('playback_style'),
+        uploadedAt: row.readNullable<DateTime>('uploaded_at'),
+      ),
+    );
+  }
+
+  i0.Selectable<MergedAssetRow> mergedAssetAfter({
+    required List<String> userIds,
+    required DateTime afterTimelineAt,
+    required DateTime afterCreatedAt,
+    required MergedAssetAfter$limit limit,
+  }) {
+    var $arrayStartIndex = 3;
+    final expandeduserIds = $expandVar($arrayStartIndex, userIds.length);
+    $arrayStartIndex += userIds.length;
+    final generatedlimit = $write(
+      limit(alias(this.localAssetEntity, 'lae')),
+      startIndex: $arrayStartIndex,
+    );
+    $arrayStartIndex += generatedlimit.amountOfVariables;
+    return customSelect(
+      'SELECT rae.id AS remote_id, COALESCE((SELECT lae.id FROM local_asset_entity AS lae WHERE lae.checksum = rae.checksum LIMIT 1), (SELECT lae.id FROM remote_asset_cloud_id_entity AS raci INNER JOIN local_asset_entity AS lae ON lae.checksum = raci.cloud_id WHERE raci.asset_id = rae.id LIMIT 1)) AS local_id, rae.name, rae.type, rae.created_at AS created_at, rae.local_date_time AS timeline_at, rae.updated_at, rae.width, rae.height, rae.duration_ms, rae.is_favorite, rae.thumb_hash, rae.checksum, rae.owner_id, rae.live_photo_video_id, 0 AS orientation, rae.stack_id, NULL AS i_cloud_id, NULL AS latitude, NULL AS longitude, NULL AS adjustmentTime, rae.is_edited, 0 AS playback_style, rae.uploaded_at FROM remote_asset_entity AS rae LEFT JOIN stack_entity AS se ON rae.stack_id = se.id WHERE rae.deleted_at IS NULL AND rae.visibility = 0 AND rae.owner_id IN ($expandeduserIds) AND(rae.stack_id IS NULL OR rae.id = se.primary_asset_id)AND (rae.local_date_time, rae.created_at) < (?1, ?2) UNION ALL SELECT NULL AS remote_id, lae.id AS local_id, lae.name, lae.type, lae.created_at AS created_at, lae.local_date_time AS timeline_at, lae.updated_at, lae.width, lae.height, lae.duration_ms, lae.is_favorite, lae.thumb_hash, lae.checksum, NULL AS owner_id, NULL AS live_photo_video_id, lae.orientation, NULL AS stack_id, lae.i_cloud_id, lae.latitude, lae.longitude, lae.adjustment_time, 0 AS is_edited, lae.playback_style, NULL AS uploaded_at FROM local_asset_entity AS lae WHERE NOT EXISTS (SELECT 1 FROM remote_asset_entity AS rae WHERE rae.owner_id IN ($expandeduserIds) AND rae.checksum = lae.checksum) AND NOT EXISTS (SELECT 1 FROM remote_asset_cloud_id_entity AS raci INNER JOIN remote_asset_entity AS rae ON rae.id = raci.asset_id WHERE raci.cloud_id = lae.checksum AND rae.owner_id IN ($expandeduserIds)) AND EXISTS (SELECT 1 FROM local_album_asset_entity AS laa INNER JOIN local_album_entity AS la ON laa.album_id = la.id WHERE laa.asset_id = lae.id AND la.backup_selection = 0) AND NOT EXISTS (SELECT 1 FROM local_album_asset_entity AS laa INNER JOIN local_album_entity AS la ON laa.album_id = la.id WHERE laa.asset_id = lae.id AND la.backup_selection = 2) AND (lae.local_date_time, lae.created_at) < (?1, ?2) ORDER BY timeline_at DESC, created_at DESC ${generatedlimit.sql}',
+      variables: [
+        i0.Variable<DateTime>(afterTimelineAt),
+        i0.Variable<DateTime>(afterCreatedAt),
+        for (var $ in userIds) i0.Variable<String>($),
+        ...generatedlimit.introducedVariables,
+      ],
+      readsFrom: {
+        remoteAssetEntity,
+        localAssetEntity,
+        remoteAssetCloudIdEntity,
+        stackEntity,
+        localAlbumAssetEntity,
+        localAlbumEntity,
+        ...generatedlimit.watchedTables,
+      },
+    ).map(
+      (i0.QueryRow row) => MergedAssetRow(
         remoteId: row.readNullable<String>('remote_id'),
         localId: row.readNullable<String>('local_id'),
         name: row.read<String>('name'),
@@ -131,7 +194,7 @@ class MergedAssetDrift extends i1.ModularAccessor {
   ).resultSet<i8.$LocalAlbumEntityTable>('local_album_entity');
 }
 
-class MergedAssetResult {
+class MergedAssetRow {
   final String? remoteId;
   final String? localId;
   final String name;
@@ -156,7 +219,7 @@ class MergedAssetResult {
   final bool isEdited;
   final int playbackStyle;
   final DateTime? uploadedAt;
-  MergedAssetResult({
+  MergedAssetRow({
     this.remoteId,
     this.localId,
     required this.name,
@@ -185,6 +248,8 @@ class MergedAssetResult {
 }
 
 typedef MergedAsset$limit = i0.Limit Function(i3.$LocalAssetEntityTable lae);
+typedef MergedAssetAfter$limit =
+    i0.Limit Function(i3.$LocalAssetEntityTable lae);
 
 class MergedBucketResult {
   final int assetCount;

@@ -65,6 +65,7 @@ TimelineService _service(int assetCount, {required int assetsPerBucket}) {
   final bucketCount = (assetCount / assetsPerBucket).ceil();
   return TimelineService((
     assetSource: (offset, count) async => assets.skip(offset).take(count).toList(growable: false),
+    assetSourceAfter: null,
     bucketSource: () => Stream.value(
       List<Bucket>.generate(
         bucketCount,

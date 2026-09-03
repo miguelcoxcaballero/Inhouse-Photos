@@ -27,6 +27,7 @@ void main() {
     final service = TimelineService((
       assetSource: (i, n) async => assets.sublist(i, math.min(i + n, assets.length)),
       bucketSource: () => Stream.value([TimeBucket(date: DateTime(2025), assetCount: assets.length)]),
+      assetSourceAfter: null,
       origin: TimelineOrigin.main,
     ));
     addTearDown(service.dispose);

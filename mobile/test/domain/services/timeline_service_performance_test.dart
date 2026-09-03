@@ -24,6 +24,7 @@ void main() {
         return const <BaseAsset>[];
       },
       bucketSource: () => source.stream,
+      assetSourceAfter: null,
       origin: TimelineOrigin.main,
     ), bucketRefreshInterval: const Duration(milliseconds: 10));
     final subscription = service.watchBuckets().listen((buckets) {
@@ -57,6 +58,7 @@ void main() {
     var sourceSubscriptions = 0;
     final service = TimelineService((
       assetSource: (index, count) async => const <BaseAsset>[],
+      assetSourceAfter: null,
       bucketSource: () {
         sourceSubscriptions++;
         return source.stream;
