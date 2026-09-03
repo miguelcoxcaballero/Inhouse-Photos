@@ -1,7 +1,7 @@
 {
-  "version": "3.1.74",
-  "versionCode": 7132,
+  "version": "3.1.75",
+  "versionCode": 7133,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.74-stop-grid-resetting/Inhouse-Photos-3.1.74-arm64.apk",
-  "sha256": "d0452d479c3d3b6e8b15413193cf54604d992479bdef2b1e75ebdfdd4628b689"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.75-faster-warm-start/Inhouse-Photos-3.1.75-arm64.apk",
+  "sha256": "2e9f81df8740a230c04d4f52bebf1c642cfa28f48770f5b6f385f8bc4b88b793"
 }
