@@ -906,6 +906,12 @@ class _DenseAssetChunkStore {
 
 class _DenseAtlasPersistenceQueue {
   static const int _maxPending = 4;
+  /// Floor and ceiling for the gap between foreground writes.
+  ///
+  /// The floor stops a cheap encode turning into a tight loop; the ceiling is
+  /// the old fixed value, so the slowest case is no worse than before.
+  static const Duration _minForegroundGap = Duration(milliseconds: 120);
+  static const Duration _maxForegroundGap = Duration(milliseconds: 450);
   final LinkedHashMap<String, _DenseAtlasPersistenceTask> _pending = LinkedHashMap();
   bool _active = false;
   bool _appVisible = true;
@@ -970,11 +976,29 @@ class _DenseAtlasPersistenceQueue {
     }
     _active = true;
     final task = _pending.remove(slot)!;
+    final timer = Stopwatch()..start();
     unawaited(
       _encode(task).whenComplete(() {
+        timer.stop();
         _active = false;
         if (_appVisible) {
-          _scheduleForegroundDrain(delay: const Duration(milliseconds: 450));
+          // Paced by what the write actually cost rather than a fixed gap. One
+          // write is a PNG encode of the whole panel, and that varies by an
+          // order of magnitude with zoom: 47.9ms at eighteen columns against
+          // 10.2ms at forty-eight. A single 450ms gap is calibrated for the
+          // expensive end, so at the dense end - where a screen holds far more
+          // panels and cold start has the most to gain - it was idle roughly
+          // forty times longer than the work it was spacing out.
+          //
+          // Four times the last encode keeps the duty cycle at twenty per cent
+          // whatever the zoom, so this never occupies more of a frame than it
+          // did before.
+          final measured = timer.elapsed * 4;
+          _scheduleForegroundDrain(
+            delay: measured < _minForegroundGap
+                ? _minForegroundGap
+                : (measured > _maxForegroundGap ? _maxForegroundGap : measured),
+          );
         } else {
           _drain();
         }

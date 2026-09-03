@@ -117,6 +117,12 @@ Future<void> _realDelay(WidgetTester tester, Duration duration) async {
   await tester.pump();
 }
 
+int _panelCount(WidgetTester tester) => tester
+    .widgetList<CustomPaint>(find.byType(CustomPaint))
+    .map((paint) => paint.painter)
+    .where((painter) => painter.runtimeType.toString() == '_DenseAssetRowPainter')
+    .length;
+
 int _panelsWithAtlas(WidgetTester tester) => tester
     .widgetList<CustomPaint>(find.byType(CustomPaint))
     .map((paint) => paint.painter)
@@ -284,6 +290,72 @@ void main() {
     print('GRIDZOOM fetched at 18 columns        : $afterFirst');
     print('GRIDZOOM refetched changing to 24     : $refetchedOnZoom');
     print('GRIDZOOM refetched returning to 18    : ${served - beforeReturn}');
+
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 8)));
+
+  testWidgets('a restart with a warm disk restores instead of rebuilding', (tester) async {
+    // The cold-start complaint, measured for the first time. Every previous
+    // measurement reported zero disk hits, and that was the harness lying:
+    // `flutter drive` uninstalls the app between runs, so the disk cache was
+    // wiped before each one. It could never have hit.
+    //
+    // This keeps the process, drops exactly what the OS drops under memory
+    // pressure - the in-memory textures and queues - and rebuilds the grid. The
+    // disk cache survives, so this is what opening the app again should feel
+    // like.
+    tester.view.devicePixelRatio = 3;
+    tester.view.physicalSize = const Size(1080, 2400);
+    addTearDown(tester.view.reset);
+
+    final service = _service(6000, assetsPerBucket: 500);
+    addTearDown(service.dispose);
+
+    Future<void> show() => tester.pumpConsumerWidget(
+      const Timeline(
+        withScrubber: false,
+        readOnly: true,
+        appBar: SliverToBoxAdapter(child: SizedBox.shrink()),
+        bottomSheet: null,
+      ),
+      overrides: [
+        timelineServiceProvider.overrideWithValue(service),
+        appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 18))),
+      ],
+      settle: false,
+    );
+
+    await show();
+    // Long settle so panels finish and get written to disk; writes are paced.
+    for (var step = 0; step < 90; step++) {
+      await _realDelay(tester, const Duration(milliseconds: 100));
+    }
+    final servedFirst = served;
+    final firstRun = DenseGridStats.summary();
+
+    // The restart.
+    releaseDenseTimelineMemory();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _realDelay(tester, const Duration(milliseconds: 300));
+    DenseGridStats.reset();
+    final servedBeforeRestart = served;
+
+    await show();
+    final settle = Stopwatch()..start();
+    for (var step = 0; step < 60; step++) {
+      await _realDelay(tester, const Duration(milliseconds: 100));
+      final panels = _panelsWithAtlas(tester);
+      if (panels > 0 && panels == _panelCount(tester)) {
+        break;
+      }
+    }
+    settle.stop();
+
+    print('GRIDCOLD first run                    : $firstRun');
+    print('GRIDCOLD first run fetched            : $servedFirst');
+    print('GRIDCOLD after restart                : ${DenseGridStats.summary()}');
+    print('GRIDCOLD after restart refetched      : ${served - servedBeforeRestart}');
+    print('GRIDCOLD time to a full screen        : ${settle.elapsedMilliseconds} ms');
 
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(minutes: 8)));
