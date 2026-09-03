@@ -1488,9 +1488,17 @@ class DenseThumbnailQueue {
   // dequeue. Re-sorting made scheduling quadratic and stalled the UI isolate
   // exactly when the gallery was trying to fill in.
   //
-  // A dense screen routinely asks for more than this, so the discard path below
-  // is ordinary behaviour rather than an edge case, and callers must expect
-  // `onDiscard` to run before `schedule` returns.
+  // This is smaller than one screen of the densest grid, which puts 4808 cells
+  // on screen, so requests really are dropped and really are re-asked for. That
+  // looks like it should starve the panels that ask last, since a full queue
+  // drops the newest and retries ask in the same order - but raising it to
+  // 12288 was measured and changed nothing: 22 panels of 29 finished against 24
+  // and 25 on the unchanged build, which is inside the run to run spread.
+  // Capacity is not what stops those panels finishing, so it stays where it was
+  // rather than costing memory for a disproved theory.
+  //
+  // The discard path is ordinary rather than exceptional, so callers must
+  // expect `onDiscard` to run before `schedule` returns.
   final int maxPending;
   final HeapPriorityQueue<_DenseThumbnailTask> _pending = HeapPriorityQueue(_compareTasks);
   int _active = 0;
@@ -2985,6 +2993,9 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
           backgroundColor: _surfaceTone,
           placeholderColor: _placeholderTone,
           atlasHidesPlaceholder: _persistentExact && _atlas != null,
+          upgradeCells: _upgradeIndexes.length,
+          mergedCells: _mergedIndexes.length,
+          pendingCells: _pendingIndexes.length,
           textDirection: textDirection,
           layoutAnimation: reflowActive ? layoutTransition?.animation : null,
           previousRects: reflowActive ? layoutTransition!.previousRects : const {},
@@ -3031,6 +3042,15 @@ class _DenseAssetRowPainter extends CustomPainter {
   /// and painting it is pure overdraw - a third full pass over the panel on
   /// every frame it is on screen, on top of the background and the atlas.
   final bool atlasHidesPlaceholder;
+  /// Why a panel has not finished, for the on-device loading tests.
+  ///
+  /// A panel counts as finished when every cell it wants upgraded has been
+  /// merged and nothing is still in flight. Reporting the three numbers
+  /// separately is the difference between knowing a panel is stuck and knowing
+  /// which of those it is stuck on.
+  final int upgradeCells;
+  final int mergedCells;
+  final int pendingCells;
   final TextDirection textDirection;
   final Animation<double>? layoutAnimation;
   final Map<Object, Rect> previousRects;
@@ -3053,6 +3073,9 @@ class _DenseAssetRowPainter extends CustomPainter {
     required this.backgroundColor,
     required this.placeholderColor,
     required this.atlasHidesPlaceholder,
+    required this.upgradeCells,
+    required this.mergedCells,
+    required this.pendingCells,
     required this.textDirection,
     required this.layoutAnimation,
     required this.previousRects,

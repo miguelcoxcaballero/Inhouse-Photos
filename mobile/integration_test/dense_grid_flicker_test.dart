@@ -122,21 +122,41 @@ TimelineService _service(int assetCount, {required int assetsPerBucket}) {
 }
 
 /// One dense panel's currently visible state.
-typedef PanelState = ({Object key, ui.Image? atlas, int loose, int cells});
+typedef PanelState = ({Object key, ui.Image? atlas, int loose, int cells, bool complete, bool onScreen, int upgrade, int merged, int pending});
 
-List<PanelState> _panels(WidgetTester tester) => tester
-    .widgetList<CustomPaint>(find.byType(CustomPaint))
-    .map((paint) => paint.painter)
-    .where((painter) => painter.runtimeType.toString() == '_DenseAssetRowPainter')
-    .map((painter) {
+List<PanelState> _panels(WidgetTester tester) => find
+    .byType(CustomPaint)
+    .evaluate()
+    .where((element) => (element.widget as CustomPaint).painter.runtimeType.toString() == '_DenseAssetRowPainter')
+    .map((element) {
+      final painter = (element.widget as CustomPaint).painter!;
+      // Panels held in the sliver's cache extent are mounted but deliberately
+      // not upgraded - queueing thousands of cells nobody can see would bury
+      // the ones they can. Separating them matters: an unfinished panel off
+      // screen is the design working, and one on screen is the bug.
+      final box = element.renderObject as RenderBox?;
+      final onScreen =
+          box != null &&
+          box.attached &&
+          box.hasSize &&
+          (box.localToGlobal(Offset.zero) & box.size).overlaps(Offset.zero & (tester.view.physicalSize / 3));
       final dynamic p = painter;
       final keys = p.assetKeys as List<Object?>;
       final images = p.images as List<Object?>;
       return (
         key: keys.isEmpty ? painter as Object : keys.first as Object,
         atlas: p.atlas as ui.Image?,
+        // Thumbnails resolved but not yet folded into the atlas.
         loose: images.where((image) => image != null).length,
         cells: keys.length,
+        // Every cell carries a real photo. A panel that never reaches this is
+        // one where some tiles stay on their blurry preview indefinitely, which
+        // is what "parts still don't load properly" looks like from the code.
+        complete: p.atlasHidesPlaceholder as bool,
+        onScreen: onScreen,
+        upgrade: p.upgradeCells as int,
+        merged: p.mergedCells as int,
+        pending: p.pendingCells as int,
       );
     })
     .toList(growable: false);
@@ -270,8 +290,35 @@ void main() {
         }
         final stranded = _panels(tester).where((panel) => panel.atlas == null).toList();
 
+    // How much of the screen actually finished, not just how much has a
+    // texture. Settle generously first: this asks whether it ever finishes, not
+    // how quickly.
+    for (var step = 0; step < 60; step++) {
+      await _realDelay(tester, const Duration(milliseconds: 100));
+      if (_panels(tester).where((panel) => panel.onScreen).every((panel) => panel.complete)) {
+        break;
+      }
+    }
+    final settled = _panels(tester);
+    final visible = settled.where((panel) => panel.onScreen).toList();
+    final complete = visible.where((panel) => panel.complete).length;
+    final offScreenIncomplete = settled.where((panel) => !panel.onScreen && !panel.complete).length;
+    final cells = visible.fold<int>(0, (sum, panel) => sum + panel.cells);
+
         print('GRIDFLICK ===== real thumbnails, $columnCount columns =====');
         print('GRIDFLICK panels stranded without atlas: ${stranded.length} of ${_panels(tester).length}');
+    print('GRIDFLICK on-screen panels loaded      : $complete of ${visible.length}  ($cells cells)');
+    print('GRIDFLICK off-screen not loaded         : $offScreenIncomplete of ${settled.length - visible.length} (expected)');
+    for (final panel in visible.where((panel) => !panel.complete)) {
+      // upgrade = cells this panel wants sharp, merged = cells it has, pending
+      // = cells still in flight. A stuck panel with pending 0 and merged short
+      // of upgrade is one that has stopped asking; pending above 0 is one still
+      // waiting on requests that never land.
+      print(
+        'GRIDFLICK   unfinished panel: upgrade ${panel.upgrade} merged ${panel.merged} '
+        'pending ${panel.pending} loose ${panel.loose} cells ${panel.cells}',
+      );
+    }
         print('GRIDFLICK thumbnail requests served    : ${served - servedBefore}');
         print('GRIDFLICK peak loose images on screen  : $peakLoose');
         print('GRIDFLICK atlas changes                : $atlasChanges');
