@@ -190,7 +190,12 @@ void main() {
           .map((f) => (f.buildDuration.inMicroseconds + f.rasterDuration.inMicroseconds) / 1000)
           .toList();
       double pct(List<double> values, double p) => values.isEmpty ? 0 : values[(values.length * p).clamp(0, values.length - 1).floor()];
-      final janky = work.where((ms) => ms > 16.7).length;
+      // Taken from the display rather than assumed. A 120Hz panel gives 8.3ms
+      // per frame, not 16.7 - measuring against the wrong one calls a frame
+      // comfortable when it has already missed.
+      final refreshRate = tester.view.display.refreshRate;
+      final budgetMs = 1000 / refreshRate;
+      final janky = work.where((ms) => ms > budgetMs).length;
       final swaps = swapsByPanel.values.fold<int>(0, (a, b) => a + b);
 
       print('GRIDPERF ===== $columnCount columns =====');
@@ -200,7 +205,8 @@ void main() {
       print('GRIDPERF raster p50/p95/p99 ms        : ${pct(raster, .5).toStringAsFixed(1)} / ${pct(raster, .95).toStringAsFixed(1)} / ${pct(raster, .99).toStringAsFixed(1)}');
       final sortedWork = [...work]..sort();
       print('GRIDPERF build+raster p50/p95/p99 ms  : ${pct(sortedWork, .5).toStringAsFixed(1)} / ${pct(sortedWork, .95).toStringAsFixed(1)} / ${pct(sortedWork, .99).toStringAsFixed(1)}');
-      print('GRIDPERF frames whose work > 16.7ms   : $janky (${frames.isEmpty ? 0 : (janky * 100 / frames.length).round()}%)');
+      print('GRIDPERF display                      : ${refreshRate.toStringAsFixed(0)} Hz, ${budgetMs.toStringAsFixed(1)} ms per frame');
+      print('GRIDPERF frames over budget           : $janky (${frames.isEmpty ? 0 : (janky * 100 / frames.length).round()}%)');
       looseSamples.sort();
       print('GRIDPERF atlas swaps during scroll    : $swaps across ${swapsByPanel.length} panels');
       print('GRIDPERF loose images/frame p50/max   : ${pct(looseSamples.map((v) => v.toDouble()).toList(), .5).toStringAsFixed(0)} / ${looseSamples.isEmpty ? 0 : looseSamples.last}');
@@ -296,6 +302,10 @@ void main() {
     print('GRIDSWEEP steady raster median     : ${median(steady).toStringAsFixed(2)} ms');
     print('GRIDSWEEP steady work median       : ${median(steadyWork).toStringAsFixed(2)} ms');
     print('GRIDSWEEP steady spread            : ${spread.toStringAsFixed(2)} ms');
+    print(
+      'GRIDSWEEP display                  : ${tester.view.display.refreshRate.toStringAsFixed(0)} Hz, '
+      '${(1000 / tester.view.display.refreshRate).toStringAsFixed(1)} ms per frame',
+    );
     print('GRIDSWEEP => a change must beat that spread to be believable');
     print('GRIDSWEEP grid busy during scroll   : $busySamples/$totalSamples samples');
 
