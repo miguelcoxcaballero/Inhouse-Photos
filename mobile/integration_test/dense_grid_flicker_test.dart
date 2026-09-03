@@ -22,6 +22,7 @@ import 'dart:ui' as ui;
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
@@ -167,7 +168,7 @@ Future<void> _realDelay(WidgetTester tester, Duration duration) async {
 }
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   // One server and one store for the whole file. `StoreService` is a singleton
   // and the endpoint lives in its cache, so tearing this down per test left the
@@ -214,6 +215,15 @@ void main() {
 
         final service = _service(6000, assetsPerBucket: 500);
         addTearDown(service.dispose);
+
+        // Frame cost measured while thumbnails are actually being fetched,
+        // which is the only time the loading pipeline competes with drawing.
+        // The perf harness cannot see this: it has no server, so its queue is
+        // idle and any change to how hard that queue works is invisible there.
+        final frames = <FrameTiming>[];
+        void collect(List<FrameTiming> timings) => frames.addAll(timings);
+        binding.addTimingsCallback(collect);
+        addTearDown(() => binding.removeTimingsCallback(collect));
 
         await tester.pumpConsumerWidget(
           const Timeline(
@@ -324,6 +334,15 @@ void main() {
         print('GRIDFLICK atlas changes                : $atlasChanges');
         print('GRIDFLICK merges (loose -> new atlas)  : $merges');
         print('GRIDFLICK REGRESSIONS (lost, no atlas) : $regressions');
+    final raster = frames.map((f) => f.rasterDuration.inMicroseconds / 1000).toList()..sort();
+    final work =
+        frames.map((f) => (f.buildDuration.inMicroseconds + f.rasterDuration.inMicroseconds) / 1000).toList()..sort();
+    double pct(List<double> v, double p) => v.isEmpty ? 0 : v[(v.length * p).clamp(0, v.length - 1).floor()];
+    print(
+      'GRIDFLICK frames while loading         : ${frames.length}  raster p50/p95 '
+      '${pct(raster, .5).toStringAsFixed(1)}/${pct(raster, .95).toStringAsFixed(1)} ms  '
+      'work p50/p95 ${pct(work, .5).toStringAsFixed(1)}/${pct(work, .95).toStringAsFixed(1)} ms',
+    );
         print('GRIDFLICK ===== end =====');
 
         expect(tester.takeException(), isNull);
