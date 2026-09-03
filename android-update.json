@@ -1,7 +1,7 @@
 {
-  "version": "3.1.73",
-  "versionCode": 7131,
+  "version": "3.1.74",
+  "versionCode": 7132,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.73-resume-partial-panels/Inhouse-Photos-3.1.73-arm64.apk",
-  "sha256": "6ca27d460c6d79a85600c94b1fffd1f819611a8c19662cfc53982a6c72202995"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.74-stop-grid-resetting/Inhouse-Photos-3.1.74-arm64.apk",
+  "sha256": "d0452d479c3d3b6e8b15413193cf54604d992479bdef2b1e75ebdfdd4628b689"
 }
