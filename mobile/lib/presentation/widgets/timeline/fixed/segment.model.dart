@@ -1441,6 +1441,12 @@ const int batchedGridDiskCacheLimitBytes = 256 * 1024 * 1024;
 // thumbnail disk cache rather than fresh downloads. Four at a time made that
 // crawl; the work itself is tiny, so the limit only needs to stop a fling from
 // starving raster/UI work on mid-range phones.
+// Eight, and raising it does nothing. Measured on device: asking for eight,
+// sixteen or thirty-two cells at once filled a dense screen in the same time
+// every way, while per-cell latency rose in exact step with the extra
+// parallelism. Nothing downstream is idle waiting for more requests - see
+// `integration_test/cell_materialise_cost_test.dart` and its siblings for where
+// the per-cell time actually goes.
 const int _denseThumbnailConcurrency = 8;
 const int _denseMetadataAtlasConcurrency = 3;
 // ui.Image.clone shares the underlying GPU texture, so keeping a wider rolling

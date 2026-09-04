@@ -76,21 +76,25 @@ Future<List<Uint8List>> _thumbnailBytes() async {
   return images;
 }
 
-TimelineService _service(int assetCount, {required int assetsPerBucket}) {
+TimelineService _service(int assetCount, {required int assetsPerBucket, int seed = 0}) {
+  // Content the grid caches is keyed by what is in it, so two tests built
+  // from the same assets share cache entries and the second one measures the
+  // first one's work. `seed` shifts the identity of every asset so a test that
+  // means to be cold really is.
   final now = DateTime(2026, 8, 25);
   final assets = List<BaseAsset>.generate(
     assetCount,
     (index) => RemoteAsset(
-      id: 'remote-$index',
-      name: 'photo-$index.jpg',
+      id: 'remote-${seed}s$index',
+      name: 'photo-${seed}s$index.jpg',
       ownerId: 'owner',
-      checksum: 'checksum-$index',
+      checksum: 'checksum-${seed}s$index',
       type: AssetType.image,
       createdAt: now.subtract(Duration(minutes: index)),
       updatedAt: now,
       width: 4032,
       height: 3024,
-      thumbHash: _thumbHash(index),
+      thumbHash: _thumbHash(index + seed * 7919),
       isEdited: false,
     ),
     growable: false,
@@ -119,6 +123,26 @@ Future<void> _realDelay(WidgetTester tester, Duration duration) async {
 }
 
 /// Per-panel state, keyed so a panel can be followed over time.
+/// Share of on-screen cells currently carrying a real photo.
+///
+/// The per-panel `sharp` flag is all-or-nothing over roughly a hundred and
+/// fifty photos, so it reports the arrival of the slowest one and calls that
+/// the moment the screen stops looking blurry. What a person actually sees is
+/// this: how much of the screen is real, over time.
+({int merged, int wanted}) _cellProgress(WidgetTester tester) {
+  var merged = 0;
+  var wanted = 0;
+  for (final painter in tester
+      .widgetList<CustomPaint>(find.byType(CustomPaint))
+      .map((paint) => paint.painter)
+      .where((painter) => painter.runtimeType.toString() == '_DenseAssetRowPainter')) {
+    final dynamic p = painter;
+    merged += p.mergedCells as int;
+    wanted += p.upgradeCells as int;
+  }
+  return (merged: merged, wanted: wanted);
+}
+
 List<({Object key, bool hasAtlas, bool sharp})> _panelStates(WidgetTester tester) => tester
     .widgetList<CustomPaint>(find.byType(CustomPaint))
     .map((paint) => paint.painter)
@@ -154,12 +178,22 @@ void main() {
   late List<Uint8List> bytes;
   late Drift db;
   var served = 0;
+  // Counting requests alone cannot tell repeated work from work that simply had
+  // not happened yet: a panel flung past unfinished leaves cells nobody ever
+  // fetched, and those look identical to a cache failure in a plain total. What
+  // answers "does going back redo work" is how often the same photo is asked for
+  // twice, so the path of each request is remembered.
+  final servedPaths = <String>{};
+  var servedAgain = 0;
 
   setUpAll(() async {
     bytes = await _thumbnailBytes();
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) async {
       served++;
+      if (!servedPaths.add(request.uri.path)) {
+        servedAgain++;
+      }
       final body = bytes[served % bytes.length];
       request.response
         ..statusCode = HttpStatus.ok
@@ -460,4 +494,231 @@ void main() {
 
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(minutes: 8)));
+
+  testWidgets('how much of the screen is real photos, over time, after scrolling', (tester) async {
+    // What the complaint is actually about. After a fling lands, how quickly
+    // does the screen stop being blurry - measured as the share of visible
+    // cells carrying a real photo rather than as the arrival of the slowest
+    // photo on screen.
+    tester.view.devicePixelRatio = 3;
+    tester.view.physicalSize = const Size(1080, 2400);
+    addTearDown(tester.view.reset);
+
+    final service = _service(6000, assetsPerBucket: 500, seed: 337);
+    addTearDown(service.dispose);
+
+    await tester.pumpConsumerWidget(
+      const Timeline(
+        withScrubber: false,
+        readOnly: true,
+        appBar: SliverToBoxAdapter(child: SizedBox.shrink()),
+        bottomSheet: null,
+      ),
+      overrides: [
+        timelineServiceProvider.overrideWithValue(service),
+        appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 18))),
+      ],
+      settle: false,
+    );
+    for (var step = 0; step < 40; step++) {
+      await _realDelay(tester, const Duration(milliseconds: 100));
+    }
+
+    // Three separate landings, each measured from the moment the fling is over,
+    // so the numbers are per-arrival rather than averaged over a long gesture.
+    for (var landing = 0; landing < 3; landing++) {
+      DenseGridStats.reset();
+      await tester.fling(find.byType(Timeline), const Offset(0, -760), 1800);
+      final clock = Stopwatch()..start();
+      final marks = <int, int>{};
+      var last = (merged: 0, wanted: 0);
+      for (var step = 0; step < 100; step++) {
+        await _realDelay(tester, const Duration(milliseconds: 50));
+        last = _cellProgress(tester);
+        if (last.wanted == 0) {
+          continue;
+        }
+        final percent = last.merged * 100 ~/ last.wanted;
+        for (final threshold in [50, 75, 90, 99]) {
+          if (percent >= threshold) {
+            marks.putIfAbsent(threshold, () => clock.elapsedMilliseconds);
+          }
+        }
+        if (marks.containsKey(99)) {
+          break;
+        }
+      }
+      clock.stop();
+      String at(int threshold) => marks[threshold] == null ? 'not reached' : '${marks[threshold]} ms';
+      print(
+        'GRIDREAL landing $landing: 50% ${at(50)} | 75% ${at(75)} | 90% ${at(90)} '
+        '| 99% ${at(99)} | ended ${last.merged}/${last.wanted} cells',
+      );
+      print('GRIDREAL landing $landing cost: ${DenseGridStats.summary()}');
+    }
+
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 10)));
+
+  testWidgets('how long a panel scrolled into shows blurry before it is sharp', (tester) async {
+    // The other half of the complaint - "same when scrolling" - which the
+    // reopen measurement does not cover. Opening the app lands on panels the
+    // disk may already hold; scrolling forward reaches panels nothing has ever
+    // built, and the honest question is how long those show blurry, and whether
+    // scrolling back over them is instant the way reopening now is.
+    //
+    // Panels are followed by key across the whole gesture, so a panel that
+    // scrolls off and returns is the same panel, and three moments are recorded
+    // for each: mounted, first texture of any kind, and every cell sharp.
+    tester.view.devicePixelRatio = 3;
+    tester.view.physicalSize = const Size(1080, 2400);
+    addTearDown(tester.view.reset);
+
+    // A library no other test in this run has touched, so the outbound leg is
+    // measuring panels being built for the first time rather than panels an
+    // earlier test already cached.
+    final service = _service(6000, assetsPerBucket: 500, seed: 991);
+    addTearDown(service.dispose);
+
+    await tester.pumpConsumerWidget(
+      const Timeline(
+        withScrubber: false,
+        readOnly: true,
+        appBar: SliverToBoxAdapter(child: SizedBox.shrink()),
+        bottomSheet: null,
+      ),
+      overrides: [
+        timelineServiceProvider.overrideWithValue(service),
+        appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 18))),
+      ],
+      settle: false,
+    );
+
+    // Settle the first screen, so the measurement below is about scrolling and
+    // not about the cold start that the reopen test already measures.
+    for (var step = 0; step < 40; step++) {
+      await _realDelay(tester, const Duration(milliseconds: 100));
+    }
+
+    final clock = Stopwatch()..start();
+    final mountedAt = <Object, int>{};
+    final textureAt = <Object, int>{};
+    final sharpAt = <Object, int>{};
+    // Panels that existed before the gesture started are excluded: they are
+    // already resolved and would report a gap of zero for the wrong reason.
+    final preexisting = <Object>{for (final panel in _panelStates(tester)) panel.key};
+
+    void sample() {
+      for (final panel in _panelStates(tester)) {
+        if (preexisting.contains(panel.key)) {
+          continue;
+        }
+        mountedAt.putIfAbsent(panel.key, () => clock.elapsedMilliseconds);
+        if (panel.hasAtlas) {
+          textureAt.putIfAbsent(panel.key, () => clock.elapsedMilliseconds);
+        }
+        if (panel.sharp) {
+          sharpAt.putIfAbsent(panel.key, () => clock.elapsedMilliseconds);
+        }
+      }
+    }
+
+    // A panel that never turned sharp is two different things, and only one of
+    // them is a bug: a panel still on screen at the end that is not sharp is
+    // stuck, while a panel that scrolled past before it finished says nothing
+    // except that it was scrolled past. They are counted apart.
+    ({List<int> blank, List<int> gap, int stuck, int scrolledPast}) report() {
+      final onScreen = {for (final panel in _panelStates(tester)) panel.key};
+      final blank = <int>[];
+      final gap = <int>[];
+      var stuck = 0;
+      var scrolledPast = 0;
+      for (final key in mountedAt.keys) {
+        final texture = textureAt[key];
+        final sharp = sharpAt[key];
+        if (texture != null) {
+          blank.add(texture - mountedAt[key]!);
+        }
+        if (texture != null && sharp != null) {
+          gap.add(math.max(0, sharp - texture));
+        } else if (onScreen.contains(key)) {
+          stuck++;
+        } else {
+          scrolledPast++;
+        }
+      }
+      blank.sort();
+      gap.sort();
+      return (blank: blank, gap: gap, stuck: stuck, scrolledPast: scrolledPast);
+    }
+
+    void printReport(String label, ({List<int> blank, List<int> gap, int stuck, int scrolledPast}) r) {
+      String stat(List<int> values) =>
+          values.isEmpty ? 'n/a' : '${values[values.length ~/ 2]} / ${values.last} ms';
+      print('GRIDSCROLL $label panels                 : ${mountedAt.length}');
+      print('GRIDSCROLL $label blank-to-texture med/max: ${stat(r.blank)}');
+      print('GRIDSCROLL $label blurry-to-sharp med/max : ${stat(r.gap)}');
+      print('GRIDSCROLL $label sharp panels            : ${r.gap.length}');
+      print('GRIDSCROLL $label stuck on screen         : ${r.stuck}');
+      print('GRIDSCROLL $label scrolled past unfinished: ${r.scrolledPast}');
+    }
+
+    // Held still after the last fling, so "stuck" means a panel a person would
+    // be sitting there looking at, not one still catching up mid-gesture.
+    Future<void> settle() async {
+      for (var step = 0; step < 40; step++) {
+        await _realDelay(tester, const Duration(milliseconds: 100));
+        sample();
+      }
+    }
+
+    // Forward into ground nothing has built yet.
+    const screens = 3;
+    final servedBeforeOutbound = served;
+    DenseGridStats.reset();
+    for (var i = 0; i < screens; i++) {
+      await tester.fling(find.byType(Timeline), const Offset(0, -760), 1800);
+      for (var step = 0; step < 24; step++) {
+        await _realDelay(tester, const Duration(milliseconds: 50));
+        sample();
+      }
+    }
+    await settle();
+    final outbound = report();
+    printReport('new content ', outbound);
+    print('GRIDSCROLL new content  fetched          : ${served - servedBeforeOutbound}');
+    print('GRIDSCROLL new content  cache            : ${DenseGridStats.summary()}');
+
+    // Back over exactly that ground, then forward over it again. Panels here
+    // have been built once already, so anything other than an instant texture
+    // is the cache failing rather than work that had to happen.
+    final servedBeforeReturn = served;
+    final repeatsBeforeReturn = servedAgain;
+    DenseGridStats.reset();
+    final returnClockBase = clock.elapsedMilliseconds;
+    mountedAt.clear();
+    textureAt.clear();
+    sharpAt.clear();
+    preexisting
+      ..clear()
+      ..addAll([for (final panel in _panelStates(tester)) panel.key]);
+    for (final direction in [760.0, -760.0]) {
+      for (var i = 0; i < screens; i++) {
+        await tester.fling(find.byType(Timeline), Offset(0, direction), 1800);
+        for (var step = 0; step < 24; step++) {
+          await _realDelay(tester, const Duration(milliseconds: 50));
+          sample();
+        }
+      }
+    }
+    await settle();
+    clock.stop();
+    printReport('seen before ', report());
+    print('GRIDSCROLL seen before  requests          : ${served - servedBeforeReturn}');
+    print('GRIDSCROLL seen before  same photo twice   : ${servedAgain - repeatsBeforeReturn}');
+    print('GRIDSCROLL seen before  cache            : ${DenseGridStats.summary()}');
+    print('GRIDSCROLL return leg took               : ${clock.elapsedMilliseconds - returnClockBase} ms');
+
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 10)));
 }
