@@ -1474,6 +1474,13 @@ class DenseGridStats {
   static int diskWritesScheduled = 0;
   static int diskWritesEvicted = 0;
   static int diskWritesRefused = 0;
+  /// Restores that came back sharp, against ones that came back blurry and had
+  /// to redo every thumbnail. The second kind is what "it opens blurry then
+  /// takes a second" is made of.
+  static int diskRestoredSharp = 0;
+  static int diskRestoredBlurry = 0;
+  static int diskWritesSharp = 0;
+  static int diskWritesBlurry = 0;
 
   static void reset() {
     memoryAtlasHits = 0;
@@ -1487,6 +1494,10 @@ class DenseGridStats {
     diskWritesScheduled = 0;
     diskWritesEvicted = 0;
     diskWritesRefused = 0;
+    diskRestoredSharp = 0;
+    diskRestoredBlurry = 0;
+    diskWritesSharp = 0;
+    diskWritesBlurry = 0;
   }
 
   static String summary() =>
@@ -1494,7 +1505,9 @@ class DenseGridStats {
       'disk ${diskAtlasHits}h/${diskAtlasMisses}m  '
       'thumbhashBuilds $thumbhashAtlasBuilds  compositeBuilds $compositeAtlasBuilds  '
       'diskWrite sched $diskWritesScheduled/evicted $diskWritesEvicted/'
-      'refused $diskWritesRefused/written $diskAtlasWrites  noDir $diskDirectoryUnavailable';
+      'refused $diskWritesRefused/written $diskAtlasWrites  noDir $diskDirectoryUnavailable  '
+      'restored ${diskRestoredSharp}sharp/${diskRestoredBlurry}blurry  '
+      'wrote ${diskWritesSharp}sharp/${diskWritesBlurry}blurry';
 }
 
 final DenseThumbnailQueue _denseThumbnailQueue = DenseThumbnailQueue();
@@ -2283,6 +2296,11 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
           if (image != null) {
             setState(() => _replaceAtlas(image, signature: entry.signature, cellPixels: cellPixels));
             _denseRowAtlasCache.put(_slotAtlasKey, image, signature: entry.signature);
+            if (entry.signature == _contentSignature && cellPixels == _targetPixels) {
+              DenseGridStats.diskRestoredSharp++;
+            } else {
+              DenseGridStats.diskRestoredBlurry++;
+            }
             if (entry.signature == _contentSignature) {
               _baseAtlasReady = true;
               if (cellPixels == _targetPixels) {
@@ -2940,7 +2958,24 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     );
   }
 
+  /// Saves a finished panel so that opening the app again shows it finished.
+  ///
+  /// Only ever the finished one. A partly built panel is stored under a
+  /// placeholder fingerprint that cannot match its content on the way back, so
+  /// restoring it produced a blurry panel that then had to redo every thumbnail
+  /// - and because the file is per slot, it displaced the finished panel that
+  /// had been saved there. Measured over a session: five saves scheduled, all
+  /// five of them the blurry kind, none of the sharp kind. That is what "it
+  /// opens blurry and takes a second" was made of.
+  ///
+  /// Rebuilding the blurry texture instead costs almost nothing, because its
+  /// cells are cached per photo and the data comes from the database.
   Future<void> _persistAtlas(ui.Image atlas, {bool exact = true}) {
+    if (!exact) {
+      DenseGridStats.diskWritesBlurry++;
+      return Future.value();
+    }
+    DenseGridStats.diskWritesSharp++;
     _denseAtlasPersistenceQueue.schedule(
       slot: widget.cacheSlot,
       signature: exact ? _contentSignature : _provisionalSignature,

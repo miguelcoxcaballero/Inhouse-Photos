@@ -118,6 +118,22 @@ Future<void> _realDelay(WidgetTester tester, Duration duration) async {
   await tester.pump();
 }
 
+/// Per-panel state, keyed so a panel can be followed over time.
+List<({Object key, bool hasAtlas, bool sharp})> _panelStates(WidgetTester tester) => tester
+    .widgetList<CustomPaint>(find.byType(CustomPaint))
+    .map((paint) => paint.painter)
+    .where((painter) => painter.runtimeType.toString() == '_DenseAssetRowPainter')
+    .map((painter) {
+      final dynamic p = painter;
+      final keys = p.assetKeys as List<Object?>;
+      return (
+        key: keys.isEmpty ? painter as Object : keys.first as Object,
+        hasAtlas: p.atlas != null,
+        sharp: p.atlasHidesPlaceholder as bool,
+      );
+    })
+    .toList(growable: false);
+
 int _panelCount(WidgetTester tester) => tester
     .widgetList<CustomPaint>(find.byType(CustomPaint))
     .map((paint) => paint.painter)
@@ -357,6 +373,90 @@ void main() {
     print('GRIDCOLD after restart                : ${DenseGridStats.summary()}');
     print('GRIDCOLD after restart refetched      : ${served - servedBeforeRestart}');
     print('GRIDCOLD time to a full screen        : ${settle.elapsedMilliseconds} ms');
+
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 8)));
+
+  testWidgets('how long a panel shows blurry before it is sharp', (tester) async {
+    // The complaint, stated as a number: photos appear blurry and take about a
+    // second to sharpen, on opening the app and while scrolling. This follows
+    // each panel from the moment it has any texture to the moment every cell in
+    // it carries a real photo, on a warm disk - which is what opening the app
+    // again actually looks like.
+    tester.view.devicePixelRatio = 3;
+    tester.view.physicalSize = const Size(1080, 2400);
+    addTearDown(tester.view.reset);
+
+    final service = _service(6000, assetsPerBucket: 500);
+    addTearDown(service.dispose);
+
+    Future<void> show() => tester.pumpConsumerWidget(
+      const Timeline(
+        withScrubber: false,
+        readOnly: true,
+        appBar: SliverToBoxAdapter(child: SizedBox.shrink()),
+        bottomSheet: null,
+      ),
+      overrides: [
+        timelineServiceProvider.overrideWithValue(service),
+        appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 18))),
+      ],
+      settle: false,
+    );
+
+    // First visit, so the disk has something to restore from next time.
+    await show();
+    for (var step = 0; step < 90; step++) {
+      await _realDelay(tester, const Duration(milliseconds: 100));
+    }
+    print('GRIDBLUR first visit                  : ${DenseGridStats.summary()}');
+
+    // Reopen: drop what the OS drops, keep the disk.
+    releaseDenseTimelineMemory();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _realDelay(tester, const Duration(milliseconds: 300));
+    DenseGridStats.reset();
+
+    final clock = Stopwatch()..start();
+    final firstTexture = <Object, int>{};
+    final becameSharp = <Object, int>{};
+    await show();
+    for (var step = 0; step < 100; step++) {
+      await _realDelay(tester, const Duration(milliseconds: 50));
+      for (final panel in _panelStates(tester)) {
+        if (panel.hasAtlas) {
+          firstTexture.putIfAbsent(panel.key, () => clock.elapsedMilliseconds);
+        }
+        if (panel.sharp) {
+          becameSharp.putIfAbsent(panel.key, () => clock.elapsedMilliseconds);
+        }
+      }
+      // Only stop once the screen has settled at its full panel count and all
+      // of them are sharp; stopping at the first sharp panel measured one
+      // panel and called it the answer.
+      final mounted = _panelCount(tester);
+      if (mounted > 0 && firstTexture.length >= mounted && becameSharp.length >= mounted && step > 12) {
+        break;
+      }
+    }
+    clock.stop();
+
+    final gaps = <int>[];
+    for (final entry in becameSharp.entries) {
+      final blurAt = firstTexture[entry.key];
+      if (blurAt != null) {
+        gaps.add(entry.value - blurAt);
+      }
+    }
+    gaps.sort();
+    final neverSharp = firstTexture.length - becameSharp.length;
+
+    print('GRIDBLUR reopen                       : ${DenseGridStats.summary()}');
+    print('GRIDBLUR panels that showed a texture : ${firstTexture.length}');
+    print('GRIDBLUR first texture at             : ${firstTexture.values.isEmpty ? -1 : firstTexture.values.reduce(math.min)} ms');
+    print('GRIDBLUR blurry-to-sharp median/worst : '
+        '${gaps.isEmpty ? -1 : gaps[gaps.length ~/ 2]} / ${gaps.isEmpty ? -1 : gaps.last} ms');
+    print('GRIDBLUR panels still not sharp       : $neverSharp');
 
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(minutes: 8)));
