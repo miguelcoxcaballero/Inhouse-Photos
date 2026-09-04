@@ -1,7 +1,7 @@
 {
-  "version": "3.1.76",
-  "versionCode": 7134,
+  "version": "3.1.77",
+  "versionCode": 7135,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.76-deep-scroll-and-dense-raster/Inhouse-Photos-3.1.76-arm64.apk",
-  "sha256": "7d1949fd658900e4814423466dbeecea418b56437b3f43eae3bb11a1f21ec90f"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.77-sharp-on-open/Inhouse-Photos-3.1.77-arm64.apk",
+  "sha256": "dc00c290a11808fe0c8a6533ca247f9ffa299a3c42a961053c5dd84b3a7dfccc"
 }
