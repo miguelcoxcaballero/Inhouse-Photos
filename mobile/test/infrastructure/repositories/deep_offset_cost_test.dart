@@ -58,6 +58,8 @@ void main() {
             userIds: [userId],
             afterTimelineAt: boundary.timelineAt!,
             afterCreatedAt: boundary.createdAt,
+            afterSource: boundary.cursorSource,
+            afterId: boundary.cursorId,
             limit: (_) => Limit(2048, null),
           )
           .get();
@@ -111,6 +113,8 @@ void main() {
             userIds: [userId],
             afterTimelineAt: boundary.timelineAt!,
             afterCreatedAt: boundary.createdAt,
+            afterSource: boundary.cursorSource,
+            afterId: boundary.cursorId,
             limit: (_) => Limit(500, null),
           )
           .get();

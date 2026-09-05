@@ -20,6 +20,7 @@ import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/asset_viewer/asset_viewer.page.dart';
 import 'package:immich_mobile/presentation/widgets/images/image_provider.dart';
+import 'package:immich_mobile/presentation/widgets/images/sharp_preview_cache.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail_tile.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/row.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/header.widget.dart';
@@ -66,31 +67,13 @@ int denseTimelineAssetChunkSize({
 ///
 /// The lower bound is only a guard against a degenerate viewport measurement.
 ///
-/// At or below [denseResolutionCapBelow] the cell is rendered at three quarters
-/// of its physical size and scaled up. At forty-eight columns a tile is about
-/// thirty physical pixels - a couple of millimetres - and a full-resolution
-/// thumbnail for each of the roughly forty-eight hundred on screen is what puts
-/// raster at 14.7ms against the 8.3ms a 120Hz display allows.
-///
-/// Three quarters rather than a rounder number, because of what it measures.
-/// Rendering at any reduced size and scaling back costs about 10/255 of mean
-/// channel error on its own, from the resampling alone; going from 88% to 75%
-/// takes that to 11.6 while saving 41% of the pixels rather than 25%, and 67%
-/// costs 13.3 for 56%. The error climbs far more slowly than the saving until
-/// it does not, and this is that knee.
+/// Motion defers new decodes, not the quality of pixels already displayed.
+/// Previously decoded sheets are reused across zoom levels; when stationary,
+/// new cells resolve at the actual physical display size.
 int denseTimelineTargetPixels({required double tileExtent, required double devicePixelRatio}) {
   final native = (tileExtent * devicePixelRatio).ceil();
-  if (native > denseResolutionCapBelow) {
-    return math.max(8, native);
-  }
-  return math.max(8, (native * 3 / 4).ceil());
+  return math.max(8, native);
 }
-
-/// Cell sizes at or below this are rendered at reduced resolution.
-///
-/// Chosen to catch the two densest levels and nothing else: on a 1440px screen
-/// those are thirty and forty physical pixels, while the next step up is sixty.
-const int denseResolutionCapBelow = 48;
 
 /// Cell size of the instant ThumbHash fallback texture.
 ///
@@ -930,6 +913,7 @@ class _DenseAssetChunkStore {
 
 class _DenseAtlasPersistenceQueue {
   static const int _maxPending = 4;
+
   /// Floor and ceiling for the gap between foreground writes.
   ///
   /// The floor stops a cheap encode turning into a tight loop; the ceiling is
@@ -1178,6 +1162,7 @@ class _FixedSegmentRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(timelineAssetRevisionProvider);
     final timelineState = ref.watch(
       timelineStateProvider.select((state) => (isScrubbing: state.isScrubbing, isInteracting: state.isInteracting)),
     );
@@ -1217,7 +1202,7 @@ class _FixedSegmentRow extends ConsumerWidget {
     return FutureBuilder<List<BaseAsset>>(
       future: timelineService.loadAssets(assetIndex, assetCount),
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (!snapshot.hasData) {
           return _buildPlaceholder(context);
         }
         return _buildAssetRow(context, ref, snapshot.requireData, timelineService, isDynamicLayout);
@@ -1480,6 +1465,7 @@ class DenseGridStats {
   static int diskWritesScheduled = 0;
   static int diskWritesEvicted = 0;
   static int diskWritesRefused = 0;
+
   /// Restores that came back sharp, against ones that came back blurry and had
   /// to redo every thumbnail. The second kind is what "it opens blurry then
   /// takes a second" is made of.
@@ -1542,6 +1528,7 @@ void setDenseTimelineAppVisible(bool visible) => _denseAtlasPersistenceQueue.set
 /// pressure. Visible panels retain their own small atlas, so this does not turn
 /// the current viewport blank while immediately releasing off-screen memory.
 void releaseDenseTimelineMemory() {
+  sharpPreviewCache.clear();
   _denseThumbnailQueue.cancelPending();
   _denseMetadataAtlasQueue.cancelPending();
   _denseAtlasPersistenceQueue.trimPending();
@@ -1774,6 +1761,7 @@ class _DenseAsyncTask {
 class DenseRowAtlasCache {
   final LinkedHashMap<Object, ui.Image> _images = LinkedHashMap();
   final Map<Object, String> _signatures = {};
+
   /// Which cells a stored texture already carries a real thumbnail for.
   ///
   /// Only meaningful for a partially finished panel. Without it a restored
@@ -1952,6 +1940,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   /// thumbnail and discards the panel's progress, which is what stopped the
   /// densest levels from ever converging on a sharp image.
   List<BaseAsset>? _assets;
+  SharpPreviewLease? _sharpPreviews;
   List<ImageInfo?> _images = const [];
   List<ImageStream?> _streams = const [];
   List<ImageStreamListener?> _listeners = const [];
@@ -1976,6 +1965,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   int _targetPixels = batchedGridMetadataCellPixels;
   int _metadataPixels = batchedGridMetadataCellPixels;
   int _completeAtlasKey = 0;
+
   /// Where a partly finished panel is kept, addressed by its content.
   ///
   /// The slot key is positional, so scrolling recycles it away almost at once.
@@ -2061,7 +2051,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       return false;
     }
     for (var index = 0; index < previous.length; index++) {
-      if (previous[index].heroTag != next[index].heroTag) {
+      if (previous[index] != next[index]) {
         return false;
       }
     }
@@ -2146,6 +2136,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     }
 
     _images = List<ImageInfo?>.filled(assets.length, null);
+    _sharpPreviews = sharpPreviewCache.take(assets.map(sharpPreviewKey).toList());
     _streams = List<ImageStream?>.filled(assets.length, null);
     _listeners = List<ImageStreamListener?>.filled(assets.length, null);
     _completers = List<Completer<ImageInfo>?>.filled(assets.length, null);
@@ -2238,6 +2229,10 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     }
 
     unawaited(_restoreThenBuild(generation, skipDiskRestore: restoredFromSlot));
+    if (_sharpPreviews!.cells.isNotEmpty) {
+      _scheduleRepaint();
+      unawaited(_buildCompositeAtlas(generation));
+    }
   }
 
   /// Paints the last texture stored for this grid position while the assets
@@ -2299,7 +2294,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
             image?.dispose();
             return;
           }
-          if (image != null) {
+          if (image != null && !_persistentExact && _mergedIndexes.isEmpty) {
             setState(() => _replaceAtlas(image, signature: entry.signature, cellPixels: cellPixels));
             _denseRowAtlasCache.put(_slotAtlasKey, image, signature: entry.signature);
             if (entry.signature == _contentSignature && cellPixels == _targetPixels) {
@@ -2316,6 +2311,8 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
                 return;
               }
             }
+          } else {
+            image?.dispose();
           }
         }
       }
@@ -2393,7 +2390,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     // Whatever goes wrong for one cell, the panel still gets another go.
     try {
       for (final index in _upgradeIndexes) {
-        if (_mergedIndexes.contains(index)) {
+        if (_mergedIndexes.contains(index) || (_sharpPreviews?.cells[index]?.pixels ?? 0) >= _targetPixels) {
           continue;
         }
         _requestActualThumbnail(index, targetGeneration, priority: panelPriority + (index ~/ widget.columnCount));
@@ -2510,7 +2507,38 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     }
     _atlas?.dispose();
     _atlas = image;
+    final assets = _assets;
+    if (signature == _contentSignature && cellPixels == _targetPixels && _persistentExact && assets != null) {
+      sharpPreviewCache.put(image, {
+        for (var index = 0; index < assets.length; index++)
+          sharpPreviewKey(assets[index]): Rect.fromLTWH(
+            (index % widget.columnCount) * cellPixels!.toDouble(),
+            (index ~/ widget.columnCount) * cellPixels.toDouble(),
+            cellPixels.toDouble(),
+            cellPixels.toDouble(),
+          ),
+      });
+    }
     _reportVisualReady();
+  }
+
+  void _rememberSharpAtlas() {
+    final atlas = _atlas;
+    final assets = _assets;
+    final pixels = _atlasCellPixels;
+    if (atlas == null || assets == null || pixels == null || _mergedIndexes.isEmpty) {
+      return;
+    }
+    sharpPreviewCache.put(atlas, {
+      for (final index in _mergedIndexes)
+        if (index < assets.length)
+          sharpPreviewKey(assets[index]): Rect.fromLTWH(
+            (index % widget.columnCount) * pixels.toDouble(),
+            (index ~/ widget.columnCount) * pixels.toDouble(),
+            pixels.toDouble(),
+            pixels.toDouble(),
+          ),
+    });
   }
 
   bool get _atlasIsFinalForContent =>
@@ -2779,7 +2807,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     if (_atlasBuilding || _persistentExact || assets == null || !mounted || generation != _generation) {
       return;
     }
-    if (!_images.any((image) => image != null)) {
+    if (!_images.any((image) => image != null) && (_sharpPreviews?.cells.isEmpty ?? true)) {
       return;
     }
     _atlasBuilding = true;
@@ -2803,6 +2831,27 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
         Paint()..filterQuality = FilterQuality.low,
       );
+    }
+    for (final entry in _sharpPreviews?.cells.entries ?? const <MapEntry<int, SharpPreviewCell>>[]) {
+      final index = entry.key;
+      if (_mergedIndexes.contains(index)) {
+        continue;
+      }
+      final cell = entry.value;
+      canvas.drawImageRect(
+        cell.image,
+        cell.source,
+        Rect.fromLTWH(
+          (index % widget.columnCount) * targetPixels.toDouble(),
+          (index ~/ widget.columnCount) * targetPixels.toDouble(),
+          targetPixels.toDouble(),
+          targetPixels.toDouble(),
+        ),
+        Paint()..filterQuality = FilterQuality.low,
+      );
+      if (cell.pixels >= targetPixels) {
+        merged.add(index);
+      }
     }
     for (var index = 0; index < _images.length; index++) {
       final image = _images[index]?.image;
@@ -2839,6 +2888,15 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       _images[index] = null;
     }
     _mergedIndexes.addAll(merged);
+    sharpPreviewCache.put(atlas, {
+      for (final index in _mergedIndexes)
+        sharpPreviewKey(assets[index]): Rect.fromLTWH(
+          (index % widget.columnCount) * targetPixels.toDouble(),
+          (index ~/ widget.columnCount) * targetPixels.toDouble(),
+          targetPixels.toDouble(),
+          targetPixels.toDouble(),
+        ),
+    });
     if (merged.isNotEmpty) {
       // Progress refunds the retry budget. The bound exists to stop a panel
       // that genuinely cannot resolve from re-queueing itself forever, not to
@@ -3031,6 +3089,8 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
   }
 
   void _unsubscribeFromImages({bool preserveAtlas = false}) {
+    _sharpPreviews?.dispose();
+    _sharpPreviews = null;
     _generation++;
     _metadataRetryTimer?.cancel();
     _metadataRetryTimer = null;
@@ -3091,6 +3151,8 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
         // grey was surfacing.
         willChange: reflowActive,
         painter: _DenseAssetRowPainter(
+          sharpPreviews: _sharpPreviews?.cells ?? const {},
+          mergedIndexes: _mergedIndexes,
           images: _images,
           atlas: _atlas,
           assetKeys: _assetKeys,
@@ -3111,6 +3173,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       ),
     );
     return TimelineDenseAssetLayoutMarker(
+      onCapture: _rememberSharpAtlas,
       assetKeys: _assetKeys,
       columnCount: widget.columnCount,
       tileExtent: widget.tileExtent,
@@ -3134,6 +3197,8 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
 }
 
 class _DenseAssetRowPainter extends CustomPainter {
+  final Map<int, SharpPreviewCell> sharpPreviews;
+  final Set<int> mergedIndexes;
   final List<ImageInfo?> images;
   final ui.Image? atlas;
   final List<Object> assetKeys;
@@ -3141,6 +3206,7 @@ class _DenseAssetRowPainter extends CustomPainter {
   final double tileExtent;
   final Color backgroundColor;
   final Color placeholderColor;
+
   /// Whether the atlas is known to be opaque over every cell the panel fills.
   ///
   /// True only for a finished panel, where every occupied cell carries a real
@@ -3148,6 +3214,7 @@ class _DenseAssetRowPainter extends CustomPainter {
   /// and painting it is pure overdraw - a third full pass over the panel on
   /// every frame it is on screen, on top of the background and the atlas.
   final bool atlasHidesPlaceholder;
+
   /// Why a panel has not finished, for the on-device loading tests.
   ///
   /// A panel counts as finished when every cell it wants upgraded has been
@@ -3171,6 +3238,8 @@ class _DenseAssetRowPainter extends CustomPainter {
   Float64List? _endTop;
 
   _DenseAssetRowPainter({
+    required this.sharpPreviews,
+    required this.mergedIndexes,
     required this.images,
     required this.atlas,
     required this.assetKeys,
@@ -3199,15 +3268,15 @@ class _DenseAssetRowPainter extends CustomPainter {
     textDirection: textDirection,
   );
 
-  void _prepareAtlasReflow(Size size, ui.Image atlas) {
+  void _prepareAtlasReflow(Size size, ui.Image? atlas) {
     if (_atlasTransforms != null) {
       return;
     }
 
     final inverseTransform = globalToLocalTransform();
     final sourceRows = (itemCount / columnCount).ceil();
-    final sourceWidth = atlas.width / columnCount;
-    final sourceHeight = atlas.height / sourceRows;
+    final sourceWidth = (atlas?.width ?? columnCount) / columnCount;
+    final sourceHeight = (atlas?.height ?? sourceRows) / sourceRows;
     _atlasSourceRects = Float32List(itemCount * 4);
     _atlasTransforms = Float32List(itemCount * 4);
     _startLeft = Float64List(itemCount);
@@ -3272,15 +3341,7 @@ class _DenseAssetRowPainter extends CustomPainter {
       transforms[sourceOffset + 3] = visualRect.center.dy - (scale * sourceCenterY);
     }
 
-    canvas.drawRawAtlas(
-      atlas,
-      transforms,
-      sourceRects,
-      null,
-      null,
-      Offset.zero & size,
-      Paint()..filterQuality = FilterQuality.low,
-    );
+    canvas.drawRawAtlas(atlas, transforms, sourceRects, null, null, null, Paint()..filterQuality = FilterQuality.low);
   }
 
   @override
@@ -3289,11 +3350,16 @@ class _DenseAssetRowPainter extends CustomPainter {
     final animationProgress = layoutAnimation?.value ?? 1;
     final isReflowing = previousRects.isNotEmpty && animationProgress < 1;
     final reflowProgress = isReflowing ? timelineLayoutTransitionProgress(animationProgress) : 1.0;
+    if (isReflowing) {
+      _prepareAtlasReflow(size, atlas);
+    }
     // A panel owns every pixel it is given. The cells a bucket does not fill
     // are still part of this surface, and leaving them transparent meant they
     // showed whatever the compositor had beneath - which on some devices is a
     // light grey that belongs to no palette in this app.
-    canvas.drawRect(Offset.zero & size, Paint()..color = backgroundColor);
+    if (!isReflowing) {
+      canvas.drawRect(Offset.zero & size, Paint()..color = backgroundColor);
+    }
     if (!isReflowing && !atlasHidesPlaceholder) {
       // Painted under everything else so a panel is never invisible, whatever
       // stage of loading it is in. During a zoom reflow the cells are moving,
@@ -3323,6 +3389,20 @@ class _DenseAssetRowPainter extends CustomPainter {
         );
       }
     }
+    if (!atlasHidesPlaceholder) {
+      for (final entry in sharpPreviews.entries) {
+        if (mergedIndexes.contains(entry.key)) {
+          continue;
+        }
+        final cell = entry.value;
+        canvas.drawImageRect(
+          cell.image,
+          cell.source,
+          isReflowing ? _reflowRect(entry.key, reflowProgress, size) : _currentRect(entry.key, size),
+          Paint()..filterQuality = FilterQuality.low,
+        );
+      }
+    }
     for (var index = 0; index < images.length; index++) {
       final image = images[index]?.image;
       if (image == null) {
@@ -3340,6 +3420,7 @@ class _DenseAssetRowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DenseAssetRowPainter oldDelegate) =>
+      oldDelegate.sharpPreviews != sharpPreviews ||
       oldDelegate.images != images ||
       oldDelegate.atlas != atlas ||
       oldDelegate.assetKeys != assetKeys ||

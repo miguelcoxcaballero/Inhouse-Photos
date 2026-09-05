@@ -270,7 +270,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     _scrollController = ScrollController(onAttach: _onScrollAttach, onDetach: _onScrollDetach);
     _layoutTransitionController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 210),
+      duration: const Duration(milliseconds: 260),
       value: 1,
     );
     _eventSubscription = EventStream.shared.listen(_onEvent);
@@ -475,11 +475,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
             ? targetSegment.gridOffset +
                   ((assetIndexInSegment ~/ newColumnCount) * (targetSegment.tileHeight + targetSegment.spacing))
             : targetSegment.indexToLayoutOffset(targetSegment.firstIndex + 1);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _scrollController.jumpTo(targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent));
-          }
-        });
+        if (mounted && _scrollController.hasClients) {
+          _scrollController.jumpTo(targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent));
+        }
       }
     });
     _restoreAssetIndex = null;

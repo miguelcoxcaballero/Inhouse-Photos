@@ -7,6 +7,8 @@ import 'remote_asset_cloud_id.entity.dart';
 
 mergedAsset AS MergedAssetRow:
 SELECT
+	1 as cursor_source,
+	rae.id as cursor_id,
 	rae.id as remote_id,
 	COALESCE(
 		(
@@ -60,6 +62,8 @@ WHERE
 UNION ALL
 
 SELECT
+	0 as cursor_source,
+	lae.id as cursor_id,
 	NULL as remote_id,
 	lae.id as local_id,
 	lae.name,
@@ -121,7 +125,7 @@ AND NOT EXISTS (
 -- both indexes even when they exist - a full sort plus a full scan of the local
 -- arm - which is the regression 3.1.65 shipped. `local_date_time` is backfilled
 -- and written by every path, so there is nothing left for a fallback to catch.
-ORDER BY timeline_at DESC, created_at DESC
+ORDER BY timeline_at DESC, created_at DESC, cursor_source DESC, cursor_id DESC
 LIMIT $limit;
 
 -- Same rows as `mergedAsset`, but continuing from a position rather than
@@ -135,8 +139,10 @@ LIMIT $limit;
 --
 -- The bound has to be a row value rather than `a < x OR (a = x AND b < y)`:
 -- the latter is the same set but SQLite cannot drive an index from it.
-mergedAssetAfter(:after_timeline_at AS DATETIME, :after_created_at AS DATETIME) AS MergedAssetRow:
+mergedAssetAfter(:after_timeline_at AS DATETIME, :after_created_at AS DATETIME, :after_source AS INTEGER, :after_id AS TEXT) AS MergedAssetRow:
 SELECT
+	1 as cursor_source,
+	rae.id as cursor_id,
 	rae.id as remote_id,
 	COALESCE(
 		(
@@ -186,11 +192,13 @@ WHERE
 		rae.stack_id IS NULL
 		OR rae.id = se.primary_asset_id
 	)
-	AND (rae.local_date_time, rae.created_at) < (:after_timeline_at, :after_created_at)
+	AND (rae.local_date_time, rae.created_at, 1, rae.id) < (:after_timeline_at, :after_created_at, :after_source, :after_id)
 
 UNION ALL
 
 SELECT
+	0 as cursor_source,
+	lae.id as cursor_id,
 	NULL as remote_id,
 	lae.id as local_id,
 	lae.name,
@@ -238,7 +246,7 @@ AND NOT EXISTS (
     INNER JOIN local_album_entity la on laa.album_id = la.id
     WHERE laa.asset_id = lae.id AND la.backup_selection = 2 -- excluded
 )
-AND (lae.local_date_time, lae.created_at) < (:after_timeline_at, :after_created_at)
+AND (lae.local_date_time, lae.created_at, 0, lae.id) < (:after_timeline_at, :after_created_at, :after_source, :after_id)
 -- The timeline hands each bucket a contiguous slice of this list, so the list
 -- has to be partitioned by the key the buckets group on: the wall clock. That
 -- is what `timeline_at` is, and `mergedBucket.bucket_date` is its date part.
@@ -253,7 +261,7 @@ AND (lae.local_date_time, lae.created_at) < (:after_timeline_at, :after_created_
 -- both indexes even when they exist - a full sort plus a full scan of the local
 -- arm - which is the regression 3.1.65 shipped. `local_date_time` is backfilled
 -- and written by every path, so there is nothing left for a fallback to catch.
-ORDER BY timeline_at DESC, created_at DESC
+ORDER BY timeline_at DESC, created_at DESC, cursor_source DESC, cursor_id DESC
 LIMIT $limit;
 
 mergedBucket(:group_by AS INTEGER):

@@ -17,6 +17,26 @@ BaseAsset _asset(int index) => LocalAsset(
 );
 
 void main() {
+  test('same-count metadata changes refresh the asset window', () async {
+    final changes = StreamController<List<Bucket>>.broadcast();
+    var current = _asset(0);
+    final service = TimelineService((
+      assetSource: (offset, count) async => [current],
+      bucketSource: () => changes.stream,
+      assetSourceAfter: null,
+      origin: TimelineOrigin.main,
+    ), bucketRefreshInterval: const Duration(milliseconds: 10));
+    addTearDown(service.dispose);
+    addTearDown(changes.close);
+    changes.add([const Bucket(assetCount: 1)]);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    final revision = service.revision;
+    current = (current as LocalAsset).copyWith(isFavorite: true);
+    changes.add([const Bucket(assetCount: 1)]);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    expect(service.revision, greaterThan(revision));
+    expect(service.getAssets(0, 1).single.isFavorite, isTrue);
+  });
   test('a refresh that changes no bucket does not invalidate the grid', () async {
     // Bumping the revision resets every panel and drops every cached asset
     // chunk. Background preview generation writes to a table the bucket query
@@ -39,6 +59,9 @@ void main() {
     ), bucketRefreshInterval: const Duration(milliseconds: 50));
     addTearDown(service.dispose);
 
+    var layouts = 0;
+    final layoutSubscription = service.watchBuckets().listen((_) => layouts++);
+    addTearDown(layoutSubscription.cancel);
     List<Bucket> buckets() => [
       TimeBucket(date: DateTime.utc(2026, 1, 2), assetCount: 40),
       TimeBucket(date: DateTime.utc(2026, 1, 1), assetCount: 60),
@@ -57,8 +80,9 @@ void main() {
     }
     await Future<void>.delayed(const Duration(milliseconds: 250));
 
-    expect(service.revision, revisionAfterFirst, reason: 'identical buckets must not bump the revision');
-    expect(assetReads, readsAfterFirst, reason: 'identical buckets must not re-read the asset window');
+    expect(service.revision, greaterThan(revisionAfterFirst), reason: 'asset caches must see database changes');
+    expect(layouts, 1, reason: 'identical buckets must not regenerate grid geometry');
+    expect(assetReads, greaterThan(readsAfterFirst), reason: 'same counts must still check for changed assets');
 
     // A real change still gets through.
     controller.add([

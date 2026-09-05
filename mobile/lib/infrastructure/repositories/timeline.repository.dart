@@ -56,8 +56,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
     assetSource: (offset, count) => _getMainBucketAssets(userIds, offset: offset, count: count),
     // Only the main timeline goes tens of thousands of rows deep, which is
     // where counting to an offset starts to cost more than the read itself.
-    assetSourceAfter: (afterTimelineAt, afterCreatedAt, count) =>
-        _getMainBucketAssetsAfter(userIds, timelineAt: afterTimelineAt, createdAt: afterCreatedAt, count: count),
+    assetSourceAfter: (after, count) => _getMainBucketAssetsAfter(userIds, after: after, count: count),
     origin: TimelineOrigin.main,
   );
 
@@ -79,15 +78,16 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
   /// `deep_offset_cost_test.dart`, which reads both ways and compares.
   Future<List<BaseAsset>> _getMainBucketAssetsAfter(
     List<String> userIds, {
-    required DateTime timelineAt,
-    required DateTime createdAt,
+    required BaseAsset after,
     required int count,
   }) {
     return _db.mergedAssetDrift
         .mergedAssetAfter(
           userIds: userIds,
-          afterTimelineAt: timelineAt,
-          afterCreatedAt: createdAt,
+          afterTimelineAt: after.timelineAt!,
+          afterCreatedAt: after.createdAt,
+          afterSource: after.remoteId == null ? 0 : 1,
+          afterId: (after.remoteId ?? after.localId)!,
           limit: (_) => Limit(count, null),
         )
         .map(_toAsset)

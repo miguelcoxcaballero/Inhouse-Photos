@@ -23,8 +23,7 @@ typedef TimelineBucketSource = Stream<List<Bucket>> Function();
 /// SQLite produce and discard everything before it, which measured 114ms fifty
 /// five thousand rows into a library against 31ms for the same read continuing
 /// from a key.
-typedef TimelineAssetSourceAfter =
-    Future<List<BaseAsset>> Function(DateTime afterTimelineAt, DateTime afterCreatedAt, int count);
+typedef TimelineAssetSourceAfter = Future<List<BaseAsset>> Function(BaseAsset after, int count);
 
 typedef TimelineQuery = ({
   TimelineAssetSource assetSource,
@@ -152,6 +151,7 @@ class TimelineService {
   final AsyncMutex _mutex = AsyncMutex();
   final StreamController<_TimelineBucketSnapshot> _publishedBuckets =
       StreamController<_TimelineBucketSnapshot>.broadcast(sync: true);
+  final StreamController<int> _publishedAssets = StreamController<int>.broadcast(sync: true);
   int _bufferOffset = 0;
   List<BaseAsset> _buffer = [];
   StreamSubscription? _bucketSubscription;
@@ -166,6 +166,11 @@ class TimelineService {
   int get totalAssets => _totalAssets;
   int _revision = 0;
   int get revision => _revision;
+  Stream<int> watchAssetChanges() => Stream<int>.multi((listener) {
+    final subscription = _publishedAssets.stream.listen(listener.add, onDone: listener.close);
+    listener.add(_revision);
+    listener.onCancel = subscription.cancel;
+  });
 
   TimelineService(TimelineQuery query, {Duration bucketRefreshInterval = _defaultBucketRefreshInterval})
     : this._(
@@ -271,24 +276,15 @@ class TimelineService {
   }
 
   Future<void> _applyBuckets(List<Bucket> buckets) async {
-    // A refresh that changes nothing must not reset the grid. Bumping the
-    // revision invalidates every cached asset chunk and resets every panel, so
-    // a write that leaves the buckets identical - the same days holding the same
-    // counts - would throw away work for no reason.
-    //
-    // That is not hypothetical. Generated local previews are written to
-    // `local_asset_entity`, which the bucket query reads, so every batch of them
-    // re-fires this watch. Sixteen rows every four hundred milliseconds meant the
-    // whole timeline being invalidated roughly twice a second for as long as
-    // generation ran, which is long enough on a large library to look like rows
-    // that never finish loading.
+    // Database content and grid geometry have separate notifications. A
+    // same-count upload or edit refreshes metadata without reconstructing all
+    // slivers. Unchanged panels keep their decoded textures.
     final published = _latestBucketSnapshot?.buckets;
-    if (published != null &&
+    final sameLayout =
+        published != null &&
         _buffer.isNotEmpty &&
         published.length == buckets.length &&
-        const ListEquality<Bucket>().equals(published, buckets)) {
-      return;
-    }
+        const ListEquality<Bucket>().equals(published, buckets);
 
     final totalAssets = buckets.fold<int>(0, (acc, bucket) => acc + bucket.assetCount);
 
@@ -315,11 +311,20 @@ class TimelineService {
     if (_disposed) {
       return;
     }
+    // Equal bucket counts do not mean equal photos (upload reconciliation,
+    // edits and thumbnail hashes all change without affecting day geometry).
+    // Re-read only the bounded navigation window.
     // Publish the buckets only after their matching asset window is coherent.
     // All consumers share this replaying stream, so relayout no longer opens a
     // duplicate Drift query or races ahead of the service buffer.
     _totalAssets = totalAssets;
     _revision++;
+    _publishedAssets.add(_revision);
+    // Data outside the current window can have changed as well. Invalidate
+    // demand-loaded metadata, but do not regenerate the day/row geometry.
+    if (sameLayout) {
+      return;
+    }
     final snapshot = _TimelineBucketSnapshot(++_publishedBucketRevision, List.unmodifiable(buckets));
     _latestBucketSnapshot = snapshot;
     _publishedBuckets.add(snapshot);
@@ -363,8 +368,8 @@ class TimelineService {
     final continuation = _assetSourceAfter;
     final bufferEnd = _bufferOffset + _buffer.length;
     final key = _buffer.isEmpty ? null : _buffer.last.timelineAt;
-    if (continuation != null && key != null && forward && index >= bufferEnd && index < bufferEnd + len) {
-      _buffer = await continuation(key, _buffer.last.createdAt, len);
+    if (continuation != null && key != null && forward && index >= bufferEnd && index + count <= bufferEnd + len) {
+      _buffer = await continuation(_buffer.last, len);
       _bufferOffset = bufferEnd;
       return getAssets(index, count);
     }
@@ -449,6 +454,7 @@ class TimelineService {
     await _bucketSubscription?.cancel();
     _bucketSubscription = null;
     await _publishedBuckets.close();
+    await _publishedAssets.close();
     _buffer = [];
     _bufferOffset = 0;
   }

@@ -90,6 +90,7 @@ class LocalAsset extends BaseAsset {
     return super == other &&
         id == other.id &&
         cloudId == other.cloudId &&
+        thumbHash == other.thumbHash &&
         orientation == other.orientation &&
         playbackStyle == other.playbackStyle &&
         adjustmentTime == other.adjustmentTime &&
@@ -101,6 +102,7 @@ class LocalAsset extends BaseAsset {
   int get hashCode =>
       super.hashCode ^
       id.hashCode ^
+      thumbHash.hashCode ^
       remoteId.hashCode ^
       orientation.hashCode ^
       playbackStyle.hashCode ^

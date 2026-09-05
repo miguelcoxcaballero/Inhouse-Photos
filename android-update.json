@@ -1,7 +1,7 @@
 {
-  "version": "3.1.77",
-  "versionCode": 7135,
+  "version": "3.1.78",
+  "versionCode": 7136,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.77-sharp-on-open/Inhouse-Photos-3.1.77-arm64.apk",
-  "sha256": "dc00c290a11808fe0c8a6533ca247f9ffa299a3c42a961053c5dd84b3a7dfccc"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.78-sharp-reflow/Inhouse-Photos-3.1.78-arm64.apk",
+  "sha256": "df26b9fab458ccc9b3cdfbcd7031136578ad430801b3674ca09ff5d0291f067a"
 }

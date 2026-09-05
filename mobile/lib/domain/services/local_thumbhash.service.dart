@@ -50,6 +50,7 @@ class LocalThumbHashService {
 
   bool _running = false;
   bool _stopped = false;
+  String? _afterId;
   int _requestId = 1 << 30;
 
   /// True while the grid is actively resolving thumbnails a person can see.
@@ -60,6 +61,7 @@ class LocalThumbHashService {
   static bool Function() foregroundIsBusy = () => false;
 
   Future<void> start() async {
+    _stopped = false;
     if (_running) {
       return;
     }
@@ -70,7 +72,6 @@ class LocalThumbHashService {
 
   void stop() {
     _stopped = true;
-    _running = false;
   }
 
   Future<void> _pump() async {
@@ -80,8 +81,9 @@ class LocalThumbHashService {
           await Future<void>.delayed(betweenBatches);
           continue;
         }
-        final pending = await _repository.getAssetsMissingThumbHash(limit: batchSize);
+        final pending = await _repository.getAssetsMissingThumbHash(limit: batchSize, afterId: _afterId);
         if (pending.isEmpty) {
+          _afterId = null;
           // Nothing left. The partial index makes this check almost free, but
           // there is no point asking often.
           await Future<void>.delayed(afterEmptyBatch);
@@ -97,6 +99,9 @@ class LocalThumbHashService {
             break;
           }
           final hash = await generateFor(asset.id, isVideo: asset.isVideo);
+          // Advance even on a corrupt/unavailable file. Retry it on the next
+          // sweep, after every other pending photo has had an opportunity.
+          _afterId = asset.id;
           if (hash != null) {
             generated[asset.id] = hash;
           }

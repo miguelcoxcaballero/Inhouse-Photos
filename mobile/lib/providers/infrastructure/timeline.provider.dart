@@ -34,6 +34,11 @@ final timelineFactoryProvider = Provider<TimelineFactory>(
   ),
 );
 
+final timelineAssetRevisionProvider = StreamProvider.autoDispose<int>(
+  (ref) => ref.watch(timelineServiceProvider).watchAssetChanges(),
+  dependencies: [timelineServiceProvider],
+);
+
 final timelineUsersProvider = StreamProvider<List<String>>((ref) {
   final currentUserId = ref.watch(currentUserProvider.select((u) => u?.id));
   if (currentUserId == null) {

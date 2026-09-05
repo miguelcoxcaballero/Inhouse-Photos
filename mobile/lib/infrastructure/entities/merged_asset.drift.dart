@@ -31,7 +31,7 @@ class MergedAssetDrift extends i1.ModularAccessor {
     );
     $arrayStartIndex += generatedlimit.amountOfVariables;
     return customSelect(
-      'SELECT rae.id AS remote_id, COALESCE((SELECT lae.id FROM local_asset_entity AS lae WHERE lae.checksum = rae.checksum LIMIT 1), (SELECT lae.id FROM remote_asset_cloud_id_entity AS raci INNER JOIN local_asset_entity AS lae ON lae.checksum = raci.cloud_id WHERE raci.asset_id = rae.id LIMIT 1)) AS local_id, rae.name, rae.type, rae.created_at AS created_at, rae.local_date_time AS timeline_at, rae.updated_at, rae.width, rae.height, rae.duration_ms, rae.is_favorite, rae.thumb_hash, rae.checksum, rae.owner_id, rae.live_photo_video_id, 0 AS orientation, rae.stack_id, NULL AS i_cloud_id, NULL AS latitude, NULL AS longitude, NULL AS adjustmentTime, rae.is_edited, 0 AS playback_style, rae.uploaded_at FROM remote_asset_entity AS rae LEFT JOIN stack_entity AS se ON rae.stack_id = se.id WHERE rae.deleted_at IS NULL AND rae.visibility = 0 AND rae.owner_id IN ($expandeduserIds) AND(rae.stack_id IS NULL OR rae.id = se.primary_asset_id)UNION ALL SELECT NULL AS remote_id, lae.id AS local_id, lae.name, lae.type, lae.created_at AS created_at, lae.local_date_time AS timeline_at, lae.updated_at, lae.width, lae.height, lae.duration_ms, lae.is_favorite, lae.thumb_hash, lae.checksum, NULL AS owner_id, NULL AS live_photo_video_id, lae.orientation, NULL AS stack_id, lae.i_cloud_id, lae.latitude, lae.longitude, lae.adjustment_time, 0 AS is_edited, lae.playback_style, NULL AS uploaded_at FROM local_asset_entity AS lae WHERE NOT EXISTS (SELECT 1 FROM remote_asset_entity AS rae WHERE rae.owner_id IN ($expandeduserIds) AND rae.checksum = lae.checksum) AND NOT EXISTS (SELECT 1 FROM remote_asset_cloud_id_entity AS raci INNER JOIN remote_asset_entity AS rae ON rae.id = raci.asset_id WHERE raci.cloud_id = lae.checksum AND rae.owner_id IN ($expandeduserIds)) AND EXISTS (SELECT 1 FROM local_album_asset_entity AS laa INNER JOIN local_album_entity AS la ON laa.album_id = la.id WHERE laa.asset_id = lae.id AND la.backup_selection = 0) AND NOT EXISTS (SELECT 1 FROM local_album_asset_entity AS laa INNER JOIN local_album_entity AS la ON laa.album_id = la.id WHERE laa.asset_id = lae.id AND la.backup_selection = 2) ORDER BY timeline_at DESC, created_at DESC ${generatedlimit.sql}',
+      'SELECT 1 AS cursor_source, rae.id AS cursor_id, rae.id AS remote_id, COALESCE((SELECT lae.id FROM local_asset_entity AS lae WHERE lae.checksum = rae.checksum LIMIT 1), (SELECT lae.id FROM remote_asset_cloud_id_entity AS raci INNER JOIN local_asset_entity AS lae ON lae.checksum = raci.cloud_id WHERE raci.asset_id = rae.id LIMIT 1)) AS local_id, rae.name, rae.type, rae.created_at AS created_at, rae.local_date_time AS timeline_at, rae.updated_at, rae.width, rae.height, rae.duration_ms, rae.is_favorite, rae.thumb_hash, rae.checksum, rae.owner_id, rae.live_photo_video_id, 0 AS orientation, rae.stack_id, NULL AS i_cloud_id, NULL AS latitude, NULL AS longitude, NULL AS adjustmentTime, rae.is_edited, 0 AS playback_style, rae.uploaded_at FROM remote_asset_entity AS rae LEFT JOIN stack_entity AS se ON rae.stack_id = se.id WHERE rae.deleted_at IS NULL AND rae.visibility = 0 AND rae.owner_id IN ($expandeduserIds) AND(rae.stack_id IS NULL OR rae.id = se.primary_asset_id)UNION ALL SELECT 0 AS cursor_source, lae.id AS cursor_id, NULL AS remote_id, lae.id AS local_id, lae.name, lae.type, lae.created_at AS created_at, lae.local_date_time AS timeline_at, lae.updated_at, lae.width, lae.height, lae.duration_ms, lae.is_favorite, lae.thumb_hash, lae.checksum, NULL AS owner_id, NULL AS live_photo_video_id, lae.orientation, NULL AS stack_id, lae.i_cloud_id, lae.latitude, lae.longitude, lae.adjustment_time, 0 AS is_edited, lae.playback_style, NULL AS uploaded_at FROM local_asset_entity AS lae WHERE NOT EXISTS (SELECT 1 FROM remote_asset_entity AS rae WHERE rae.owner_id IN ($expandeduserIds) AND rae.checksum = lae.checksum) AND NOT EXISTS (SELECT 1 FROM remote_asset_cloud_id_entity AS raci INNER JOIN remote_asset_entity AS rae ON rae.id = raci.asset_id WHERE raci.cloud_id = lae.checksum AND rae.owner_id IN ($expandeduserIds)) AND EXISTS (SELECT 1 FROM local_album_asset_entity AS laa INNER JOIN local_album_entity AS la ON laa.album_id = la.id WHERE laa.asset_id = lae.id AND la.backup_selection = 0) AND NOT EXISTS (SELECT 1 FROM local_album_asset_entity AS laa INNER JOIN local_album_entity AS la ON laa.album_id = la.id WHERE laa.asset_id = lae.id AND la.backup_selection = 2) ORDER BY timeline_at DESC, created_at DESC, cursor_source DESC, cursor_id DESC ${generatedlimit.sql}',
       variables: [
         for (var $ in userIds) i0.Variable<String>($),
         ...generatedlimit.introducedVariables,
@@ -47,6 +47,8 @@ class MergedAssetDrift extends i1.ModularAccessor {
       },
     ).map(
       (i0.QueryRow row) => MergedAssetRow(
+        cursorSource: row.read<int>('cursor_source'),
+        cursorId: row.read<String>('cursor_id'),
         remoteId: row.readNullable<String>('remote_id'),
         localId: row.readNullable<String>('local_id'),
         name: row.read<String>('name'),
@@ -81,9 +83,11 @@ class MergedAssetDrift extends i1.ModularAccessor {
     required List<String> userIds,
     required DateTime afterTimelineAt,
     required DateTime afterCreatedAt,
+    required int afterSource,
+    required String afterId,
     required MergedAssetAfter$limit limit,
   }) {
-    var $arrayStartIndex = 3;
+    var $arrayStartIndex = 5;
     final expandeduserIds = $expandVar($arrayStartIndex, userIds.length);
     $arrayStartIndex += userIds.length;
     final generatedlimit = $write(
@@ -92,10 +96,12 @@ class MergedAssetDrift extends i1.ModularAccessor {
     );
     $arrayStartIndex += generatedlimit.amountOfVariables;
     return customSelect(
-      'SELECT rae.id AS remote_id, COALESCE((SELECT lae.id FROM local_asset_entity AS lae WHERE lae.checksum = rae.checksum LIMIT 1), (SELECT lae.id FROM remote_asset_cloud_id_entity AS raci INNER JOIN local_asset_entity AS lae ON lae.checksum = raci.cloud_id WHERE raci.asset_id = rae.id LIMIT 1)) AS local_id, rae.name, rae.type, rae.created_at AS created_at, rae.local_date_time AS timeline_at, rae.updated_at, rae.width, rae.height, rae.duration_ms, rae.is_favorite, rae.thumb_hash, rae.checksum, rae.owner_id, rae.live_photo_video_id, 0 AS orientation, rae.stack_id, NULL AS i_cloud_id, NULL AS latitude, NULL AS longitude, NULL AS adjustmentTime, rae.is_edited, 0 AS playback_style, rae.uploaded_at FROM remote_asset_entity AS rae LEFT JOIN stack_entity AS se ON rae.stack_id = se.id WHERE rae.deleted_at IS NULL AND rae.visibility = 0 AND rae.owner_id IN ($expandeduserIds) AND(rae.stack_id IS NULL OR rae.id = se.primary_asset_id)AND (rae.local_date_time, rae.created_at) < (?1, ?2) UNION ALL SELECT NULL AS remote_id, lae.id AS local_id, lae.name, lae.type, lae.created_at AS created_at, lae.local_date_time AS timeline_at, lae.updated_at, lae.width, lae.height, lae.duration_ms, lae.is_favorite, lae.thumb_hash, lae.checksum, NULL AS owner_id, NULL AS live_photo_video_id, lae.orientation, NULL AS stack_id, lae.i_cloud_id, lae.latitude, lae.longitude, lae.adjustment_time, 0 AS is_edited, lae.playback_style, NULL AS uploaded_at FROM local_asset_entity AS lae WHERE NOT EXISTS (SELECT 1 FROM remote_asset_entity AS rae WHERE rae.owner_id IN ($expandeduserIds) AND rae.checksum = lae.checksum) AND NOT EXISTS (SELECT 1 FROM remote_asset_cloud_id_entity AS raci INNER JOIN remote_asset_entity AS rae ON rae.id = raci.asset_id WHERE raci.cloud_id = lae.checksum AND rae.owner_id IN ($expandeduserIds)) AND EXISTS (SELECT 1 FROM local_album_asset_entity AS laa INNER JOIN local_album_entity AS la ON laa.album_id = la.id WHERE laa.asset_id = lae.id AND la.backup_selection = 0) AND NOT EXISTS (SELECT 1 FROM local_album_asset_entity AS laa INNER JOIN local_album_entity AS la ON laa.album_id = la.id WHERE laa.asset_id = lae.id AND la.backup_selection = 2) AND (lae.local_date_time, lae.created_at) < (?1, ?2) ORDER BY timeline_at DESC, created_at DESC ${generatedlimit.sql}',
+      'SELECT 1 AS cursor_source, rae.id AS cursor_id, rae.id AS remote_id, COALESCE((SELECT lae.id FROM local_asset_entity AS lae WHERE lae.checksum = rae.checksum LIMIT 1), (SELECT lae.id FROM remote_asset_cloud_id_entity AS raci INNER JOIN local_asset_entity AS lae ON lae.checksum = raci.cloud_id WHERE raci.asset_id = rae.id LIMIT 1)) AS local_id, rae.name, rae.type, rae.created_at AS created_at, rae.local_date_time AS timeline_at, rae.updated_at, rae.width, rae.height, rae.duration_ms, rae.is_favorite, rae.thumb_hash, rae.checksum, rae.owner_id, rae.live_photo_video_id, 0 AS orientation, rae.stack_id, NULL AS i_cloud_id, NULL AS latitude, NULL AS longitude, NULL AS adjustmentTime, rae.is_edited, 0 AS playback_style, rae.uploaded_at FROM remote_asset_entity AS rae LEFT JOIN stack_entity AS se ON rae.stack_id = se.id WHERE rae.deleted_at IS NULL AND rae.visibility = 0 AND rae.owner_id IN ($expandeduserIds) AND(rae.stack_id IS NULL OR rae.id = se.primary_asset_id)AND (rae.local_date_time, rae.created_at, 1, rae.id) < (?1, ?2, ?3, ?4) UNION ALL SELECT 0 AS cursor_source, lae.id AS cursor_id, NULL AS remote_id, lae.id AS local_id, lae.name, lae.type, lae.created_at AS created_at, lae.local_date_time AS timeline_at, lae.updated_at, lae.width, lae.height, lae.duration_ms, lae.is_favorite, lae.thumb_hash, lae.checksum, NULL AS owner_id, NULL AS live_photo_video_id, lae.orientation, NULL AS stack_id, lae.i_cloud_id, lae.latitude, lae.longitude, lae.adjustment_time, 0 AS is_edited, lae.playback_style, NULL AS uploaded_at FROM local_asset_entity AS lae WHERE NOT EXISTS (SELECT 1 FROM remote_asset_entity AS rae WHERE rae.owner_id IN ($expandeduserIds) AND rae.checksum = lae.checksum) AND NOT EXISTS (SELECT 1 FROM remote_asset_cloud_id_entity AS raci INNER JOIN remote_asset_entity AS rae ON rae.id = raci.asset_id WHERE raci.cloud_id = lae.checksum AND rae.owner_id IN ($expandeduserIds)) AND EXISTS (SELECT 1 FROM local_album_asset_entity AS laa INNER JOIN local_album_entity AS la ON laa.album_id = la.id WHERE laa.asset_id = lae.id AND la.backup_selection = 0) AND NOT EXISTS (SELECT 1 FROM local_album_asset_entity AS laa INNER JOIN local_album_entity AS la ON laa.album_id = la.id WHERE laa.asset_id = lae.id AND la.backup_selection = 2) AND (lae.local_date_time, lae.created_at, 0, lae.id) < (?1, ?2, ?3, ?4) ORDER BY timeline_at DESC, created_at DESC, cursor_source DESC, cursor_id DESC ${generatedlimit.sql}',
       variables: [
         i0.Variable<DateTime>(afterTimelineAt),
         i0.Variable<DateTime>(afterCreatedAt),
+        i0.Variable<int>(afterSource),
+        i0.Variable<String>(afterId),
         for (var $ in userIds) i0.Variable<String>($),
         ...generatedlimit.introducedVariables,
       ],
@@ -110,6 +116,8 @@ class MergedAssetDrift extends i1.ModularAccessor {
       },
     ).map(
       (i0.QueryRow row) => MergedAssetRow(
+        cursorSource: row.read<int>('cursor_source'),
+        cursorId: row.read<String>('cursor_id'),
         remoteId: row.readNullable<String>('remote_id'),
         localId: row.readNullable<String>('local_id'),
         name: row.read<String>('name'),
@@ -195,6 +203,8 @@ class MergedAssetDrift extends i1.ModularAccessor {
 }
 
 class MergedAssetRow {
+  final int cursorSource;
+  final String cursorId;
   final String? remoteId;
   final String? localId;
   final String name;
@@ -220,6 +230,8 @@ class MergedAssetRow {
   final int playbackStyle;
   final DateTime? uploadedAt;
   MergedAssetRow({
+    required this.cursorSource,
+    required this.cursorId,
     this.remoteId,
     this.localId,
     required this.name,

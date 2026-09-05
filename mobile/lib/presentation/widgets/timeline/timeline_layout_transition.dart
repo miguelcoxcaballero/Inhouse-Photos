@@ -182,6 +182,7 @@ class TimelineDenseAssetLayoutMarker extends SingleChildRenderObjectWidget {
     required this.columnCount,
     required this.tileExtent,
     required this.textDirection,
+    this.onCapture,
     required super.child,
   });
 
@@ -189,6 +190,7 @@ class TimelineDenseAssetLayoutMarker extends SingleChildRenderObjectWidget {
   final int columnCount;
   final double tileExtent;
   final TextDirection textDirection;
+  final VoidCallback? onCapture;
 
   @override
   RenderTimelineDenseAssetLayoutMarker createRenderObject(BuildContext context) => RenderTimelineDenseAssetLayoutMarker(
@@ -196,6 +198,8 @@ class TimelineDenseAssetLayoutMarker extends SingleChildRenderObjectWidget {
     columnCount: columnCount,
     tileExtent: tileExtent,
     textDirection: textDirection,
+    transition: TimelineLayoutTransitionScope.maybeOf(context),
+    onCapture: onCapture,
   );
 
   @override
@@ -204,7 +208,9 @@ class TimelineDenseAssetLayoutMarker extends SingleChildRenderObjectWidget {
       ..assetKeys = assetKeys
       ..columnCount = columnCount
       ..tileExtent = tileExtent
-      ..textDirection = textDirection;
+      ..textDirection = textDirection
+      ..onCapture = onCapture
+      ..transition = TimelineLayoutTransitionScope.maybeOf(context);
   }
 }
 
@@ -214,12 +220,16 @@ class RenderTimelineDenseAssetLayoutMarker extends RenderProxyBox {
     required this.columnCount,
     required this.tileExtent,
     required this.textDirection,
+    this.transition,
+    this.onCapture,
   });
 
   List<Object> assetKeys;
   int columnCount;
   double tileExtent;
   TextDirection textDirection;
+  TimelineLayoutTransitionScope? transition;
+  VoidCallback? onCapture;
 
   void collectVisibleAssetRects(Rect visibleBounds, Map<Object, Rect> result) {
     if (!attached || !hasSize || size.isEmpty || columnCount <= 0 || tileExtent <= 0) {
@@ -235,6 +245,7 @@ class RenderTimelineDenseAssetLayoutMarker extends RenderProxyBox {
     if (!MatrixUtils.transformRect(transform, Offset.zero & size).overlaps(visibleBounds)) {
       return;
     }
+    onCapture?.call();
     for (var index = 0; index < assetKeys.length; index++) {
       final localRect = calculateTimelineDenseAssetRect(
         index: index,
@@ -243,7 +254,15 @@ class RenderTimelineDenseAssetLayoutMarker extends RenderProxyBox {
         containerWidth: size.width,
         textDirection: textDirection,
       );
-      final globalRect = MatrixUtils.transformRect(transform, localRect);
+      var globalRect = MatrixUtils.transformRect(transform, localRect);
+      final previous = transition?.previousRects[assetKeys[index]];
+      if (previous != null && transition!.animation.value < 1) {
+        globalRect = calculateTimelineAssetTransitionRect(
+          previousRect: previous,
+          currentRect: globalRect,
+          progress: transition!.animation.value,
+        );
+      }
       if (globalRect.overlaps(visibleBounds)) {
         result[assetKeys[index]] = globalRect;
       }

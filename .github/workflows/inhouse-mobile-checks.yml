@@ -1,0 +1,40 @@
+name: Inhouse mobile regression checks
+on:
+  pull_request:
+    paths: ['mobile/**', '.github/workflows/inhouse-mobile-checks.yml']
+  push:
+    branches: [main]
+    paths: ['mobile/**', '.github/workflows/inhouse-mobile-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: inhouse-mobile-checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: immich-app/devtools/actions/use-mise@3bca63ca3c15020293b36b51737a3ee2c773340b
+        with:
+          github_token: ${{ github.token }}
+          working_directory: ./mobile
+      - run: flutter pub get --enforce-lockfile
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: dart analyze --fatal-infos
+      - run: >-
+          flutter test
+          test/unit/required_update_gate_test.dart
+          test/services/auth.service_test.dart
+          test/domain/services/timeline_norefresh_test.dart
+          test/domain/services/timeline_service_performance_test.dart
+          test/domain/services/local_thumbhash_service_test.dart
+          test/infrastructure/repositories/timeline_cursor_ties_test.dart
+          test/presentation/widgets/timeline/
+          test/presentation/widgets/images/sharp_preview_cache_test.dart
+          test/drift/main/migration_test.dart

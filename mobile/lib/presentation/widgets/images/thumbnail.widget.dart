@@ -5,6 +5,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/theme_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/images/image_provider.dart';
+import 'package:immich_mobile/presentation/widgets/images/sharp_preview_cache.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumb_hash_provider.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/constants.dart';
@@ -15,6 +16,7 @@ final log = Logger('ThumbnailWidget');
 enum ThumbhashMode { enabled, disabled, only }
 
 class Thumbnail extends StatefulWidget {
+  final Object? previewKey;
   final ImageProvider? imageProvider;
   final ImageProvider? thumbhashProvider;
   final BoxFit fit;
@@ -22,6 +24,7 @@ class Thumbnail extends StatefulWidget {
   final bool repaintBoundary;
 
   const Thumbnail({
+    this.previewKey,
     this.imageProvider,
     this.fit = BoxFit.cover,
     this.thumbhashProvider,
@@ -38,7 +41,8 @@ class Thumbnail extends StatefulWidget {
     this.animate = true,
     this.repaintBoundary = true,
     super.key,
-  }) : imageProvider = RemoteImageProvider.thumbnail(assetId: remoteId, thumbhash: thumbhash),
+  }) : previewKey = null,
+       imageProvider = RemoteImageProvider.thumbnail(assetId: remoteId, thumbhash: thumbhash),
        thumbhashProvider = null;
 
   Thumbnail.fromAsset({
@@ -50,7 +54,8 @@ class Thumbnail extends StatefulWidget {
     this.animate = true,
     this.repaintBoundary = true,
     super.key,
-  }) : thumbhashProvider = switch (asset) {
+  }) : previewKey = asset == null ? null : sharpPreviewKey(asset),
+       thumbhashProvider = switch (asset) {
          RemoteAsset() when asset.thumbHash != null && asset.localId == null => ThumbHashProvider(
            thumbHash: asset.thumbHash!,
          ),
@@ -63,6 +68,7 @@ class Thumbnail extends StatefulWidget {
 }
 
 class _ThumbnailState extends State<Thumbnail> with SingleTickerProviderStateMixin {
+  SharpPreviewLease? _sharpPreview;
   ui.Image? _providerImage;
   ui.Image? _previousImage;
 
@@ -95,7 +101,7 @@ class _ThumbnailState extends State<Thumbnail> with SingleTickerProviderStateMix
   void _loadFromThumbhashProvider() {
     _stopListeningToThumbhashStream();
     final thumbhashProvider = widget.thumbhashProvider;
-    if (thumbhashProvider == null || _providerImage != null) {
+    if (thumbhashProvider == null || _providerImage != null || (_sharpPreview?.cells.isNotEmpty ?? false)) {
       return;
     }
 
@@ -138,6 +144,15 @@ class _ThumbnailState extends State<Thumbnail> with SingleTickerProviderStateMix
 
         if (_providerImage == imageInfo.image) {
           return;
+        }
+        final key = widget.previewKey;
+        if (key != null) {
+          final image = imageInfo.image;
+          // Square center crop, matching the gallery's cover fit.
+          final side = image.width < image.height ? image.width.toDouble() : image.height.toDouble();
+          sharpPreviewCache.put(image, {
+            key: Rect.fromLTWH((image.width - side) / 2, (image.height - side) / 2, side, side),
+          });
         }
 
         if (!widget.animate || (synchronousCall && _providerImage == null) || !_isVisible()) {
@@ -190,6 +205,14 @@ class _ThumbnailState extends State<Thumbnail> with SingleTickerProviderStateMix
   @override
   void didUpdateWidget(Thumbnail oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.previewKey != oldWidget.previewKey) {
+      _sharpPreview?.dispose();
+      _sharpPreview = widget.previewKey == null ? null : sharpPreviewCache.take([widget.previewKey!]);
+      _providerImage?.dispose();
+      _providerImage = null;
+      _previousImage?.dispose();
+      _previousImage = null;
+    }
 
     if (widget.imageProvider != oldWidget.imageProvider) {
       if (_fadeController.isAnimating) {
@@ -212,6 +235,8 @@ class _ThumbnailState extends State<Thumbnail> with SingleTickerProviderStateMix
   }
 
   void _loadImage() {
+    _sharpPreview?.dispose();
+    _sharpPreview = widget.previewKey == null ? null : sharpPreviewCache.take([widget.previewKey!]);
     _loadFromImageProvider();
     _loadFromThumbhashProvider();
   }
@@ -239,6 +264,10 @@ class _ThumbnailState extends State<Thumbnail> with SingleTickerProviderStateMix
     return AnimatedBuilder(
       animation: _fadeAnimation,
       builder: (context, child) {
+        final sharp = _sharpPreview?.cells[0];
+        if (_providerImage == null && sharp != null) {
+          return CustomPaint(painter: _SharpThumbnailPainter(sharp), size: Size.infinite);
+        }
         return _ThumbnailLeaf(
           image: _providerImage,
           previousImage: _previousImage,
@@ -253,6 +282,7 @@ class _ThumbnailState extends State<Thumbnail> with SingleTickerProviderStateMix
 
   @override
   void dispose() {
+    _sharpPreview?.dispose();
     _fadeController.removeStatusListener(_onAnimationStatusChanged);
     _fadeController.dispose();
     _stopListeningToStream();
@@ -260,6 +290,16 @@ class _ThumbnailState extends State<Thumbnail> with SingleTickerProviderStateMix
     _previousImage?.dispose();
     super.dispose();
   }
+}
+
+class _SharpThumbnailPainter extends CustomPainter {
+  final SharpPreviewCell cell;
+  _SharpThumbnailPainter(this.cell);
+  @override
+  void paint(Canvas canvas, Size size) =>
+      canvas.drawImageRect(cell.image, cell.source, Offset.zero & size, Paint()..filterQuality = FilterQuality.low);
+  @override
+  bool shouldRepaint(covariant _SharpThumbnailPainter oldDelegate) => oldDelegate.cell != cell;
 }
 
 class _ThumbnailLeaf extends LeafRenderObjectWidget {

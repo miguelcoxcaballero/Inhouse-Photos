@@ -69,10 +69,14 @@ class DriftLocalAssetRepository extends DriftDatabaseRepository {
   /// The `IS NULL` predicate matches `idx_local_asset_missing_thumb_hash`, which
   /// is partial on exactly that condition, so this reads only the backlog rather
   /// than scanning a library that is almost entirely done.
-  Future<List<({String id, bool isVideo})>> getAssetsMissingThumbHash({required int limit}) {
+  Future<List<({String id, bool isVideo})>> getAssetsMissingThumbHash({required int limit, String? afterId}) {
     final query = _db.localAssetEntity.select()
       ..where((row) => row.thumbHash.isNull())
+      ..orderBy([(row) => OrderingTerm.asc(row.id)])
       ..limit(limit);
+    if (afterId != null) {
+      query.where((row) => row.id.isBiggerThanValue(afterId));
+    }
     return query.map((row) => (id: row.id, isVideo: row.type == AssetType.video)).get();
   }
 
