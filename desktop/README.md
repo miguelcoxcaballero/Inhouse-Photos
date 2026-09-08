@@ -8,16 +8,33 @@ in the executable. Requires Windows 10/11 with .NET Framework 4.8.
 Build: `powershell -File desktop/build.ps1`. Run `--self-test` for non-mutating
 checks. `--render-preview PATH.png` renders the application's own window offscreen.
 
-Implemented: installation discovery, health checks, hidden engine start, start
-existing services, disk usage, physical-disk inventory, database snapshots,
+Implemented: per-user installer with SHA-256 validation and versioned files,
+installation discovery, health checks, hidden engine start, start
+existing services, tray supervisor, opt-in Windows sign-in startup, disk usage,
+physical-disk inventory, database snapshots,
 copy-only media backup to a separate drive, endpoint validation and mobile linking.
 Database snapshots alone are not a backup of the photos. The UI explicitly says
 so. Copy-only backups never mirror deletions or overwrite existing files.
 
-Safety boundary: there is no format, delete-volume, prune or uninstall-data action.
-Storage Spaces management opens the Windows control panel; this version does not
-automatically create a RAID pool or redistribute the library. New server
-provisioning and transparent engine installation are not implemented yet.
+Adoption exports a consistent PostgreSQL snapshot, restores it to an isolated,
+labelled disposable database, compares asset/user/album counts, and rechecks
+container identities and configuration hashes before saving a receipt. Original
+containers and media stay in place. Configuration copies use current-user DPAPI.
+The database snapshot does not include media files.
+
+The startup switch uses a limited, interactive scheduled task: it starts after
+Windows sign-in, not before login. It preserves the independent DDNS task.
+Disabling startup does not stop a running server. Unlinking restores the prior
+startup configuration. There is no forced Docker/WSL restart or container recreation.
+
+Storage Spaces supports mirror/parity creation using only uniquely verified,
+empty, poolable disks, with typed confirmation and Windows elevation. Only the
+newly created virtual disk can be formatted; existing partitions are refused.
+Adding a disk increases pool capacity, not an existing volume automatically.
+No existing-data RAID conversion, delete-volume, prune or uninstall-data action
+is provided. Real RAID creation requires eligible empty disks and has not been
+hardware-tested on this installation. New server provisioning and transparent
+engine installation are not implemented yet; this release manages existing servers.
 
 The program is not Authenticode-signed. Do not instruct people to disable
 SmartScreen or their antivirus. Publish the SHA-256 with the download.

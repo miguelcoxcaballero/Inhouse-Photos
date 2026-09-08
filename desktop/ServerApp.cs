@@ -17,19 +17,23 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("0.1.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
     public string Installation { get; set; }
     public string Endpoint { get; set; }
     public string BackupDestination { get; set; }
+    public string ProjectName { get; set; }
+    public string LocalEndpoint { get; set; }
+    public string ReceiptPath { get; set; }
+    public bool Managed { get; set; }
   }
   public sealed class DiskInfo {
     public string Root, Name;
     public long Total, Free;
   }
-  public static class Backend {
+  public static partial class Backend {
     public static readonly string SettingsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Inhouse Photos Server");
     public static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
     public static string Quote(string s) {
@@ -56,10 +60,11 @@ namespace InhousePhotos {
           if (first != null) { try { p.Endpoint = CanonicalEndpoint("https://" + first.Split('{')[0].Trim()); } catch { } }
         }
       }
+      if(String.IsNullOrEmpty(p.LocalEndpoint))p.LocalEndpoint="http://127.0.0.1:2283";
       return p;
     }
     public static void Save(Preferences p) {
-      Directory.CreateDirectory(SettingsDir);
+      PrivateDirectory(SettingsDir);
       var path = Path.Combine(SettingsDir,"settings.json");
       var temp = path + ".new";
       File.WriteAllText(temp,Json.Serialize(p),new UTF8Encoding(false));
@@ -89,7 +94,7 @@ namespace InhousePhotos {
     }
     public static Task<string> Compose(Preferences p, string args, int seconds) {
       if (String.IsNullOrEmpty(p.Installation) || !File.Exists(Path.Combine(p.Installation,"docker-compose.yml"))) throw new InvalidOperationException("Selecciona la carpeta de tu servidor existente.");
-      return Run(DockerExe(),"compose --project-directory " + Quote(p.Installation) + " -f " + Quote(Path.Combine(p.Installation,"docker-compose.yml")) + " " + args,p.Installation,seconds);
+      return Run(DockerExe(),ComposeArgs(p,args),p.Installation,seconds);
     }
     public static async Task<bool> Ping(string endpoint) {
       try {
@@ -189,7 +194,7 @@ namespace InhousePhotos {
       return target;
     }
   }
-  public sealed class ServerWindow : Window {
+  public sealed partial class ServerWindow : Window {
     readonly Preferences prefs=Backend.Load();
     readonly StackPanel content=new StackPanel();
     readonly TextBlock notice=new TextBlock();
@@ -234,7 +239,7 @@ namespace InhousePhotos {
           Heading("Tu servidor","Tus fotos permanecen en este equipo. Cerrar esta ventana no detiene el servidor.");
           var health=Label("Comprobando conexión…",22,muted);content.Children.Add(health);
           var pingTask=String.IsNullOrEmpty(prefs.Endpoint)?Task.FromResult(false):Backend.Ping(prefs.Endpoint);
-          var local=await Backend.Ping("http://127.0.0.1:2283");var remote=await pingTask;
+          var local=await Backend.Ping(prefs.LocalEndpoint);var remote=await pingTask;
           health.Text=local?"●  Servidor en funcionamiento":"○  Servidor no disponible";health.Foreground=local?new SolidColorBrush(Color.FromRgb(160,201,145)):accent;
           content.Children.Add(Label(remote?"Acceso por internet disponible":"No se ha podido verificar el acceso por internet",15,muted));
           if(!String.IsNullOrEmpty(prefs.Endpoint))Action("Abrir mi biblioteca ↗",()=>{Open(Backend.CanonicalEndpoint(prefs.Endpoint));return Task.FromResult(0);},true);
@@ -246,10 +251,7 @@ namespace InhousePhotos {
             }
           }catch(Exception ex){content.Children.Add(Label(ex.Message,15,muted));}
           Action("Encender servidor",async()=>{
-            var docker=Backend.DockerExe();var engine=Path.GetFullPath(Path.Combine(Path.GetDirectoryName(docker),@"..\..\Docker Desktop.exe"));
-            bool running=true;try{await Backend.Run(docker,"info",Environment.SystemDirectory,8);}catch{running=false;}
-            if(!running){if(!File.Exists(engine))throw new InvalidOperationException("No se encuentra el motor del servidor.");Process.Start(new ProcessStartInfo(engine){UseShellExecute=true,WindowStyle=ProcessWindowStyle.Hidden});notice.Text="Iniciando el motor del servidor…";var ready=false;for(int i=0;i<24;i++){await Task.Delay(5000);try{await Backend.Run(docker,"info",Environment.SystemDirectory,5);ready=true;}catch{}if(ready)break;}if(!ready)throw new TimeoutException("El motor todavía no está listo. Puede requerir reiniciar Windows.");}
-            await Backend.Compose(prefs,"up -d --no-recreate",120);notice.Text="Inicio solicitado. Espera unos segundos y actualiza el estado.";
+            await Backend.StartManaged(prefs,text=>Dispatcher.Invoke(()=>notice.Text=text));notice.Text="Biblioteca disponible.";
           });
           Action("Actualizar estado",async()=>{notice.Text="";await Render();});
         } else if(page=="Discos") {
@@ -261,8 +263,8 @@ namespace InhousePhotos {
             content.Children.Add(Label(Backend.Size(disk.Free)+" disponibles",14,muted));Rule();
           }
           content.Children.Add(Label("Discos físicos",20));content.Children.Add(Label(await Task.Run(()=>Backend.PhysicalDisks()),14,muted));
-          content.Children.Add(Label("RAID / Espacios de almacenamiento",20));content.Children.Add(Label("Esta versión no modifica particiones ni crea RAID. En Windows puedes configurar redundancia con discos vacíos. Una copia en otro disco sigue siendo necesaria.",15,muted));
-          Action("Abrir Espacios de almacenamiento",()=>{if(Confirm("Se abrirá la configuración de Windows. Crear un grupo puede borrar los discos seleccionados. No selecciones el disco del sistema ni el de tu biblioteca."))Process.Start(new ProcessStartInfo("control.exe","/name Microsoft.StorageSpaces"){UseShellExecute=true});return Task.FromResult(0);});
+          content.Children.Add(Label("Espacio protegido / RAID",20));content.Children.Add(Label("Crea un espejo o un grupo de paridad, o añade discos vacíos a un grupo de Inhouse Photos. Los discos con datos no son seleccionables.",15,muted));
+          Action("Configurar discos protegidos",()=>{Process.Start(new ProcessStartInfo(typeof(Program).Assembly.Location,"--storage"){UseShellExecute=true,Verb="runas",WindowStyle=ProcessWindowStyle.Normal});return Task.FromResult(0);});
         } else if(page=="Protección") {
           Heading("Copia de seguridad","Conserva una segunda copia. RAID no protege frente a borrados accidentales.");
           content.Children.Add(Label("Biblioteca + base de datos",22));content.Children.Add(Label("Copia los archivos nuevos a otro disco sin replicar borrados ni sobrescribir archivos. Al finalizar guarda una copia de la base de datos. Evita editar o subir fotos mientras se ejecuta esta primera copia.",15,muted));
@@ -286,7 +288,8 @@ namespace InhousePhotos {
           Action("Seleccionar instalación",()=>{var path=PickFolder();if(path!=null){if(!File.Exists(Path.Combine(path,"docker-compose.yml")))throw new InvalidOperationException("Esta carpeta no contiene docker-compose.yml.");if(Confirm("¿Confiar en esta instalación? Inhouse ejecutará sus servicios cuando pulses Encender servidor.")){prefs.Installation=path;Backend.Save(prefs);folder.Text=path;}}return Task.FromResult(0);});
           content.Children.Add(Label("Dirección de la biblioteca",18));var endpoint=new TextBox{Text=prefs.Endpoint??"",Padding=new Thickness(12),FontSize=16,Margin=new Thickness(0,4,0,10)};content.Children.Add(endpoint);
           Action("Comprobar y guardar dirección",async()=>{var url=Backend.CanonicalEndpoint(endpoint.Text);if(!await Backend.Ping(url))throw new InvalidOperationException("No responde un servidor compatible en esa dirección. No se ha guardado.");prefs.Endpoint=url;Backend.Save(prefs);notice.Text="Conexión verificada y guardada.";},true);
-          Rule();content.Children.Add(Label("Inhouse Photos Server 0.1",16));content.Children.Add(Label("Administra tu instalación existente. Preparar un servidor nuevo y crear RAID desde esta interfaz aún no está disponible. El motor se ejecuta en segundo plano; no necesitas abrir su panel para gestionar el servidor.",15,muted));
+          await RenderManagement();
+          Rule();content.Children.Add(Label("Inhouse Photos Server "+Backend.Version,16));
         }
       }catch(Exception ex){content.Children.Add(Label(ex.Message,16,accent));}finally{refreshing=false;foreach(var tab in tabs.Values)tab.IsEnabled=true;}
     }
@@ -294,8 +297,29 @@ namespace InhousePhotos {
   public static class Program {
     [STAThread] public static int Main(string[] args){
       ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
+      if(args.Contains("--storage")){return new Application().Run(new StorageWindow());}
+      if(args.Contains("--adopt-current")||args.Contains("--verify-installation")||args.Contains("--start-once")||args.Contains("--enable-startup")||args.Contains("--disable-startup")) {
+        try {
+          var prefs=Backend.Load();
+          if(args.Contains("--adopt-current"))Backend.Adopt(prefs,Console.WriteLine).GetAwaiter().GetResult();
+          else if(args.Contains("--start-once"))Backend.StartManaged(prefs,Console.WriteLine).GetAwaiter().GetResult();
+          else if(args.Contains("--enable-startup")||args.Contains("--disable-startup"))Startup.SetEnabled(prefs,args.Contains("--enable-startup")).GetAwaiter().GetResult();
+          else {Backend.ValidateManagedConfiguration(prefs);var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));Backend.AssertIdentity(receipt.Containers,Backend.InspectServer(prefs).GetAwaiter().GetResult());if(Backend.Hash(receipt.Snapshot)!=receipt.SnapshotSha256)throw new IOException("La instantánea ha cambiado.");}
+          Console.WriteLine("Verificado: "+prefs.ReceiptPath);return 0;
+        }catch(Exception ex){Console.Error.WriteLine(ex.Message);return 20;}
+      }
       if(args.Contains("--self-test")){
         try {
+          var mountA=new ServerMount{Type="bind",Source="D:/library",Destination="/data",RW=true};
+          var mountB=new ServerMount{Type="volume",Name="database",Source="/volumes/db",Destination="/db",RW=true};
+          var firstIdentity=new List<ServerContainer>{new ServerContainer{Id="same",Image="image",Service="server",Project="photos",Mounts=new[]{mountA,mountB}}};
+          var reorderedIdentity=new List<ServerContainer>{new ServerContainer{Id="same",Image="image",Service="server",Project="photos",Mounts=new[]{mountB,mountA}}};
+          Backend.AssertIdentity(firstIdentity,reorderedIdentity);
+          reorderedIdentity[0].Id="replacement";
+          try{Backend.AssertIdentity(firstIdentity,reorderedIdentity);return 11;}catch(InvalidOperationException){}
+          reorderedIdentity[0].Id="same";
+          reorderedIdentity[0].Mounts=new[]{new ServerMount{Type="bind",Source="D:/different",Destination="/data",RW=true},mountB};
+          try{Backend.AssertIdentity(firstIdentity,reorderedIdentity);return 12;}catch(InvalidOperationException){}
           if(Backend.CanonicalEndpoint("https://example.com/")!="https://example.com")return 1;
           foreach(var bad in new[]{null,"","http://example.com","https://user:password@example.com","file:///D:/Immich","https://example.com?key=secret"}){try{Backend.CanonicalEndpoint(bad);return 2;}catch(ArgumentException){}}
           foreach(var bad in new[]{@"D:\photos\backup",@"D:\other",@"D:\"}){try{Backend.ValidateBackup(@"D:\photos",bad);return 3;}catch(InvalidOperationException){}}
@@ -307,13 +331,17 @@ namespace InhousePhotos {
       }
       bool first;
       using(var singleInstance=new Mutex(true,@"Local\InhousePhotosServer",out first)) {
-      if(!first){MessageBox.Show("Inhouse Photos Server ya está abierto. Puedes encontrarlo en la barra de tareas.","Inhouse Photos");return 0;}
+      if(!first){if(!args.Contains("--startup")){try{using(var activate=EventWaitHandle.OpenExisting(@"Local\InhousePhotosServer.Activate"))activate.Set();}catch{}}return 0;}
       var app=new Application();var window=new ServerWindow();
       if(args.Length==2&&args[0]=="--render-preview"){
         app.Dispatcher.BeginInvoke(new Action(async()=>{await window.Render();var root=(FrameworkElement)window.Content;root.Width=1080;root.Height=760;root.Measure(new Size(1080,760));root.Arrange(new Rect(0,0,1080,760));root.UpdateLayout();var bmp=new RenderTargetBitmap(1080,760,96,96,PixelFormats.Pbgra32);bmp.Render(root);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bmp));using(var stream=File.Create(args[1]))encoder.Save(stream);app.Shutdown();}));app.Run();return 0;
       }
       app.DispatcherUnhandledException+=(s,e)=>{MessageBox.Show("No se pudo completar la operación. Reinicia la aplicación; no se ha solicitado borrar datos.","Inhouse Photos");e.Handled=true;};
-      return app.Run(window);
+      var hidden=args.Contains("--startup");window.InitializeLifecycle(hidden);
+      using(var activate=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\InhousePhotosServer.Activate")) {
+        var registration=ThreadPool.RegisterWaitForSingleObject(activate,(s,t)=>app.Dispatcher.BeginInvoke(new Action(window.BringToFront)),null,-1,false);
+        try{app.ShutdownMode=ShutdownMode.OnMainWindowClose;app.MainWindow=window;if(!hidden)window.Show();return app.Run();}finally{registration.Unregister(null);}
+      }
       }
     }
   }
