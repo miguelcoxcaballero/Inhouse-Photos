@@ -261,6 +261,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
   int _layoutTransitionGeneration = 0;
   final Set<ScrollPosition> _attachedScrollPositions = {};
   Timer? _scrollIdleTimer;
+  Timer? _zoomCommitTimer;
+  bool _pinching = false;
+  int _gestureInitialPerRow = 4;
 
   @override
   void initState() {
@@ -270,7 +273,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     _scrollController = ScrollController(onAttach: _onScrollAttach, onDetach: _onScrollDetach);
     _layoutTransitionController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 260),
+      duration: const Duration(milliseconds: 220),
       value: 1,
     );
     _eventSubscription = EventStream.shared.listen(_onEvent);
@@ -352,7 +355,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     if (rects.isEmpty) {
       _layoutTransitionController.value = 1;
       _previousTileRects = const {};
-      ref.read(timelineStateProvider.notifier).setZooming(false);
+      ref.read(timelineStateProvider.notifier).setZooming(_pinching);
       return;
     }
 
@@ -373,7 +376,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     }
     if (_previousTileRects.isEmpty || (MediaQuery.maybeOf(context)?.disableAnimations ?? false)) {
       _layoutTransitionController.value = 1;
-      ref.read(timelineStateProvider.notifier).setZooming(false);
+      ref.read(timelineStateProvider.notifier).setZooming(_pinching);
       if (_previousTileRects.isNotEmpty) {
         setState(() => _previousTileRects = const {});
       }
@@ -385,25 +388,24 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
         return;
       }
       setState(() => _previousTileRects = const {});
-      ref.read(timelineStateProvider.notifier).setZooming(false);
+      ref.read(timelineStateProvider.notifier).setZooming(_pinching);
     });
-  }
-
-  void _finishLayoutTransitionImmediately() {
-    _layoutTransitionGeneration++;
-    _layoutTransitionController
-      ..stop()
-      ..value = 1;
-    if (_previousTileRects.isNotEmpty) {
-      setState(() => _previousTileRects = const {});
-    }
   }
 
   void _commitColumnCount(int targetColumns, int? targetAssetIndex) {
     _perRow = targetColumns;
     _restoreAssetIndex = targetAssetIndex;
     widget.onInteractiveColumnCountChanged(targetColumns);
-    widget.onInteractiveColumnCountSettled(targetColumns);
+  }
+
+  void _commitPendingZoom(List<Segment> segments) {
+    final target = _pendingPerRow ?? _perRow;
+    if (target == _perRow || !mounted) {
+      return;
+    }
+    final anchor = _getCurrentAssetIndex(segments);
+    _prepareLayoutTransition();
+    _commitColumnCount(target, anchor);
   }
 
   @override
@@ -512,6 +514,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     WidgetsBinding.instance.removeObserver(this);
     setDenseTimelineAppVisible(false);
     _scrollIdleTimer?.cancel();
+    _zoomCommitTimer?.cancel();
     for (final position in _attachedScrollPositions.toList()) {
       position.isScrollingNotifier.removeListener(_onScrollActivityChanged);
     }
@@ -780,7 +783,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                       () => CustomScaleGestureRecognizer(),
                       (CustomScaleGestureRecognizer scale) {
                         scale.onStart = (details) {
-                          _finishLayoutTransitionImmediately();
+                          _pinching = true;
+                          _gestureInitialPerRow = _perRow;
+                          _zoomCommitTimer?.cancel();
                           _baseScaleFactor = _scaleFactor;
                           _pendingPerRow = _perRow;
                           ref.read(timelineStateProvider.notifier).setZooming(true);
@@ -794,20 +799,30 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                           );
                           _scaleFactor = newScaleFactor;
                           _pendingPerRow = newPerRow;
+                          if (_pendingPerRow != _perRow && !(_zoomCommitTimer?.isActive ?? false)) {
+                            // Coalesce gesture events instead of rebuilding at
+                            // touch-sampling rate; respond before fingers lift.
+                            _zoomCommitTimer = Timer(const Duration(milliseconds: 120), () {
+                              if (mounted && _pinching) {
+                                _commitPendingZoom(segments);
+                              }
+                            });
+                          }
                         };
                         scale.onEnd = (_) {
+                          _pinching = false;
+                          _zoomCommitTimer?.cancel();
                           final targetColumns = _pendingPerRow ?? _perRow;
+                          _commitPendingZoom(segments);
                           _pendingPerRow = null;
                           _scaleFactor = timelineScaleFactorForColumnCount(targetColumns);
                           _baseScaleFactor = _scaleFactor;
-                          if (targetColumns == _perRow) {
-                            ref.read(timelineStateProvider.notifier).setZooming(false);
-                            return;
+                          if (targetColumns != _gestureInitialPerRow) {
+                            widget.onInteractiveColumnCountSettled(targetColumns);
                           }
-
-                          final targetAssetIndex = _getCurrentAssetIndex(segments);
-                          _prepareLayoutTransition();
-                          _commitColumnCount(targetColumns, targetAssetIndex);
+                          if (!_layoutTransitionController.isAnimating && _previousTileRects.isEmpty) {
+                            ref.read(timelineStateProvider.notifier).setZooming(false);
+                          }
                           // Keep decoding/compositing deferred until the reflow
                           // finishes, not merely until the fingers lift.
                         };

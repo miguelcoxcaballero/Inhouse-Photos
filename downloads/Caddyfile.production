@@ -1,0 +1,17 @@
+fotos.miguelcoxcaballero.com {
+	encode zstd gzip
+	redir /descargas /descargas/ 308
+	handle_path /descargas/* {
+		root * /data/inhouse-downloads
+		header {
+			X-Content-Type-Options nosniff
+			Referrer-Policy no-referrer
+			Content-Security-Policy "default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+			Cache-Control "no-cache"
+		}
+		file_server
+	}
+	handle {
+		reverse_proxy immich-server:2283
+	}
+}

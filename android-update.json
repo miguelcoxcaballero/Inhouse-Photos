@@ -1,7 +1,7 @@
 {
-  "version": "3.1.79",
-  "versionCode": 7137,
+  "version": "3.1.80",
+  "versionCode": 7138,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.79-smooth-grid/Inhouse-Photos-3.1.79-arm64.apk",
-  "sha256": "9679a7a34863c477e317b89c9ed370fefaabf380ee5703c6546fe67e6c079e45"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.80-connected/Inhouse-Photos-3.1.80-arm64.apk",
+  "sha256": "4df1f9cc6df2eeed861acfd54a0aed78165758fac7e695aa683e0742b9594c59"
 }

@@ -21,6 +21,7 @@ import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/storage.provider.dart';
 import 'package:immich_mobile/repositories/asset_media.repository.dart';
 import 'package:immich_mobile/repositories/upload.repository.dart';
+import 'package:immich_mobile/utils/upload_capacity_gate.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
 import 'package:path/path.dart' as p;
@@ -83,41 +84,6 @@ class _UploadAcknowledgement {
 /// A permit is held from just before an upload starts until that asset's
 /// compression has settled. With a limit of zero the gate is inert, which is
 /// the original-quality path where nothing waits on the server at all.
-class _CountingGate {
-  _CountingGate(this.limit);
-
-  final int limit;
-  int _held = 0;
-  final List<Completer<void>> _waiting = [];
-
-  Future<void> acquire() {
-    if (limit <= 0) {
-      return Future.value();
-    }
-    if (_held < limit) {
-      _held++;
-      return Future.value();
-    }
-    final completer = Completer<void>();
-    _waiting.add(completer);
-    return completer.future;
-  }
-
-  void release() {
-    if (limit <= 0) {
-      return;
-    }
-    if (_waiting.isNotEmpty) {
-      // Hand the permit straight to the next waiter instead of returning it.
-      _waiting.removeAt(0).complete();
-      return;
-    }
-    if (_held > 0) {
-      _held--;
-    }
-  }
-}
-
 class _BoundedAsyncQueue<T> {
   final int capacity;
   final Queue<T> _items = Queue<T>();
@@ -207,6 +173,7 @@ class ForegroundUploadService {
   final Logger _logger = Logger('ForegroundUploadService');
 
   bool shouldAbortUpload = false;
+  void Function()? _cancelPipeline;
 
   Future<({int total, int remainder, int processing})> getBackupCounts(String userId) {
     return _backupRepository.getAllCounts(userId);
@@ -281,7 +248,7 @@ class ForegroundUploadService {
     // than the thing that decides upload speed.
     final uploadWorkerCount = transferPlan.uploadWorkers;
     final compressionWindow = waitsForServerCompression ? transferPlan.compressionWindow(isUnmetered: isUnmetered) : 0;
-    final compressionGate = _CountingGate(compressionWindow);
+    final compressionGate = UploadCapacityGate(compressionWindow);
     final outstandingAcknowledgements = <Future<void>>{};
     _logger.info(
       'Backup transfer plan: speed=$speed, unmetered=$isUnmetered, '
@@ -292,13 +259,19 @@ class ForegroundUploadService {
     final prepared = _BoundedAsyncQueue<_PreparedAsset>(transferPlan.preparedQueueCapacity);
     final acknowledgements = _BoundedAsyncQueue<_UploadAcknowledgement>(transferPlan.acknowledgementQueueCapacity);
     var currentIndex = 0;
+    void cancelPipeline() {
+      prepared.close();
+      compressionGate.cancel();
+    }
+
+    _cancelPipeline = cancelPipeline;
 
     // Wake producers blocked on a full preparation queue. Existing uploads are
     // allowed to receive their cancellation signal and every temporary file is
     // still cleaned up by its owning worker.
     final cancellation = cancelToken?.future;
     if (cancellation != null) {
-      unawaited(cancellation.whenComplete(prepared.close));
+      unawaited(cancellation.whenComplete(cancelPipeline));
     }
 
     LocalAsset? nextAsset() {
@@ -357,7 +330,15 @@ class ForegroundUploadService {
         if (waitsForServerCompression) {
           // Only blocks once the server is genuinely behind by several times
           // the worker count, so the steady state is limited by the network.
-          await compressionGate.acquire();
+          if (!await compressionGate.acquire()) {
+            await _cleanupPreparedAsset(item);
+            continue;
+          }
+        }
+        if (shouldAbortUpload || (cancelToken?.isCompleted ?? false)) {
+          compressionGate.release();
+          await _cleanupPreparedAsset(item);
+          continue;
         }
 
         final acknowledgement = await _uploadPreparedAsset(item, cancelToken, callbacks: callbacks);
@@ -409,6 +390,9 @@ class ForegroundUploadService {
     // once each one has recorded its asset.
     while (outstandingAcknowledgements.isNotEmpty) {
       await Future.wait(outstandingAcknowledgements.toList());
+    }
+    if (identical(_cancelPipeline, cancelPipeline)) {
+      _cancelPipeline = null;
     }
   }
 
@@ -489,6 +473,7 @@ class ForegroundUploadService {
 
   void cancel() {
     shouldAbortUpload = true;
+    _cancelPipeline?.call();
   }
 
   /// Generic worker pool for concurrent uploads
