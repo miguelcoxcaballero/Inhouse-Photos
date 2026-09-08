@@ -151,7 +151,7 @@ class TimelineService {
   final AsyncMutex _mutex = AsyncMutex();
   final StreamController<_TimelineBucketSnapshot> _publishedBuckets =
       StreamController<_TimelineBucketSnapshot>.broadcast(sync: true);
-  final StreamController<int> _publishedAssets = StreamController<int>.broadcast(sync: true);
+  final StreamController<List<int>> _publishedAssets = StreamController<List<int>>.broadcast(sync: true);
   int _bufferOffset = 0;
   List<BaseAsset> _buffer = [];
   StreamSubscription? _bucketSubscription;
@@ -166,10 +166,26 @@ class TimelineService {
   int get totalAssets => _totalAssets;
   int _revision = 0;
   int get revision => _revision;
-  Stream<int> watchAssetChanges() => Stream<int>.multi((listener) {
-    final subscription = _publishedAssets.stream.listen(listener.add, onDone: listener.close);
+  int _cacheRevision = 0;
+  int get cacheRevision => _cacheRevision;
+  final Map<({int index, int count}), int> _observedRanges = {};
+  Stream<int> watchAssetChanges({required int index, required int count}) => Stream<int>.multi((listener) {
+    final range = (index: index, count: count);
+    _observedRanges.update(range, (value) => value + 1, ifAbsent: () => 1);
+    final end = index + count;
+    final subscription = _publishedAssets.stream
+        .where((changed) => changed.any((changedIndex) => changedIndex >= index && changedIndex < end))
+        .listen((_) => listener.add(_revision), onDone: listener.close);
     listener.add(_revision);
-    listener.onCancel = subscription.cancel;
+    listener.onCancel = () async {
+      final remaining = (_observedRanges[range] ?? 1) - 1;
+      if (remaining == 0) {
+        _observedRanges.remove(range);
+      } else {
+        _observedRanges[range] = remaining;
+      }
+      await subscription.cancel();
+    };
   });
 
   TimelineService(TimelineQuery query, {Duration bucketRefreshInterval = _defaultBucketRefreshInterval})
@@ -285,6 +301,8 @@ class TimelineService {
         _buffer.isNotEmpty &&
         published.length == buckets.length &&
         const ListEquality<Bucket>().equals(published, buckets);
+    final previousOffset = _bufferOffset;
+    final previousAssets = _buffer;
 
     final totalAssets = buckets.fold<int>(0, (acc, bucket) => acc + bucket.assetCount);
 
@@ -318,11 +336,41 @@ class TimelineService {
     // All consumers share this replaying stream, so relayout no longer opens a
     // duplicate Drift query or races ahead of the service buffer.
     _totalAssets = totalAssets;
-    _revision++;
-    _publishedAssets.add(_revision);
+    // Unmounted metadata caches must revalidate on their next use, even when
+    // this notification changed only a photo outside the navigation buffer.
+    _cacheRevision++;
+    final changedIndexes = <int>[];
+    if (previousOffset == _bufferOffset) {
+      final common = math.min(previousAssets.length, _buffer.length);
+      for (var offset = 0; offset < common; offset++) {
+        if (previousAssets[offset] != _buffer[offset]) {
+          changedIndexes.add(_bufferOffset + offset);
+        }
+      }
+      for (var offset = common; offset < math.max(previousAssets.length, _buffer.length); offset++) {
+        changedIndexes.add(_bufferOffset + offset);
+      }
+    } else {
+      changedIndexes.addAll(List<int>.generate(_buffer.length, (offset) => _bufferOffset + offset));
+    }
+    for (final range in _observedRanges.keys) {
+      // Content outside the refreshed window is unknown, not unchanged.
+      // Notify only those mounted ranges so they can demand-load fresh data.
+      if (range.index < _bufferOffset) {
+        changedIndexes.add(range.index);
+      } else if (range.index + range.count > _bufferOffset + _buffer.length) {
+        changedIndexes.add(math.max(range.index, _bufferOffset + _buffer.length));
+      }
+    }
+    if (changedIndexes.isNotEmpty || !sameLayout) {
+      _revision++;
+    }
     // Data outside the current window can have changed as well. Invalidate
     // demand-loaded metadata, but do not regenerate the day/row geometry.
     if (sameLayout) {
+      if (changedIndexes.isNotEmpty) {
+        _publishedAssets.add(changedIndexes);
+      }
       return;
     }
     final snapshot = _TimelineBucketSnapshot(++_publishedBucketRevision, List.unmodifiable(buckets));

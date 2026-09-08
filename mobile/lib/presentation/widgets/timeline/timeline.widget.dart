@@ -352,6 +352,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     if (rects.isEmpty) {
       _layoutTransitionController.value = 1;
       _previousTileRects = const {};
+      ref.read(timelineStateProvider.notifier).setZooming(false);
       return;
     }
 
@@ -372,6 +373,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
     }
     if (_previousTileRects.isEmpty || (MediaQuery.maybeOf(context)?.disableAnimations ?? false)) {
       _layoutTransitionController.value = 1;
+      ref.read(timelineStateProvider.notifier).setZooming(false);
       if (_previousTileRects.isNotEmpty) {
         setState(() => _previousTileRects = const {});
       }
@@ -383,6 +385,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
         return;
       }
       setState(() => _previousTileRects = const {});
+      ref.read(timelineStateProvider.notifier).setZooming(false);
     });
   }
 
@@ -805,7 +808,8 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                           final targetAssetIndex = _getCurrentAssetIndex(segments);
                           _prepareLayoutTransition();
                           _commitColumnCount(targetColumns, targetAssetIndex);
-                          ref.read(timelineStateProvider.notifier).setZooming(false);
+                          // Keep decoding/compositing deferred until the reflow
+                          // finishes, not merely until the fingers lift.
                         };
                       },
                     ),

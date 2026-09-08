@@ -17,6 +17,25 @@ BaseAsset _asset(int index) => LocalAsset(
 );
 
 void main() {
+  test('a mounted row outside the navigation buffer is revalidated', () async {
+    final changes = StreamController<List<Bucket>>.broadcast();
+    final service = TimelineService((
+      assetSource: (offset, count) async => List.generate(count, (i) => _asset(offset + i)),
+      bucketSource: () => changes.stream,
+      assetSourceAfter: null,
+      origin: TimelineOrigin.main,
+    ), bucketRefreshInterval: const Duration(milliseconds: 10));
+    addTearDown(service.dispose);
+    addTearDown(changes.close);
+    changes.add([const Bucket(assetCount: 3000)]);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    var notifications = 0;
+    final subscription = service.watchAssetChanges(index: 2000, count: 100).skip(1).listen((_) => notifications++);
+    addTearDown(subscription.cancel);
+    changes.add([const Bucket(assetCount: 3000)]);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    expect(notifications, 1);
+  });
   test('same-count metadata changes refresh the asset window', () async {
     final changes = StreamController<List<Bucket>>.broadcast();
     var current = _asset(0);
@@ -80,7 +99,7 @@ void main() {
     }
     await Future<void>.delayed(const Duration(milliseconds: 250));
 
-    expect(service.revision, greaterThan(revisionAfterFirst), reason: 'asset caches must see database changes');
+    expect(service.revision, revisionAfterFirst, reason: 'identical assets must not invalidate row caches');
     expect(layouts, 1, reason: 'identical buckets must not regenerate grid geometry');
     expect(assetReads, greaterThan(readsAfterFirst), reason: 'same counts must still check for changed assets');
 
@@ -92,4 +111,30 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 250));
     expect(service.revision, greaterThan(revisionAfterFirst), reason: 'a genuine change must still refresh');
   }, timeout: const Timeout(Duration(seconds: 30)));
+
+  test('metadata changes notify only the row containing the changed photo', () async {
+    final changes = StreamController<List<Bucket>>.broadcast();
+    var assets = [_asset(0), _asset(1), _asset(2)];
+    final service = TimelineService((
+      assetSource: (offset, count) async => assets.skip(offset).take(count).toList(),
+      bucketSource: () => changes.stream,
+      assetSourceAfter: null,
+      origin: TimelineOrigin.main,
+    ), bucketRefreshInterval: const Duration(milliseconds: 10));
+    addTearDown(service.dispose);
+    addTearDown(changes.close);
+    changes.add([const Bucket(assetCount: 3)]);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    var firstRowUpdates = 0;
+    var secondRowUpdates = 0;
+    final first = service.watchAssetChanges(index: 0, count: 1).skip(1).listen((_) => firstRowUpdates++);
+    final second = service.watchAssetChanges(index: 1, count: 1).skip(1).listen((_) => secondRowUpdates++);
+    addTearDown(first.cancel);
+    addTearDown(second.cancel);
+    assets = [assets[0], (assets[1] as LocalAsset).copyWith(isFavorite: true), assets[2]];
+    changes.add([const Bucket(assetCount: 3)]);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    expect(firstRowUpdates, 0);
+    expect(secondRowUpdates, 1);
+  });
 }

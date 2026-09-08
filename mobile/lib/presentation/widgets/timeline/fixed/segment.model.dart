@@ -738,10 +738,10 @@ class _DenseAssetChunkStore {
   int _revision = -1;
 
   void _resetIfNeeded(TimelineService service) {
-    if (_revision == service.revision) {
+    if (_revision == service.cacheRevision) {
       return;
     }
-    _revision = service.revision;
+    _revision = service.cacheRevision;
     _chunks.clear();
     _resolvedChunks.clear();
     _rows.clear();
@@ -1162,7 +1162,7 @@ class _FixedSegmentRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(timelineAssetRevisionProvider);
+    ref.watch(timelineAssetRevisionProvider((index: assetIndex, count: assetCount)));
     final timelineState = ref.watch(
       timelineStateProvider.select((state) => (isScrubbing: state.isScrubbing, isInteracting: state.isInteracting)),
     );
@@ -2231,7 +2231,6 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     unawaited(_restoreThenBuild(generation, skipDiskRestore: restoredFromSlot));
     if (_sharpPreviews!.cells.isNotEmpty) {
       _scheduleRepaint();
-      unawaited(_buildCompositeAtlas(generation));
     }
   }
 
@@ -2308,6 +2307,17 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
                 _persistentExact = true;
                 _mergedIndexes.addAll(_upgradeIndexes);
                 _denseRowAtlasCache.put(_completeAtlasKey, image, signature: _contentSignature);
+                // Seed the cross-zoom cache when a saved sharp sheet is read,
+                // rather than doing that work in the pinch capture callback.
+                sharpPreviewCache.put(image, {
+                  for (var index = 0; index < _assets!.length; index++)
+                    sharpPreviewKey(_assets![index]): Rect.fromLTWH(
+                      (index % widget.columnCount) * cellPixels.toDouble(),
+                      (index ~/ widget.columnCount) * cellPixels.toDouble(),
+                      cellPixels.toDouble(),
+                      cellPixels.toDouble(),
+                    ),
+                });
                 return;
               }
             }
@@ -2332,6 +2342,10 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     // per-asset upgrade below is restricted to what is actually on screen.
     final priority = _viewportState().priority;
     final targetGeneration = generation ?? _generation;
+    if (!widget.deferHighResolution &&
+        ((_sharpPreviews?.cells.isNotEmpty ?? false) || _images.any((image) => image != null))) {
+      unawaited(_buildCompositeAtlas(targetGeneration));
+    }
     if (!_baseAtlasReady && !_metadataAtlasRequested) {
       _metadataAtlasRequested = true;
       unawaited(_buildThumbhashAtlas(targetGeneration, priority: priority));
@@ -2390,7 +2404,9 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     // Whatever goes wrong for one cell, the panel still gets another go.
     try {
       for (final index in _upgradeIndexes) {
-        if (_mergedIndexes.contains(index) || (_sharpPreviews?.cells[index]?.pixels ?? 0) >= _targetPixels) {
+        if (_mergedIndexes.contains(index) ||
+            _images[index] != null ||
+            (_sharpPreviews?.cells[index]?.pixels ?? 0) >= _targetPixels) {
           continue;
         }
         _requestActualThumbnail(index, targetGeneration, priority: panelPriority + (index ~/ widget.columnCount));
@@ -2507,38 +2523,7 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     }
     _atlas?.dispose();
     _atlas = image;
-    final assets = _assets;
-    if (signature == _contentSignature && cellPixels == _targetPixels && _persistentExact && assets != null) {
-      sharpPreviewCache.put(image, {
-        for (var index = 0; index < assets.length; index++)
-          sharpPreviewKey(assets[index]): Rect.fromLTWH(
-            (index % widget.columnCount) * cellPixels!.toDouble(),
-            (index ~/ widget.columnCount) * cellPixels.toDouble(),
-            cellPixels.toDouble(),
-            cellPixels.toDouble(),
-          ),
-      });
-    }
     _reportVisualReady();
-  }
-
-  void _rememberSharpAtlas() {
-    final atlas = _atlas;
-    final assets = _assets;
-    final pixels = _atlasCellPixels;
-    if (atlas == null || assets == null || pixels == null || _mergedIndexes.isEmpty) {
-      return;
-    }
-    sharpPreviewCache.put(atlas, {
-      for (final index in _mergedIndexes)
-        if (index < assets.length)
-          sharpPreviewKey(assets[index]): Rect.fromLTWH(
-            (index % widget.columnCount) * pixels.toDouble(),
-            (index ~/ widget.columnCount) * pixels.toDouble(),
-            pixels.toDouble(),
-            pixels.toDouble(),
-          ),
-    });
   }
 
   bool get _atlasIsFinalForContent =>
@@ -2804,7 +2789,12 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
 
   Future<void> _buildCompositeAtlas(int generation) async {
     final assets = _assets;
-    if (_atlasBuilding || _persistentExact || assets == null || !mounted || generation != _generation) {
+    if (_atlasBuilding ||
+        _persistentExact ||
+        widget.deferHighResolution ||
+        assets == null ||
+        !mounted ||
+        generation != _generation) {
       return;
     }
     if (!_images.any((image) => image != null) && (_sharpPreviews?.cells.isEmpty ?? true)) {
@@ -2888,15 +2878,6 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       _images[index] = null;
     }
     _mergedIndexes.addAll(merged);
-    sharpPreviewCache.put(atlas, {
-      for (final index in _mergedIndexes)
-        sharpPreviewKey(assets[index]): Rect.fromLTWH(
-          (index % widget.columnCount) * targetPixels.toDouble(),
-          (index ~/ widget.columnCount) * targetPixels.toDouble(),
-          targetPixels.toDouble(),
-          targetPixels.toDouble(),
-        ),
-    });
     if (merged.isNotEmpty) {
       // Progress refunds the retry budget. The bound exists to stop a panel
       // that genuinely cannot resolve from re-queueing itself forever, not to
@@ -2916,6 +2897,17 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
     });
     _denseRowAtlasCache.put(_slotAtlasKey, atlas, signature: isComplete ? _contentSignature : _provisionalSignature);
     if (isComplete) {
+      // Retain the shared sheet only after the panel is complete, avoiding
+      // repeated cache indexing and retention of intermediate sheets.
+      sharpPreviewCache.put(atlas, {
+        for (final index in _mergedIndexes)
+          sharpPreviewKey(assets[index]): Rect.fromLTWH(
+            (index % widget.columnCount) * targetPixels.toDouble(),
+            (index ~/ widget.columnCount) * targetPixels.toDouble(),
+            targetPixels.toDouble(),
+            targetPixels.toDouble(),
+          ),
+      });
       _denseRowAtlasCache.put(_completeAtlasKey, atlas, signature: _contentSignature);
     } else {
       // Keep the unfinished work under its content as well, with a record of
@@ -3173,7 +3165,6 @@ class _DenseAssetRowState extends State<_DenseAssetRow> {
       ),
     );
     return TimelineDenseAssetLayoutMarker(
-      onCapture: _rememberSharpAtlas,
       assetKeys: _assetKeys,
       columnCount: widget.columnCount,
       tileExtent: widget.tileExtent,
@@ -3236,6 +3227,7 @@ class _DenseAssetRowPainter extends CustomPainter {
   Float64List? _startExtent;
   Float64List? _endLeft;
   Float64List? _endTop;
+  late final List<_SharpAtlasGroup> _sharpGroups = _buildSharpGroups();
 
   _DenseAssetRowPainter({
     required this.sharpPreviews,
@@ -3259,6 +3251,30 @@ class _DenseAssetRowPainter extends CustomPainter {
   }) : super(repaint: Listenable.merge([repaint, if (layoutAnimation != null) layoutAnimation]));
 
   int get itemCount => assetKeys.length;
+
+  List<_SharpAtlasGroup> _buildSharpGroups() {
+    final grouped = <ui.Image, List<MapEntry<int, SharpPreviewCell>>>{};
+    for (final entry in sharpPreviews.entries) {
+      if (!mergedIndexes.contains(entry.key)) {
+        grouped.putIfAbsent(entry.value.image, () => []).add(entry);
+      }
+    }
+    return [
+      for (final group in grouped.entries)
+        _SharpAtlasGroup(
+          image: group.key,
+          indexes: Int32List.fromList(group.value.map((entry) => entry.key).toList()),
+          sources: Float32List.fromList([
+            for (final entry in group.value) ...[
+              entry.value.source.left,
+              entry.value.source.top,
+              entry.value.source.right,
+              entry.value.source.bottom,
+            ],
+          ]),
+        ),
+    ];
+  }
 
   Rect _currentRect(int index, Size size) => calculateTimelineDenseAssetRect(
     index: index,
@@ -3327,21 +3343,45 @@ class _DenseAssetRowPainter extends CustomPainter {
     final sourceRects = _atlasSourceRects!;
     final sourceWidth = atlas.width / columnCount;
     final sourceHeight = atlas.height / (itemCount / columnCount).ceil();
-    final sourceExtent = math.min(sourceWidth, sourceHeight);
 
     for (var index = 0; index < itemCount; index++) {
       final visualRect = _reflowRect(index, progress, size);
-      final scale = visualRect.width / sourceExtent;
       final sourceOffset = index * 4;
-      final sourceCenterX = (sourceRects[sourceOffset] + sourceRects[sourceOffset + 2]) * 0.5;
-      final sourceCenterY = (sourceRects[sourceOffset + 1] + sourceRects[sourceOffset + 3]) * 0.5;
-      transforms[sourceOffset] = scale;
-      transforms[sourceOffset + 1] = 0;
-      transforms[sourceOffset + 2] = visualRect.center.dx - (scale * sourceCenterX);
-      transforms[sourceOffset + 3] = visualRect.center.dy - (scale * sourceCenterY);
+      writeTimelineSpriteTransform(transforms, sourceOffset, sourceWidth, sourceHeight, visualRect);
     }
 
     canvas.drawRawAtlas(atlas, transforms, sourceRects, null, null, null, Paint()..filterQuality = FilterQuality.low);
+  }
+
+  void _paintSharpPreviews(Canvas canvas, Size size, {required bool isReflowing, required double progress}) {
+    for (final group in _sharpGroups) {
+      for (var offset = 0; offset < group.indexes.length; offset++) {
+        final rect = isReflowing
+            ? _reflowRect(group.indexes[offset], progress, size)
+            : _currentRect(group.indexes[offset], size);
+        final sourceOffset = offset * 4;
+        final sourceLeft = group.sources[sourceOffset];
+        final sourceTop = group.sources[sourceOffset + 1];
+        final sourceRight = group.sources[sourceOffset + 2];
+        final sourceBottom = group.sources[sourceOffset + 3];
+        writeTimelineSpriteTransform(
+          group.transforms,
+          sourceOffset,
+          sourceRight - sourceLeft,
+          sourceBottom - sourceTop,
+          rect,
+        );
+      }
+      canvas.drawRawAtlas(
+        group.image,
+        group.transforms,
+        group.sources,
+        null,
+        null,
+        null,
+        Paint()..filterQuality = FilterQuality.low,
+      );
+    }
   }
 
   @override
@@ -3390,18 +3430,7 @@ class _DenseAssetRowPainter extends CustomPainter {
       }
     }
     if (!atlasHidesPlaceholder) {
-      for (final entry in sharpPreviews.entries) {
-        if (mergedIndexes.contains(entry.key)) {
-          continue;
-        }
-        final cell = entry.value;
-        canvas.drawImageRect(
-          cell.image,
-          cell.source,
-          isReflowing ? _reflowRect(entry.key, reflowProgress, size) : _currentRect(entry.key, size),
-          Paint()..filterQuality = FilterQuality.low,
-        );
-      }
+      _paintSharpPreviews(canvas, size, isReflowing: isReflowing, progress: reflowProgress);
     }
     for (var index = 0; index < images.length; index++) {
       final image = images[index]?.image;
@@ -3432,4 +3461,14 @@ class _DenseAssetRowPainter extends CustomPainter {
       oldDelegate.textDirection != textDirection ||
       oldDelegate.layoutAnimation != layoutAnimation ||
       oldDelegate.previousRects != previousRects;
+}
+
+class _SharpAtlasGroup {
+  final ui.Image image;
+  final Int32List indexes;
+  final Float32List sources;
+  final Float32List transforms;
+
+  _SharpAtlasGroup({required this.image, required this.indexes, required this.sources})
+    : transforms = Float32List(indexes.length * 4);
 }

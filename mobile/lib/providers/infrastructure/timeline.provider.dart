@@ -34,8 +34,8 @@ final timelineFactoryProvider = Provider<TimelineFactory>(
   ),
 );
 
-final timelineAssetRevisionProvider = StreamProvider.autoDispose<int>(
-  (ref) => ref.watch(timelineServiceProvider).watchAssetChanges(),
+final timelineAssetRevisionProvider = StreamProvider.autoDispose.family<int, ({int index, int count})>(
+  (ref, range) => ref.watch(timelineServiceProvider).watchAssetChanges(index: range.index, count: range.count),
   dependencies: [timelineServiceProvider],
 );
 

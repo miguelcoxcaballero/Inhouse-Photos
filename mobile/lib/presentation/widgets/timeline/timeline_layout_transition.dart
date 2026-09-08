@@ -1,7 +1,24 @@
+import 'dart:typed_data';
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 double timelineLayoutTransitionProgress(double progress) => Curves.easeOutQuart.transform(progress.clamp(0.0, 1.0));
+
+/// Atlas sprites use a local origin, regardless of their position in the sheet.
+void writeTimelineSpriteTransform(
+  Float32List transforms,
+  int offset,
+  double sourceWidth,
+  double sourceHeight,
+  Rect destination,
+) {
+  final scale = destination.width / (sourceWidth < sourceHeight ? sourceWidth : sourceHeight);
+  transforms[offset] = scale;
+  transforms[offset + 1] = 0;
+  transforms[offset + 2] = destination.center.dx - scale * sourceWidth * 0.5;
+  transforms[offset + 3] = destination.center.dy - scale * sourceHeight * 0.5;
+}
 
 Object timelineAssetLayoutKey(int assetIndex) => (assetIndex: assetIndex);
 
@@ -182,7 +199,6 @@ class TimelineDenseAssetLayoutMarker extends SingleChildRenderObjectWidget {
     required this.columnCount,
     required this.tileExtent,
     required this.textDirection,
-    this.onCapture,
     required super.child,
   });
 
@@ -190,7 +206,6 @@ class TimelineDenseAssetLayoutMarker extends SingleChildRenderObjectWidget {
   final int columnCount;
   final double tileExtent;
   final TextDirection textDirection;
-  final VoidCallback? onCapture;
 
   @override
   RenderTimelineDenseAssetLayoutMarker createRenderObject(BuildContext context) => RenderTimelineDenseAssetLayoutMarker(
@@ -199,7 +214,6 @@ class TimelineDenseAssetLayoutMarker extends SingleChildRenderObjectWidget {
     tileExtent: tileExtent,
     textDirection: textDirection,
     transition: TimelineLayoutTransitionScope.maybeOf(context),
-    onCapture: onCapture,
   );
 
   @override
@@ -209,7 +223,6 @@ class TimelineDenseAssetLayoutMarker extends SingleChildRenderObjectWidget {
       ..columnCount = columnCount
       ..tileExtent = tileExtent
       ..textDirection = textDirection
-      ..onCapture = onCapture
       ..transition = TimelineLayoutTransitionScope.maybeOf(context);
   }
 }
@@ -221,7 +234,6 @@ class RenderTimelineDenseAssetLayoutMarker extends RenderProxyBox {
     required this.tileExtent,
     required this.textDirection,
     this.transition,
-    this.onCapture,
   });
 
   List<Object> assetKeys;
@@ -229,7 +241,6 @@ class RenderTimelineDenseAssetLayoutMarker extends RenderProxyBox {
   double tileExtent;
   TextDirection textDirection;
   TimelineLayoutTransitionScope? transition;
-  VoidCallback? onCapture;
 
   void collectVisibleAssetRects(Rect visibleBounds, Map<Object, Rect> result) {
     if (!attached || !hasSize || size.isEmpty || columnCount <= 0 || tileExtent <= 0) {
@@ -245,7 +256,6 @@ class RenderTimelineDenseAssetLayoutMarker extends RenderProxyBox {
     if (!MatrixUtils.transformRect(transform, Offset.zero & size).overlaps(visibleBounds)) {
       return;
     }
-    onCapture?.call();
     for (var index = 0; index < assetKeys.length; index++) {
       final localRect = calculateTimelineDenseAssetRect(
         index: index,
