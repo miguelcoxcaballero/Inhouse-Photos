@@ -42,7 +42,7 @@ namespace InhousePhotos {
     public Dictionary<string,string> ConfigurationHashes {get;set;}
   }
   public static partial class Backend {
-    public const string Version="1.0.0";
+    public const string Version="1.0.1";
     public const string DockerContext="--context desktop-linux ";
     static readonly SemaphoreSlim ServerLock=new SemaphoreSlim(1,1);
     public static readonly string InstallDir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),@"Programs\Inhouse Photos Server");
@@ -189,6 +189,16 @@ namespace InhousePhotos {
     public static async Task<AdoptionReceipt> Adopt(Preferences p,Action<string> progress) {
       await ServerLock.WaitAsync();
       try {
+        await EnsureEngine(progress);
+        if(p.Managed) {
+          progress("Comprobando tu conexión guardada…");
+          ValidateManagedConfiguration(p);
+          var existing=Json.Deserialize<AdoptionReceipt>(File.ReadAllText(p.ReceiptPath));
+          AssertIdentity(existing.Containers,await InspectServer(p));
+          if(!File.Exists(existing.Snapshot)||Hash(existing.Snapshot)!=existing.SnapshotSha256)throw new IOException("La copia de verificación no está disponible. Revisa el disco donde se guardó.");
+          progress("Tu servidor ya está vinculado. No hace falta volver a migrarlo.");
+          return existing;
+        }
         progress("Comprobando biblioteca, cuentas y discos actuales…");Library(p);
         var previous=Json.Deserialize<Preferences>(Json.Serialize(p));var hashes=ConfigurationHashes(p);var before=await InspectServer(p);
         var project=before[0].Project;if(!Regex.IsMatch(project??"","^[a-z0-9][a-z0-9_-]*$"))throw new IOException("Identidad del servidor no válida.");
