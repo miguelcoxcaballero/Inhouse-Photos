@@ -42,7 +42,7 @@ namespace InhousePhotos {
     public Dictionary<string,string> ConfigurationHashes {get;set;}
   }
   public static partial class Backend {
-    public const string Version="1.0.1";
+    public const string Version="1.1.0";
     public const string DockerContext="--context desktop-linux ";
     static readonly SemaphoreSlim ServerLock=new SemaphoreSlim(1,1);
     public static readonly string InstallDir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),@"Programs\Inhouse Photos Server");
@@ -162,7 +162,10 @@ namespace InhousePhotos {
         id=(await Docker("run -d --name "+name+" --label inhouse.restore-test="+token+" --network none --memory 2g --cpus 2 --mount type=volume,source="+volume+",destination=/var/lib/postgresql/data --env-file "+Quote(envFile)+" "+image,60)).Trim();
         if(!Regex.IsMatch(id,"^[a-f0-9]{64}$"))throw new IOException("No se pudo identificar la instancia de prueba.");
         bool ready=false;
-        for(int i=0;i<60;i++){try{await Docker("exec "+id+" pg_isready -U postgres -d immich",8);ready=true;break;}catch{await Task.Delay(2000);}}
+        // During initdb PostgreSQL briefly accepts Unix-socket connections
+        // before restarting. Wait for final TCP readiness, not that temporary
+        // bootstrap server, or pg_restore can lose its connection mid-start.
+        for(int i=0;i<90;i++){try{await Docker("exec "+id+" pg_isready -h 127.0.0.1 -U postgres -d immich",8);ready=true;break;}catch{await Task.Delay(2000);}}
         if(!ready)throw new IOException("La base de datos de prueba no está lista.");
         progress("Restaurando la copia en una base de datos aislada…");
         await Docker("cp "+Quote(dump)+" "+id+":/tmp/inhouse.dump",120);
@@ -186,7 +189,7 @@ namespace InhousePhotos {
         if(File.Exists(envFile))File.Delete(envFile);
       }
     }
-    public static async Task<AdoptionReceipt> Adopt(Preferences p,Action<string> progress) {
+    public static async Task<AdoptionReceipt> Adopt(Preferences p,Action<string> progress,bool persist=true) {
       await ServerLock.WaitAsync();
       try {
         await EnsureEngine(progress);
@@ -215,7 +218,7 @@ namespace InhousePhotos {
         var afterHashes=ConfigurationHashes(p);if(hashes.Any(x=>!afterHashes.ContainsKey(x.Key)||afterHashes[x.Key]!=x.Value))throw new IOException("La configuración cambió durante la comprobación. Vuelve a intentarlo.");
         var receipt=new AdoptionReceipt{Version=Version,CompletedUtc=DateTime.UtcNow.ToString("o"),Snapshot=dump,SnapshotSha256=Hash(dump),Counts=counts,RestoreVerified=true,PreviousPreferences=previous,Containers=before,ConfigurationHashes=hashes};
         var path=Path.Combine(directory,"receipt.json");File.WriteAllText(path,Json.Serialize(receipt),new UTF8Encoding(false));
-        p.ProjectName=project;p.ReceiptPath=path;p.Managed=true;Save(p);
+        p.ProjectName=project;p.ReceiptPath=path;p.Managed=true;if(persist)Save(p);
         progress("Vinculación verificada. Se conservan las fotos, cuentas y dirección del servidor.");return receipt;
       } finally {ServerLock.Release();}
     }

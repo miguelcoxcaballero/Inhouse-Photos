@@ -33,8 +33,21 @@ newly created virtual disk can be formatted; existing partitions are refused.
 Adding a disk increases pool capacity, not an existing volume automatically.
 No existing-data RAID conversion, delete-volume, prune or uninstall-data action
 is provided. Real RAID creation requires eligible empty disks and has not been
-hardware-tested on this installation. New server provisioning and transparent
-engine installation are not implemented yet; this release manages existing servers.
+hardware-tested on this installation.
+
+New-server wizard (1.1): selects an empty local media folder, prepares the engine
+with explicit license acceptance, pins and verifies the Inhouse server image,
+creates independent service/volume names, creates and verifies the administrator
+over loopback, then verifies recovery before taking ownership. Failed setup can
+be resumed in the same folder without overwriting its configuration. Passwords
+are not stored by the wizard. Windows prerequisite installation requests UAC and
+never automatically reboots. Engine installation is only attempted when absent.
+
+The optional domain enables Caddy HTTPS only after the administrator is created.
+DNS and router ports 80/443 must point to that PC; the wizard does not bypass CGNAT
+or claim remote access before it is reachable. Without a domain the new server is
+loopback-only. Media uses the selected disk; database/model volumes use Docker's
+configured Linux data disk. The engine component is downloaded separately.
 
 The program is not Authenticode-signed. Do not instruct people to disable
 SmartScreen or their antivirus. Publish the SHA-256 with the download.

@@ -17,7 +17,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.0.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -76,7 +76,7 @@ namespace InhousePhotos {
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),@"Docker\Docker")}) {
         var file = Path.Combine(root,@"resources\bin\docker.exe"); if (File.Exists(file)) return file;
       }
-      throw new InvalidOperationException("Este equipo todavía no tiene el motor del servidor. Esta versión puede vincular instalaciones existentes; no prepara un servidor nuevo.");
+      throw new InvalidOperationException("Falta el motor del servidor. Abre Crear una biblioteca nueva para preparar este ordenador.");
     }
     public static Task<string> Run(string exe, string args, string cwd, int seconds) {
       return Task.Run(async delegate {
@@ -87,7 +87,10 @@ namespace InhousePhotos {
           var error = process.StandardError.ReadToEndAsync();
           if (!process.WaitForExit(seconds * 1000)) { try { process.Kill(); } catch {} throw new TimeoutException("La operación está tardando demasiado. Comprueba el estado antes de repetirla."); }
           var text = await output; var details = await error;
-          if (process.ExitCode != 0) throw new InvalidOperationException("El servidor no pudo completar la operación (código " + process.ExitCode + "). No se ha solicitado borrar datos.");
+          if (process.ExitCode != 0) {
+            try{PrivateDirectory(Path.Combine(SettingsDir,"diagnostics"));File.WriteAllText(Path.Combine(SettingsDir,"diagnostics","last-operation.txt"),details);}catch{}
+            throw new InvalidOperationException("El servidor no pudo completar la operación (código " + process.ExitCode + "). No se ha solicitado borrar datos. Puedes reintentarlo; el diagnóstico se guarda solo en este PC.");
+          }
           return text;
         }
       });
@@ -310,6 +313,26 @@ namespace InhousePhotos {
   public static class Program {
     [STAThread] public static int Main(string[] args){
       ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
+      if(args.Length==2&&args[0]=="--render-setup-preview") {
+        var previewApp=new Application();var setupWindow=new NewServerWindow();
+        previewApp.Dispatcher.BeginInvoke(new Action(()=>{var root=(FrameworkElement)setupWindow.Content;root.Width=660;root.Height=1000;root.Measure(new Size(660,1000));root.Arrange(new Rect(0,0,660,1000));root.UpdateLayout();var bmp=new RenderTargetBitmap(660,1000,96,96,PixelFormats.Pbgra32);bmp.Render(root);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bmp));using(var stream=File.Create(args[1]))encoder.Save(stream);previewApp.Shutdown();}));return previewApp.Run();
+      }
+      if(args.Length==3&&args[0]=="--verify-recovery") {
+        try{Backend.VerifyRestore(args[1],"sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23",args[2],Console.WriteLine).GetAwaiter().GetResult();return 0;}catch(Exception ex){Console.Error.WriteLine(ex.Message);return 22;}
+      }
+      if(args.Length==2&&args[0]=="--new-server-smoke") {
+        try {
+          var leaf=Path.GetFileName(args[1].TrimEnd('\\'));
+          if(!System.Text.RegularExpressions.Regex.IsMatch(leaf,"^Inhouse-Setup-Test-[a-f0-9]{8}$"))throw new ArgumentException("Use an isolated Inhouse-Setup-Test-xxxxxxxx directory.");
+          var secretDirectory=Path.Combine(Backend.SettingsDir,"test-secrets");Backend.PrivateDirectory(secretDirectory);var secretPath=Path.Combine(secretDirectory,leaf+".dpapi");
+          string secret;
+          if(File.Exists(secretPath))secret=Encoding.UTF8.GetString(System.Security.Cryptography.ProtectedData.Unprotect(File.ReadAllBytes(secretPath),null,System.Security.Cryptography.DataProtectionScope.CurrentUser));
+          else {secret=Backend.RandomHex(24);File.WriteAllBytes(secretPath,System.Security.Cryptography.ProtectedData.Protect(Encoding.UTF8.GetBytes(secret),null,System.Security.Cryptography.DataProtectionScope.CurrentUser));}
+          var p=NewServer.Create(args[1],"setup-check@example.invalid",secret,"Setup validation","",Console.WriteLine,false).GetAwaiter().GetResult();
+          File.WriteAllText(Path.Combine(p.Installation,"test-result.json"),Backend.Json.Serialize(p));
+          Console.WriteLine("Nueva biblioteca verificada: "+p.ProjectName);return 0;
+        }catch(Exception ex){Console.Error.WriteLine(ex.Message);return 21;}
+      }
       if(args.Contains("--storage")){return new Application().Run(new StorageWindow());}
       if(args.Contains("--adopt-current")||args.Contains("--verify-installation")||args.Contains("--start-once")||args.Contains("--enable-startup")||args.Contains("--disable-startup")) {
         try {
@@ -323,6 +346,14 @@ namespace InhousePhotos {
       }
       if(args.Contains("--self-test")){
         try {
+          var sample=Path.Combine(Path.GetTempPath(),"inhouse-validation-only");
+          NewServer.Validate(sample,"test@example.com","test-password-long","Test","");
+          foreach(var bad in new[]{"https://photos.example.com","a.example.com/route","a.example.com\nextra",""}) {
+            if(bad=="")continue;
+            try{NewServer.Validate(sample,"test@example.com","test-password-long","Test",bad);return 13;}catch(ArgumentException){}
+          }
+          try{NewServer.Validate(Path.GetPathRoot(sample),"test@example.com","test-password-long","Test","");return 14;}catch(ArgumentException){}
+          if(NewServer.ComposeText(false).Contains("container_name:")||NewServer.ComposeText(false).Contains("443:443"))return 15;
           var mountA=new ServerMount{Type="bind",Source="D:/library",Destination="/data",RW=true};
           var mountB=new ServerMount{Type="volume",Name="database",Source="/volumes/db",Destination="/db",RW=true};
           var firstIdentity=new List<ServerContainer>{new ServerContainer{Id="same",Image="image",Service="server",Project="photos",Mounts=new[]{mountA,mountB}}};

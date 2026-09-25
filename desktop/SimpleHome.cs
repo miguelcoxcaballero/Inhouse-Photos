@@ -9,7 +9,7 @@ namespace InhousePhotos {
   public sealed partial class ServerWindow {
     async Task RenderSimpleHome() {
       Heading(prefs.Managed?"Tu biblioteca, en casa.":"Vamos a conectar tus fotos.",
-        prefs.Managed?"Gestiona tu biblioteca sin cambiar tus fotos ni tus cuentas.":"Prepararemos el servidor que ya tienes en este ordenador.");
+        prefs.Managed?"Gestiona tu biblioteca sin cambiar tus fotos ni tus cuentas.":"Conecta una biblioteca existente o crea una nueva en este ordenador.");
       if(!prefs.Managed) {
         content.Children.Add(Label(String.IsNullOrEmpty(prefs.Installation)?"Selecciona dónde está tu servidor":"Hemos encontrado tu servidor",24));
         content.Children.Add(Label("Conservaremos tus fotos, álbumes y usuarios. La comprobación inicial puede tardar varios minutos; verás cada paso aquí.",16,muted));
@@ -27,6 +27,8 @@ namespace InhousePhotos {
             notice.Text="Listo. Tu biblioteca está conectada.";await Render();
           }finally{content.Children.Remove(progress);}
         },true);
+        Rule();
+        Action(File.Exists(NewServer.PendingFile)?"Continuar la preparación":"Crear una biblioteca nueva",async()=>{var wizard=new NewServerWindow{Owner=this};if(wizard.ShowDialog()==true){prefs=wizard.Result;notice.Text="Tu biblioteca está preparada.";await Render();}},String.IsNullOrEmpty(prefs.Installation));
         return;
       }
       var state=Label("Comprobando disponibilidad…",22,muted);content.Children.Add(state);
