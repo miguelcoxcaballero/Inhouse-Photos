@@ -10,12 +10,16 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 final sharpPreviewCache = SharpPreviewCache();
 
 Object sharpPreviewKey(BaseAsset asset) => (
-  asset.localId ?? asset.remoteId,
-  asset.updatedAt,
+  // Uploading and server-side compression change remote metadata, not the
+  // pixels of a local asset. Keep its decoded preview through that transition.
+  asset.localId == null ? 'remote:${asset.remoteId}' : 'local:${asset.localId}',
+  asset.localId == null ? asset.checksum : null,
+  asset.isEdited ? asset.updatedAt : null,
   asset.isEdited,
   asset.width,
   asset.height,
   asset is LocalAsset ? asset.adjustmentTime : null,
+  asset is LocalAsset ? asset.orientation : null,
 );
 
 class SharpPreviewCell {

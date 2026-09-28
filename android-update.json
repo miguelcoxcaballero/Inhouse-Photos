@@ -1,7 +1,7 @@
 {
-  "version": "3.1.80",
-  "versionCode": 7138,
+  "version": "3.1.81",
+  "versionCode": 7139,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.80-connected/Inhouse-Photos-3.1.80-arm64.apk",
-  "sha256": "4df1f9cc6df2eeed861acfd54a0aed78165758fac7e695aa683e0742b9594c59"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.81-connected/Inhouse-Photos-3.1.81-arm64.apk",
+  "sha256": "02a680e99db23062a8d68eb2b0d29e06973ecd0611aefce0223d0d1499392115"
 }

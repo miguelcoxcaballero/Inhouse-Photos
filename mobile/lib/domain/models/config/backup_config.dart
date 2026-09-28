@@ -34,11 +34,10 @@ class BackupTransferPlan {
   /// work faster than the server can drain it. This used to be enforced by
   /// making an upload worker wait for its own asset to finish compressing,
   /// which tied upload concurrency to server latency and left the network idle.
-  /// The window is deliberately several times the worker count: in the steady
-  /// state the network decides throughput, and this only engages once the
-  /// server has genuinely fallen behind.
+  /// The window allows uploads to run ahead briefly, but caps the amount of
+  /// unfinished server work so a fast phone cannot bury a slower compressor.
   int compressionWindow({required bool isUnmetered}) =>
-      math.max(isUnmetered ? 24 : 12, uploadWorkers * (isUnmetered ? 3 : 2));
+      math.min(isUnmetered ? 32 : 12, math.max(isUnmetered ? 12 : 6, uploadWorkers * 2));
 
   static const empty = BackupTransferPlan(
     preparationWorkers: 0,
@@ -84,10 +83,9 @@ extension BackupSpeedModeProfile on BackupSpeedMode {
       preparationWorkers: preparationWorkers,
       uploadWorkers: uploadWorkers,
       acknowledgementWorkers: acknowledgementWorkers,
-      // A deeper read-ahead queue prevents slow Android media-provider lookups
-      // from starving a fast connection. The queue implementation also caps
-      // capacities at 64 as a final safety net.
-      preparedQueueCapacity: math.min(64, uploadWorkers * 3),
+      // Read ahead enough to avoid idle sockets without keeping dozens of
+      // large temporary media files open at once.
+      preparedQueueCapacity: math.min(32, uploadWorkers * 3),
       acknowledgementQueueCapacity: math.min(64, uploadWorkers * 4),
     );
   }

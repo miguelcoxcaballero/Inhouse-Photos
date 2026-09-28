@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/presentation/widgets/images/sharp_preview_cache.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 
@@ -17,6 +18,25 @@ Future<ui.Image> _image(int size) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('local preview survives upload metadata changes but not a local edit', () {
+    LocalAsset asset({String? remoteId, DateTime? adjustedAt, DateTime? updatedAt}) => LocalAsset(
+      id: 'device-photo-1',
+      remoteId: remoteId,
+      name: 'photo.jpg',
+      type: AssetType.image,
+      createdAt: DateTime.utc(2025),
+      updatedAt: updatedAt ?? DateTime.utc(2025),
+      width: 4032,
+      height: 3024,
+      playbackStyle: AssetPlaybackStyle.image,
+      adjustmentTime: adjustedAt,
+      isEdited: false,
+    );
+
+    final original = sharpPreviewKey(asset());
+    expect(sharpPreviewKey(asset(remoteId: 'server-id', updatedAt: DateTime.utc(2026))), original);
+    expect(sharpPreviewKey(asset(adjustedAt: DateTime.utc(2026))), isNot(original));
+  });
   testWidgets('warm preview paints immediately at a different grid size, without a provider', (tester) async {
     await tester.runAsync(() async {
       final image = await _image(64);

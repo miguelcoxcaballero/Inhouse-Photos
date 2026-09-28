@@ -4,8 +4,9 @@ import 'dart:collection';
 /// Bounded server work that can be cancelled without leaving upload workers
 /// waiting forever for a compression acknowledgement.
 class UploadCapacityGate {
-  UploadCapacityGate(this.limit);
-  final int limit;
+  UploadCapacityGate(this._limit);
+  int _limit;
+  int get limit => _limit;
   final Queue<Completer<bool>> _waiting = Queue();
   int _held = 0;
   bool _cancelled = false;
@@ -14,10 +15,10 @@ class UploadCapacityGate {
     if (_cancelled) {
       return Future.value(false);
     }
-    if (limit <= 0) {
+    if (_limit <= 0) {
       return Future.value(true);
     }
-    if (_held < limit) {
+    if (_held < _limit) {
       _held++;
       return Future.value(true);
     }
@@ -27,13 +28,29 @@ class UploadCapacityGate {
   }
 
   void release() {
-    if (_cancelled || limit <= 0) {
+    if (_cancelled || _limit <= 0) {
       return;
     }
-    if (_waiting.isNotEmpty) {
-      _waiting.removeFirst().complete(true);
-    } else if (_held > 0) {
+    if (_held > 0) {
       _held--;
+    }
+    _wakeWaiting();
+  }
+
+  /// Change concurrency without discarding in-flight requests. When lowering
+  /// the limit, existing uploads finish normally and new ones wait.
+  void updateLimit(int limit) {
+    if (_cancelled || _limit <= 0 || limit < 1) {
+      return;
+    }
+    _limit = limit;
+    _wakeWaiting();
+  }
+
+  void _wakeWaiting() {
+    while (_waiting.isNotEmpty && _held < _limit) {
+      _held++;
+      _waiting.removeFirst().complete(true);
     }
   }
 

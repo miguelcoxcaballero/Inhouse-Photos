@@ -21,6 +21,7 @@ import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/storage.provider.dart';
 import 'package:immich_mobile/repositories/asset_media.repository.dart';
 import 'package:immich_mobile/repositories/upload.repository.dart';
+import 'package:immich_mobile/utils/adaptive_upload_limiter.dart';
 import 'package:immich_mobile/utils/upload_capacity_gate.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
@@ -241,12 +242,12 @@ class ForegroundUploadService {
     // the server's compression latency: a worker that had already pushed its
     // bytes sat idle until a websocket said the server was done, and the pool
     // was clamped to the size of that window. Pushing bytes and waiting for
-    // compression are now separate concerns. Workers upload at whatever
-    // concurrency the network profile allows, and a semaphore bounds only how
-    // many assets may be awaiting compression at once. Sized well above the
-    // worker count, it is a backstop against an unbounded server queue rather
-    // than the thing that decides upload speed.
+    // compression are now separate concerns. Upload concurrency adapts to
+    // measured network throughput, while a separate semaphore bounds how many
+    // assets may be awaiting compression on the server.
     final uploadWorkerCount = transferPlan.uploadWorkers;
+    final adaptiveLimit = AdaptiveUploadLimiter(maximum: uploadWorkerCount, isUnmetered: isUnmetered);
+    final uploadGate = UploadCapacityGate(adaptiveLimit.current);
     final compressionWindow = waitsForServerCompression ? transferPlan.compressionWindow(isUnmetered: isUnmetered) : 0;
     final compressionGate = UploadCapacityGate(compressionWindow);
     final outstandingAcknowledgements = <Future<void>>{};
@@ -261,6 +262,7 @@ class ForegroundUploadService {
     var currentIndex = 0;
     void cancelPipeline() {
       prepared.close();
+      uploadGate.cancel();
       compressionGate.cancel();
     }
 
@@ -328,8 +330,7 @@ class ForegroundUploadService {
         }
 
         if (waitsForServerCompression) {
-          // Only blocks once the server is genuinely behind by several times
-          // the worker count, so the steady state is limited by the network.
+          // Stop adding to the server backlog when it is genuinely behind.
           if (!await compressionGate.acquire()) {
             await _cleanupPreparedAsset(item);
             continue;
@@ -341,7 +342,25 @@ class ForegroundUploadService {
           continue;
         }
 
-        final acknowledgement = await _uploadPreparedAsset(item, cancelToken, callbacks: callbacks);
+        if (!await uploadGate.acquire()) {
+          compressionGate.release();
+          await _cleanupPreparedAsset(item);
+          continue;
+        }
+        _UploadAcknowledgement? acknowledgement;
+        try {
+          acknowledgement = await _uploadPreparedAsset(item, cancelToken, callbacks: callbacks);
+          final newLimit = adaptiveLimit.record(
+            bytes: acknowledgement == null ? 0 : item.file.lengthSync(),
+            success: acknowledgement != null,
+            now: DateTime.now(),
+          );
+          if (newLimit != null) {
+            uploadGate.updateLimit(newLimit);
+          }
+        } finally {
+          uploadGate.release();
+        }
         if (acknowledgement == null) {
           compressionGate.release();
           await _cleanupPreparedAsset(item);

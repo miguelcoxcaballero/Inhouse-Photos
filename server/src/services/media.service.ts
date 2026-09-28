@@ -82,11 +82,25 @@ export class MediaService extends BaseService {
     }
 
     const sourcePath = asset.originalPath;
+    // A previous attempt may have committed the new path and then failed while
+    // updating usage or scheduling cleanup. Never transcode the committed file
+    // again (or delete it on a retry).
+    if (/\.storage-saver\.(?:jpg|mp4)$/i.test(sourcePath)) {
+      const previousPath = sourcePath.replace(/\.storage-saver\.(?:jpg|mp4)$/i, '');
+      await this.jobRepository.queue({ name: JobName.UserSyncUsage });
+      if (await this.storageRepository.checkFileExists(previousPath)) {
+        await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [previousPath] } });
+      }
+      await this.jobRepository.queue({ name: JobName.AssetExtractMetadata, data: { id, source: 'upload' } });
+      return JobStatus.Success;
+    }
     const isGif = asset.originalFileName.toLowerCase().endsWith('.gif');
     const extension = asset.type === AssetType.Video ? '.mp4' : '.jpg';
     const outputPath = `${sourcePath}.storage-saver${extension}`;
     const sourceStats = await this.storageRepository.stat(sourcePath);
     let lastReportedProgress = -1;
+    let pathCommitted = false;
+    let committedBytes: number | undefined;
     let lastReportedState: ArgOf<'StorageSaverProgress'>['state'] | undefined;
     const report = (progress: number, state: ArgOf<'StorageSaverProgress'>['state'], outputBytes?: number) => {
       const normalizedProgress = Math.min(1, Math.max(0, progress));
@@ -146,12 +160,14 @@ export class MediaService extends BaseService {
 
       const originalFileName = `${path.parse(asset.originalFileName).name}${extension}`;
       await this.storageRepository.utimes(outputPath, new Date(), sourceStats.mtime);
+      committedBytes = outputStats.size;
       await this.assetRepository.update({
         id,
         originalPath: outputPath,
         originalFileName,
         checksum: checksum.digest(),
       });
+      pathCommitted = true;
       await this.userRepository.updateUsage(asset.ownerId, outputStats.size - sourceStats.size);
       await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [sourcePath] } });
       this.logger.log(`Storage Saver reduced asset ${id} from ${sourceStats.size} to ${outputStats.size} bytes`);
@@ -159,8 +175,32 @@ export class MediaService extends BaseService {
       return JobStatus.Success;
     } catch (error: any) {
       this.logger.error(`Storage Saver failed for asset ${id}: ${error}`, error?.stack);
-      if (await this.storageRepository.checkFileExists(outputPath)) {
+      // An interrupted database acknowledgment can throw even after its
+      // transaction committed. Re-read the durable reference before cleanup.
+      if (!pathCommitted) {
+        try {
+          pathCommitted = (await this.assetRepository.getById(id))?.originalPath === outputPath;
+        } catch {
+          // An unavailable database is not proof that the file is disposable.
+          pathCommitted = true;
+        }
+      }
+      if (!pathCommitted && (await this.storageRepository.checkFileExists(outputPath))) {
         await this.storageRepository.unlink(outputPath);
+      }
+      // BullMQ does not retry a JobStatus.Failed result in this project. Repair
+      // bookkeeping explicitly and consider the asset complete once its durable
+      // path is switched; the old source is safer left behind than the new one
+      // deleted. A manual requeue also reaches the idempotent branch above.
+      if (pathCommitted) {
+        try {
+          await this.jobRepository.queue({ name: JobName.UserSyncUsage });
+          await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [sourcePath] } });
+        } catch (repairError: any) {
+          this.logger.warn(`Storage Saver repair scheduling failed for asset ${id}: ${repairError}`);
+        }
+        report(1, 'completed', committedBytes);
+        return JobStatus.Success;
       }
       report(1, 'failed', sourceStats.size);
       return JobStatus.Failed;
