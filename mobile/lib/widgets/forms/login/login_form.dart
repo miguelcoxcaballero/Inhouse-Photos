@@ -146,10 +146,6 @@ class LoginForm extends HookConsumerWidget {
       final serverUrl = getServerUrl();
       if (serverUrl != null) {
         serverEndpointController.text = serverUrl;
-      } else {
-        // This distribution is paired with the existing Inhouse server while
-        // still allowing the endpoint to be edited for any Immich 3.1 server.
-        serverEndpointController.text = 'https://fotos.miguelcoxcaballero.com';
       }
       return null;
     }, []);
