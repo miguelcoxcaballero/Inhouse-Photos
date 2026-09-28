@@ -17,7 +17,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.1.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.0.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -138,7 +138,7 @@ namespace InhousePhotos {
       destination=Path.GetFullPath(destination).TrimEnd('\\')+"\\";
       if (destination.StartsWith(source,StringComparison.OrdinalIgnoreCase) || source.StartsWith(destination,StringComparison.OrdinalIgnoreCase) ||
           String.Equals(Path.GetPathRoot(source),Path.GetPathRoot(destination),StringComparison.OrdinalIgnoreCase))
-        throw new InvalidOperationException("Elige otro disco para la copia. No puede estar dentro de la biblioteca ni en su mismo volumen.");
+        throw new InvalidOperationException("Elige otra unidad para la copia. No puede estar dentro de la biblioteca ni en su mismo volumen.");
       RejectLinks(source); RejectLinks(destination);
     }
     public static void RejectLinks(string path) {
@@ -152,35 +152,76 @@ namespace InhousePhotos {
       if(!Directory.Exists(path))return;
       foreach(var child in Directory.EnumerateDirectories(path))RejectNestedLinks(child);
     }
-    public static async Task<string> Snapshot(Preferences p) {
+    public static Task<string> Snapshot(Preferences p) { return Snapshot(p,CancellationToken.None); }
+    public static async Task<string> Snapshot(Preferences p,CancellationToken cancellation) {
+      cancellation.ThrowIfCancellationRequested();
       var directory=Path.Combine(p.Installation,@"operations\backups"); Directory.CreateDirectory(directory);
-      var file=Path.Combine(directory,"inhouse-"+DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff")+".sql");
+      var file=Path.Combine(directory,"inhouse-"+DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff")+"-"+Guid.NewGuid().ToString("N")+".sql");
+      var partial=file+".partial";
       // Shell is inside the selected database container; variables are expanded
       // there, never exposed to this process, UI or the release artifact.
-      await Task.Run(async delegate {
+      try {
+        await Task.Run(async delegate {
         using(var process=new Process()) {
           var args="compose --project-directory "+Quote(p.Installation)+" -f "+Quote(Path.Combine(p.Installation,"docker-compose.yml"))+" exec -T database sh -c "+Quote("exec pg_dump --username=$POSTGRES_USER --dbname=$POSTGRES_DB --no-owner --no-acl");
           process.StartInfo=new ProcessStartInfo(DockerExe(),args){WorkingDirectory=p.Installation,UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,RedirectStandardOutput=true,RedirectStandardError=true};
-          process.Start();var error=process.StandardError.ReadToEndAsync();
-          using(var output=new FileStream(file+".partial",FileMode.CreateNew,FileAccess.Write,FileShare.None,65536,true)) {
-            var copy=process.StandardOutput.BaseStream.CopyToAsync(output);
-            if(await Task.WhenAny(copy,Task.Delay(TimeSpan.FromMinutes(15)))!=copy){try{process.Kill();}catch{}throw new TimeoutException("Instantánea incompleta: tiempo agotado.");}
-            await copy;
+          process.Start();
+          using(var stop=cancellation.Register(()=>{try{if(!process.HasExited)process.Kill();}catch{}})) {
+            var error=process.StandardError.ReadToEndAsync();
+            using(var output=new FileStream(partial,FileMode.CreateNew,FileAccess.Write,FileShare.None,65536,true)) {
+              var copy=process.StandardOutput.BaseStream.CopyToAsync(output,65536,cancellation);
+              if(await Task.WhenAny(copy,Task.Delay(TimeSpan.FromMinutes(15),cancellation))!=copy){try{process.Kill();}catch{}cancellation.ThrowIfCancellationRequested();throw new TimeoutException("Instantánea incompleta: tiempo agotado.");}
+              await copy;
+            }
+            cancellation.ThrowIfCancellationRequested();
+            if(!process.WaitForExit(30000)){try{process.Kill();}catch{}throw new TimeoutException("La base de datos no confirmó el final de la instantánea.");}
+            await error;cancellation.ThrowIfCancellationRequested();
+            if(process.ExitCode!=0)throw new IOException("La instantánea no se completó. El archivo parcial no es una copia válida.");
           }
-          if(!process.WaitForExit(30000)){try{process.Kill();}catch{}throw new TimeoutException("La base de datos no confirmó el final de la instantánea.");}
-          await error;if(process.ExitCode!=0)throw new IOException("La instantánea no se completó. El archivo parcial no es una copia válida.");
         }
-      });
-      using(var reader=new StreamReader(file+".partial")){var header=new char[200];var count=reader.Read(header,0,header.Length);if(!new string(header,0,count).Contains("PostgreSQL database dump"))throw new IOException("La instantánea no es válida.");}
-      File.Move(file+".partial",file); return file;
+        },cancellation);
+        cancellation.ThrowIfCancellationRequested();
+        using(var reader=new StreamReader(partial)){var header=new char[200];var count=reader.Read(header,0,header.Length);if(!new string(header,0,count).Contains("PostgreSQL database dump"))throw new IOException("La instantánea no es válida.");}
+        File.Move(partial,file); return file;
+      } catch {
+        try{if(File.Exists(partial))File.Delete(partial);}catch{}
+        cancellation.ThrowIfCancellationRequested();
+        throw;
+      }
     }
     public static async Task<string> Backup(Preferences p, Action<string> progress, CancellationToken cancellation) {
+      ValidateManagedConfiguration(p);
+      var receipt=Json.Deserialize<AdoptionReceipt>(File.ReadAllText(p.ReceiptPath));
+      AssertIdentity(receipt.Containers,await InspectServer(p));
       var source=Library(p); ValidateBackup(source,p.BackupDestination);
       var target=Path.Combine(p.BackupDestination,"Inhouse Photos backup");
-      progress("Comprobando el destino de la copia…");
+      progress("Comprobando archivos y espacio del disco de copia…");
+      var capacity=await Task.Run(()=>EstimateBackupCapacity(source,target,cancellation,
+        count=>progress("Comprobando espacio · "+count.ToString("N0")+" archivos revisados…")),cancellation);
+      if(!capacity.EnoughSpace)throw new InsufficientBackupSpaceException(capacity);
       await Task.Run(()=>{cancellation.ThrowIfCancellationRequested();RejectNestedLinks(target);Directory.CreateDirectory(target);},cancellation);
       cancellation.ThrowIfCancellationRequested();
-      progress("Copiando archivos nuevos. No se borran ni se sobrescriben los existentes…");
+      // Database first, media second: if uploads continue, the copied media
+      // can contain extra files, but the database should not refer to media
+      // that had not yet been copied. This follows Immich's backup ordering.
+      progress("1 de 3 · Guardando álbumes y cuentas…");
+      var snapshot=await Snapshot(p,cancellation);
+      cancellation.ThrowIfCancellationRequested();
+      var databaseCopy=Path.Combine(target,Path.GetFileName(snapshot));
+      var databasePartial=databaseCopy+".partial";
+      try {
+        using(var input=new FileStream(snapshot,FileMode.Open,FileAccess.Read,FileShare.Read,65536,true))
+        using(var output=new FileStream(databasePartial,FileMode.CreateNew,FileAccess.Write,FileShare.None,65536,true))
+          await input.CopyToAsync(output,65536,cancellation);
+        cancellation.ThrowIfCancellationRequested();
+        File.Move(databasePartial,databaseCopy);
+      } catch {
+        try{if(File.Exists(databasePartial))File.Delete(databasePartial);}catch{}
+        cancellation.ThrowIfCancellationRequested();
+        throw;
+      }
+      cancellation.ThrowIfCancellationRequested();
+      progress("2 de 3 · Copiando fotos y vídeos nuevos…");
       // No /MIR, /PURGE, /MOVE: a removed source photo must survive in the backup.
       var code=await Task.Run(delegate {
         using(var process=new Process()) {
@@ -192,10 +233,13 @@ namespace InhousePhotos {
           cancellation.ThrowIfCancellationRequested();return process.ExitCode;
         }
       });
-      if(code>=8) throw new IOException("Algunos archivos no se copiaron. La copia no está completa. Revisa espacio y conexión del disco y vuelve a intentarlo.");
+      if(code>=4) throw new IOException("Algunos archivos no se copiaron o no coinciden. La copia no está completa. Revisa el disco de destino y vuelve a intentarlo.");
       cancellation.ThrowIfCancellationRequested();
-      progress("Guardando la base de datos…");
-      var snapshot=await Snapshot(p); File.Copy(snapshot,Path.Combine(target,Path.GetFileName(snapshot)),false);
+      progress("3 de 3 · Comprobando los archivos de la copia…");
+      await Task.Run(()=>VerifyPendingBackupFiles(capacity,cancellation,
+        count=>progress("3 de 3 · "+count.ToString("N0")+" archivos comprobados…")),cancellation);
+      cancellation.ThrowIfCancellationRequested();
+      SaveFullBackupSuccess(p,target,databaseCopy);
       return target;
     }
   }
@@ -211,14 +255,16 @@ namespace InhousePhotos {
     public ServerWindow() {
       Title="Inhouse Photos Server"; Width=1080;Height=760;MinWidth=760;MinHeight=600;Background=new SolidColorBrush(Color.FromRgb(19,17,14));Foreground=Brushes.White;FontFamily=new FontFamily("Segoe UI");FontSize=15;WindowStartupLocation=WindowStartupLocation.CenterScreen;
       Resources.Add(typeof(Button),XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Setter Property='Background' Value='#2C251F'/><Setter Property='Foreground' Value='#F4F1EC'/><Setter Property='BorderThickness' Value='0'/><Setter Property='Padding' Value='18,12'/><Setter Property='Margin' Value='0,6,8,6'/><Setter Property='Cursor' Value='Hand'/><Setter Property='HorizontalContentAlignment' Value='Left'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='Button'><Border x:Name='bg' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{TemplateBinding Background}' Padding='{TemplateBinding Padding}' CornerRadius='10'><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='bg' Property='Opacity' Value='0.8'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='bg' Property='Opacity' Value='0.45'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>"));
-      var root=new Grid{Background=Background}; root.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(215)});root.ColumnDefinitions.Add(new ColumnDefinition());Content=root;
-      var sidebar=new StackPanel {Margin=new Thickness(24,32,14,20)};root.Children.Add(sidebar);
+      var root=new Grid{Background=Background}; root.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(236)});root.ColumnDefinitions.Add(new ColumnDefinition());Content=root;
+      var sidebar=new StackPanel {Margin=new Thickness(24,32,20,20)};root.Children.Add(sidebar);
       using(var brand=typeof(ServerWindow).Assembly.GetManifestResourceStream("InhousePhotos.brand.xaml"))Icon=(ImageSource)XamlReader.Load(brand);
       sidebar.Children.Add(new Image{Source=Icon,Width=52,Height=52,HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,0,0,8)});
-      sidebar.Children.Add(Label("inhouse photos",22,accent));sidebar.Children.Add(Label("SERVER · WINDOWS",12,muted));
+      sidebar.Children.Add(Label("inhouse photos",22,accent));sidebar.Children.Add(Label("TU SERVIDOR",11,muted));
       sidebar.Children.Add(new Border{Height=36});
-      var navLabels=new Dictionary<string,string>{{"Inicio","Mi biblioteca"},{"Discos","Almacenamiento"},{"Protección","Copia de seguridad"},{"Conectar","Mi móvil"},{"Configuración","Ajustes"}};
-      foreach(var name in new[]{"Inicio","Discos","Protección","Conectar","Configuración"}) {var captured=name;var button=new Button{Content=navLabels[name],FontSize=14,Background=Brushes.Transparent};button.Click+=async(s,e)=>{if(!busy){page=captured;notice.Text="";await Render();}};tabs[name]=button;sidebar.Children.Add(button);}
+      var navLabels=new Dictionary<string,string>{{"Inicio","Resumen"},{"Protección","Copias"},{"Discos","Almacenamiento"},{"Configuración","Ajustes"}};
+      foreach(var name in new[]{"Inicio","Protección","Discos","Configuración"}) {var captured=name;var button=new Button{Content=navLabels[name],FontSize=15,Background=Brushes.Transparent};button.Click+=async(s,e)=>{if(!busy||backupCancellation!=null){page=captured;notice.Text="";await Render();}};tabs[name]=button;sidebar.Children.Add(button);}
+      sidebar.Children.Add(new Border{Height=36});
+      sidebar.Children.Add(Label("Versión "+Backend.Version+" · Windows",12,muted));
       var right=new DockPanel{Margin=new Thickness(26,35,34,24)};Grid.SetColumn(right,1);root.Children.Add(right);
       notice.TextWrapping=TextWrapping.Wrap;notice.Foreground=accent;notice.Margin=new Thickness(0,12,0,0);DockPanel.SetDock(notice,Dock.Bottom);right.Children.Add(notice);
       right.Children.Add(new ScrollViewer{Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
@@ -232,7 +278,7 @@ namespace InhousePhotos {
     void Rule(){content.Children.Add(new Border{Height=1,Background=new SolidColorBrush(Color.FromRgb(61,52,43)),Margin=new Thickness(0,18,0,20)});}
     Button Action(string title,Func<Task> task,bool primary=false) {
       var button=new Button{Content=title,HorizontalAlignment=HorizontalAlignment.Left};if(primary){button.Background=accent;button.Foreground=Background;}
-      button.Click+=async(s,e)=>{if(busy)return;busy=true;button.IsEnabled=false;notice.Text="Trabajando…";try{await task();}catch(Exception ex){notice.Text=ex.Message;}finally{busy=false;button.IsEnabled=true;}};content.Children.Add(button);return button;
+      button.Click+=async(s,e)=>{if(busy)return;busy=true;button.IsEnabled=false;notice.Text="Trabajando…";try{await task();if(notice.Text=="Trabajando…")notice.Text="";}catch(Exception ex){notice.Text=ex.Message;}finally{busy=false;button.IsEnabled=true;}};content.Children.Add(button);return button;
     }
     string PickFolder(){using(var dialog=new System.Windows.Forms.FolderBrowserDialog()){dialog.Description="Selecciona una carpeta";return dialog.ShowDialog()==System.Windows.Forms.DialogResult.OK?dialog.SelectedPath:null;}}
     bool Confirm(string message){return MessageBox.Show(this,message,"Inhouse Photos",MessageBoxButton.OKCancel,MessageBoxImage.Warning)==MessageBoxResult.OK;}
@@ -240,75 +286,26 @@ namespace InhousePhotos {
     internal void PreviewPage(string target) { if(!tabs.ContainsKey(target))throw new ArgumentException("Unknown preview page");page=target; }
     internal void PreviewMigration() {prefs=new Preferences{Installation=@"D:\Immich",Managed=false,Endpoint="",LocalEndpoint="http://127.0.0.1:2283"};busy=true;page="Inicio";}
     public async Task Render(){
-      if(refreshing)return;if(!busy)prefs=Backend.Load();refreshing=true;content.Children.Clear();
-      foreach(var tab in tabs.Values)tab.IsEnabled=false;
-      foreach(var item in tabs){item.Value.Foreground=item.Key==page?accent:muted;item.Value.Background=item.Key==page?new SolidColorBrush(Color.FromRgb(44,37,31)):Brushes.Transparent;}
+      if(refreshing)return;
+      if(!busy)prefs=Backend.Load();
+      if(!prefs.Managed)page="Inicio";
+      refreshing=true;
+      content.Children.Clear();
+      foreach(var item in tabs) {
+        item.Value.IsEnabled=false;
+        item.Value.Visibility=prefs.Managed||item.Key=="Inicio"?Visibility.Visible:Visibility.Collapsed;
+        item.Value.Foreground=item.Key==page?accent:muted;
+        item.Value.Background=item.Key==page?new SolidColorBrush(Color.FromRgb(44,37,31)):Brushes.Transparent;
+      }
       try {
-        if(page=="Inicio") {
-          await RenderSimpleHome();
-        } else if(page=="Diagnóstico") {
-          Heading("Tu servidor","Tus fotos permanecen en este equipo. Cerrar esta ventana no detiene el servidor.");
-          var health=Label("Comprobando conexión…",22,muted);content.Children.Add(health);
-          var pingTask=String.IsNullOrEmpty(prefs.Endpoint)?Task.FromResult(false):Backend.Ping(prefs.Endpoint);
-          var local=await Backend.Ping(prefs.LocalEndpoint);var remote=await pingTask;
-          health.Text=local?"●  Servidor en funcionamiento":"○  Servidor no disponible";health.Foreground=local?new SolidColorBrush(Color.FromRgb(160,201,145)):accent;
-          content.Children.Add(Label(remote?"Acceso por internet disponible":"No se ha podido verificar el acceso por internet",15,muted));
-          if(!String.IsNullOrEmpty(prefs.Endpoint))Action("Abrir mi biblioteca ↗",()=>{Open(Backend.CanonicalEndpoint(prefs.Endpoint));return Task.FromResult(0);},true);
-          Rule();content.Children.Add(Label("Servicios",20));
-          try {
-            var data=await Backend.Compose(prefs,"ps --format json",12);
-            foreach(var line in data.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries)){
-              var row=Backend.Json.Deserialize<Dictionary<string,object>>(line);var service=Convert.ToString(row.ContainsKey("Service")?row["Service"]:"");var names=new Dictionary<string,string>{{"immich-server","Biblioteca"},{"immich-machine-learning","Análisis de fotos"},{"database","Base de datos"},{"redis","Cola de tareas"},{"caddy","Conexión segura"}};var state=Convert.ToString(row.ContainsKey("State")?row["State"]:"");content.Children.Add(Label((names.ContainsKey(service)?names[service]:service)+"   ·   "+(state=="running"?"Activo":state),15,muted));
-            }
-          }catch(Exception ex){content.Children.Add(Label(ex.Message,15,muted));}
-          Action("Encender servidor",async()=>{
-            await Backend.StartManaged(prefs,text=>Dispatcher.Invoke(()=>notice.Text=text));notice.Text="Biblioteca disponible.";
-          });
-          Action("Actualizar estado",async()=>{notice.Text="";await Render();});
-        } else if(page=="Discos") {
-          Heading("Almacenamiento","Espacio real de los volúmenes conectados a este PC.");
-          foreach(var disk in await Task.Run(()=>Backend.Disks())){
-            content.Children.Add(Label(disk.Root+"  "+disk.Name,22));
-            content.Children.Add(Label(Backend.Size(disk.Total-disk.Free)+" usados   /   "+Backend.Size(disk.Total)+" totales",15,muted));
-            content.Children.Add(new ProgressBar{Minimum=0,Maximum=disk.Total,Value=disk.Total-disk.Free,Height=7,Foreground=accent,Background=new SolidColorBrush(Color.FromRgb(49,42,35)),BorderThickness=new Thickness(0),Margin=new Thickness(0,4,0,12)});
-            content.Children.Add(Label(Backend.Size(disk.Free)+" disponibles",14,muted));Rule();
-          }
-          content.Children.Add(Label("Discos físicos",20));content.Children.Add(Label(await Task.Run(()=>Backend.PhysicalDisks()),14,muted));
-          content.Children.Add(Label("Espacio protegido / RAID",20));content.Children.Add(Label("Crea un espejo o un grupo de paridad, o añade discos vacíos a un grupo de Inhouse Photos. Los discos con datos no son seleccionables.",15,muted));
-          Action("Configurar discos protegidos",()=>{Process.Start(new ProcessStartInfo(typeof(Program).Assembly.Location,"--storage"){UseShellExecute=true,Verb="runas",WindowStyle=ProcessWindowStyle.Normal});return Task.FromResult(0);});
-        } else if(page=="Protección") {
-          Heading("Copia de seguridad","Conserva una segunda copia. RAID no protege frente a borrados accidentales.");
-          content.Children.Add(Label("Biblioteca + base de datos",22));content.Children.Add(Label("Copia los archivos nuevos a otro disco sin replicar borrados ni sobrescribir archivos. Al finalizar guarda una copia de la base de datos. Evita editar o subir fotos mientras se ejecuta esta primera copia.",15,muted));
-          var destination=Label(String.IsNullOrEmpty(prefs.BackupDestination)?"Ningún destino seleccionado":prefs.BackupDestination,15,accent);content.Children.Add(destination);
-          Action("Elegir disco de copia",()=>{var path=PickFolder();if(path!=null){Backend.ValidateBackup(Backend.Library(prefs),path);prefs.BackupDestination=path;Backend.Save(prefs);destination.Text=path;notice.Text="Destino guardado. No se ha movido ni borrado ningún archivo.";}return Task.FromResult(0);});
-          Action("Crear copia ahora",async()=>{if(!Confirm("Se copiarán archivos a otro disco y la base de datos. Puede tardar bastante. No se eliminará ni sobrescribirá nada. Evita editar la biblioteca durante la copia. ¿Continuar?")){notice.Text="Cancelado.";return;}backupCancellation=new CancellationTokenSource();try{var result=await Backend.Backup(prefs,text=>Dispatcher.Invoke(()=>notice.Text=text),backupCancellation.Token);notice.Text="Copia terminada en "+result+". Conserva este disco separado del servidor.";}finally{backupCancellation.Dispose();backupCancellation=null;}},true);
-          var cancelBackup=new Button{Content="Detener copia",HorizontalAlignment=HorizontalAlignment.Left,Visibility=Visibility.Collapsed};cancelBackup.Click+=(s,e)=>{if(backupCancellation!=null){backupCancellation.Cancel();notice.Text="Deteniendo la copia sin borrar lo que ya se ha copiado…";}};content.Children.Add(cancelBackup);
-          var cancelVisibility=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(250)};cancelVisibility.Tick+=(s,e)=>{if(!content.Children.Contains(cancelBackup)){cancelVisibility.Stop();return;}cancelBackup.Visibility=backupCancellation==null?Visibility.Collapsed:Visibility.Visible;};cancelVisibility.Start();Closed+=(s,e)=>cancelVisibility.Stop();
-          Rule();content.Children.Add(Label("Solo base de datos",20));content.Children.Add(Label("Guarda álbumes y metadatos, pero no las fotos ni los vídeos. No basta para recuperar la biblioteca.",15,muted));
-          Action("Guardar instantánea",async()=>{notice.Text="Instantánea guardada: "+await Backend.Snapshot(prefs);});
-          content.Children.Add(Label("Protecciones activas",20));content.Children.Add(Label("Las copias no propagan borrados. No se permite formatear discos con datos. Cambiar la configuración no mueve tus fotos.",15,muted));
-        } else if(page=="Conectar") {
-          Heading("Tu móvil, conectado","Usa la misma dirección y cuenta de tu biblioteca actual.");
-          content.Children.Add(Label(String.IsNullOrEmpty(prefs.Endpoint)?"Configura primero la dirección del servidor.":prefs.Endpoint,23,accent));
-          Action("Copiar dirección",()=>{Clipboard.SetText(Backend.CanonicalEndpoint(prefs.Endpoint));notice.Text="Dirección copiada. Pégala en la pantalla de conexión de Inhouse Photos.";return Task.FromResult(0);},true);
-          Action("Abrir descargas",()=>{Open(Backend.CanonicalEndpoint(prefs.Endpoint)+"/descargas/");return Task.FromResult(0);});
-          Rule();content.Children.Add(Label("1. Instala Inhouse Photos en el móvil.\n2. Introduce la dirección de arriba.\n3. Inicia sesión con tu cuenta existente.\n4. Elige los álbumes que quieres respaldar.",17));
-          content.Children.Add(Label("El instalador no contiene contraseñas. No se cambia ninguna cuenta ni se publica acceso a tus fotos.",15,muted));
-        } else {
-          Heading("Ajustes","Lo esencial para que tu biblioteca esté disponible.");
-          await RenderManagement();
-          var advanced=new StackPanel();
-          var advancedSection=new Expander{Header="Opciones avanzadas",Content=advanced,Foreground=muted,Margin=new Thickness(0,24,0,0)};
-          int advancedStart=content.Children.Count;
-          content.Children.Add(Label("Carpeta del servidor",18));var folder=Label(prefs.Installation??"",15,accent);content.Children.Add(folder);
-          Action("Seleccionar instalación",async()=>{var path=PickFolder();if(path!=null){if(!File.Exists(Path.Combine(path,"docker-compose.yml")))throw new InvalidOperationException("Esta carpeta no contiene un servidor compatible.");if(!String.Equals(path,prefs.Installation,StringComparison.OrdinalIgnoreCase)&&Confirm("¿Cambiar el servidor que gestiona esta app? Se pausará el inicio automático hasta verificarlo. Tus fotos no se moverán.")){await Startup.SetEnabled(prefs,false);prefs.Installation=path;prefs.Managed=false;prefs.ReceiptPath=null;prefs.ProjectName=null;Backend.Save(prefs);folder.Text=path;page="Inicio";await Render();}}});
-          content.Children.Add(Label("Dirección de la biblioteca",18));var endpoint=new TextBox{Text=prefs.Endpoint??"",Padding=new Thickness(12),FontSize=16,Background=new SolidColorBrush(Color.FromRgb(44,37,31)),Foreground=Foreground,BorderThickness=new Thickness(1),BorderBrush=muted,Margin=new Thickness(0,4,0,10)};content.Children.Add(endpoint);
-          Action("Comprobar y guardar dirección",async()=>{var url=Backend.CanonicalEndpoint(endpoint.Text);if(!await Backend.Ping(url))throw new InvalidOperationException("No responde un servidor compatible en esa dirección. No se ha guardado.");prefs.Endpoint=url;Backend.Save(prefs);notice.Text="Conexión verificada y guardada.";},true);
-          while(content.Children.Count>advancedStart){var child=content.Children[advancedStart];content.Children.RemoveAt(advancedStart);advanced.Children.Add(child);}
-          content.Children.Add(advancedSection);
-          Rule();content.Children.Add(Label("Inhouse Photos Server "+Backend.Version,16));
-        }
-      }catch(Exception ex){content.Children.Add(Label(ex.Message,16,accent));}finally{refreshing=false;foreach(var tab in tabs.Values)tab.IsEnabled=true;}
+        if(prefs.Managed)await RenderManagedPage();
+        else await RenderSimpleHome();
+      } catch(Exception ex) {
+        content.Children.Add(Label(ex.Message,16,accent));
+      } finally {
+        refreshing=false;
+        foreach(var item in tabs)item.Value.IsEnabled=prefs.Managed||item.Key=="Inicio";
+      }
     }
   }
   public static class Program {
@@ -370,6 +367,9 @@ namespace InhousePhotos {
           foreach(var bad in new[]{null,"","http://example.com","https://user:password@example.com","file:///D:/Immich","https://example.com?key=secret"}){try{Backend.CanonicalEndpoint(bad);return 2;}catch(ArgumentException){}}
           foreach(var bad in new[]{@"D:\photos\backup",@"D:\other",@"D:\"}){try{Backend.ValidateBackup(@"D:\photos",bad);return 3;}catch(InvalidOperationException){}}
           Backend.ValidateBackup(@"D:\photos",@"E:\backups");
+          var due=DateTime.SpecifyKind(new DateTime(2026,9,27,3,0,0),DateTimeKind.Utc);
+          var schedule=new BackupSchedule{Enabled=true,NextDueUtc=due.ToString("o")};
+          if(Backend.IsBackupDue(schedule,due.AddTicks(-1))||!Backend.IsBackupDue(schedule,due))return 16;
           if(Backend.Quote(@"E:\")!="\"E:\\\\\"")return 4;
           foreach(var bad in new[]{null,"","folder\"name","folder\nname"}){try{Backend.Quote(bad);return 5;}catch(ArgumentException){}}
           return 0;

@@ -12,7 +12,7 @@ Implemented: per-user installer with SHA-256 validation and versioned files,
 installation discovery, health checks, hidden engine start, start
 existing services, tray supervisor, opt-in Windows sign-in startup, disk usage,
 physical-disk inventory, database snapshots,
-copy-only media backup to a separate drive, endpoint validation and mobile linking.
+copy-only media backup to a separate volume, endpoint validation and mobile linking.
 Database snapshots alone are not a backup of the photos. The UI explicitly says
 so. Copy-only backups never mirror deletions or overwrite existing files.
 
@@ -21,6 +21,25 @@ labelled disposable database, compares asset/user/album counts, and rechecks
 container identities and configuration hashes before saving a receipt. Original
 containers and media stay in place. Configuration copies use current-user DPAPI.
 The database snapshot does not include media files.
+
+Manager 1.2.0 uses four main areas: Overview, Backups, Storage, and Settings.
+The overview prioritizes local availability, free space on the actual library
+disk, the last completed full backup, and a contextual next action. A public
+URL responding from the PC is labelled as such; it is not proof of access from
+outside the home. Device connection is an Overview action. Raw service status,
+database-only snapshots, and Storage Spaces are under technical/advanced
+controls, not the normal route through the product.
+
+Full backup now records a success marker only after both a database SQL dump
+and a media copy have completed. The database is captured before the media
+copy, following Immich's recommended order when uploads may continue. The
+copy checks source/target names, sizes and timestamps before marking success;
+it refuses to overwrite an existing file that changed, to protect the prior
+copy. This is not a checksum audit or a tested full restore. Optional weekly
+copies are disabled by default, require a separate volume (ideally a different
+physical disk) and the manager running, and never enable themselves during
+migration or upgrade. Failed scheduled runs have bounded retry delays; they
+are not marked successful.
 
 Existing-server setup (1.1.1): the home screen can discover a running Compose
 library automatically. The user checks the folder and presses one button. Five

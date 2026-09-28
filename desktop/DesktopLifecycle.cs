@@ -31,10 +31,39 @@ namespace InhousePhotos {
       if(busy||monitorBusy||!prefs.Managed||DateTime.UtcNow<retryAfter)return;
       monitorBusy=true;
       try {
-        if(!await Startup.IsEnabled())return;
-        if(!await Backend.Ping(prefs.LocalEndpoint)) {
+        bool autoStart=false;
+        try{autoStart=await Startup.IsEnabled();}catch{}
+        var online=await Backend.Ping(prefs.LocalEndpoint);
+        if(autoStart&&!online) {
           await Backend.StartManaged(prefs,text=>Dispatcher.Invoke(()=>notice.Text=text));
-          notice.Text="Servidor disponible.";
+          online=true;notice.Text="Servidor disponible.";
+        }
+        if(Backend.IsBackupDue()) {
+          if(String.IsNullOrWhiteSpace(prefs.BackupDestination)) {
+            Backend.RecordScheduledBackupResult(false,"destination");
+            notice.Text="La copia semanal necesita un segundo disco. Ve a Copias para elegirlo.";
+          } else if(!online) {
+            Backend.RecordScheduledBackupResult(false,"server");
+            notice.Text="La copia semanal esperará a que el servidor esté disponible.";
+          } else {
+            Backend.RecordScheduledBackupStart();
+            backupCancellation=new CancellationTokenSource();busy=true;
+            try {
+              if(IsVisible&&page=="Protección")await Render();
+              await Backend.Backup(prefs,text=>Dispatcher.Invoke(()=>SetBackupProgress(text)),backupCancellation.Token);
+              Backend.RecordScheduledBackupResult(true,null);
+              notice.Text="Copia semanal terminada. Comprueba su estado en Copias.";
+            } catch(OperationCanceledException) {
+              Backend.RecordScheduledBackupResult(false,"cancelled");
+              notice.Text="Copia semanal detenida. Los archivos ya copiados se conservan.";
+            } catch(Exception ex) {
+              Backend.RecordScheduledBackupResult(false,ex is InsufficientBackupSpaceException||!Directory.Exists(prefs.BackupDestination)?"destination":"unknown");
+              notice.Text="La copia semanal no se completó: "+ex.Message;
+            } finally {
+              backupCancellation.Dispose();backupCancellation=null;backupProgressText=null;busy=false;
+              if(IsVisible&&(page=="Inicio"||page=="Protección"))await Render();
+            }
+          }
         }
         retryAfter=DateTime.UtcNow.AddSeconds(45);
       }catch(Exception ex){notice.Text=ex.Message;retryAfter=DateTime.UtcNow.AddMinutes(2);}
@@ -46,6 +75,10 @@ namespace InhousePhotos {
       auto.Template=(ControlTemplate)XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='CheckBox'><StackPanel Orientation='Horizontal'><Border x:Name='track' Width='44' Height='26' CornerRadius='13' Background='#554B43' Margin='0,0,12,0'><Ellipse x:Name='thumb' Width='20' Height='20' Fill='#F4F1EC' HorizontalAlignment='Left' Margin='3'/></Border><ContentPresenter VerticalAlignment='Center'/></StackPanel><ControlTemplate.Triggers><Trigger Property='IsChecked' Value='True'><Setter TargetName='track' Property='Background' Value='#ED995A'/><Setter TargetName='thumb' Property='HorizontalAlignment' Value='Right'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.45'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
       auto.Click+=async(s,e)=>{
         if(busy){auto.IsChecked=await Startup.IsEnabled();return;}
+        if(auto.IsChecked==false&&Backend.ReadBackupSchedule().Enabled&&
+           !Confirm("La copia semanal está activada. Si el gestor no se inicia con Windows, solo podrá copiar cuando lo abras manualmente. ¿Desactivar el inicio automático?")){
+          auto.IsChecked=true;return;
+        }
         busy=true;auto.IsEnabled=false;
         try {await Startup.SetEnabled(prefs,auto.IsChecked==true);notice.Text=auto.IsChecked==true?"Inicio automático activado. El servidor se preparará al iniciar sesión.":"Inicio automático desactivado. El servidor actual no se ha detenido.";}
         catch(Exception ex){notice.Text=ex.Message;auto.IsChecked=await Startup.IsEnabled();}
@@ -55,8 +88,8 @@ namespace InhousePhotos {
       Rule();content.Children.Add(Label("Conexión del servidor",22));
       if(prefs.Managed&&File.Exists(prefs.ReceiptPath)) {
         var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));
-        var counts=receipt.Counts.Split('|');content.Children.Add(Label("Comprobación de restauración superada",17,accent));
-        content.Children.Add(Label(counts[0]+" fotos y vídeos · "+counts[1]+" cuentas · "+counts[2]+" álbumes en la instantánea",14,muted));
+        var counts=receipt.Counts.Split('|');content.Children.Add(Label("Base de datos verificada al vincular",17,accent));
+        content.Children.Add(Label(counts[0]+" fotos y vídeos · "+counts[1]+" cuentas · "+counts[2]+" álbumes en aquella instantánea. No es una copia de las fotos.",14,muted));
         content.Children.Add(Label("Ya está conectado. No necesitas vincularlo de nuevo.",15,muted));
         int detailsStart=content.Children.Count;
         Action("Abrir informe y copia de migración",()=>{Open(Path.GetDirectoryName(prefs.ReceiptPath));return Task.FromResult(0);});

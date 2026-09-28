@@ -73,6 +73,7 @@ Register-ScheduledTask -TaskName 'Inhouse Photos Server' -Description 'Inhouse P
     }
     public static async Task ReleaseOwnership(Preferences p) {
       await SetEnabled(p,false);
+      Backend.SetBackupScheduleEnabled(false);
       if(File.Exists(ReceiptPath))await RestoreLegacy(Backend.Json.Deserialize<StartupReceipt>(File.ReadAllText(ReceiptPath)));
       p.Managed=false;Backend.Save(p);
     }
