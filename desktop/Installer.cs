@@ -89,17 +89,113 @@ namespace InhousePhotos {
       }catch(Exception ex){if(args.Length==0)MessageBox.Show(ex.Message,"Inhouse Photos",MessageBoxButton.OK,MessageBoxImage.Error);else Console.Error.WriteLine(ex.Message);return 1;}
     }
     sealed class SetupWindow:Window {
+      static readonly Brush Page=new SolidColorBrush(Color.FromRgb(23,18,15));
+      static readonly Brush Text=new SolidColorBrush(Color.FromRgb(249,243,237));
+      static readonly Brush Muted=new SolidColorBrush(Color.FromRgb(189,172,160));
+      static readonly Brush Accent=new SolidColorBrush(Color.FromRgb(242,160,103));
+      static readonly Brush Rule=new SolidColorBrush(Color.FromRgb(66,51,42));
+      static readonly Brush Notice=new SolidColorBrush(Color.FromRgb(45,34,27));
+      static readonly Brush Warning=new SolidColorBrush(Color.FromRgb(251,187,155));
+      readonly TextBlock statusTitle;
+      readonly TextBlock statusDetail;
+      readonly Border statusPanel;
+      readonly ProgressBar progress;
+      readonly Button button;
+      bool installed;
+
+      static TextBlock Copy(string value,double size,Brush color,bool bold=false) {
+        return new TextBlock {Text=value,FontSize=size,Foreground=color,FontWeight=bold?FontWeights.SemiBold:FontWeights.Normal,
+          TextWrapping=TextWrapping.Wrap,LineHeight=size*1.42};
+      }
+      static FrameworkElement Step(string number,string title,string detail) {
+        var row=new Grid {Margin=new Thickness(0,13,0,13)};
+        row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(48)});
+        row.ColumnDefinitions.Add(new ColumnDefinition());
+        var index=Copy(number,13,Accent,true);index.Margin=new Thickness(0,3,0,0);
+        Grid.SetColumn(index,0);row.Children.Add(index);
+        var words=new StackPanel();words.Children.Add(Copy(title,17,Text,true));
+        var description=Copy(detail,14,Muted);description.Margin=new Thickness(0,3,0,0);words.Children.Add(description);
+        Grid.SetColumn(words,1);row.Children.Add(words);
+        return row;
+      }
+      static Border Divider() {return new Border {Height=1,Background=Rule};}
+
       public SetupWindow() {
-        Title="Instalar Inhouse Photos Server";Width=560;Height=460;ResizeMode=ResizeMode.NoResize;WindowStartupLocation=WindowStartupLocation.CenterScreen;
-        Background=new SolidColorBrush(Color.FromRgb(19,17,14));Foreground=Brushes.White;FontFamily=new FontFamily("Segoe UI");
+        Title="Instalar Inhouse Photos Server";
+        Width=Math.Min(610,Math.Max(480,SystemParameters.WorkArea.Width-48));
+        Height=Math.Min(620,Math.Max(500,SystemParameters.WorkArea.Height-48));
+        MinWidth=450;MinHeight=480;ResizeMode=ResizeMode.CanResize;WindowStartupLocation=WindowStartupLocation.CenterScreen;
+        Background=Page;Foreground=Text;FontFamily=new FontFamily("Segoe UI");
         using(var brand=Assembly.GetExecutingAssembly().GetManifestResourceStream("InhousePhotos.brand.xaml"))Icon=(ImageSource)XamlReader.Load(brand);
-        var panel=new StackPanel{Margin=new Thickness(38)};Content=panel;
-        panel.Children.Add(new Image{Source=Icon,Height=58,Width=58,HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,0,0,18)});
-        panel.Children.Add(new TextBlock{Text="Tus fotos siguen donde están.",FontSize=28,Margin=new Thickness(0,0,0,12)});
-        panel.Children.Add(new TextBlock{Text="Este instalador añade el gestor de Inhouse Photos. Si ya tienes un servidor, al abrirlo te guiaremos para conectarlo sin trasladar fotos, cambiar cuentas ni apagarlo.",FontSize=16,TextWrapping=TextWrapping.Wrap});
-        var status=new TextBlock{Text="Windows 10 / 11 · versión "+Backend.Version+" · No se moverán archivos",FontSize=14,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,20,0,20)};panel.Children.Add(status);
-        var button=new Button{Content="Instalar y abrir",Padding=new Thickness(20,14,20,14),FontSize=17,BorderThickness=new Thickness(0),Background=new SolidColorBrush(Color.FromRgb(237,153,90)),Foreground=Brushes.Black};panel.Children.Add(button);
-        button.Click+=async(s,e)=>{button.IsEnabled=false;status.Text="1 de 2 · Instalando y comprobando el programa…";try{await Task.Run((Action)Install);status.Text="2 de 2 · Abriendo el gestor. Tu servidor no se ha modificado.";Launch(false);Close();}catch(ManagerRunningException){status.Text="El gestor anterior sigue abierto. Desde el icono de Inhouse Photos junto al reloj, pulsa «Salir del gestor» y después «Reintentar». Tu servidor, fotos y subidas seguirán funcionando.";button.Content="Reintentar instalación";button.IsEnabled=true;}catch(Exception ex){status.Text=ex.Message;button.Content="Reintentar instalación";button.IsEnabled=true;}};
+        var root=new Grid();root.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});
+        root.RowDefinitions.Add(new RowDefinition());root.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});Content=root;
+
+        var header=new Grid {Margin=new Thickness(34,25,34,20)};
+        header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(48)});
+        header.ColumnDefinitions.Add(new ColumnDefinition());
+        var mark=new Image {Source=Icon,Width=38,Height=38,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};
+        header.Children.Add(mark);
+        var brandText=new StackPanel();brandText.Children.Add(Copy("INHOUSE PHOTOS",13,Accent,true));
+        brandText.Children.Add(Copy("Servidor para Windows",14,Muted));Grid.SetColumn(brandText,1);header.Children.Add(brandText);
+        Grid.SetRow(header,0);root.Children.Add(header);
+
+        var scroll=new ScrollViewer {VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
+        var body=new StackPanel {Margin=new Thickness(34,0,34,12)};scroll.Content=body;
+        var title=Copy("Instala el gestor.\nTus fotos se quedan.",30,Text,true);title.LineHeight=36;
+        body.Children.Add(title);
+        var introduction=Copy("Una forma sencilla de conectar, revisar y proteger tu biblioteca desde este ordenador.",15,Muted);
+        introduction.Margin=new Thickness(0,13,0,20);body.Children.Add(introduction);
+        body.Children.Add(Divider());
+        body.Children.Add(Step("01","Instalar el gestor","Se añadirá al menú Inicio. Solo se instala el programa de Windows."));
+        body.Children.Add(Divider());
+        body.Children.Add(Step("02","Conectar tu biblioteca","Al abrirlo, podrás vincular el servidor que ya tienes y ver su estado."));
+        body.Children.Add(Divider());
+
+        var reassurance=new Grid {Margin=new Thickness(0,16,0,16)};
+        reassurance.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(30)});
+        reassurance.ColumnDefinitions.Add(new ColumnDefinition());
+        reassurance.Children.Add(Copy("✓",18,Accent,true));
+        var safe=Copy("No se mueven ni se borran fotos. Instalar el gestor no apaga el servidor.",14,Text);
+        Grid.SetColumn(safe,1);reassurance.Children.Add(safe);body.Children.Add(reassurance);
+        Grid.SetRow(scroll,1);root.Children.Add(scroll);
+
+        var footer=new StackPanel {Margin=new Thickness(34,0,34,28)};
+        statusPanel=new Border {Background=Notice,CornerRadius=new CornerRadius(10),Padding=new Thickness(14,10,14,10),Margin=new Thickness(0,0,0,14)};
+        var statusStack=new StackPanel();statusTitle=Copy("Listo para instalar",15,Text,true);
+        statusDetail=Copy("Versión "+Backend.Version+"  ·  Windows 10 / 11",13,Muted);statusDetail.Margin=new Thickness(0,2,0,0);
+        statusStack.Children.Add(statusTitle);statusStack.Children.Add(statusDetail);
+        progress=new ProgressBar {Height=4,Margin=new Thickness(0,10,0,0),Foreground=Accent,Background=Rule,
+          BorderThickness=new Thickness(0),IsIndeterminate=true,Visibility=Visibility.Collapsed};statusStack.Children.Add(progress);
+        statusPanel.Child=statusStack;footer.Children.Add(statusPanel);
+        button=new Button {Content="Instalar y abrir",Padding=new Thickness(20,12,20,12),MinHeight=48,FontSize=16,
+          FontWeight=FontWeights.SemiBold,BorderThickness=new Thickness(0),Background=Accent,Foreground=Page,
+          HorizontalContentAlignment=HorizontalAlignment.Center};footer.Children.Add(button);
+        Grid.SetRow(footer,2);root.Children.Add(footer);
+        button.Click+=InstallClicked;
+      }
+
+      async void InstallClicked(object sender,RoutedEventArgs e) {
+        button.IsEnabled=false;
+        progress.Visibility=Visibility.Visible;
+        statusTitle.Foreground=Text;
+        statusTitle.Text=installed?"Abriendo el gestor…":"Instalando el gestor…";
+        statusDetail.Text=installed?"Tus fotos y el servidor no se han modificado.":"Copiando el programa y comprobando su integridad.";
+        try {
+          if(!installed){await Task.Run((Action)Install);installed=true;}
+          statusTitle.Text="Instalación completa";
+          statusDetail.Text="Abriendo el gestor de tu biblioteca…";
+          Launch(false);Close();
+        }catch(ManagerRunningException) {
+          progress.Visibility=Visibility.Collapsed;
+          statusTitle.Foreground=Warning;statusTitle.Text="Cierra el gestor anterior";
+          statusDetail.Text="En la barra de tareas, abre los iconos junto al reloj. Haz clic derecho en Inhouse Photos, elige «Salir del gestor» y vuelve aquí. Tus fotos y subidas seguirán funcionando.";
+          button.Content="Reintentar instalación";button.IsEnabled=true;
+        }catch(Exception ex) {
+          progress.Visibility=Visibility.Collapsed;
+          statusTitle.Foreground=Warning;statusTitle.Text=installed?"Instalado, pero no se pudo abrir":"No se pudo completar la instalación";
+          statusDetail.Text=(installed?"Puedes abrirlo desde el menú Inicio. ":"")+ex.Message;
+          button.Content=installed?"Abrir el gestor":"Reintentar instalación";button.IsEnabled=true;
+        }
       }
     }
     sealed class ManagerRunningException:IOException {

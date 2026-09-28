@@ -22,7 +22,18 @@ container identities and configuration hashes before saving a receipt. Original
 containers and media stay in place. Configuration copies use current-user DPAPI.
 The database snapshot does not include media files.
 
-Manager 1.2.0 uses four main areas: Overview, Backups, Storage, and Settings.
+Manager 1.2.1 uses five clear destinations: Overview, Connect mobile, Backups,
+Storage, and Settings. Its darker, higher-contrast interface uses status cards,
+storage and backup progress visuals, and guided steps instead of a dense list
+of technical controls. The installer, existing-library adoption, and new-server
+wizard have matching progress and confirmation screens. Windows and the setup
+wizard fit within the available desktop area at higher display scaling. A
+loopback-only new server is never offered as a mobile address; the HTTPS
+address can be configured from the main Settings page. Changing backup
+destination leaves the previous copy visible but marks the selected destination
+as pending until a full backup completes there.
+
+Manager 1.2.0 introduced four main areas: Overview, Backups, Storage, and Settings.
 The overview prioritizes local availability, free space on the actual library
 disk, the last completed full backup, and a contextual next action. A public
 URL responding from the PC is labelled as such; it is not proof of access from
