@@ -42,7 +42,7 @@ namespace InhousePhotos {
     public Dictionary<string,string> ConfigurationHashes {get;set;}
   }
   public static partial class Backend {
-    public const string Version="1.1.0";
+    public const string Version="1.1.1";
     public const string DockerContext="--context desktop-linux ";
     static readonly SemaphoreSlim ServerLock=new SemaphoreSlim(1,1);
     public static readonly string InstallDir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),@"Programs\Inhouse Photos Server");
@@ -63,6 +63,24 @@ namespace InhousePhotos {
         (String.IsNullOrEmpty(p.ProjectName)?"":" --project-name "+p.ProjectName)+" "+args;
     }
     public static Task<string> Docker(string args,int seconds) {return Run(DockerExe(),DockerContext+args,Environment.SystemDirectory,seconds);}
+    public static async Task<List<string>> DiscoverExistingInstallations() {
+      var folders=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      try {
+        var ids=(await Docker("ps -a -q --no-trunc --filter label=com.docker.compose.service=immich-server",15))
+          .Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries);
+        foreach(var id in ids.Take(20)) {
+          if(!Regex.IsMatch(id,"^[a-f0-9]{64}$"))continue;
+          try {
+            var directory=(await Docker("inspect --format "+Argument("{{index .Config.Labels \"com.docker.compose.project.working_dir\"}}")+" "+id,10)).Trim();
+            if(Path.IsPathRooted(directory)) {
+              directory=Path.GetFullPath(directory);
+              if(File.Exists(Path.Combine(directory,"docker-compose.yml"))&&File.Exists(Path.Combine(directory,".env")))folders.Add(directory);
+            }
+          }catch{}
+        }
+      }catch{}
+      return folders.OrderBy(x=>x,StringComparer.OrdinalIgnoreCase).ToList();
+    }
     public static Task<string> PowerShell(string script,int seconds) {
       return Run(Path.Combine(Environment.SystemDirectory,@"WindowsPowerShell\v1.0\powershell.exe"),"-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand "+Convert.ToBase64String(Encoding.Unicode.GetBytes("$ErrorActionPreference='Stop'; "+script)),Environment.SystemDirectory,seconds);
     }
@@ -189,9 +207,10 @@ namespace InhousePhotos {
         if(File.Exists(envFile))File.Delete(envFile);
       }
     }
-    public static async Task<AdoptionReceipt> Adopt(Preferences p,Action<string> progress,bool persist=true) {
+    public static async Task<AdoptionReceipt> Adopt(Preferences p,Action<string> progress,bool persist=true,Action<int,string> milestone=null) {
       await ServerLock.WaitAsync();
       try {
+        if(milestone!=null)milestone(0,"Comprobando el servidor existente");
         await EnsureEngine(progress);
         if(p.Managed) {
           progress("Comprobando tu conexión guardada…");
@@ -199,6 +218,7 @@ namespace InhousePhotos {
           var existing=Json.Deserialize<AdoptionReceipt>(File.ReadAllText(p.ReceiptPath));
           AssertIdentity(existing.Containers,await InspectServer(p));
           if(!File.Exists(existing.Snapshot)||Hash(existing.Snapshot)!=existing.SnapshotSha256)throw new IOException("La copia de verificación no está disponible. Revisa el disco donde se guardó.");
+          if(milestone!=null)milestone(4,"La biblioteca ya estaba vinculada");
           progress("Tu servidor ya está vinculado. No hace falta volver a migrarlo.");
           return existing;
         }
@@ -208,9 +228,12 @@ namespace InhousePhotos {
         var directory=Path.Combine(SettingsDir,"migrations",DateTime.UtcNow.ToString("yyyyMMdd-HHmmss")+"-"+RandomHex(4));PrivateDirectory(directory);
         foreach(var file in hashes.Keys)File.WriteAllBytes(Path.Combine(directory,file+".dpapi"),ProtectedData.Protect(File.ReadAllBytes(Path.Combine(p.Installation,file)),null,DataProtectionScope.CurrentUser));
         var dump=Path.Combine(directory,"library.dump");var db=before.Single(r=>r.Service=="database");
+        if(milestone!=null)milestone(1,"Guardando una copia de verificación");
         progress("Guardando una instantánea coherente sin detener las subidas…");
         var counts=await ExportConsistentSnapshot(db.Id,dump);
+        if(milestone!=null)milestone(2,"Probando la recuperación en un espacio aislado");
         await VerifyRestore(dump,db.Image,counts,progress);
+        if(milestone!=null)milestone(3,"Comprobando que nada ha cambiado");
         var after=await InspectServer(p);
         File.WriteAllText(Path.Combine(directory,"identity-before.json"),Json.Serialize(before));
         File.WriteAllText(Path.Combine(directory,"identity-after.json"),Json.Serialize(after));
@@ -219,8 +242,20 @@ namespace InhousePhotos {
         var receipt=new AdoptionReceipt{Version=Version,CompletedUtc=DateTime.UtcNow.ToString("o"),Snapshot=dump,SnapshotSha256=Hash(dump),Counts=counts,RestoreVerified=true,PreviousPreferences=previous,Containers=before,ConfigurationHashes=hashes};
         var path=Path.Combine(directory,"receipt.json");File.WriteAllText(path,Json.Serialize(receipt),new UTF8Encoding(false));
         p.ProjectName=project;p.ReceiptPath=path;p.Managed=true;if(persist)Save(p);
+        if(milestone!=null)milestone(4,"Biblioteca vinculada sin mover las fotos");
         progress("Vinculación verificada. Se conservan las fotos, cuentas y dirección del servidor.");return receipt;
       } finally {ServerLock.Release();}
+    }
+    public static async Task<AdoptionReceipt> ReverifyExisting(Preferences current,Action<string> progress,Action<int,string> milestone=null) {
+      if(!current.Managed)throw new InvalidOperationException("Conecta primero tu biblioteca existente.");
+      // Keep the previous verified connection untouched until the new
+      // snapshot has been restored and the replacement receipt is complete.
+      var candidate=Json.Deserialize<Preferences>(Json.Serialize(current));
+      candidate.Managed=false;candidate.ReceiptPath=null;candidate.ProjectName=null;
+      var receipt=await Adopt(candidate,progress,false,milestone);
+      Save(candidate);
+      current.ProjectName=candidate.ProjectName;current.ReceiptPath=candidate.ReceiptPath;current.Managed=true;
+      return receipt;
     }
     public static async Task StartManaged(Preferences p,Action<string> progress) {
       await ServerLock.WaitAsync();

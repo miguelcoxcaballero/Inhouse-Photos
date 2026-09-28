@@ -22,6 +22,15 @@ container identities and configuration hashes before saving a receipt. Original
 containers and media stay in place. Configuration copies use current-user DPAPI.
 The database snapshot does not include media files.
 
+Existing-server setup (1.1.1): the home screen can discover a running Compose
+library automatically. The user checks the folder and presses one button. Five
+visible stages explain the safe snapshot/restore verification; failure leaves
+the existing server untouched and offers a retry. If a server image changed
+after the initial adoption, re-verification creates a new receipt without
+discarding the old one until the isolated restore succeeds. The installer
+validates its embedded payload and, if an older manager is open, explains how
+to close only that manager and retry. This does not stop the photo server.
+
 The startup switch uses a limited, interactive scheduled task: it starts after
 Windows sign-in, not before login. It preserves the independent DDNS task.
 Disabling startup does not stop a running server. Unlinking restores the prior

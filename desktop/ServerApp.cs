@@ -17,7 +17,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.1.1.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -238,6 +238,7 @@ namespace InhousePhotos {
     bool Confirm(string message){return MessageBox.Show(this,message,"Inhouse Photos",MessageBoxButton.OKCancel,MessageBoxImage.Warning)==MessageBoxResult.OK;}
     void Open(string url){Process.Start(new ProcessStartInfo(url){UseShellExecute=true});}
     internal void PreviewPage(string target) { if(!tabs.ContainsKey(target))throw new ArgumentException("Unknown preview page");page=target; }
+    internal void PreviewMigration() {prefs=new Preferences{Installation=@"D:\Immich",Managed=false,Endpoint="",LocalEndpoint="http://127.0.0.1:2283"};busy=true;page="Inicio";}
     public async Task Render(){
       if(refreshing)return;if(!busy)prefs=Backend.Load();refreshing=true;content.Children.Clear();
       foreach(var tab in tabs.Values)tab.IsEnabled=false;
@@ -334,10 +335,11 @@ namespace InhousePhotos {
         }catch(Exception ex){Console.Error.WriteLine(ex.Message);return 21;}
       }
       if(args.Contains("--storage")){return new Application().Run(new StorageWindow());}
-      if(args.Contains("--adopt-current")||args.Contains("--verify-installation")||args.Contains("--start-once")||args.Contains("--enable-startup")||args.Contains("--disable-startup")) {
+      if(args.Contains("--adopt-current")||args.Contains("--reverify-current")||args.Contains("--verify-installation")||args.Contains("--start-once")||args.Contains("--enable-startup")||args.Contains("--disable-startup")) {
         try {
           var prefs=Backend.Load();
           if(args.Contains("--adopt-current"))Backend.Adopt(prefs,Console.WriteLine).GetAwaiter().GetResult();
+          else if(args.Contains("--reverify-current"))Backend.ReverifyExisting(prefs,Console.WriteLine).GetAwaiter().GetResult();
           else if(args.Contains("--start-once"))Backend.StartManaged(prefs,Console.WriteLine).GetAwaiter().GetResult();
           else if(args.Contains("--enable-startup")||args.Contains("--disable-startup"))Startup.SetEnabled(prefs,args.Contains("--enable-startup")).GetAwaiter().GetResult();
           else {Backend.ValidateManagedConfiguration(prefs);var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));Backend.AssertIdentity(receipt.Containers,Backend.InspectServer(prefs).GetAwaiter().GetResult());if(Backend.Hash(receipt.Snapshot)!=receipt.SnapshotSha256)throw new IOException("La instantánea ha cambiado.");}
@@ -379,7 +381,7 @@ namespace InhousePhotos {
       if(!first){if(!args.Contains("--startup")){try{using(var activate=EventWaitHandle.OpenExisting(@"Local\InhousePhotosServer.Activate"))activate.Set();}catch{}}return 0;}
       var app=new Application();var window=new ServerWindow();
       if(preview){
-        if(args.Length==3)window.PreviewPage(args[2]);
+        if(args.Length==3){if(args[2]=="Migracion")window.PreviewMigration();else window.PreviewPage(args[2]);}
         app.Dispatcher.BeginInvoke(new Action(async()=>{await window.Render();var root=(FrameworkElement)window.Content;root.Width=1080;root.Height=760;root.Measure(new Size(1080,760));root.Arrange(new Rect(0,0,1080,760));root.UpdateLayout();var bmp=new RenderTargetBitmap(1080,760,96,96,PixelFormats.Pbgra32);bmp.Render(root);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bmp));using(var stream=File.Create(args[1]))encoder.Save(stream);app.Shutdown();}));app.Run();return 0;
       }
       app.DispatcherUnhandledException+=(s,e)=>{MessageBox.Show("No se pudo completar la operación. Reinicia la aplicación; no se ha solicitado borrar datos.","Inhouse Photos");e.Handled=true;};

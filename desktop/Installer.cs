@@ -33,7 +33,7 @@ namespace InhousePhotos {
       // verifying storage. Closing the manager does not stop the photo server.
       try {
         using(var running=System.Threading.Mutex.OpenExisting(@"Local\InhousePhotosServer"))
-          throw new IOException("Cierra el gestor desde su icono junto al reloj (Salir del gestor) y vuelve a instalar. El servidor y tus fotos seguirán disponibles.");
+          throw new ManagerRunningException();
       }catch(System.Threading.WaitHandleCannotBeOpenedException){}
       Backend.PrivateDirectory(Backend.InstallDir);
       var assembly=Assembly.GetExecutingAssembly();
@@ -59,6 +59,20 @@ namespace InhousePhotos {
       using(var key=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\App Paths\Inhouse Photos.exe"))key.SetValue("",Backend.Launcher);
       ReadInstalled();
     }
+    public static void VerifyPayload() {
+      var assembly=Assembly.GetExecutingAssembly();
+      string expected;
+      using(var hash=assembly.GetManifestResourceStream("InhousePhotos.payload.sha256"))
+      using(var reader=new StreamReader(hash??throw new IOException("Falta la suma de comprobación del programa.")))expected=reader.ReadToEnd().Trim().ToLowerInvariant();
+      if(!Regex.IsMatch(expected,"^[a-f0-9]{64}$"))throw new IOException("La suma de comprobación del programa no es válida.");
+      using(var payload=assembly.GetManifestResourceStream("InhousePhotos.payload.exe")) {
+        if(payload==null)throw new IOException("Falta el programa en el instalador.");
+        using(var sha=System.Security.Cryptography.SHA256.Create()) {
+          var actual=BitConverter.ToString(sha.ComputeHash(payload)).Replace("-","").ToLowerInvariant();
+          if(actual!=expected)throw new IOException("El programa descargado no pasa la comprobación de integridad.");
+        }
+      }
+    }
     static int Launch(bool startup) {
       var record=ReadInstalled();var path=Path.Combine(Backend.InstallDir,record.RelativePath);
       using(var child=Process.Start(new ProcessStartInfo(path,startup?"--startup":""){UseShellExecute=false,CreateNoWindow=true,WindowStyle=startup?ProcessWindowStyle.Hidden:ProcessWindowStyle.Normal,WorkingDirectory=Backend.InstallDir})) {
@@ -68,6 +82,7 @@ namespace InhousePhotos {
     [STAThread] public static int Main(string[] args) {
       try {
         if(args.Contains("--launch")||args.Contains("--startup"))return Launch(args.Contains("--startup"));
+        if(args.Contains("--verify-payload")){VerifyPayload();Console.WriteLine("Contenido verificado.");return 0;}
         if(args.Contains("--install-current")){Install();Console.WriteLine("Instalación verificada en "+Backend.InstallDir);return 0;}
         if(args.Contains("--verify-installed")){var app=ReadInstalled();Console.WriteLine(app.Version+" "+app.Sha256);return 0;}
         var application=new Application();return application.Run(new SetupWindow());
@@ -80,12 +95,15 @@ namespace InhousePhotos {
         using(var brand=Assembly.GetExecutingAssembly().GetManifestResourceStream("InhousePhotos.brand.xaml"))Icon=(ImageSource)XamlReader.Load(brand);
         var panel=new StackPanel{Margin=new Thickness(38)};Content=panel;
         panel.Children.Add(new Image{Source=Icon,Height=58,Width=58,HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,0,0,18)});
-        panel.Children.Add(new TextBlock{Text="Tu servidor, en una app.",FontSize=28,Margin=new Thickness(0,0,0,12)});
-        panel.Children.Add(new TextBlock{Text="Instala o actualiza Inhouse Photos Server. La biblioteca, las cuentas y el servidor existente no se eliminan ni se trasladan.",FontSize=16,TextWrapping=TextWrapping.Wrap});
-        var status=new TextBlock{Text="Windows 10 / 11 · versión "+Backend.Version,FontSize=14,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,20,0,20)};panel.Children.Add(status);
+        panel.Children.Add(new TextBlock{Text="Tus fotos siguen donde están.",FontSize=28,Margin=new Thickness(0,0,0,12)});
+        panel.Children.Add(new TextBlock{Text="Este instalador añade el gestor de Inhouse Photos. Si ya tienes un servidor, al abrirlo te guiaremos para conectarlo sin trasladar fotos, cambiar cuentas ni apagarlo.",FontSize=16,TextWrapping=TextWrapping.Wrap});
+        var status=new TextBlock{Text="Windows 10 / 11 · versión "+Backend.Version+" · No se moverán archivos",FontSize=14,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,20,0,20)};panel.Children.Add(status);
         var button=new Button{Content="Instalar y abrir",Padding=new Thickness(20,14,20,14),FontSize=17,BorderThickness=new Thickness(0),Background=new SolidColorBrush(Color.FromRgb(237,153,90)),Foreground=Brushes.Black};panel.Children.Add(button);
-        button.Click+=async(s,e)=>{button.IsEnabled=false;status.Text="Instalando y comprobando los archivos…";try{await Task.Run((Action)Install);Launch(false);Close();}catch(Exception ex){status.Text=ex.Message;button.IsEnabled=true;}};
+        button.Click+=async(s,e)=>{button.IsEnabled=false;status.Text="1 de 2 · Instalando y comprobando el programa…";try{await Task.Run((Action)Install);status.Text="2 de 2 · Abriendo el gestor. Tu servidor no se ha modificado.";Launch(false);Close();}catch(ManagerRunningException){status.Text="El gestor anterior sigue abierto. Desde el icono de Inhouse Photos junto al reloj, pulsa «Salir del gestor» y después «Reintentar». Tu servidor, fotos y subidas seguirán funcionando.";button.Content="Reintentar instalación";button.IsEnabled=true;}catch(Exception ex){status.Text=ex.Message;button.Content="Reintentar instalación";button.IsEnabled=true;}};
       }
+    }
+    sealed class ManagerRunningException:IOException {
+      public ManagerRunningException():base("El gestor anterior sigue abierto."){}
     }
   }
 }
