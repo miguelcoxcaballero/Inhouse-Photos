@@ -15,16 +15,15 @@ import 'package:immich_mobile/utils/debug_print.dart';
 
 import 'package:immich_mobile/repositories/lan_upload_route.dart';
 
-final uploadRepositoryProvider = Provider((ref) => UploadRepository());
+final localUploadRouteActiveProvider = StateProvider<bool>((ref) => false);
+final uploadRepositoryProvider = Provider(
+  (ref) => UploadRepository(
+    onLocalRouteChanged: (active) => ref.read(localUploadRouteActiveProvider.notifier).state = active,
+  ),
+);
 
 class UploadRepository {
-  final Logger logger = Logger('UploadRepository');
-  IOClient? _lanClient;
-  LanUploadRoute? _lanRoute;
-  void Function(TaskStatusUpdate)? onUploadStatus;
-  void Function(TaskProgressUpdate)? onTaskProgress;
-
-  UploadRepository() {
+  UploadRepository({this.onLocalRouteChanged}) {
     FileDownloader().registerCallbacks(
       group: kBackupGroup,
       taskStatusCallback: (update) => onUploadStatus?.call(update),
@@ -42,6 +41,13 @@ class UploadRepository {
     );
   }
 
+  final void Function(bool active)? onLocalRouteChanged;
+  final Logger logger = Logger('UploadRepository');
+  IOClient? _lanClient;
+  LanUploadRoute? _lanRoute;
+  void Function(TaskStatusUpdate)? onUploadStatus;
+  void Function(TaskProgressUpdate)? onTaskProgress;
+
   /// Resolve the server's trusted LAN hint once per foreground backup run.
   /// The hint arrives over the already-authenticated public HTTPS origin and
   /// the local connection must still present that origin's valid TLS cert.
@@ -55,6 +61,7 @@ class UploadRepository {
     // the public site's root, while actual uploads stay on /api/assets.
     final origin = LanUploadRouteResolver.publicOriginForApiEndpoint(endpoint);
     if (origin == null) {
+      _disableLocalRoute();
       return false;
     }
     if (_lanRoute?.origin == origin && _lanClient != null) {
@@ -67,11 +74,13 @@ class UploadRepository {
     }
     _lanRoute = route;
     _lanClient = route.createClient();
+    onLocalRouteChanged?.call(true);
     logger.info('Using verified local HTTPS route for foreground uploads');
     return true;
   }
 
   void _disableLocalRoute() {
+    onLocalRouteChanged?.call(false);
     if (_lanRoute == null) {
       return;
     }

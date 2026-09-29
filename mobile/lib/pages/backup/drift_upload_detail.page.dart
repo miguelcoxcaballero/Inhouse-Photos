@@ -7,6 +7,7 @@ import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/providers/backup/drift_backup.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
+import 'package:immich_mobile/repositories/upload.repository.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
 import 'package:path/path.dart' as path;
 
@@ -39,6 +40,7 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
   Widget build(BuildContext context) {
     final uploadItems = ref.watch(driftBackupProvider.select((state) => state.uploadItems));
     final iCloudProgress = ref.watch(driftBackupProvider.select((state) => state.iCloudDownloadProgress));
+    final usingLocalNetwork = ref.watch(localUploadRouteActiveProvider);
 
     final uploadingItems = uploadItems.values.where((item) => item.isActivelyUploading).toList();
     final processingItems = uploadItems.values.where((item) => item.isCloudProcessing).toList()
@@ -52,6 +54,16 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text("upload_details".t(context: context)),
+        actions: [
+          if (usingLocalNetwork && uploadingItems.isNotEmpty)
+            Tooltip(
+              message: 'Connected directly to your PC on this Wi-Fi network',
+              child: Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Icon(Icons.lan_rounded, color: context.colorScheme.primary),
+              ),
+            ),
+        ],
         backgroundColor: context.colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 1,

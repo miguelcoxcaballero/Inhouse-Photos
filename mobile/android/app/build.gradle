@@ -88,6 +88,25 @@ flutter {
   source '../..'
 }
 
+// Flutter writes the Java registrant for all pub plugins, including the
+// integration_test dev dependency. The release Gradle graph intentionally
+// omits dev plugins, so compiling that generated reference fails after a
+// clean build. Remove only that test-only registration before release Java
+// compilation; all production plugin registrations remain untouched.
+def prepareReleasePluginRegistrant = tasks.register('prepareReleasePluginRegistrant') {
+  doLast {
+    def registrant = file('src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java')
+    if (!registrant.exists()) return
+    def source = registrant.getText('UTF-8')
+    def testRegistration = /(?s)\s*try \{\s*flutterEngine\.getPlugins\(\)\.add\(new dev\.flutter\.plugins\.integration_test\.IntegrationTestPlugin\(\)\);\s*\} catch \(Exception e\) \{\s*Log\.e\(TAG, "Error registering plugin integration_test, dev\.flutter\.plugins\.integration_test\.IntegrationTestPlugin", e\);\s*\}/
+    def cleaned = source.replaceFirst(testRegistration, '')
+    if (cleaned != source) registrant.setText(cleaned, 'UTF-8')
+  }
+}
+tasks.matching { it.name == 'compileReleaseJavaWithJavac' }.configureEach {
+  dependsOn prepareReleasePluginRegistrant
+}
+
 dependencies {
   implementation libs.okhttp
   implementation libs.cronet.embedded

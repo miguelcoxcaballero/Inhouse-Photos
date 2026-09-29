@@ -17,9 +17,11 @@ import 'package:immich_mobile/widgets/settings/networking_settings/networking_se
 import 'package:immich_mobile/widgets/settings/notification_setting.dart';
 import 'package:immich_mobile/widgets/settings/preference_settings/preference_setting.dart';
 import 'package:immich_mobile/widgets/settings/settings_card.dart';
+import 'package:immich_mobile/widgets/settings/server_management_settings.dart';
 
 enum SettingSection {
   health('App Health', Icons.health_and_safety_outlined, 'Connection, backup, storage and diagnostics'),
+  server('Server management', Icons.dns_outlined, 'Disks, backups and Windows settings'),
   advanced('advanced', Icons.build_outlined, "advanced_settings_tile_subtitle"),
   assetViewer('asset_viewer_settings_title', Icons.image_outlined, "asset_viewer_settings_subtitle"),
   backup('backup', Icons.cloud_upload_outlined, "backup_settings_subtitle"),
@@ -37,6 +39,7 @@ enum SettingSection {
 
   Widget get widget => switch (this) {
     SettingSection.health => const AppHealthSettings(),
+    SettingSection.server => const ServerManagementSettings(),
     SettingSection.advanced => const AdvancedSettings(),
     SettingSection.assetViewer => const AssetViewerSettings(),
     SettingSection.backup => const DriftBackupSettings(),

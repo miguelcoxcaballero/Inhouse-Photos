@@ -1,8 +1,8 @@
 {
-  "version": "3.1.88",
-  "versionCode": 7146,
+  "version": "3.1.89",
+  "versionCode": 7147,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.88-windows-manager-update/Inhouse-Photos.apk",
-  "sizeBytes": 74902409,
-  "sha256": "250d4a8d1bbc937a8ecb7714f83c57a6c3946a1a79365c13ff5f840801ea913f"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.89-remote-server-management/Inhouse-Photos.apk",
+  "sizeBytes": 74903029,
+  "sha256": "f1719b4d7ac4bc995f8e206f8be0dcd500533ec825fbad35d80b20f90a17cc34"
 }
