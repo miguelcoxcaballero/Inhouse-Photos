@@ -86,7 +86,7 @@ class LanUploadRouteResolver {
     if (origin.scheme != 'https' || origin.port != 443 || (origin.path.isNotEmpty && origin.path != '/')) {
       return null;
     }
-    final hintUrl = origin.resolve('/.well-known/inhouse-photos/lan.json');
+    final hintUrl = origin.resolve('/descargas/lan.json');
     try {
       final response = await http
           .get(hintUrl, headers: {'Cache-Control': 'no-cache'})

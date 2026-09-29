@@ -13,7 +13,7 @@ namespace InhousePhotos {
   public static class LanRoute {
     static string lastAddress;
     static DateTime nextRefreshUtc=DateTime.MinValue;
-    public const string RoutePath="/.well-known/inhouse-photos/lan.json";
+    public const string RoutePath="/descargas/lan.json";
 
     static bool PrivateIpv4(IPAddress ip) {
       if(ip.AddressFamily!=AddressFamily.InterNetwork)return false;
@@ -35,7 +35,9 @@ namespace InhousePhotos {
       if(prefs==null||String.IsNullOrWhiteSpace(prefs.Installation)||String.IsNullOrWhiteSpace(prefs.Endpoint))return;
       Uri origin;if(!Uri.TryCreate(prefs.Endpoint,UriKind.Absolute,out origin)||origin.Scheme!="https"||origin.Port!=443)return;
       var caddyfile=Path.Combine(prefs.Installation,"Caddyfile");
-      if(!File.Exists(caddyfile)||!File.ReadAllText(caddyfile).Contains(RoutePath))return;
+      if(!File.Exists(caddyfile))return;
+      var caddyText=File.ReadAllText(caddyfile);
+      if(!caddyText.Contains(RoutePath)&&!caddyText.Contains("handle_path /descargas/*"))return;
       var address=LocalAddress();
       if(String.IsNullOrEmpty(address))return;
       if(address==lastAddress&&DateTime.UtcNow<nextRefreshUtc)return;
@@ -45,7 +47,7 @@ namespace InhousePhotos {
       var hint=Path.Combine(Backend.SettingsDir,"lan-route.json");
       var body=Backend.Json.Serialize(new{origin=origin.GetLeftPart(UriPartial.Authority),ipv4=address,port=443});
       File.WriteAllText(hint,body,new UTF8Encoding(false));
-      await Backend.Run(Backend.DockerExe(),"cp "+Backend.Quote(hint)+" "+Backend.Quote(container+":/data/inhouse-lan.json"),prefs.Installation,30);
+      await Backend.Run(Backend.DockerExe(),"cp "+Backend.Quote(hint)+" "+Backend.Quote(container+":/data/inhouse-downloads/lan.json"),prefs.Installation,30);
       lastAddress=address;nextRefreshUtc=DateTime.UtcNow.AddMinutes(10);
     }
   }
