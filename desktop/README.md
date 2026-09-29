@@ -36,7 +36,7 @@ container identities and configuration hashes before saving a receipt. Original
 containers and media stay in place. Configuration copies use current-user DPAPI.
 The database snapshot does not include media files.
 
-Manager 1.2.6 keeps the same five destinations and publishes a private-network
+Manager 1.2.7 keeps the same five destinations and publishes a private-network
 route for the mobile uploader. The phone still authenticates the public HTTPS
 hostname; the manager only refreshes the computer's LAN address, and public
 access remains the fallback. New managed servers include the discovery route.
