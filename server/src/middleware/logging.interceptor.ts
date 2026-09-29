@@ -5,7 +5,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository';
 
 const maxArrayLength = 100;
 const replacer = (key: string, value: unknown) => {
-  if (key.toLowerCase().includes('password')) {
+  if (/(password|token|secret|proof|invite|code)/i.test(key)) {
     return '********';
   }
 
@@ -37,7 +37,8 @@ export class LoggingInterceptor implements NestInterceptor {
         const duration = (finish - start).toFixed(2);
         const { statusCode } = res;
 
-        this.logger.debug(`${method} ${url} ${statusCode} ${duration}ms ${ip}`);
+        const loggedUrl = req.path.startsWith('/api/auth/pairing') ? req.path : url;
+        this.logger.debug(`${method} ${loggedUrl} ${statusCode} ${duration}ms ${ip}`);
         if (req.body && Object.keys(req.body).length > 0) {
           this.logger.verbose(JSON.stringify(req.body, replacer));
         }

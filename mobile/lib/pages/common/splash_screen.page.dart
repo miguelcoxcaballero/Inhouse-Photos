@@ -340,7 +340,7 @@ class SplashScreenPageState extends ConsumerState<SplashScreenPage> {
             }
           },
           onError: (exception) => {
-            log.severe('Failed to update auth info with access token: $accessToken'),
+            log.severe('Failed to update auth info with the saved session'),
             ref.read(authProvider.notifier).logout(),
             context.router.replaceAll([const LoginRoute()]),
           },

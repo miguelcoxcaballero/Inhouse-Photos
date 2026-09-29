@@ -103,6 +103,16 @@
 					<string>immich</string>
 				</array>
 			</dict>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLName</key>
+				<string>Inhouse Photos pairing</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>inhousephotos</string>
+				</array>
+			</dict>
 		</array>
 		<key>CFBundleVersion</key>
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
@@ -131,7 +141,7 @@
 			<string>_CC1AD845._googlecast._tcp</string>
 		</array>
 		<key>NSCameraUsageDescription</key>
-		<string>We need to access the camera to let you take beautiful video using this app</string>
+		<string>Use the camera to scan your computer’s Inhouse Photos pairing QR code.</string>
 		<key>NSFaceIDUsageDescription</key>
 		<string>We need to use FaceID to allow access to your locked folder</string>
 		<key>NSLocalNetworkUsageDescription</key>

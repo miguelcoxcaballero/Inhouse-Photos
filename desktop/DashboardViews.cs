@@ -313,51 +313,7 @@ namespace InhousePhotos {
       return Task.FromResult(0);
     }
 
-    Task RenderConnectPage() {
-      var generation=++connectGeneration;
-      Heading("Conectar un móvil","Solo necesitas la dirección y tu cuenta habitual.");
-      var address=String.IsNullOrWhiteSpace(prefs.Endpoint)?null:Backend.CanonicalEndpoint(prefs.Endpoint);
-      if(address==null||LocalOnlyEndpoint(address)) {
-        var localBox=Column();localBox.Children.Add(StatusLine(address==null?"FALTA CONFIGURAR EL ACCESO":"ACCESO SOLO EN ESTE PC",accent));
-        localBox.Children.Add(Label("Aún no hay dirección para el móvil",23));
-        localBox.Children.Add(Fine(address==null?"Guarda primero una dirección accesible desde el móvil.":"La dirección local apunta al propio dispositivo. Pegarla en el móvil no conectaría con este servidor."));
-        content.Children.Add(Panel(localBox));
-        content.Children.Add(Fine("Para entrar desde el móvil, prepara un dominio HTTPS que apunte a este PC y configura el router. Después guarda esa dirección en Ajustes."));
-        Action("Abrir Ajustes  →",()=>GoTo("Configuración"),true);
-        return Task.CompletedTask;
-      }
-      var box=Column();box.Children.Add(StatusLine("DIRECCIÓN DE TU BIBLIOTECA",address==null?accent:good));
-      var addressBox=new TextBox{Text=address??"Aún no hay una dirección configurada",IsReadOnly=true,TextWrapping=TextWrapping.Wrap,
-        FontSize=21,FontWeight=FontWeights.SemiBold,Foreground=Foreground,Background=Brushes.Transparent,
-        BorderThickness=new Thickness(0),Padding=new Thickness(0),Margin=new Thickness(0,0,0,12)};
-      box.Children.Add(addressBox);
-      if(address!=null)PlaceAction(box,"Copiar dirección",()=>{Clipboard.SetText(address);notice.Text="Dirección copiada. Pégala en la pantalla de inicio de Inhouse Photos.";return Task.FromResult(0);},true);
-      content.Children.Add(Panel(box));
-      content.Children.Add(StepHeading("1","Instala Inhouse Photos"));
-      content.Children.Add(Fine("Descarga la aplicación en tu móvil."));
-      Action("Abrir página de descargas  ↗",()=>{Open("https://fotos.miguelcoxcaballero.com/descargas/");return Task.FromResult(0);});
-      content.Children.Add(StepHeading("2","Pega la dirección"));
-      content.Children.Add(Fine("En la primera pantalla de la app, pega la dirección de arriba."));
-      content.Children.Add(StepHeading("3","Inicia sesión"));
-      content.Children.Add(Fine("Usa la cuenta que ya tienes en esta biblioteca."));
-      if(address!=null) {
-        Rule();
-        var reachability=StatusLine("COMPROBANDO LA DIRECCIÓN",muted);content.Children.Add(reachability);
-        var reachabilityDetail=Fine("La comprobación de este PC no confirma el acceso desde fuera de casa.");content.Children.Add(reachabilityDetail);
-        _=RefreshConnectHealth(generation,address,reachability,reachabilityDetail);
-      }
-      return Task.CompletedTask;
-    }
-
-    async Task RefreshConnectHealth(int generation,string address,StackPanel status,TextBlock detail) {
-      bool reached;
-      try {reached=await Backend.Ping(address);} catch {reached=false;}
-      if(generation!=connectGeneration||page!="Conectar"||!content.Children.Contains(status))return;
-      ((Ellipse)status.Children[0]).Fill=reached?good:accent;
-      var label=(TextBlock)status.Children[1];label.Foreground=reached?good:accent;
-      label.Text=reached?"RESPONDE DESDE ESTE PC":"NO RESPONDE DESDE ESTE PC";
-      detail.Text=reached?"Para comprobar el acceso fuera de casa, abre la app con datos móviles.":"Comprueba la dirección en Ajustes.";
-    }
+    Task RenderConnectPage() {return RenderPairingPage();}
 
     async Task RenderSettingsPage() {
       Heading("Ajustes","Acceso desde el móvil y arranque automático. Lo técnico queda aparte.");
@@ -413,6 +369,10 @@ namespace InhousePhotos {
         notice.Text="Instantánea de metadatos guardada: "+await Backend.Snapshot(prefs);
       });
       advanced.Children.Add(Fine("Una instantánea de base de datos no contiene fotos ni vídeos."));
+      PlaceAction(advanced,"Licencia del generador QR",()=>{
+        MessageBox.Show(this,PairingClient.QrLicense(),"QRCoder · licencia MIT",MessageBoxButton.OK,MessageBoxImage.Information);
+        return Task.CompletedTask;
+      });
       content.Children.Add(new Expander{Header="Opciones técnicas",Content=advanced,Foreground=muted,Margin=new Thickness(0,20,0,10)});
     }
   }

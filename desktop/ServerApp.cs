@@ -19,7 +19,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.2.4.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.5.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -366,6 +366,7 @@ namespace InhousePhotos {
   }
   public static class Program {
     [STAThread] public static int Main(string[] args){
+      PairingClient.RegisterQrAssembly();
       ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
       if(args.Length==2&&args[0]=="--render-setup-preview") {
         var previewApp=new Application();var setupWindow=new NewServerWindow();
@@ -462,6 +463,16 @@ namespace InhousePhotos {
           try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 33;}catch(InvalidOperationException){}
           if(Backend.CanonicalEndpoint("https://example.com/")!="https://example.com")return 1;
           foreach(var bad in new[]{null,"","http://example.com","https://user:password@example.com","file:///D:/Immich","https://example.com?key=secret"}){try{Backend.CanonicalEndpoint(bad);return 2;}catch(ArgumentException){}}
+          var sampleInvite=new string('A',43);
+          var pairingLink=PairingClient.Link("https://photos.example.com/",sampleInvite);
+          if(pairingLink!="https://fotos.miguelcoxcaballero.com/vincular#origin=https%3A%2F%2Fphotos.example.com&invite="+sampleInvite||new Uri(pairingLink).Query!="")return 34;
+          var qrPng=PairingClient.QrPng(pairingLink);
+          if(qrPng.Length<500||qrPng[0]!=137||qrPng[1]!=80||qrPng[2]!=78||qrPng[3]!=71)return 35;
+          if(!PairingClient.QrLicense().Contains("The MIT License"))return 38;
+          foreach(var bad in new[]{"http://photos.example.com","https://user:pass@photos.example.com","https://photos.example.com?secret=1"}){
+            try{PairingClient.Link(bad,sampleInvite);return 36;}catch(ArgumentException){}
+          }
+          try{PairingClient.Link("https://photos.example.com","short");return 37;}catch(ArgumentException){}
           foreach(var bad in new[]{@"D:\photos\backup",@"D:\other",@"D:\"}){try{Backend.ValidateBackup(@"D:\photos",bad);return 3;}catch(InvalidOperationException){}}
           Backend.ValidateBackup(@"D:\photos",@"E:\backups");
           var due=DateTime.SpecifyKind(new DateTime(2026,9,27,3,0,0),DateTimeKind.Utc);
@@ -479,6 +490,7 @@ namespace InhousePhotos {
       var app=new Application();var window=new ServerWindow();
       if(preview){
         window.DisableTransitions=true;
+        window.DisablePairingRequests=true;
         var previewWidth=args.Length>=5?int.Parse(args[3]):1080;
         var previewHeight=args.Length>=5?int.Parse(args[4]):760;
         if(previewWidth<760||previewHeight<600||previewWidth>2400||previewHeight>1800)throw new ArgumentOutOfRangeException("preview","Tamaño de vista previa no válido.");

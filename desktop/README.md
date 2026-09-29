@@ -8,6 +8,19 @@ in the executable. Requires Windows 10/11 with .NET Framework 4.8.
 
 Build: `powershell -File desktop/build.ps1`. Run `--self-test` for non-mutating
 checks. `--render-preview PATH.png` renders the application's own window offscreen.
+The build downloads QRCoder 1.8.0 from NuGet, verifies the pinned SHA-512 from
+NuGet's catalog, and embeds its .NET Framework DLL in the manager and installer.
+The installed program does not need a QR service or a separate DLL.
+
+Connect mobile now starts a three-minute, one-use QR invite after an admin signs
+in once on the PC. Only the access token is saved, encrypted for the current
+Windows user with DPAPI; the password is never saved. The QR uses the public
+`/vincular` landing page with the configured HTTPS server origin and invite in
+the URL fragment. Pairing API calls go only to the manager's loopback endpoint.
+Both devices must show the same six-digit code before the PC authorizes the
+phone. The page supports expiry and cancellation. Manual address-and-password
+connection remains available under a secondary disclosure. New-server setup
+stores its already-verified admin session for this flow when possible.
 
 Implemented: per-user installer with SHA-256 validation and versioned files,
 installation discovery, health checks, hidden engine start, start
@@ -23,7 +36,7 @@ container identities and configuration hashes before saving a receipt. Original
 containers and media stay in place. Configuration copies use current-user DPAPI.
 The database snapshot does not include media files.
 
-Manager 1.2.4 uses five clear destinations: Overview, Connect mobile, Backups,
+Manager 1.2.5 uses five clear destinations: Overview, Connect mobile, Backups,
 Storage, and Settings. Its layout gives the server state one primary action,
 shows space and backup facts without nested cards, and moves technical controls
 out of the everyday flow. Page and setup-step transitions are brief and respect

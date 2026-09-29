@@ -15,6 +15,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/constants/locales.dart';
 import 'package:immich_mobile/domain/services/background_worker.service.dart';
+import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/generated/codegen_loader.g.dart';
@@ -38,6 +40,7 @@ import 'package:immich_mobile/domain/services/local_thumbhash.service.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/fixed/segment.model.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/services/deep_link.service.dart';
+import 'package:immich_mobile/services/pairing.service.dart';
 import 'package:immich_mobile/theme/dynamic_theme.dart';
 import 'package:immich_mobile/theme/theme_data.dart';
 import 'package:immich_mobile/utils/bootstrap.dart';
@@ -196,10 +199,29 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
   }
 
   Future<DeepLink> _deepLinkBuilder(PlatformDeepLink deepLink) async {
-    final deepLinkHandler = ref.read(deepLinkServiceProvider);
     final currentRouteName = ref.read(currentRouteNameProvider.notifier).state;
-
     final isColdStart = currentRouteName == null || currentRouteName == SplashScreenRoute.name;
+
+    final pairingInvite = PairingInvite.parse(deepLink.uri.toString());
+    if (pairingInvite != null) {
+      if (Store.tryGet(StoreKey.accessToken) != null) {
+        scaffoldMessengerKey.currentState?.showSnackBar(
+          const SnackBar(content: Text('Sign out before connecting this phone to another account.')),
+        );
+        return DeepLink.none;
+      }
+      ref.read(pendingPairingInviteProvider.notifier).state = pairingInvite;
+      if (currentRouteName == LoginRoute.name) {
+        return DeepLink.none;
+      }
+      if (!isColdStart) {
+        unawaited(ref.read(appRouterProvider).push(const LoginRoute()));
+        return DeepLink.none;
+      }
+      return const DeepLink([LoginRoute()]);
+    }
+
+    final deepLinkHandler = ref.read(deepLinkServiceProvider);
 
     PageRouteInfo? route;
     if (deepLink.uri.scheme == "immich") {

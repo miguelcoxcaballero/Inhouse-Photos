@@ -32,6 +32,8 @@ jobs:
           flutter test
           test/unit/required_update_gate_test.dart
           test/services/auth.service_test.dart
+          test/services/pairing.service_test.dart
+          test/widgets/forms/login/pairing_login_test.dart
           test/domain/services/timeline_norefresh_test.dart
           test/domain/services/timeline_service_performance_test.dart
           test/domain/services/local_thumbhash_service_test.dart

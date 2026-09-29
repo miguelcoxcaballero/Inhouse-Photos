@@ -21,6 +21,30 @@ if (-not (Test-Path -LiteralPath $compilerExe)) {
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   [IO.Compression.ZipFile]::ExtractToDirectory($package,$compilerRoot)
 }
+# QR codes are generated inside the manager. Pin the official NuGet package
+# checksum and embed its dependency-free .NET Framework assembly in both EXEs.
+$qrVersion = '1.8.0'
+$qrPackage = Join-Path $outDir "qrcoder.$qrVersion.nupkg"
+if (-not (Test-Path -LiteralPath $qrPackage)) {
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  Invoke-WebRequest -Uri "https://api.nuget.org/v3-flatcontainer/qrcoder/$qrVersion/qrcoder.$qrVersion.nupkg" -OutFile $qrPackage -UseBasicParsing
+}
+$qrExpected = 'WVQOLFZ3S4aLzLPq/i+WedWLs6FzZ5SCefwC24JA5Gtn3Wz/vDjEQ+A94uJQsRPn270PFZZRRqM9dY94HJDXvg=='
+$qrHasher = [Security.Cryptography.SHA512]::Create()
+$qrStream = [IO.File]::OpenRead($qrPackage)
+try { $qrActual = [Convert]::ToBase64String($qrHasher.ComputeHash($qrStream)) } finally { $qrStream.Dispose(); $qrHasher.Dispose() }
+if ($qrActual -ne $qrExpected) { throw 'QRCoder package checksum mismatch' }
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$qrDll = Join-Path $outDir 'QRCoder.dll'
+$qrLicense = Join-Path $desktopRoot 'QRCoder-LICENSE.txt'
+$qrArchive = [IO.Compression.ZipFile]::OpenRead($qrPackage)
+try {
+  $qrEntry = $qrArchive.GetEntry('lib/net40/QRCoder.dll')
+  if ($null -eq $qrEntry) { throw 'QRCoder .NET Framework assembly missing from package' }
+  $qrInput = $qrEntry.Open()
+  $qrOutput = [IO.File]::Create($qrDll)
+  try { $qrInput.CopyTo($qrOutput) } finally { $qrOutput.Dispose(); $qrInput.Dispose() }
+} finally { $qrArchive.Dispose() }
 # Render the repository's vector mark into the executable's Windows icon.
 Add-Type -AssemblyName PresentationCore,PresentationFramework,WindowsBase
 $brandPath = Join-Path $desktopRoot 'brand.xaml'
@@ -48,6 +72,8 @@ $sources = (Get-ChildItem -LiteralPath $desktopRoot -Filter '*.cs' -File).FullNa
 & $compilerExe /nologo /target:winexe /platform:x64 /optimize+ /utf8output /langversion:latest /deterministic /main:InhousePhotos.Program `
   "/out:$outDir\Inhouse-Photos-Server.exe" `
   "/win32icon:$iconPath" "/resource:$brandPath,InhousePhotos.brand.xaml" `
+  "/resource:$qrDll,InhousePhotos.QRCoder.dll" "/reference:$qrDll" `
+  "/resource:$qrLicense,InhousePhotos.QRCoder-LICENSE.txt" `
   "/resource:$desktopRoot\storage.ps1,InhousePhotos.storage.ps1" `
   /reference:System.dll /reference:System.Core.dll /reference:System.Web.Extensions.dll `
   /reference:System.Management.dll /reference:System.Security.dll /reference:System.Xaml.dll `
@@ -60,6 +86,8 @@ $payloadHash = Join-Path $outDir 'payload.sha256'
 & $compilerExe /nologo /target:winexe /platform:x64 /optimize+ /utf8output /langversion:latest /deterministic /main:InhousePhotos.SetupProgram `
   "/out:$outDir\Inhouse-Photos-Server-Setup.exe" "/win32icon:$iconPath" `
   "/resource:$brandPath,InhousePhotos.brand.xaml" "/resource:$outDir\Inhouse-Photos-Server.exe,InhousePhotos.payload.exe" "/resource:$payloadHash,InhousePhotos.payload.sha256" `
+  "/resource:$qrDll,InhousePhotos.QRCoder.dll" "/reference:$qrDll" `
+  "/resource:$qrLicense,InhousePhotos.QRCoder-LICENSE.txt" `
   "/resource:$desktopRoot\storage.ps1,InhousePhotos.storage.ps1" `
   /reference:System.dll /reference:System.Core.dll /reference:System.Web.Extensions.dll /reference:System.Management.dll /reference:System.Security.dll /reference:System.Xaml.dll `
   /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:Microsoft.CSharp.dll `

@@ -143,6 +143,10 @@ namespace InhousePhotos {
         if(!login.ContainsKey("isAdmin")||!(bool)login["isAdmin"])throw new IOException("No se ha podido verificar la cuenta administradora.");
         if(!String.IsNullOrEmpty(domain))await Backend.Compose(p,"up -d caddy",300);
         progress("Verificando la copia de recuperación…");await Backend.Adopt(p,progress,persist);
+        if(persist) {
+          try {PairingClient.SaveSession(p,Convert.ToString(login["accessToken"]),Convert.ToString(login["userEmail"]));}
+          catch(Exception) {progress("La biblioteca está lista. Para conectar un móvil, vuelve a entrar como administrador en este PC.");}
+        }
         if(persist&&File.Exists(PendingFile))File.Delete(PendingFile);
         return p;
       } finally {Gate.Release();}

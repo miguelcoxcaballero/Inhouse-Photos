@@ -26,6 +26,7 @@ import 'package:immich_mobile/providers/view_intent/view_intent_handler.provider
 import 'package:immich_mobile/providers/websocket.provider.dart';
 import 'package:immich_mobile/repositories/permission.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:immich_mobile/services/pairing.service.dart';
 import 'package:immich_mobile/utils/provider_utils.dart';
 import 'package:immich_mobile/utils/semver.dart';
 import 'package:immich_mobile/utils/url_helper.dart';
@@ -33,6 +34,7 @@ import 'package:immich_mobile/utils/version_compatibility.dart';
 import 'package:immich_mobile/widgets/common/immich_logo.dart';
 import 'package:immich_mobile/widgets/common/immich_title_text.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
+import 'package:immich_mobile/widgets/forms/login/pairing_login.dart';
 import 'package:immich_ui/immich_ui.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
@@ -74,6 +76,14 @@ class LoginForm extends HookConsumerWidget {
     final warningMessage = useState<String?>(null);
     final loginFormKey = GlobalKey<FormState>();
     final ValueNotifier<String?> serverEndpoint = useState<String?>(null);
+    final manualMode = useState(false);
+
+    ref.listen<PairingInvite?>(pendingPairingInviteProvider, (_, invite) {
+      if (invite != null) {
+        serverEndpoint.value = null;
+        manualMode.value = false;
+      }
+    });
 
     checkVersionMismatch() async {
       try {
@@ -245,6 +255,35 @@ class LoginForm extends HookConsumerWidget {
       }
     }
 
+    Future<void> finishPairingLogin(String accessToken, Uri origin) async {
+      // Establish the public server endpoint before installing the freshly
+      // redeemed token in the same auth state used by password/OAuth sign-in.
+      await ref.read(authProvider.notifier).validateServerUrl(origin.toString());
+      invalidateAllApiRepositoryProviders(ref);
+      late bool isSuccess;
+      try {
+        isSuccess = await ref.read(authProvider.notifier).saveAuthInfo(accessToken: accessToken);
+      } catch (_) {
+        await ref.read(authProvider.notifier).logout();
+        rethrow;
+      }
+      if (!isSuccess) {
+        await ref.read(authProvider.notifier).logout();
+        throw StateError('Pairing sign-in could not load the account.');
+      }
+      if (!context.mounted) {
+        return;
+      }
+      await ref.read(galleryPermissionNotifier.notifier).requestGalleryPermission();
+      if (isSyncRemoteDeletionsMode()) {
+        await getManageMediaPermission();
+      }
+      unawaited(handleSyncFlow());
+      ref.read(websocketProvider.notifier).connect();
+      unawaited(ref.read(featureMessageServiceProvider).markSeen());
+      unawaited(context.router.replaceAll([const TabShellRoute()]));
+    }
+
     String generateRandomString(int length) {
       const chars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
       final random = Random.secure();
@@ -376,33 +415,41 @@ class LoginForm extends HookConsumerWidget {
     }
 
     final serverSelectionOrLogin = serverEndpoint.value == null
-        ? Padding(
-            padding: const EdgeInsets.only(top: ImmichSpacing.md),
-            child: Column(
-              mainAxisSize: MainAxisSize.max,
-              children: [
-                ImmichForm(
-                  onSubmit: getServerAuthSettings,
-                  submitText: 'next'.t(context: context),
-                  submitIcon: Icons.arrow_forward_rounded,
-                  builder: (_, form) => ImmichURLInput(
-                    controller: serverEndpointController,
-                    label: 'login_form_endpoint_url'.t(context: context),
-                    hintText: 'login_form_endpoint_hint'.t(context: context),
-                    validator: _validateUrl,
-                    keyboardAction: .next,
-                    onSubmit: (_) => form.submit(),
+        ? (manualMode.value
+              ? Padding(
+                  padding: const EdgeInsets.only(top: ImmichSpacing.md),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                      ImmichForm(
+                        onSubmit: getServerAuthSettings,
+                        submitText: 'next'.t(context: context),
+                        submitIcon: Icons.arrow_forward_rounded,
+                        builder: (_, form) => ImmichURLInput(
+                          controller: serverEndpointController,
+                          label: 'login_form_endpoint_url'.t(context: context),
+                          hintText: 'login_form_endpoint_hint'.t(context: context),
+                          validator: _validateUrl,
+                          keyboardAction: .next,
+                          onSubmit: (_) => form.submit(),
+                        ),
+                      ),
+                      ImmichTextButton(
+                        labelText: 'settings'.t(context: context),
+                        icon: Icons.settings,
+                        variant: ImmichVariant.ghost,
+                        onPressed: () => context.pushRoute(const SettingsRoute()),
+                      ),
+                      ImmichTextButton(
+                        labelText: 'Scan QR code',
+                        icon: Icons.qr_code_scanner,
+                        variant: ImmichVariant.ghost,
+                        onPressed: () => manualMode.value = false,
+                      ),
+                    ],
                   ),
-                ),
-                ImmichTextButton(
-                  labelText: 'settings'.t(context: context),
-                  icon: Icons.settings,
-                  variant: ImmichVariant.ghost,
-                  onPressed: () => context.pushRoute(const SettingsRoute()),
-                ),
-              ],
-            ),
-          )
+                )
+              : PairingLogin(onManual: () => manualMode.value = true, onRedeemed: finishPairingLogin))
         : AutofillGroup(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
