@@ -42,7 +42,7 @@ namespace InhousePhotos {
     public Dictionary<string,string> ConfigurationHashes {get;set;}
   }
   public static partial class Backend {
-    public const string Version="1.2.2";
+    public const string Version="1.2.3";
     public const string DockerContext="--context desktop-linux ";
     static readonly SemaphoreSlim ServerLock=new SemaphoreSlim(1,1);
     public static readonly string InstallDir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),@"Programs\Inhouse Photos Server");
@@ -106,24 +106,68 @@ namespace InhousePhotos {
       if(!rows.Any(r=>r.Service=="immich-server")||!rows.Any(r=>r.Service=="database")||rows.Select(r=>r.Project).Distinct().Count()!=1)throw new InvalidOperationException("La instalación no contiene una biblioteca y base de datos compatibles.");
       return rows;
     }
+    static ServerMount[] OrderedMounts(ServerMount[] mounts) {
+      // Docker does not guarantee mount enumeration order, including for
+      // mounts with the same destination. Compare every storage attribute.
+      return mounts.OrderBy(m=>m.Destination,StringComparer.Ordinal)
+        .ThenBy(m=>m.Type,StringComparer.Ordinal).ThenBy(m=>m.Name,StringComparer.Ordinal)
+        .ThenBy(m=>m.Source,StringComparer.Ordinal).ThenBy(m=>m.Driver,StringComparer.Ordinal)
+        .ThenBy(m=>m.Mode,StringComparer.Ordinal).ThenBy(m=>m.RW)
+        .ThenBy(m=>m.Propagation,StringComparer.Ordinal).ToArray();
+    }
+    static bool SameMounts(ServerMount[] a,ServerMount[] b) {
+      if(a==null||b==null||a.Any(m=>m==null)||b.Any(m=>m==null))return false;
+      var left=OrderedMounts(a);var right=OrderedMounts(b);
+      if(left.Length!=right.Length)return false;
+      for(int i=0;i<left.Length;i++) {
+        var x=left[i];var y=right[i];
+        if(x.Type!=y.Type||x.Name!=y.Name||x.Source!=y.Source||x.Destination!=y.Destination||
+           x.Driver!=y.Driver||x.Mode!=y.Mode||x.RW!=y.RW||x.Propagation!=y.Propagation)return false;
+      }
+      return true;
+    }
+    static bool HasWritablePersistentMount(ServerContainer container,string destination) {
+      return container.Mounts!=null&&container.Mounts.Any(m=>m!=null&&m.Destination==destination&&m.RW&&
+        !String.IsNullOrEmpty(m.Source)&&(m.Type=="bind"||m.Type=="volume"));
+    }
+    static void ChangedIdentity() {
+      throw new InvalidOperationException("La identidad o los discos del servidor han cambiado. Se ha detenido la vinculación para proteger la biblioteca.");
+    }
     public static void AssertIdentity(List<ServerContainer> before,List<ServerContainer> after) {
-      // Docker does not guarantee mount enumeration order. Compare canonical
-      // typed records, retaining all storage identity and access attributes.
+      // During the initial migration, the exact containers and images must
+      // remain in place for the entire snapshot and isolated restore.
+      if(before==null||after==null||before.Any(r=>r==null)||after.Any(r=>r==null))ChangedIdentity();
       var left=before.OrderBy(r=>r.Id,StringComparer.Ordinal).ToArray();
       var right=after.OrderBy(r=>r.Id,StringComparer.Ordinal).ToArray();
-      bool equal=left.Length==right.Length;
-      for(int i=0;equal&&i<left.Length;i++) {
+      if(left.Length!=right.Length)ChangedIdentity();
+      for(int i=0;i<left.Length;i++) {
         var a=left[i];var b=right[i];
-        equal=a.Id==b.Id&&a.Image==b.Image&&a.Service==b.Service&&a.Project==b.Project;
-        var am=(a.Mounts??new ServerMount[0]).OrderBy(m=>m.Destination,StringComparer.Ordinal).ToArray();
-        var bm=(b.Mounts??new ServerMount[0]).OrderBy(m=>m.Destination,StringComparer.Ordinal).ToArray();
-        equal=equal&&am.Length==bm.Length;
-        for(int j=0;equal&&j<am.Length;j++) {
-          var x=am[j];var y=bm[j];
-          equal=x.Type==y.Type&&x.Name==y.Name&&x.Source==y.Source&&x.Destination==y.Destination&&x.Driver==y.Driver&&x.Mode==y.Mode&&x.RW==y.RW&&x.Propagation==y.Propagation;
-        }
+        if(a.Id!=b.Id||a.Image!=b.Image||a.Service!=b.Service||a.Project!=b.Project||!SameMounts(a.Mounts,b.Mounts))ChangedIdentity();
       }
-      if(!equal)throw new InvalidOperationException("La identidad o los discos del servidor han cambiado. Se ha detenido la vinculación para proteger la biblioteca.");
+    }
+    public static void AssertManagedIdentity(Preferences p,List<ServerContainer> adopted,List<ServerContainer> current) {
+      // A receipt represents durable Compose and storage identity, not Docker
+      // container IDs. Application images can be rolled out without moving the
+      // library. The database image and every mount remain pinned to the receipt.
+      if(p==null||String.IsNullOrEmpty(p.ProjectName)||!Regex.IsMatch(p.ProjectName,"^[a-z0-9][a-z0-9_-]*$")||
+         adopted==null||current==null||adopted.Count==0||adopted.Count!=current.Count||
+         adopted.Any(r=>r==null||String.IsNullOrEmpty(r.Id)||String.IsNullOrEmpty(r.Image)||String.IsNullOrEmpty(r.Service)||r.Project!=p.ProjectName)||
+         current.Any(r=>r==null||String.IsNullOrEmpty(r.Id)||String.IsNullOrEmpty(r.Image)||String.IsNullOrEmpty(r.Service)||r.Project!=p.ProjectName)||
+         adopted.Select(r=>r.Service).Distinct(StringComparer.Ordinal).Count()!=adopted.Count||
+         current.Select(r=>r.Service).Distinct(StringComparer.Ordinal).Count()!=current.Count)ChangedIdentity();
+      var services=current.ToDictionary(r=>r.Service,StringComparer.Ordinal);
+      if(!services.ContainsKey("database")||!services.ContainsKey("immich-server")||
+         !adopted.Any(r=>r.Service=="database")||!adopted.Any(r=>r.Service=="immich-server"))ChangedIdentity();
+      var database=adopted.Single(r=>r.Service=="database");
+      var server=adopted.Single(r=>r.Service=="immich-server");
+      if(!HasWritablePersistentMount(database,"/var/lib/postgresql/data")||!HasWritablePersistentMount(server,"/data"))ChangedIdentity();
+      foreach(var previous in adopted) {
+        ServerContainer now;
+        if(!services.TryGetValue(previous.Service,out now)||!SameMounts(previous.Mounts,now.Mounts))ChangedIdentity();
+        var rollingImage=previous.Service=="immich-server"||previous.Service=="immich-machine-learning"||
+          previous.Service=="redis"||previous.Service=="caddy";
+        if(!rollingImage&&previous.Image!=now.Image)ChangedIdentity();
+      }
     }
     public static void ValidateManagedConfiguration(Preferences p) {
       Library(p);
@@ -216,7 +260,7 @@ namespace InhousePhotos {
           progress("Comprobando tu conexión guardada…");
           ValidateManagedConfiguration(p);
           var existing=Json.Deserialize<AdoptionReceipt>(File.ReadAllText(p.ReceiptPath));
-          AssertIdentity(existing.Containers,await InspectServer(p));
+          AssertManagedIdentity(p,existing.Containers,await InspectServer(p));
           if(!File.Exists(existing.Snapshot)||Hash(existing.Snapshot)!=existing.SnapshotSha256)throw new IOException("La copia de verificación no está disponible. Revisa el disco donde se guardó.");
           if(milestone!=null)milestone(4,"La biblioteca ya estaba vinculada");
           progress("Tu servidor ya está vinculado. No hace falta volver a migrarlo.");
@@ -263,7 +307,7 @@ namespace InhousePhotos {
         ValidateManagedConfiguration(p);
         var receipt=Json.Deserialize<AdoptionReceipt>(File.ReadAllText(p.ReceiptPath));
         await EnsureEngine(progress);
-        AssertIdentity(receipt.Containers,await InspectServer(p));
+        AssertManagedIdentity(p,receipt.Containers,await InspectServer(p));
         if(await Ping(p.LocalEndpoint))return;
         progress("Iniciando la biblioteca existente…");
         await Compose(p,"start",180);

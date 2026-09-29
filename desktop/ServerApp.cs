@@ -18,7 +18,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.2.2.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.3.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -193,7 +193,7 @@ namespace InhousePhotos {
     public static async Task<string> Backup(Preferences p, Action<string> progress, CancellationToken cancellation) {
       ValidateManagedConfiguration(p);
       var receipt=Json.Deserialize<AdoptionReceipt>(File.ReadAllText(p.ReceiptPath));
-      AssertIdentity(receipt.Containers,await InspectServer(p));
+      AssertManagedIdentity(p,receipt.Containers,await InspectServer(p));
       var source=Library(p); ValidateBackup(source,p.BackupDestination);
       var target=Path.Combine(p.BackupDestination,"Inhouse Photos backup");
       progress("Comprobando archivos y espacio del disco de copia…");
@@ -371,7 +371,7 @@ namespace InhousePhotos {
           else if(args.Contains("--reverify-current"))Backend.ReverifyExisting(prefs,Console.WriteLine).GetAwaiter().GetResult();
           else if(args.Contains("--start-once"))Backend.StartManaged(prefs,Console.WriteLine).GetAwaiter().GetResult();
           else if(args.Contains("--enable-startup")||args.Contains("--disable-startup"))Startup.SetEnabled(prefs,args.Contains("--enable-startup")).GetAwaiter().GetResult();
-          else {Backend.ValidateManagedConfiguration(prefs);var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));Backend.AssertIdentity(receipt.Containers,Backend.InspectServer(prefs).GetAwaiter().GetResult());if(Backend.Hash(receipt.Snapshot)!=receipt.SnapshotSha256)throw new IOException("La instantánea ha cambiado.");}
+          else {Backend.ValidateManagedConfiguration(prefs);var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));Backend.AssertManagedIdentity(prefs,receipt.Containers,Backend.InspectServer(prefs).GetAwaiter().GetResult());if(Backend.Hash(receipt.Snapshot)!=receipt.SnapshotSha256)throw new IOException("La instantánea ha cambiado.");}
           Console.WriteLine("Verificado: "+prefs.ReceiptPath);return 0;
         }catch(Exception ex){Console.Error.WriteLine(ex.Message);return 20;}
       }
@@ -386,7 +386,7 @@ namespace InhousePhotos {
           try{NewServer.Validate(Path.GetPathRoot(sample),"test@example.com","test-password-long","Test","");return 14;}catch(ArgumentException){}
           if(NewServer.ComposeText(false).Contains("container_name:")||NewServer.ComposeText(false).Contains("443:443"))return 15;
           var mountA=new ServerMount{Type="bind",Source="D:/library",Destination="/data",RW=true};
-          var mountB=new ServerMount{Type="volume",Name="database",Source="/volumes/db",Destination="/db",RW=true};
+          var mountB=new ServerMount{Type="volume",Name="database",Source="/volumes/db",Destination="/var/lib/postgresql/data",RW=true};
           var firstIdentity=new List<ServerContainer>{new ServerContainer{Id="same",Image="image",Service="server",Project="photos",Mounts=new[]{mountA,mountB}}};
           var reorderedIdentity=new List<ServerContainer>{new ServerContainer{Id="same",Image="image",Service="server",Project="photos",Mounts=new[]{mountB,mountA}}};
           Backend.AssertIdentity(firstIdentity,reorderedIdentity);
@@ -395,6 +395,47 @@ namespace InhousePhotos {
           reorderedIdentity[0].Id="same";
           reorderedIdentity[0].Mounts=new[]{new ServerMount{Type="bind",Source="D:/different",Destination="/data",RW=true},mountB};
           try{Backend.AssertIdentity(firstIdentity,reorderedIdentity);return 12;}catch(InvalidOperationException){}
+          var managed=new Preferences{ProjectName="photos"};
+          var adopted=new List<ServerContainer>{
+            new ServerContainer{Id="server-old",Image="web-old",Service="immich-server",Project="photos",Mounts=new[]{mountA}},
+            new ServerContainer{Id="db-old",Image="postgres-stable",Service="database",Project="photos",Mounts=new[]{mountB}},
+            new ServerContainer{Id="redis-old",Image="redis-old",Service="redis",Project="photos",Mounts=new ServerMount[0]},
+            new ServerContainer{Id="ml-old",Image="ml-old",Service="immich-machine-learning",Project="photos",Mounts=new ServerMount[0]},
+            new ServerContainer{Id="caddy-old",Image="caddy-old",Service="caddy",Project="photos",Mounts=new ServerMount[0]}};
+          var replaced=Backend.Json.Deserialize<List<ServerContainer>>(Backend.Json.Serialize(adopted));
+          foreach(var container in replaced){container.Id+="-new";if(container.Service!="database")container.Image+="-new";}
+          Backend.AssertManagedIdentity(managed,adopted,replaced);
+          try{Backend.AssertIdentity(adopted,replaced);return 17;}catch(InvalidOperationException){}
+          replaced[0].Project="other";
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 18;}catch(InvalidOperationException){}
+          replaced[0].Project="photos";replaced[0].Mounts[0].Source="D:/different";
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 19;}catch(InvalidOperationException){}
+          replaced[0].Mounts[0].Source="D:/library";replaced[1].Mounts[0].Source="/volumes/other-db";
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 25;}catch(InvalidOperationException){}
+          replaced[1].Mounts[0].Source="/volumes/db";replaced[1].Image="postgres-other";
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 23;}catch(InvalidOperationException){}
+          replaced[1].Image="postgres-stable";replaced.RemoveAt(2);
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 24;}catch(InvalidOperationException){}
+          replaced.Add(Backend.Json.Deserialize<ServerContainer>(Backend.Json.Serialize(adopted[2])));
+          adopted[1].Mounts=new ServerMount[0];replaced[1].Mounts=new ServerMount[0];
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 26;}catch(InvalidOperationException){}
+          var badDatabaseMount=new ServerMount{Type="tmpfs",Source="/volumes/db",Destination="/var/lib/postgresql/data",RW=true};
+          adopted[1].Mounts=new[]{badDatabaseMount};replaced[1].Mounts=new[]{badDatabaseMount};
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 27;}catch(InvalidOperationException){}
+          badDatabaseMount.Type="volume";badDatabaseMount.Destination="/wrong-db-path";
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 28;}catch(InvalidOperationException){}
+          badDatabaseMount.Destination="/var/lib/postgresql/data";badDatabaseMount.RW=false;
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 29;}catch(InvalidOperationException){}
+          adopted[1].Mounts=new[]{mountB};replaced[1].Mounts=new[]{mountB};
+          adopted[0].Mounts=new ServerMount[0];replaced[0].Mounts=new ServerMount[0];
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 30;}catch(InvalidOperationException){}
+          var badMediaMount=new ServerMount{Type="tmpfs",Source="D:/library",Destination="/data",RW=true};
+          adopted[0].Mounts=new[]{badMediaMount};replaced[0].Mounts=new[]{badMediaMount};
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 31;}catch(InvalidOperationException){}
+          badMediaMount.Type="bind";badMediaMount.Destination="/wrong-media-path";
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 32;}catch(InvalidOperationException){}
+          badMediaMount.Destination="/data";badMediaMount.RW=false;
+          try{Backend.AssertManagedIdentity(managed,adopted,replaced);return 33;}catch(InvalidOperationException){}
           if(Backend.CanonicalEndpoint("https://example.com/")!="https://example.com")return 1;
           foreach(var bad in new[]{null,"","http://example.com","https://user:password@example.com","file:///D:/Immich","https://example.com?key=secret"}){try{Backend.CanonicalEndpoint(bad);return 2;}catch(ArgumentException){}}
           foreach(var bad in new[]{@"D:\photos\backup",@"D:\other",@"D:\"}){try{Backend.ValidateBackup(@"D:\photos",bad);return 3;}catch(InvalidOperationException){}}

@@ -204,7 +204,7 @@ namespace InhousePhotos {
         if(local)try {
           Backend.ValidateManagedConfiguration(prefs);
           var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));
-          Backend.AssertIdentity(receipt.Containers,await Backend.InspectServer(prefs));
+          Backend.AssertManagedIdentity(prefs,receipt.Containers,await Backend.InspectServer(prefs));
         }catch {verified=false;}
         lastLocal=local;lastEndpoint=remote;lastVerified=verified;lastHealthCheck=DateTime.UtcNow;
         if(generation!=overviewGeneration||page!="Inicio")return;
