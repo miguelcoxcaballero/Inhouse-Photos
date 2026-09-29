@@ -19,7 +19,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.2.9.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.11.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -473,7 +473,7 @@ namespace InhousePhotos {
             try{PairingClient.Link(bad,sampleInvite);return 36;}catch(ArgumentException){}
           }
           try{PairingClient.Link("https://photos.example.com","short");return 37;}catch(ArgumentException){}
-          if(ManagerUpdates.Compare("1.2.9","1.2.8")<=0||ManagerUpdates.Compare("1.2.9","1.2.9")!=0)return 39;
+          if(ManagerUpdates.Compare("1.2.11","1.2.10")<=0||ManagerUpdates.Compare("1.2.11","1.2.11")!=0)return 39;
           var sampleCaddy="photos.example.com {\n handle /descargas/* {\n  file_server\n }\n handle {\n  reverse_proxy server:2283\n }\n}\n";
           var managerKey=new string('a',64);
           var withManager=RemoteManagement.WithRoute(sampleCaddy,managerKey);

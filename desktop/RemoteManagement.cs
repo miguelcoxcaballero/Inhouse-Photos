@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -16,6 +17,11 @@ namespace InhousePhotos {
   /// Caddy injects a private bridge key and the manager independently checks
   /// the phone's bearer token with the existing server before every request.
   public sealed class RemoteManagement : IDisposable {
+    [DllImport("kernel32.dll",SetLastError=true)]
+    static extern bool SetHandleInformation(IntPtr handle,uint mask,uint flags);
+    static void NoInherit(Socket socket) {
+      if(!SetHandleInformation(socket.Handle,1,0))throw new IOException("No se pudo proteger el puerto local de gestión.");
+    }
     public const int Port=52187;
     public const string Path="/inhouse-manager/v1/update";
     const string BeginMarker="# INHOUSE-MANAGER-ROUTE-BEGIN";
@@ -33,6 +39,7 @@ namespace InhousePhotos {
       this.prefs=prefs;this.canUpdate=canUpdate;this.requestUpdate=requestUpdate;
       secret=LoadOrCreateSecret();
       listener=new TcpListener(IPAddress.Any,Port);listener.Start(8);
+      try{NoInherit(listener.Server);}catch{listener.Stop();throw;}
       _=AcceptLoop();
     }
     static string LoadOrCreateSecret() {
@@ -55,7 +62,7 @@ namespace InhousePhotos {
     async Task AcceptLoop() {
       while(!disposed) {
         TcpClient client=null;
-        try{client=await listener.AcceptTcpClientAsync();await capacity.WaitAsync();
+        try{client=await listener.AcceptTcpClientAsync();NoInherit(client.Client);await capacity.WaitAsync();
           _=Task.Run(async()=>{
             try {
               var request=Serve(client);

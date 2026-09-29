@@ -41,7 +41,7 @@ route for the mobile uploader. The phone still authenticates the public HTTPS
 hostname; the manager only refreshes the computer's LAN address, and public
 access remains the fallback. New managed servers include the discovery route.
 
-Manager 1.2.9 checks `windows-server-update.json` over HTTPS, verifies the
+Manager 1.2.11 checks `windows-server-update.json` over HTTPS, verifies the
 published installer SHA-256, embedded version and payload, and offers an Update
 button in Settings. A helper waits for the manager to exit, switches only its
 versioned executable, then reopens it. Docker, Caddy and media are not stopped.

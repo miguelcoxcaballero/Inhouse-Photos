@@ -95,6 +95,10 @@ namespace InhousePhotos {
       try {
         notice.Text="Descargando y comprobando la actualización del gestor…";
         var installer=await ManagerUpdates.Prepare();
+        // Release the listening socket before creating the helper. Otherwise
+        // Windows can inherit its handle into the new process, leaving a dead
+        // listener bound to the old PID after the hand-off.
+        remoteManagement?.Dispose();remoteManagement=null;
         ManagerUpdates.StartHelper(installer,System.Diagnostics.Process.GetCurrentProcess().Id,remote||!IsVisible);
         // The verified setup waits for this process to close. It changes only
         // the per-user manager pointer; Docker and Caddy keep serving photos.
