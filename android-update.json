@@ -2,6 +2,6 @@
   "version": "3.1.84",
   "versionCode": 7142,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.84-pairing/Inhouse-Photos-3.1.84-arm64.apk",
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.84-pairing/Inhouse-Photos.apk",
   "sha256": "717f130c255d2ac89c7b1c76c90a6cb95401b58519457efba31e9737cb37f178"
 }
