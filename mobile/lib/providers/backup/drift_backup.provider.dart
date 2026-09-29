@@ -265,6 +265,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   final ForegroundUploadService _foregroundUploadService;
   final BackgroundUploadService _backgroundUploadService;
   final UploadSpeedManager _uploadSpeedManager;
+  double? get currentUploadBytesPerSecond => _uploadSpeedManager.aggregateBytesPerSecond;
   final DriftLocalAssetRepository _localAssetRepository;
   final RemoteAssetRepository _remoteAssetRepository;
   final SettingsRepository _settingsRepository;

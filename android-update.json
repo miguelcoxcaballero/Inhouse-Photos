@@ -1,8 +1,8 @@
 {
-  "version": "3.1.90",
-  "versionCode": 7148,
+  "version": "3.1.91",
+  "versionCode": 7149,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.90-video-upload-bandwidth/Inhouse-Photos.apk",
-  "sizeBytes": 74903029,
-  "sha256": "105a05b8dacb5a7e37e262d668eda585ec5f0215ef59e022c67e1f47ead6912b"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.91-live-upload-speed/Inhouse-Photos.apk",
+  "sizeBytes": 74903045,
+  "sha256": "36779569db6d3a6b99fe44a43b8ab296344974fe5003193b19b985aad0befdf6"
 }

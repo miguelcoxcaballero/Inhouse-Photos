@@ -135,12 +135,81 @@ class UploadSpeedCalculator {
   }
 }
 
+/// Measures the bytes actually sent by all foreground uploads in a short
+/// sliding window. A first progress event establishes the baseline; retries
+/// reset it rather than producing a negative or inflated speed.
+class AggregateUploadSpeed {
+  AggregateUploadSpeed({this.window = const Duration(seconds: 3)});
+
+  final Duration window;
+  final Map<String, (int bytes, DateTime since)> _active = {};
+  final List<(String taskId, DateTime time, int bytes)> _samples = [];
+
+  void update(String taskId, int currentBytes, DateTime now) {
+    final previous = _active[taskId];
+    if (previous == null || currentBytes < previous.$1) {
+      _samples.removeWhere((sample) => sample.$1 == taskId);
+      _active[taskId] = (currentBytes, now);
+    } else {
+      final delta = currentBytes - previous.$1;
+      if (delta > 0) {
+        _samples.add((taskId, now, delta));
+      }
+      _active[taskId] = (currentBytes, previous.$2);
+    }
+    _prune(now);
+  }
+
+  /// Null means no uploads are active; zero means active but no recent bytes.
+  double? bytesPerSecond(DateTime now) {
+    if (_active.isEmpty) {
+      return null;
+    }
+    _prune(now);
+    final firstStart = _active.values.map((sample) => sample.$2).reduce((a, b) => a.isBefore(b) ? a : b);
+    final elapsedMs = now.difference(firstStart).inMilliseconds;
+    final durationSeconds = (elapsedMs.clamp(500, window.inMilliseconds)) / 1000;
+    final bytes = _samples.fold<int>(0, (sum, sample) => sum + sample.$3);
+    return bytes / durationSeconds;
+  }
+
+  void remove(String taskId) {
+    _active.remove(taskId);
+    _samples.removeWhere((sample) => sample.$1 == taskId);
+  }
+
+  void clear() {
+    _active.clear();
+    _samples.clear();
+  }
+
+  void _prune(DateTime now) {
+    final cutoff = now.subtract(window);
+    _samples.removeWhere((sample) => sample.$2.isBefore(cutoff));
+  }
+}
+
+String formatAggregateUploadSpeed(double? bytesPerSecond) {
+  if (bytesPerSecond == null) {
+    return '—';
+  }
+  if (bytesPerSecond < 1024) {
+    return '${bytesPerSecond.round()} B/s';
+  }
+  if (bytesPerSecond < 1024 * 1024) {
+    return '${(bytesPerSecond / 1024).round()} kB/s';
+  }
+  final mbPerSecond = bytesPerSecond / (1024 * 1024);
+  return '${mbPerSecond.toStringAsFixed(mbPerSecond >= 10 ? 0 : 1)} MB/s';
+}
+
 /// Manager for tracking upload speeds for multiple concurrent uploads.
 ///
 /// Each upload is identified by a unique task ID.
 class UploadSpeedManager {
   /// Map of task IDs to their speed calculators.
   final Map<String, UploadSpeedCalculator> _calculators = {};
+  final AggregateUploadSpeed _aggregate = AggregateUploadSpeed();
 
   /// Gets or creates a speed calculator for the given task ID.
   UploadSpeedCalculator getCalculator(String taskId) {
@@ -157,8 +226,11 @@ class UploadSpeedManager {
   String updateProgress(String taskId, int currentBytes, int totalBytes) {
     final calculator = getCalculator(taskId);
     calculator.update(currentBytes, totalBytes);
+    _aggregate.update(taskId, currentBytes, DateTime.now());
     return calculator.speedAsString;
   }
+
+  double? get aggregateBytesPerSecond => _aggregate.bytesPerSecond(DateTime.now());
 
   /// Gets the current speed string for a specific task.
   String getSpeedAsString(String taskId) {
@@ -173,10 +245,12 @@ class UploadSpeedManager {
   /// Removes a task from tracking.
   void removeTask(String taskId) {
     _calculators.remove(taskId);
+    _aggregate.remove(taskId);
   }
 
   /// Clears all tracked tasks.
   void clear() {
     _calculators.clear();
+    _aggregate.clear();
   }
 }
