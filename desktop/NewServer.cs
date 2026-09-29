@@ -125,7 +125,7 @@ namespace InhousePhotos {
           state=new SetupState{Project="inhouse-"+Backend.RandomHex(8),Port=port,Domain=domain};
           File.WriteAllText(Path.Combine(folder,"docker-compose.yml"),ComposeText(!String.IsNullOrEmpty(domain)),new UTF8Encoding(false));
           File.WriteAllText(Path.Combine(folder,".env"),"UPLOAD_LOCATION=./library\nINHOUSE_PORT="+port+"\nDB_HOSTNAME=database\nDB_USERNAME=postgres\nDB_DATABASE_NAME=immich\nREDIS_HOSTNAME=redis\nDB_PASSWORD="+Backend.RandomHex(32)+"\n",new UTF8Encoding(false));
-          if(!String.IsNullOrEmpty(domain))File.WriteAllText(Path.Combine(folder,"Caddyfile"),domain+" {\n handle "+LanRoute.RoutePath+" {\n  root * /data\n  rewrite * /inhouse-downloads/lan.json\n  header Cache-Control \"no-store\"\n  file_server\n }\n handle {\n  reverse_proxy immich-server:2283\n }\n}\n",new UTF8Encoding(false));
+          if(!String.IsNullOrEmpty(domain))File.WriteAllText(Path.Combine(folder,"Caddyfile"),domain+" {\n handle "+LanRoute.RoutePath+" {\n  root * /data\n  rewrite * /inhouse-lan.json\n  header Cache-Control \"no-store\"\n  file_server\n }\n handle {\n  reverse_proxy immich-server:2283\n }\n}\n",new UTF8Encoding(false));
           state.Hashes=Backend.ConfigurationHashes(new Preferences{Installation=folder});File.WriteAllText(stateFile,Backend.Json.Serialize(state));
         }
         if(persist){Backend.PrivateDirectory(Backend.SettingsDir);File.WriteAllText(PendingFile,Backend.Json.Serialize(new{Folder=folder,Domain=domain,Email=email,Name=name}));}
