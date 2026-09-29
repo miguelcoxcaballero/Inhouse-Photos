@@ -1,8 +1,8 @@
 {
-  "version": "3.1.86",
-  "versionCode": 7144,
+  "version": "3.1.87",
+  "versionCode": 7145,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.86-lan-upload/Inhouse-Photos.apk",
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.87-lan-upload-fix/Inhouse-Photos.apk",
   "sizeBytes": 74902341,
-  "sha256": "36672107fe163f6bb4b3feaeb027698b7c13080d1c7048ae5f720434024e3793"
+  "sha256": "3688d6aad5173e3f3decca53c991dd36e6e8ea0a7a0e54333efed8c48cfaeaba"
 }
