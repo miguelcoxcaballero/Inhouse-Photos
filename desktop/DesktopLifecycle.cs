@@ -14,15 +14,16 @@ namespace InhousePhotos {
   public sealed partial class ServerWindow {
     Forms.NotifyIcon tray;
     DispatcherTimer monitor;
-    bool monitorBusy, exitRequested;
+    RemoteManagement remoteManagement;
+    bool monitorBusy, exitRequested, updateClose, updatingManager;
     DateTime retryAfter=DateTime.MinValue;
     internal void InitializeLifecycle(bool hidden) {
       tray=new Forms.NotifyIcon{Text="Inhouse Photos Server",Icon=System.Drawing.Icon.ExtractAssociatedIcon(typeof(ServerWindow).Assembly.Location),Visible=true};
       var menu=new Forms.ContextMenuStrip();menu.Items.Add("Abrir Inhouse Photos",null,(s,e)=>Dispatcher.Invoke(BringToFront));
       menu.Items.Add("Salir del gestor",null,(s,e)=>Dispatcher.Invoke(()=>{if(busy){notice.Text="Espera a que termine la operación antes de salir.";return;}exitRequested=true;Close();}));
       tray.ContextMenuStrip=menu;tray.DoubleClick+=(s,e)=>Dispatcher.Invoke(BringToFront);
-      Closing+=(s,e)=>{if(busy||monitorBusy){e.Cancel=true;notice.Text="Espera a que termine la operación antes de salir.";return;}if(!exitRequested){e.Cancel=true;Hide();}};
-      Closed+=(s,e)=>{if(monitor!=null)monitor.Stop();tray.Dispose();};
+      Closing+=(s,e)=>{if((busy||monitorBusy)&&!updateClose){e.Cancel=true;notice.Text="Espera a que termine la operación antes de salir.";return;}if(!exitRequested){e.Cancel=true;Hide();}};
+      Closed+=(s,e)=>{if(monitor!=null)monitor.Stop();remoteManagement?.Dispose();tray.Dispose();};
       monitor=new DispatcherTimer{Interval=TimeSpan.FromSeconds(45)};
       monitor.Tick+=async(s,e)=>await Supervise();monitor.Start();
       if(hidden)Dispatcher.BeginInvoke(new Action(async()=>await Supervise()));
@@ -41,6 +42,16 @@ namespace InhousePhotos {
         }
         if(online) {
           try {await LanRoute.Publish(prefs);} catch { /* Public HTTPS remains available if LAN discovery cannot be published. */ }
+          try {
+            if(remoteManagement==null)remoteManagement=new RemoteManagement(prefs,
+              ()=>Dispatcher.Invoke(()=>!busy&&!monitorBusy&&!updatingManager&&backupCancellation==null),
+              ()=>Dispatcher.BeginInvoke(new Action(async()=>await ApplyManagerUpdate(true))));
+            await remoteManagement.EnsurePublished();
+          }catch(Exception ex){notice.Text="Actualizaciones remotas no disponibles: "+ex.Message;}
+          try {
+            var update=await ManagerUpdates.Check();
+            if(update.Available&&String.IsNullOrWhiteSpace(notice.Text))notice.Text="Nueva versión del gestor: "+update.LatestVersion+". Abre Ajustes para actualizar.";
+          }catch{ /* A GitHub outage never affects photos or backups. */ }
         }
         if(Backend.IsBackupDue()) {
           if(String.IsNullOrWhiteSpace(prefs.BackupDestination)) {
@@ -73,7 +84,71 @@ namespace InhousePhotos {
       }catch(Exception ex){notice.Text=ex.Message;retryAfter=DateTime.UtcNow.AddMinutes(2);}
       finally{monitorBusy=false;}
     }
+    async Task ApplyManagerUpdate(bool remote) {
+      if(updatingManager||backupCancellation!=null||busy||monitorBusy) {
+        if(remote)ManagerUpdates.Fail(new IOException("El PC está ocupado. Vuelve a intentarlo en unos segundos."));
+        else notice.Text="Espera a que termine la operación actual y vuelve a intentarlo.";
+        return;
+      }
+      if(!remote&&!ManagerUpdates.TryBegin())return;
+      updatingManager=true;
+      try {
+        notice.Text="Descargando y comprobando la actualización del gestor…";
+        var installer=await ManagerUpdates.Prepare();
+        ManagerUpdates.StartHelper(installer,System.Diagnostics.Process.GetCurrentProcess().Id,remote||!IsVisible);
+        // The verified setup waits for this process to close. It changes only
+        // the per-user manager pointer; Docker and Caddy keep serving photos.
+        updateClose=true;exitRequested=true;Close();
+      }catch(Exception ex){ManagerUpdates.Fail(ex);notice.Text="No se instaló la actualización: "+ex.Message;}
+      finally{updatingManager=false;}
+    }
     Task RenderManagement() {
+      Rule();content.Children.Add(Label("Actualizaciones del gestor",22));
+      var updateRow=new StackPanel{Margin=new Thickness(0,2,0,8)};
+      var updateVersion=Label("Versión instalada "+Backend.Version,16);updateVersion.FontWeight=FontWeights.SemiBold;
+      updateVersion.Margin=new Thickness(0,0,0,3);updateRow.Children.Add(updateVersion);
+      var updateDetail=Label("Buscando actualizaciones…",14,muted);updateDetail.Margin=new Thickness(0,0,0,8);updateRow.Children.Add(updateDetail);
+      var updateProgress=new ProgressBar{Minimum=0,Maximum=100,Height=4,Foreground=accent,Visibility=Visibility.Collapsed,Margin=new Thickness(0,0,0,9)};
+      updateRow.Children.Add(updateProgress);
+      var updateActions=new StackPanel{Orientation=Orientation.Horizontal};
+      var installUpdate=new Button{Content="Actualizar el gestor",IsEnabled=false,Visibility=Visibility.Collapsed};
+      var checkUpdate=new Button{Content="Buscar actualizaciones"};
+      updateActions.Children.Add(installUpdate);updateActions.Children.Add(checkUpdate);updateRow.Children.Add(updateActions);
+      content.Children.Add(updateRow);
+      async Task RefreshUpdate(bool force) {
+        checkUpdate.IsEnabled=false;
+        updateDetail.Text="Comprobando la última versión…";
+        try {
+          var state=await ManagerUpdates.Check(force);
+          if(!content.Children.Contains(updateRow))return;
+          updateDetail.Text=state.Available?"Versión "+state.LatestVersion+" disponible. "+state.Notes:
+            "Tu gestor está al día. Las fotos y el servidor se actualizan por separado.";
+          installUpdate.Visibility=state.Available?Visibility.Visible:Visibility.Collapsed;
+          installUpdate.IsEnabled=state.Available&&!updatingManager;
+        }catch(Exception ex){if(content.Children.Contains(updateRow))updateDetail.Text="No se pudo comprobar ahora: "+ex.Message;}
+        finally{if(content.Children.Contains(updateRow))checkUpdate.IsEnabled=true;}
+      }
+      checkUpdate.Click+=async(s,e)=>await RefreshUpdate(true);
+      installUpdate.Click+=async(s,e)=>{
+        if(updatingManager||busy||backupCancellation!=null)return;
+        if(!Confirm("Se instalará solo la nueva versión del gestor y se volverá a abrir. El servidor de fotos, las subidas y tus datos seguirán funcionando. ¿Actualizar ahora?"))return;
+        installUpdate.IsEnabled=false;checkUpdate.IsEnabled=false;
+        await ApplyManagerUpdate(false);
+        if(content.Children.Contains(updateRow)){checkUpdate.IsEnabled=true;await RefreshUpdate(false);}
+      };
+      var updateTimer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(400)};
+      updateTimer.Tick+=(s,e)=>{
+        if(!content.Children.Contains(updateRow)){updateTimer.Stop();return;}
+        var state=ManagerUpdates.Status();
+        if(state.Phase=="downloading"||state.Phase=="verifying"||state.Phase=="installing") {
+          updateProgress.Visibility=Visibility.Visible;updateProgress.Value=state.Progress;
+          updateDetail.Text=state.Phase=="downloading"?"Descargando · "+state.Progress+" %":
+            state.Phase=="verifying"?"Comprobando el instalador…":"Abriendo la nueva versión…";
+        }else if(state.Phase=="error"){
+          updateProgress.Visibility=Visibility.Collapsed;updateDetail.Text="No se instaló: "+state.Error;
+        }
+      };updateTimer.Start();
+      _=RefreshUpdate(false);
       Rule();content.Children.Add(Label("Inicio automático",22));
       var startupRow=new Grid{Margin=new Thickness(0,4,0,4)};
       startupRow.ColumnDefinitions.Add(new ColumnDefinition());

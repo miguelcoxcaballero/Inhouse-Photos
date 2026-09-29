@@ -41,6 +41,20 @@ route for the mobile uploader. The phone still authenticates the public HTTPS
 hostname; the manager only refreshes the computer's LAN address, and public
 access remains the fallback. New managed servers include the discovery route.
 
+Manager 1.2.9 checks `windows-server-update.json` over HTTPS, verifies the
+published installer SHA-256, embedded version and payload, and offers an Update
+button in Settings. A helper waits for the manager to exit, switches only its
+versioned executable, then reopens it. Docker, Caddy and media are not stopped.
+The manager also exposes a narrowly scoped remote update route through Caddy.
+Only a signed-in server administrator can read its status or request the latest
+published manager version; the phone cannot choose a command, URL or version.
+Caddy supplies a per-installation bridge secret, and the manager validates the
+administrator token against the local photo API. The route is inserted only
+after validation, hot-reloaded, and reflected in the adoption receipt. A
+failed route change restores the prior Caddyfile. If the manager installation
+fails, the previous verified executable is reopened. The photo API remains
+independent of the manager throughout the hand-off.
+
 Manager 1.2.5 uses five clear destinations: Overview, Connect mobile, Backups,
 Storage, and Settings. Its layout gives the server state one primary action,
 shows space and backup facts without nested cards, and moves technical controls

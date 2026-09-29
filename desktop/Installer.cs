@@ -79,8 +79,37 @@ namespace InhousePhotos {
         if(startup){child.WaitForExit();return child.ExitCode;}return 0;
       }
     }
+    static int WaitAndInstall(string[] args) {
+      int managerPid;
+      if(args.Length<2||!int.TryParse(args[1],out managerPid)||managerPid<=0)throw new ArgumentException("La solicitud de actualización no es válida.");
+      try {using(var old=Process.GetProcessById(managerPid)) {
+        if(!old.WaitForExit(120000))throw new TimeoutException("El gestor anterior no se cerró. El servidor permanece disponible.");
+      }}catch(ArgumentException){/* It exited before the helper started. */}
+      var hidden=args.Contains("--restart-hidden");
+      try {
+        Install();
+        StartInstalled(hidden);
+        var previousError=Path.Combine(Backend.SettingsDir,"last-manager-update-error.txt");
+        if(File.Exists(previousError))File.Delete(previousError);
+        return 0;
+      }catch(Exception ex) {
+        // If installation fails, the last validated pointer still launches the
+        // previous manager. The photo server was never stopped either way.
+        try{Backend.PrivateDirectory(Backend.SettingsDir);File.WriteAllText(Path.Combine(Backend.SettingsDir,"last-manager-update-error.txt"),ex.Message);}catch{}
+        try{StartInstalled(hidden);}catch{}
+        throw;
+      }
+    }
+    static void StartInstalled(bool hidden) {
+      var record=ReadInstalled();var executable=Path.Combine(Backend.InstallDir,record.RelativePath);
+      Process.Start(new ProcessStartInfo(executable,hidden?"--startup":"") {
+        UseShellExecute=false,CreateNoWindow=hidden,WindowStyle=hidden?ProcessWindowStyle.Hidden:ProcessWindowStyle.Normal,
+        WorkingDirectory=Backend.InstallDir
+      });
+    }
     [STAThread] public static int Main(string[] args) {
       try {
+        if(args.Length>0&&args[0]=="--wait-and-install")return WaitAndInstall(args);
         if(args.Contains("--launch")||args.Contains("--startup"))return Launch(args.Contains("--startup"));
         if(args.Contains("--verify-payload")){VerifyPayload();Console.WriteLine("Contenido verificado.");return 0;}
         if(args.Contains("--install-current")){Install();Console.WriteLine("Instalación verificada en "+Backend.InstallDir);return 0;}
