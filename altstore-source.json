@@ -16,13 +16,22 @@
       "iconURL": "https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/1024.png",
       "tintColor": "#D97736",
       "category": "utilities",
-      "version": "3.1.91",
-      "versionDate": "2026-09-29T20:35:05Z",
-      "versionDescription": "Shows the active local or Internet upload route with live measured transfer speed in Upload Details.",
-      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.91-inhouse-ios.1/Inhouse-Photos.ipa",
-      "size": 32481097,
+      "version": "3.1.92",
+      "versionDate": "2026-09-29T22:31:18Z",
+      "versionDescription": "Fixes Windows server management availability and shows clear connection errors with automatic reconnection.",
+      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.92-inhouse-ios.1/Inhouse-Photos.ipa",
+      "size": 32487568,
       "minOSVersion": "15.0",
       "versions": [
+        {
+          "version": "3.1.92",
+          "buildVersion": "5150",
+          "date": "2026-09-29T22:31:18Z",
+          "localizedDescription": "Fixes Windows server management availability and shows clear connection errors with automatic reconnection.",
+          "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.92-inhouse-ios.1/Inhouse-Photos.ipa",
+          "size": 32487568,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "3.1.91",
           "buildVersion": "5149",
