@@ -16,13 +16,22 @@
       "iconURL": "https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/1024.png",
       "tintColor": "#D97736",
       "category": "utilities",
-      "version": "3.1.89",
-      "versionDate": "2026-09-29T19:07:40Z",
-      "versionDescription": "Adds secure remote controls for Windows backups, storage and startup, plus a local-network upload indicator.",
-      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.89-inhouse-ios.1/Inhouse-Photos.ipa",
-      "size": 32479559,
+      "version": "3.1.90",
+      "versionDate": "2026-09-29T19:54:17Z",
+      "versionDescription": "Uploads videos one at a time so each transfer can finish, while photos keep adaptive parallel backups. Waiting files are shown separately in Upload Details.",
+      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.90-inhouse-ios.1/Inhouse-Photos.ipa",
+      "size": 32482431,
       "minOSVersion": "15.0",
       "versions": [
+        {
+          "version": "3.1.90",
+          "buildVersion": "5148",
+          "date": "2026-09-29T19:54:17Z",
+          "localizedDescription": "Uploads videos one at a time so each transfer can finish, while photos keep adaptive parallel backups. Waiting files are shown separately in Upload Details.",
+          "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.90-inhouse-ios.1/Inhouse-Photos.ipa",
+          "size": 32482431,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "3.1.89",
           "buildVersion": "5147",
