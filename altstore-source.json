@@ -16,13 +16,22 @@
       "iconURL": "https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/1024.png",
       "tintColor": "#D97736",
       "category": "utilities",
-      "version": "3.1.84",
-      "versionDate": "2026-09-29T09:53:06Z",
-      "versionDescription": "Adds QR-first pairing with matching-code approval on iPhone and PC.",
-      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.84-inhouse-ios.1/Inhouse-Photos.ipa",
-      "size": 32447163,
+      "version": "3.1.85",
+      "versionDate": "2026-09-29T11:08:31Z",
+      "versionDescription": "Fixes QR pairing sign-in so the new session works immediately.",
+      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.85-inhouse-ios.1/Inhouse-Photos.ipa",
+      "size": 32447272,
       "minOSVersion": "15.0",
       "versions": [
+        {
+          "version": "3.1.85",
+          "buildVersion": "5143",
+          "date": "2026-09-29T11:08:31Z",
+          "localizedDescription": "Fixes QR pairing sign-in so the new session works immediately.",
+          "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.85-inhouse-ios.1/Inhouse-Photos.ipa",
+          "size": 32447272,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "3.1.84",
           "buildVersion": "5142",
