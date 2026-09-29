@@ -12,6 +12,34 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace InhousePhotos {
+  public sealed class RemoteDiskStatus {
+    public string Root {get;set;}
+    public string Name {get;set;}
+    public long Total {get;set;}
+    public long Free {get;set;}
+    public bool IsLibrary {get;set;}
+    public bool IsBackup {get;set;}
+    public bool CanUseForBackup {get;set;}
+  }
+  public sealed class RemoteManagerStatus {
+    public string Version {get;set;}
+    public bool ServerOnline {get;set;}
+    public bool Busy {get;set;}
+    public string Operation {get;set;}
+    public string Progress {get;set;}
+    public string Error {get;set;}
+    public string LibraryDrive {get;set;}
+    public string BackupDestination {get;set;}
+    public bool BackupConfigured {get;set;}
+    public bool BackupRunning {get;set;}
+    public bool BackupPresent {get;set;}
+    public string BackupCompletedUtc {get;set;}
+    public bool WeeklyBackupEnabled {get;set;}
+    public string NextBackupUtc {get;set;}
+    public bool StartupEnabled {get;set;}
+    public bool StartupKnown {get;set;}
+    public RemoteDiskStatus[] Disks {get;set;}
+  }
   /// A tiny, fixed-purpose bridge for an administrator's phone. Only the
   /// Windows manager restarts after an update; the photo API stays in Docker.
   /// Caddy injects a private bridge key and the manager independently checks
@@ -24,19 +52,24 @@ namespace InhousePhotos {
     }
     public const int Port=52187;
     public const string Path="/inhouse-manager/v1/update";
+    public const string StatusPath="/inhouse-manager/v1/status";
     const string BeginMarker="# INHOUSE-MANAGER-ROUTE-BEGIN";
     const string EndMarker="# INHOUSE-MANAGER-ROUTE-END";
     readonly Preferences prefs;
     readonly Func<bool> canUpdate;
     readonly Action requestUpdate;
+    readonly Func<Task<RemoteManagerStatus>> readStatus;
+    readonly Func<string,Task<bool>> performAction;
     readonly string secret;
     readonly TcpListener listener;
     readonly SemaphoreSlim capacity=new SemaphoreSlim(4,4);
     bool disposed;
     static string SecretPath {get{return System.IO.Path.Combine(Backend.SettingsDir,"manager-bridge.dpapi");}}
 
-    public RemoteManagement(Preferences prefs,Func<bool> canUpdate,Action requestUpdate) {
+    public RemoteManagement(Preferences prefs,Func<bool> canUpdate,Action requestUpdate,
+      Func<Task<RemoteManagerStatus>> readStatus,Func<string,Task<bool>> performAction) {
       this.prefs=prefs;this.canUpdate=canUpdate;this.requestUpdate=requestUpdate;
+      this.readStatus=readStatus;this.performAction=performAction;
       secret=LoadOrCreateSecret();
       listener=new TcpListener(IPAddress.Any,Port);listener.Start(8);
       try{NoInherit(listener.Server);}catch{listener.Stop();throw;}
@@ -116,7 +149,7 @@ namespace InhousePhotos {
           var first=ReadLineBounded(reader,512);
           if(first==null||first.Length>512){await Reply(stream,400,new{message="Invalid request"});return;}
           var parts=first.Split(' ');
-          if(parts.Length!=3||parts[1]!=Path||parts[2]!="HTTP/1.1"||
+          if(parts.Length!=3||!Allowed(parts[0],parts[1])||parts[2]!="HTTP/1.1"||
              (parts[0]!="GET"&&parts[0]!="POST")){await Reply(stream,404,new{message="Not found"});return;}
           var headers=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);var total=first.Length;
           for(var i=0;i<40;i++) {
@@ -136,20 +169,44 @@ namespace InhousePhotos {
           headers.TryGetValue("Authorization",out authorization);
           if(authorization==null||!authorization.StartsWith("Bearer ",StringComparison.Ordinal)||
              !await IsAdmin(authorization.Substring(7))){await Reply(stream,401,new{message="Administrator sign-in required"});return;}
-          if(parts[0]=="GET") {
+          if(parts[1]==StatusPath) {
+            try{await Reply(stream,200,await readStatus());}
+            catch{await Reply(stream,503,new{message="Could not read the Windows manager status."});}
+            return;
+          }
+          if(parts[1]==Path&&parts[0]=="GET") {
             try{await ManagerUpdates.Check();await Reply(stream,200,ManagerUpdates.Status());}
             catch(Exception ex){await Reply(stream,503,new{message="Update check unavailable: "+ex.Message,currentVersion=Backend.Version});}
             return;
           }
-          if(!canUpdate()){await Reply(stream,409,new{message="The PC is busy with a backup or another operation. Try again shortly."});return;}
+          if(parts[1]==Path) {
+            if(!canUpdate()){await Reply(stream,409,new{message="The PC is busy with a backup or another operation. Try again shortly."});return;}
+            try {
+              var status=await ManagerUpdates.Check(true);
+              if(!status.Available){await Reply(stream,409,new{message="The Windows manager is already up to date."});return;}
+              if(!ManagerUpdates.TryBegin()){await Reply(stream,409,new{message="The update is already in progress."});return;}
+              requestUpdate();await Reply(stream,202,ManagerUpdates.Status());
+            }catch(Exception ex){ManagerUpdates.Fail(ex);await Reply(stream,503,new{message=ex.Message});}
+            return;
+          }
           try {
-            var status=await ManagerUpdates.Check(true);
-            if(!status.Available){await Reply(stream,409,new{message="The Windows manager is already up to date."});return;}
-            if(!ManagerUpdates.TryBegin()){await Reply(stream,409,new{message="The update is already in progress."});return;}
-            requestUpdate();await Reply(stream,202,ManagerUpdates.Status());
-          }catch(Exception ex){ManagerUpdates.Fail(ex);await Reply(stream,503,new{message=ex.Message});}
+            var accepted=await performAction(parts[1].Substring(StatusPath.Length+1));
+            await Reply(stream,accepted?202:409,new{message=accepted?"Action accepted":"The PC is busy or the action is not available."});
+          }catch(ArgumentException ex){await Reply(stream,400,new{message=ex.Message});}
+          catch(InvalidOperationException ex){await Reply(stream,409,new{message=ex.Message});}
+          catch{await Reply(stream,503,new{message="The Windows manager could not start this action."});}
         }
       }catch{ /* An interrupted management request must not affect the photo server. */ }
+    }
+    public static bool Allowed(string method,string path) {
+      if(method=="GET")return path==Path||path==StatusPath;
+      if(method!="POST")return false;
+      if(path==Path)return true;
+      if(path==StatusPath+"/backup/start"||path==StatusPath+"/backup/cancel"||
+         path==StatusPath+"/backup/schedule/enable"||path==StatusPath+"/backup/schedule/disable"||
+         path==StatusPath+"/startup/enable"||path==StatusPath+"/startup/disable"||
+         path==StatusPath+"/snapshot")return true;
+      return Regex.IsMatch(path??"","^"+StatusPath+"/backup/destination/[A-Z]$");
     }
     public static string WithRoute(string source,string secret) {
       if(String.IsNullOrEmpty(source)||!Regex.IsMatch(secret??"","^[a-f0-9]{64}$"))throw new ArgumentException("Invalid manager route inputs");

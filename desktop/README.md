@@ -36,6 +36,12 @@ container identities and configuration hashes before saving a receipt. Original
 containers and media stay in place. Configuration copies use current-user DPAPI.
 The database snapshot does not include media files.
 
+Manager 1.2.12 extends the administrator-only HTTPS bridge with read-only
+server, drive and backup status, plus fixed actions for full backup, weekly
+schedule, snapshot, backup-drive selection and Windows startup. The mobile app
+cannot send an arbitrary command or filesystem path. Physical disk and RAID
+changes remain on the PC because they can irreversibly affect data.
+
 Manager 1.2.7 keeps the same five destinations and publishes a private-network
 route for the mobile uploader. The phone still authenticates the public HTTPS
 hostname; the manager only refreshes the computer's LAN address, and public

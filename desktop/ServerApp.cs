@@ -19,7 +19,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.2.11.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.12.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -473,13 +473,18 @@ namespace InhousePhotos {
             try{PairingClient.Link(bad,sampleInvite);return 36;}catch(ArgumentException){}
           }
           try{PairingClient.Link("https://photos.example.com","short");return 37;}catch(ArgumentException){}
-          if(ManagerUpdates.Compare("1.2.11","1.2.10")<=0||ManagerUpdates.Compare("1.2.11","1.2.11")!=0)return 39;
+          if(ManagerUpdates.Compare("1.2.12","1.2.11")<=0||ManagerUpdates.Compare("1.2.12","1.2.12")!=0)return 39;
           var sampleCaddy="photos.example.com {\n handle /descargas/* {\n  file_server\n }\n handle {\n  reverse_proxy server:2283\n }\n}\n";
           var managerKey=new string('a',64);
           var withManager=RemoteManagement.WithRoute(sampleCaddy,managerKey);
           if(withManager==sampleCaddy||!withManager.Contains("reverse_proxy host.docker.internal:52187")||
              !withManager.Contains("header_up X-Inhouse-Bridge "+managerKey)||RemoteManagement.WithRoute(withManager,managerKey)!=withManager)return 40;
           try{RemoteManagement.WithRoute(sampleCaddy,"short");return 41;}catch(ArgumentException){}
+          if(!RemoteManagement.Allowed("GET",RemoteManagement.StatusPath)||
+             !RemoteManagement.Allowed("POST",RemoteManagement.StatusPath+"/backup/start")||
+             !RemoteManagement.Allowed("POST",RemoteManagement.StatusPath+"/backup/destination/E")||
+             RemoteManagement.Allowed("POST",RemoteManagement.StatusPath+"/backup/destination/../../C")||
+             RemoteManagement.Allowed("GET",RemoteManagement.StatusPath+"/backup/start"))return 42;
           foreach(var bad in new[]{@"D:\photos\backup",@"D:\other",@"D:\"}){try{Backend.ValidateBackup(@"D:\photos",bad);return 3;}catch(InvalidOperationException){}}
           Backend.ValidateBackup(@"D:\photos",@"E:\backups");
           var due=DateTime.SpecifyKind(new DateTime(2026,9,27,3,0,0),DateTimeKind.Utc);

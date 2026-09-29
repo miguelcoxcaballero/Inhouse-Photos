@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -15,6 +16,7 @@ namespace InhousePhotos {
     Forms.NotifyIcon tray;
     DispatcherTimer monitor;
     RemoteManagement remoteManagement;
+    string remoteOperation="",remoteError="";
     bool monitorBusy, exitRequested, updateClose, updatingManager;
     DateTime retryAfter=DateTime.MinValue;
     internal void InitializeLifecycle(bool hidden) {
@@ -45,7 +47,8 @@ namespace InhousePhotos {
           try {
             if(remoteManagement==null)remoteManagement=new RemoteManagement(prefs,
               ()=>Dispatcher.Invoke(()=>!busy&&!monitorBusy&&!updatingManager&&backupCancellation==null),
-              ()=>Dispatcher.BeginInvoke(new Action(async()=>await ApplyManagerUpdate(true))));
+              ()=>Dispatcher.BeginInvoke(new Action(async()=>await ApplyManagerUpdate(true))),
+              ReadRemoteStatus,PerformRemoteAction);
             await remoteManagement.EnsurePublished();
           }catch(Exception ex){notice.Text="Actualizaciones remotas no disponibles: "+ex.Message;}
           try {
@@ -83,6 +86,103 @@ namespace InhousePhotos {
         retryAfter=DateTime.UtcNow.AddSeconds(45);
       }catch(Exception ex){notice.Text=ex.Message;retryAfter=DateTime.UtcNow.AddMinutes(2);}
       finally{monitorBusy=false;}
+    }
+    async Task<RemoteManagerStatus> ReadRemoteStatus() {
+      var ui=Dispatcher.Invoke(()=>new {
+        Busy=busy||updatingManager||backupCancellation!=null,
+        BackupRunning=backupCancellation!=null,
+        Operation=backupCancellation!=null?"backup":remoteOperation,
+        Progress=backupProgressText??"",
+        Error=remoteError
+      });
+      var libraryRoot=Path.GetPathRoot(Backend.Library(prefs));
+      var disks=Backend.Disks().Select(d=>{
+        var isLibrary=String.Equals(d.Root,libraryRoot,StringComparison.OrdinalIgnoreCase);
+        var isBackup=String.Equals(d.Root,Path.GetPathRoot(prefs.BackupDestination??""),StringComparison.OrdinalIgnoreCase);
+        var canBackup=false;
+        try{Backend.ValidateBackup(Backend.Library(prefs),d.Root);canBackup=!isLibrary;}catch{}
+        return new RemoteDiskStatus {Root=d.Root,Name=d.Name,Total=d.Total,Free=d.Free,
+          IsLibrary=isLibrary,IsBackup=isBackup,CanUseForBackup=canBackup};
+      }).ToArray();
+      var backup=Backend.ReadFullBackupStatus(prefs);
+      var schedule=Backend.ReadBackupSchedule();
+      bool startup=false,known=false;
+      try{startup=await Startup.IsEnabled();known=true;}catch{}
+      return new RemoteManagerStatus {
+        Version=Backend.Version,ServerOnline=await Backend.Ping(prefs.LocalEndpoint),Busy=ui.Busy,
+        Operation=ui.Operation,Progress=ui.Progress,Error=ui.Error,
+        LibraryDrive=libraryRoot,BackupDestination=prefs.BackupDestination??"",
+        BackupConfigured=!String.IsNullOrWhiteSpace(prefs.BackupDestination),
+        BackupRunning=ui.BackupRunning,BackupPresent=backup.FilesPresent,
+        BackupCompletedUtc=backup.CompletedUtc??"",WeeklyBackupEnabled=schedule.Enabled,
+        NextBackupUtc=schedule.NextDueUtc??"",StartupEnabled=startup,StartupKnown=known,Disks=disks
+      };
+    }
+    Task<bool> PerformRemoteAction(string action) {
+      return Task.FromResult(Dispatcher.Invoke(()=>BeginRemoteAction(action)));
+    }
+    bool BeginRemoteAction(string action) {
+      if(action=="backup/cancel") {
+        if(backupCancellation==null)return false;
+        backupCancellation.Cancel();SetBackupProgress("Deteniendo la copia. Se conservarán los archivos ya copiados.");return true;
+      }
+      if(busy||monitorBusy||updatingManager||backupCancellation!=null)return false;
+      if(action.StartsWith("backup/destination/",StringComparison.Ordinal)) {
+        var letter=action.Substring("backup/destination/".Length);
+        if(letter.Length!=1||letter[0]<'A'||letter[0]>'Z')throw new ArgumentException("Invalid backup drive.");
+        var drive=Backend.Disks().FirstOrDefault(d=>String.Equals(d.Root,letter+@":\",StringComparison.OrdinalIgnoreCase));
+        if(drive==null)throw new InvalidOperationException("The selected backup drive is not connected.");
+        Backend.ValidateBackup(Backend.Library(prefs),drive.Root);
+        prefs.BackupDestination=drive.Root;Backend.Save(prefs);
+        remoteError="";remoteOperation="";notice.Text="Destino de copia guardado desde el móvil. No se han movido ni borrado fotos.";
+        if(IsVisible)_=Render();return true;
+      }
+      if(action=="backup/start") {
+        if(String.IsNullOrWhiteSpace(prefs.BackupDestination))throw new InvalidOperationException("Select a backup drive first.");
+        Backend.ValidateBackup(Backend.Library(prefs),prefs.BackupDestination);
+        backupCancellation=new CancellationTokenSource();busy=true;remoteError="";remoteOperation="backup";
+        _=RunRemoteBackup();return true;
+      }
+      if(action=="snapshot") {
+        busy=true;remoteError="";remoteOperation="snapshot";
+        _=RunRemoteOperation(async()=>{await Backend.Snapshot(prefs);notice.Text="Instantánea de metadatos terminada.";});return true;
+      }
+      if(action=="backup/schedule/enable") {
+        if(String.IsNullOrWhiteSpace(prefs.BackupDestination))throw new InvalidOperationException("Select a backup drive first.");
+        Backend.ValidateBackup(Backend.Library(prefs),prefs.BackupDestination);
+        busy=true;remoteError="";remoteOperation="schedule";
+        _=RunRemoteOperation(async()=>{if(!await Startup.IsEnabled())await Startup.SetEnabled(prefs,true);
+          Backend.SetBackupScheduleEnabled(true);notice.Text="Copia semanal activada desde el móvil.";});return true;
+      }
+      if(action=="backup/schedule/disable") {
+        Backend.SetBackupScheduleEnabled(false);remoteError="";remoteOperation="";
+        notice.Text="Copia semanal desactivada desde el móvil.";if(IsVisible)_=Render();return true;
+      }
+      if(action=="startup/disable"&&Backend.ReadBackupSchedule().Enabled)
+        throw new InvalidOperationException("Disable the weekly backup before turning off Windows startup.");
+      if(action=="startup/enable"||action=="startup/disable") {
+        var enabled=action=="startup/enable";
+        busy=true;remoteError="";remoteOperation="startup";
+        _=RunRemoteOperation(async()=>{await Startup.SetEnabled(prefs,enabled);
+          notice.Text=enabled?"Inicio automático activado desde el móvil.":"Inicio automático desactivado desde el móvil.";});return true;
+      }
+      return false;
+    }
+    async Task RunRemoteBackup() {
+      var cancellation=backupCancellation;
+      try {
+        await Backend.Backup(prefs,text=>Dispatcher.Invoke(()=>SetBackupProgress(text)),cancellation.Token);
+        try{Backend.RecordManualBackupSuccessForSchedule();}catch{}
+        notice.Text="Copia completa terminada.";
+      }catch(OperationCanceledException){notice.Text="Copia detenida. Los archivos ya copiados se conservan.";}
+      catch(Exception ex){remoteError=ex.Message;notice.Text="La copia no se completó: "+ex.Message;}
+      finally{cancellation.Dispose();backupCancellation=null;backupProgressText=null;busy=false;remoteOperation="";
+        if(IsVisible&&(page=="Inicio"||page=="Protección"))await Render();}
+    }
+    async Task RunRemoteOperation(Func<Task> action) {
+      try{await action();}
+      catch(Exception ex){remoteError=ex.Message;notice.Text=ex.Message;}
+      finally{busy=false;remoteOperation="";if(IsVisible)await Render();}
     }
     async Task ApplyManagerUpdate(bool remote) {
       if(updatingManager||backupCancellation!=null||busy||monitorBusy) {
