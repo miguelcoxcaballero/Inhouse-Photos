@@ -89,13 +89,12 @@ namespace InhousePhotos {
       }catch(Exception ex){if(args.Length==0)MessageBox.Show(ex.Message,"Inhouse Photos",MessageBoxButton.OK,MessageBoxImage.Error);else Console.Error.WriteLine(ex.Message);return 1;}
     }
     sealed class SetupWindow:Window {
-      static readonly Brush Page=new SolidColorBrush(Color.FromRgb(23,18,15));
-      static readonly Brush Text=new SolidColorBrush(Color.FromRgb(249,243,237));
-      static readonly Brush Muted=new SolidColorBrush(Color.FromRgb(189,172,160));
-      static readonly Brush Accent=new SolidColorBrush(Color.FromRgb(242,160,103));
-      static readonly Brush Rule=new SolidColorBrush(Color.FromRgb(66,51,42));
-      static readonly Brush Notice=new SolidColorBrush(Color.FromRgb(45,34,27));
-      static readonly Brush Warning=new SolidColorBrush(Color.FromRgb(251,187,155));
+      static readonly Brush Page=new SolidColorBrush(Color.FromRgb(246,243,238));
+      static readonly Brush Text=new SolidColorBrush(Color.FromRgb(32,28,24));
+      static readonly Brush Muted=new SolidColorBrush(Color.FromRgb(109,98,89));
+      static readonly Brush Accent=new SolidColorBrush(Color.FromRgb(169,71,18));
+      static readonly Brush Rule=new SolidColorBrush(Color.FromRgb(226,216,205));
+      static readonly Brush Warning=new SolidColorBrush(Color.FromRgb(177,62,45));
       readonly TextBlock statusTitle;
       readonly TextBlock statusDetail;
       readonly Border statusPanel;
@@ -127,7 +126,7 @@ namespace InhousePhotos {
         MinWidth=450;MinHeight=480;ResizeMode=ResizeMode.CanResize;WindowStartupLocation=WindowStartupLocation.CenterScreen;
         Background=Page;Foreground=Text;FontFamily=new FontFamily("Segoe UI");
         using(var brand=Assembly.GetExecutingAssembly().GetManifestResourceStream("InhousePhotos.brand.xaml"))Icon=(ImageSource)XamlReader.Load(brand);
-        var root=new Grid();root.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});
+        var root=new Grid{Background=Page};root.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});
         root.RowDefinitions.Add(new RowDefinition());root.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});Content=root;
 
         var header=new Grid {Margin=new Thickness(34,25,34,20)};
@@ -160,7 +159,7 @@ namespace InhousePhotos {
         Grid.SetRow(scroll,1);root.Children.Add(scroll);
 
         var footer=new StackPanel {Margin=new Thickness(34,0,34,28)};
-        statusPanel=new Border {Background=Notice,CornerRadius=new CornerRadius(10),Padding=new Thickness(14,10,14,10),Margin=new Thickness(0,0,0,14)};
+        statusPanel=new Border {BorderBrush=Rule,BorderThickness=new Thickness(0,1,0,0),Padding=new Thickness(0,15,0,0),Margin=new Thickness(0,0,0,14)};
         var statusStack=new StackPanel();statusTitle=Copy("Listo para instalar",15,Text,true);
         statusDetail=Copy("Versión "+Backend.Version+"  ·  Windows 10 / 11",13,Muted);statusDetail.Margin=new Thickness(0,2,0,0);
         statusStack.Children.Add(statusTitle);statusStack.Children.Add(statusDetail);
@@ -168,7 +167,7 @@ namespace InhousePhotos {
           BorderThickness=new Thickness(0),IsIndeterminate=true,Visibility=Visibility.Collapsed};statusStack.Children.Add(progress);
         statusPanel.Child=statusStack;footer.Children.Add(statusPanel);
         button=new Button {Content="Instalar y abrir",Padding=new Thickness(20,12,20,12),MinHeight=48,FontSize=16,
-          FontWeight=FontWeights.SemiBold,BorderThickness=new Thickness(0),Background=Accent,Foreground=Page,
+          FontWeight=FontWeights.SemiBold,BorderThickness=new Thickness(0),Background=Accent,Foreground=Brushes.White,
           HorizontalContentAlignment=HorizontalAlignment.Center};footer.Children.Add(button);
         Grid.SetRow(footer,2);root.Children.Add(footer);
         button.Click+=InstallClicked;

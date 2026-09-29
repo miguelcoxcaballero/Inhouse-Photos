@@ -57,11 +57,11 @@ describe(NotificationService.name, () => {
       await expect(sut.sendTestEmail('', smtpTransport.notifications.smtp)).resolves.not.toThrow();
       expect(mocks.email.renderEmail).toHaveBeenCalledWith({
         template: EmailTemplate.TEST_EMAIL,
-        data: { baseUrl: 'https://my.immich.app', displayName: userStub.admin.name },
+        data: { baseUrl: 'http://localhost:2283', displayName: userStub.admin.name },
       });
       expect(mocks.email.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          subject: 'Test email from Immich',
+          subject: 'Test email from Inhouse Photos',
           smtp: smtpTransport.notifications.smtp.transport,
         }),
       );
@@ -81,7 +81,7 @@ describe(NotificationService.name, () => {
       });
       expect(mocks.email.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          subject: 'Test email from Immich',
+          subject: 'Test email from Inhouse Photos',
           smtp: smtpTransport.notifications.smtp.transport,
         }),
       );
@@ -98,11 +98,11 @@ describe(NotificationService.name, () => {
       ).resolves.not.toThrow();
       expect(mocks.email.renderEmail).toHaveBeenCalledWith({
         template: EmailTemplate.TEST_EMAIL,
-        data: { baseUrl: 'https://my.immich.app', displayName: userStub.admin.name },
+        data: { baseUrl: 'http://localhost:2283', displayName: userStub.admin.name },
       });
       expect(mocks.email.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          subject: 'Test email from Immich',
+          subject: 'Test email from Inhouse Photos',
           smtp: smtpTransport.notifications.smtp.transport,
           replyTo: 'demo@immich.app',
         }),

@@ -18,7 +18,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.2.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.2.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -254,44 +254,44 @@ namespace InhousePhotos {
     readonly TextBlock sidebarLocation=new TextBlock();
     string page="Inicio"; bool busy, refreshing;
     CancellationTokenSource backupCancellation;
-    readonly Brush accent=new SolidColorBrush(Color.FromRgb(237,153,90));
-    readonly Brush muted=new SolidColorBrush(Color.FromRgb(185,178,169));
+    readonly Brush accent=new SolidColorBrush(Color.FromRgb(169,71,18));
+    readonly Brush muted=new SolidColorBrush(Color.FromRgb(104,95,85));
+    readonly Brush line=new SolidColorBrush(Color.FromRgb(220,213,203));
     public ServerWindow() {
       var workWidth=Math.Max(320,SystemParameters.WorkArea.Width-28);
       var workHeight=Math.Max(320,SystemParameters.WorkArea.Height-28);
       Title="Inhouse Photos Server"; Width=Math.Min(1080,workWidth);Height=Math.Min(760,workHeight);
       MinWidth=Math.Min(760,workWidth);MinHeight=Math.Min(500,workHeight);
-      Background=new SolidColorBrush(Color.FromRgb(23,18,14));Foreground=new SolidColorBrush(Color.FromRgb(247,242,236));FontFamily=new FontFamily("Segoe UI");FontSize=15;WindowStartupLocation=WindowStartupLocation.CenterScreen;
-      Resources.Add(typeof(Button),XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Setter Property='Background' Value='#30251D'/><Setter Property='Foreground' Value='#F7F2EC'/><Setter Property='BorderBrush' Value='#6B4B36'/><Setter Property='BorderThickness' Value='1'/><Setter Property='Padding' Value='18,11'/><Setter Property='Margin' Value='0,6,8,6'/><Setter Property='MinHeight' Value='44'/><Setter Property='FontWeight' Value='SemiBold'/><Setter Property='Cursor' Value='Hand'/><Setter Property='HorizontalContentAlignment' Value='Left'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='Button'><Border x:Name='bg' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' Padding='{TemplateBinding Padding}' CornerRadius='10'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='bg' Property='Opacity' Value='0.86'/></Trigger><Trigger Property='IsPressed' Value='True'><Setter TargetName='bg' Property='Opacity' Value='0.72'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='bg' Property='BorderBrush' Value='#ED995A'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='bg' Property='Opacity' Value='0.4'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>"));
+      Background=new SolidColorBrush(Color.FromRgb(246,243,238));Foreground=new SolidColorBrush(Color.FromRgb(32,28,24));FontFamily=new FontFamily("Segoe UI");FontSize=14;WindowStartupLocation=WindowStartupLocation.CenterScreen;
+      Resources.Add(typeof(Button),XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Setter Property='Background' Value='#FFFCF8'/><Setter Property='Foreground' Value='#201C18'/><Setter Property='BorderBrush' Value='#DCD5CB'/><Setter Property='BorderThickness' Value='1'/><Setter Property='Padding' Value='16,9'/><Setter Property='Margin' Value='0,5,8,5'/><Setter Property='MinHeight' Value='38'/><Setter Property='FontWeight' Value='SemiBold'/><Setter Property='Cursor' Value='Hand'/><Setter Property='HorizontalContentAlignment' Value='Left'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='Button'><Border x:Name='bg' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' Padding='{TemplateBinding Padding}' CornerRadius='8'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='bg' Property='BorderBrush' Value='#A94712'/></Trigger><Trigger Property='IsPressed' Value='True'><Setter TargetName='bg' Property='Opacity' Value='0.72'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='bg' Property='BorderBrush' Value='#A94712'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='bg' Property='Opacity' Value='0.4'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>"));
       var root=new Grid{Background=Background}; root.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(236)});root.ColumnDefinitions.Add(new ColumnDefinition());Content=root;
-      var sidebarShell=new Border{Background=new SolidColorBrush(Color.FromRgb(31,25,20)),BorderBrush=new SolidColorBrush(Color.FromRgb(58,46,37)),BorderThickness=new Thickness(0,0,1,0)};
+      var sidebarShell=new Border{Background=new SolidColorBrush(Color.FromRgb(239,234,227)),BorderBrush=line,BorderThickness=new Thickness(0,0,1,0)};
       root.Children.Add(sidebarShell);
       var sidebar=new Grid{Margin=new Thickness(20,27,18,22)};sidebar.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});sidebar.RowDefinitions.Add(new RowDefinition());sidebar.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});sidebarShell.Child=sidebar;
       var brandBlock=new StackPanel();Grid.SetRow(brandBlock,0);sidebar.Children.Add(brandBlock);
       using(var brandStream=typeof(ServerWindow).Assembly.GetManifestResourceStream("InhousePhotos.brand.xaml"))Icon=(ImageSource)XamlReader.Load(brandStream);
       brandBlock.Children.Add(new Image{Source=Icon,Width=44,Height=44,HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(3,0,0,9)});
-      brandBlock.Children.Add(Label("inhouse photos",21,accent));brandBlock.Children.Add(Label("SERVIDOR PERSONAL",11,muted));
-      var navigation=new StackPanel{Margin=new Thickness(0,24,0,0)};
+      brandBlock.Children.Add(Label("inhouse photos",20,Foreground));
+      var navigation=new StackPanel{Margin=new Thickness(0,26,0,0)};
       var navScroll=new ScrollViewer{Content=navigation,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
       Grid.SetRow(navScroll,1);sidebar.Children.Add(navScroll);
-      navigation.Children.Add(Label("TU BIBLIOTECA",11,muted));
       var navLabels=new Dictionary<string,string>{{"Inicio","Resumen"},{"Conectar","Conectar móvil"},{"Protección","Copias"},{"Discos","Almacenamiento"},{"Configuración","Ajustes"}};
       foreach(var name in new[]{"Inicio","Conectar","Protección","Discos","Configuración"}) {
         var captured=name;var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(4)});row.ColumnDefinitions.Add(new ColumnDefinition());
         var rail=new Border{Width=3,Height=22,CornerRadius=new CornerRadius(2),Background=accent,Visibility=Visibility.Hidden,VerticalAlignment=VerticalAlignment.Center};row.Children.Add(rail);
-        var title=new TextBlock{Text=navLabels[name],FontSize=15,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,0,0)};Grid.SetColumn(title,1);row.Children.Add(title);
-        var button=new Button{Content=row,Background=Brushes.Transparent,BorderBrush=Brushes.Transparent,BorderThickness=new Thickness(1),Padding=new Thickness(13,11,8,11),Margin=new Thickness(0,3,0,3),HorizontalContentAlignment=HorizontalAlignment.Stretch};
+        var title=new TextBlock{Text=navLabels[name],FontSize=14,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,0,0)};Grid.SetColumn(title,1);row.Children.Add(title);
+        var button=new Button{Content=row,Background=Brushes.Transparent,BorderBrush=Brushes.Transparent,BorderThickness=new Thickness(1),Padding=new Thickness(12,8,8,8),Margin=new Thickness(0,2,0,2),HorizontalContentAlignment=HorizontalAlignment.Stretch};
         button.Click+=async(s,e)=>{if(!busy||backupCancellation!=null){page=captured;notice.Text="";await Render();}};
         tabs[name]=button;navRails[name]=rail;navTitles[name]=title;navigation.Children.Add(button);
       }
       var footer=new StackPanel();Grid.SetRow(footer,2);sidebar.Children.Add(footer);
-      footer.Children.Add(new Border{Height=1,Background=new SolidColorBrush(Color.FromRgb(66,51,41)),Margin=new Thickness(0,0,0,15)});
-      footer.Children.Add(Label("BIBLIOTECA EN ESTE PC",11,muted));
-      sidebarLocation.FontSize=13;sidebarLocation.Foreground=Foreground;sidebarLocation.TextTrimming=TextTrimming.CharacterEllipsis;sidebarLocation.Margin=new Thickness(0,0,0,10);footer.Children.Add(sidebarLocation);
-      footer.Children.Add(Label("Versión "+Backend.Version+" · Windows",12,muted));
-      var right=new DockPanel{Margin=new Thickness(30,28,34,22)};Grid.SetColumn(right,1);root.Children.Add(right);
+      footer.Children.Add(new Border{Height=1,Background=line,Margin=new Thickness(0,0,0,14)});
+      footer.Children.Add(Label("Biblioteca en este PC",12,muted));
+      sidebarLocation.FontSize=12;sidebarLocation.Foreground=Foreground;sidebarLocation.TextTrimming=TextTrimming.CharacterEllipsis;sidebarLocation.Margin=new Thickness(0,0,0,7);footer.Children.Add(sidebarLocation);
+      footer.Children.Add(Label("Versión "+Backend.Version,11,muted));
+      var right=new DockPanel{Margin=new Thickness(32,29,36,24)};Grid.SetColumn(right,1);root.Children.Add(right);
       notice.TextWrapping=TextWrapping.Wrap;notice.Foreground=Foreground;notice.FontSize=14;
-      var noticePanel=new Border{Background=new SolidColorBrush(Color.FromRgb(60,39,28)),BorderBrush=accent,BorderThickness=new Thickness(3,0,0,0),CornerRadius=new CornerRadius(7),Padding=new Thickness(15,11,15,11),Margin=new Thickness(0,10,0,0),Child=notice,Visibility=Visibility.Collapsed};
+      var noticePanel=new Border{Background=new SolidColorBrush(Color.FromRgb(246,231,216)),BorderBrush=accent,BorderThickness=new Thickness(3,0,0,0),CornerRadius=new CornerRadius(6),Padding=new Thickness(14,10,14,10),Margin=new Thickness(0,10,0,0),Child=notice,Visibility=Visibility.Collapsed};
       DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty,typeof(TextBlock)).AddValueChanged(notice,(s,e)=>noticePanel.Visibility=String.IsNullOrWhiteSpace(notice.Text)?Visibility.Collapsed:Visibility.Visible);
       DockPanel.SetDock(noticePanel,Dock.Bottom);right.Children.Add(noticePanel);
       right.Children.Add(new ScrollViewer{Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
@@ -301,10 +301,10 @@ namespace InhousePhotos {
       // position and makes controls disappear while someone is using them.
     }
     TextBlock Label(string text,double size,Brush color=null) {return new TextBlock{Text=text,FontSize=size,Foreground=color??Foreground,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,10)};}
-    void Heading(string text,string description){content.Children.Add(Label(text,34));content.Children.Add(Label(description,15,muted));content.Children.Add(new Border{Height=18});}
-    void Rule(){content.Children.Add(new Border{Height=1,Background=new SolidColorBrush(Color.FromRgb(61,52,43)),Margin=new Thickness(0,18,0,20)});}
+    void Heading(string text,string description){var title=Label(text,30);title.FontWeight=FontWeights.SemiBold;title.Margin=new Thickness(0,0,0,5);content.Children.Add(title);content.Children.Add(Label(description,14,muted));content.Children.Add(new Border{Height=18});}
+    void Rule(){content.Children.Add(new Border{Height=1,Background=line,Margin=new Thickness(0,18,0,20)});}
     Button Action(string title,Func<Task> task,bool primary=false) {
-      var button=new Button{Content=title,HorizontalAlignment=HorizontalAlignment.Left};if(primary){button.Background=accent;button.Foreground=Background;}
+      var button=new Button{Content=title,HorizontalAlignment=HorizontalAlignment.Left};if(primary){button.Background=accent;button.BorderBrush=accent;button.Foreground=Brushes.White;}
       button.Click+=async(s,e)=>{if(busy)return;busy=true;button.IsEnabled=false;notice.Text="Trabajando…";try{await task();if(notice.Text=="Trabajando…")notice.Text="";}catch(Exception ex){notice.Text=ex.Message;}finally{busy=false;button.IsEnabled=true;}};content.Children.Add(button);return button;
     }
     string PickFolder(){using(var dialog=new System.Windows.Forms.FolderBrowserDialog()){dialog.Description="Selecciona una carpeta";return dialog.ShowDialog()==System.Windows.Forms.DialogResult.OK?dialog.SelectedPath:null;}}
@@ -324,10 +324,10 @@ namespace InhousePhotos {
         item.Value.IsEnabled=false;
         item.Value.Visibility=prefs.Managed||item.Key=="Inicio"?Visibility.Visible:Visibility.Collapsed;
         var selected=item.Key==page;
-        item.Value.Foreground=selected?accent:muted;
-        item.Value.Background=selected?new SolidColorBrush(Color.FromRgb(58,42,33)):Brushes.Transparent;
+        item.Value.Foreground=selected?Foreground:muted;
+        item.Value.Background=selected?new SolidColorBrush(Color.FromRgb(240,225,211)):Brushes.Transparent;
         navRails[item.Key].Visibility=selected?Visibility.Visible:Visibility.Hidden;
-        navTitles[item.Key].Foreground=selected?accent:Foreground;
+        navTitles[item.Key].Foreground=selected?Foreground:muted;
       }
       try {
         if(prefs.Managed)await RenderManagedPage();

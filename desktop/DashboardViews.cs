@@ -12,9 +12,9 @@ using Ellipse = System.Windows.Shapes.Ellipse;
 
 namespace InhousePhotos {
   public sealed partial class ServerWindow {
-    readonly Brush good=new SolidColorBrush(Color.FromRgb(153,196,154));
-    readonly Brush surface=new SolidColorBrush(Color.FromRgb(35,29,24));
-    readonly Brush divider=new SolidColorBrush(Color.FromRgb(64,53,44));
+    readonly Brush good=new SolidColorBrush(Color.FromRgb(44,114,77));
+    readonly Brush surface=new SolidColorBrush(Color.FromRgb(255,252,248));
+    readonly Brush divider=new SolidColorBrush(Color.FromRgb(220,213,203));
     bool? lastLocal, lastEndpoint, lastVerified;
     DateTime lastHealthCheck=DateTime.MinValue;
     int overviewGeneration;
@@ -39,7 +39,7 @@ namespace InhousePhotos {
     }
 
     Border Panel(Panel inside) {
-      return new Border {Background=surface,CornerRadius=new CornerRadius(16),Padding=new Thickness(24,22,24,22),
+      return new Border {Background=surface,BorderBrush=divider,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(10),Padding=new Thickness(21,19,21,19),
         Margin=new Thickness(0,4,0,16),Child=inside};
     }
     StackPanel Column() {return new StackPanel{Orientation=Orientation.Vertical};}
@@ -83,25 +83,25 @@ namespace InhousePhotos {
       return row;
     }
     Border SummaryCard(StackPanel inside,int side=0) {
-      return new Border{Background=surface,CornerRadius=new CornerRadius(14),Padding=new Thickness(21,20,21,18),
+      return new Border{Background=surface,BorderBrush=divider,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(9),Padding=new Thickness(19,17,19,17),
         Margin=new Thickness(side==0?0:8,4,side==0?8:0,12),Child=inside};
     }
     ProgressBar SpaceBar(long total,long free) {
       return new ProgressBar{Minimum=0,Maximum=Math.Max(1,total),Value=Math.Max(0,Math.Min(total,total-free)),Height=8,
-        Foreground=LowSpace(new DiskInfo{Total=total,Free=free})?accent:good,Background=divider,
+        Foreground=accent,Background=divider,
         BorderThickness=new Thickness(0),Margin=new Thickness(0,12,0,9)};
     }
     StackPanel StepHeading(string number,string name) {
       var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,4,0,12)};
-      row.Children.Add(new Border{Width=27,Height=27,CornerRadius=new CornerRadius(14),Background=divider,
+      row.Children.Add(new Border{Width=27,Height=27,CornerRadius=new CornerRadius(14),Background=new SolidColorBrush(Color.FromRgb(240,225,211)),
         Child=new TextBlock{Text=number,Foreground=accent,FontSize=14,FontWeight=FontWeights.SemiBold,
           HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center},Margin=new Thickness(0,0,12,0)});
-      row.Children.Add(new TextBlock{Text=name,Foreground=Foreground,FontSize=20,FontWeight=FontWeights.SemiBold});
+      row.Children.Add(new TextBlock{Text=name,Foreground=Foreground,FontSize=18,FontWeight=FontWeights.SemiBold});
       return row;
     }
 
     Task RenderOverview() {
-      Heading("Tu servidor","Fotos disponibles, espacio y protección en una sola vista.");
+      Heading("Tu biblioteca","Estado del servidor, espacio y copias de seguridad.");
       var disk=default(DiskInfo);
       string diskIssue=null;
       try {disk=LibraryDisk();if(disk==null)diskIssue="No se encuentra el disco de tu biblioteca.";}
@@ -109,7 +109,7 @@ namespace InhousePhotos {
       var hero=Column();
       var healthLine=StatusLine("BIBLIOTECA",diskIssue==null&&lastLocal==true&&lastVerified!=false?good:accent);
       var healthDot=(Ellipse)healthLine.Children[0];hero.Children.Add(healthLine);
-      var state=Label(diskIssue!=null?"No encuentro el disco de tus fotos":lastLocal==true?(lastVerified==false?"Hay que verificar la biblioteca":"Tus fotos están disponibles"):lastLocal==false?"El servidor está detenido":"Comprobando el servidor…",27);
+      var state=Label(diskIssue!=null?"No encuentro el disco de tus fotos":lastLocal==true?(lastVerified==false?"Hay que verificar la biblioteca":"Tus fotos están disponibles"):lastLocal==false?"El servidor está detenido":"Comprobando el servidor…",25);
       state.FontWeight=FontWeights.SemiBold;
       hero.Children.Add(state);
       hero.Children.Add(Fine(diskIssue??(disk==null?"": "Biblioteca en "+disk.Root+" · "+Backend.Size(disk.Free)+" libres")));
@@ -123,7 +123,8 @@ namespace InhousePhotos {
       else if(lastVerified==false)mainAction.Content="Volver a verificar";
       else if(lastLocal==true)mainAction.Content="Abrir mis fotos  ↗";
       else if(lastLocal==false)mainAction.Content="Iniciar servidor";
-      content.Children.Add(Panel(hero));
+      content.Children.Add(hero);
+      Rule();
 
       var backup=Backend.ReadFullBackupStatus(prefs);
       var backupAtSelectedDestination=BackupAtSelectedDestination(backup);
@@ -133,13 +134,13 @@ namespace InhousePhotos {
         DateTime.UtcNow-completed.ToUniversalTime()>TimeSpan.FromDays(8);
       var metrics=new Grid();
       metrics.ColumnDefinitions.Add(new ColumnDefinition());metrics.ColumnDefinitions.Add(new ColumnDefinition());
-      var spaceCard=Column();spaceCard.Children.Add(Fine("ESPACIO DE TUS FOTOS",accent));
+      var spaceCard=Column();spaceCard.Children.Add(Fine("Espacio de tus fotos",muted));
       var free=Label(disk==null?"No disponible":Backend.Size(disk.Free)+" libres",23,disk!=null&&LowSpace(disk)?accent:Foreground);
       free.FontWeight=FontWeights.SemiBold;spaceCard.Children.Add(free);
       spaceCard.Children.Add(Fine(disk==null?"Conecta el disco de la biblioteca":disk.Root+" · "+Backend.Size(disk.Total)+" en total"));
       if(disk!=null)spaceCard.Children.Add(SpaceBar(disk.Total,disk.Free));
       PlaceAction(spaceCard,"Ver disco  →",()=>GoTo("Discos"));
-      var backupCard=Column();backupCard.Children.Add(Fine("SEGUNDA COPIA",accent));
+      var backupCard=Column();backupCard.Children.Add(Fine("Segunda copia",muted));
       var backupValue=String.IsNullOrWhiteSpace(prefs.BackupDestination)?"No configurada":
         backup.HasCompletedRecord&&!backupAtSelectedDestination?"Pendiente en esta unidad":
         backup.FilesPresent?(backupOld?"Conviene renovarla":"Copia disponible"):

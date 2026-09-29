@@ -3,7 +3,7 @@
   "identifier": "com.inhousesoftware.photos.source",
   "sourceURL": "https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/altstore-source.json",
   "subtitle": "Private, self-hosted photo backup",
-  "description": "The Inhouse-branded iOS client for Miguel's existing Immich server.",
+  "description": "The Inhouse Photos iOS client for a private, self-hosted photo library.",
   "iconURL": "https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/1024.png",
   "website": "https://github.com/miguelcoxcaballero/Inhouse-Photos",
   "apps": [

@@ -4,24 +4,8 @@ import { exec as execCallback } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
-import { ReleaseChannel } from 'src/dtos/system-config.dto';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
-
-export interface GitHubRelease {
-  id: number;
-  url: string;
-  tag_name: string;
-  name: string;
-  created_at: string;
-  published_at: string;
-  body: string;
-}
-
-export interface VersionResponse {
-  version: string;
-  published_at: string;
-}
 
 export interface ServerBuildVersions {
   nodejs: string;
@@ -63,32 +47,6 @@ export class ServerInfoRepository {
     private logger: LoggingRepository,
   ) {
     this.logger.setContext(ServerInfoRepository.name);
-  }
-
-  async getLatestRelease(channel: ReleaseChannel): Promise<VersionResponse> {
-    try {
-      const { versionCheck } = this.configRepository.getEnv();
-      const url = new URL(versionCheck.url);
-      switch (channel) {
-        case ReleaseChannel.Stable: {
-          url.searchParams.append('channel', 'stable');
-          break;
-        }
-        case ReleaseChannel.ReleaseCandidate: {
-          url.searchParams.append('channel', 'rc');
-          break;
-        }
-      }
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`Version check request failed with status ${response.status}: ${await response.text()}`);
-      }
-
-      return response.json();
-    } catch (error) {
-      throw new Error('Failed to fetch latest release', { cause: error });
-    }
   }
 
   buildVersions?: ServerBuildVersions;

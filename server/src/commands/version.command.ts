@@ -3,7 +3,7 @@ import { VersionService } from 'src/services/version.service';
 
 @Command({
   name: 'version',
-  description: 'Print Immich version',
+  description: 'Print Inhouse Photos version',
 })
 export class VersionCommand extends CommandRunner {
   constructor(private service: VersionService) {

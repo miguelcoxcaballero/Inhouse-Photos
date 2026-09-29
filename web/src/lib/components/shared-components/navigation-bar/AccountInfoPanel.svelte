@@ -82,9 +82,7 @@
       type="button"
       onclick={async () => {
         onClose?.();
-        if (info) {
-          await modalManager.show(HelpAndFeedbackModal, { info });
-        }
+        await modalManager.show(HelpAndFeedbackModal);
       }}
     >
       <span class="row-icon"><Icon icon={mdiHelpCircleOutline} size="20" aria-hidden /></span>

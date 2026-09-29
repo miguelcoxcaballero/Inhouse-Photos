@@ -9,7 +9,6 @@
   import MachineLearningSettings from './MachineLearningSettings.svelte';
   import MapSettings from './MapSettings.svelte';
   import MetadataSettings from './MetadataSettings.svelte';
-  import NewVersionCheckSettings from './NewVersionCheckSettings.svelte';
   import NightlyTasksSettings from './NightlyTasksSettings.svelte';
   import NotificationSettings from './NotificationSettings.svelte';
   import ServerSettings from './ServerSettings.svelte';
@@ -42,7 +41,6 @@
     mdiServerOutline,
     mdiSync,
     mdiTrashCanOutline,
-    mdiUpdate,
     mdiVideoOutline,
   } from '@mdi/js';
   import type { Component } from 'svelte';
@@ -181,13 +179,6 @@
       subtitle: $t('admin.user_settings_description'),
       key: 'user-settings',
       icon: mdiAccountOutline,
-    },
-    {
-      component: NewVersionCheckSettings,
-      title: $t('admin.version_check_settings'),
-      subtitle: $t('admin.version_check_settings_description'),
-      key: 'version-check',
-      icon: mdiUpdate,
     },
     {
       component: FFmpegSettings,

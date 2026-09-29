@@ -50,7 +50,7 @@ export const getMethodNames = (instance: any) => {
   return methods;
 };
 
-export const getExternalDomain = (server: SystemConfig['server'], defaultDomain = 'https://my.immich.app') =>
+export const getExternalDomain = (server: SystemConfig['server'], defaultDomain = 'http://localhost:2283') =>
   server.externalDomain || defaultDomain;
 
 /**
@@ -261,8 +261,8 @@ const patchOpenAPI = (document: OpenAPIObject) => {
 
 export const useSwagger = (app: INestApplication, { write }: { write: boolean }) => {
   const builder = new DocumentBuilder()
-    .setTitle('Immich')
-    .setDescription('Immich API')
+    .setTitle('Inhouse Photos')
+    .setDescription('Inhouse Photos API')
     .setVersion(serverVersion.toString())
     .addBearerAuth({
       type: 'http',
@@ -300,7 +300,7 @@ export const useSwagger = (app: INestApplication, { write }: { write: boolean })
     },
     jsonDocumentUrl: '/api/spec.json',
     yamlDocumentUrl: '/api/spec.yaml',
-    customSiteTitle: 'Immich API Documentation',
+    customSiteTitle: 'Inhouse Photos API Documentation',
   };
 
   SwaggerModule.setup('doc', app, openApiDoc, customOptions);

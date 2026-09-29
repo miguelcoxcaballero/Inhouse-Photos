@@ -1,3 +1,4 @@
-This is a client app for Immich Server and you will need to run/manage the server on your own in order to use the app.
+Inhouse Photos is a self-hosted photo and video library. Connect this app to your Inhouse Photos server to back up, browse, and organize your memories.
 
-Github URL: https://github.com/immich-app/immich
+Download and setup: https://fotos.miguelcoxcaballero.com/descargas/
+Source code: https://github.com/miguelcoxcaballero/Inhouse-Photos

@@ -3,7 +3,7 @@ import { CliService } from 'src/services/cli.service';
 
 @Command({
   name: 'list-users',
-  description: 'List Immich users',
+  description: 'List Inhouse Photos users',
 })
 export class ListUsersCommand extends CommandRunner {
   constructor(private service: CliService) {

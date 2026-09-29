@@ -55,4 +55,13 @@ describe(SystemMetadataService.name, () => {
       });
     });
   });
+
+  describe('getVersionCheckState', () => {
+    it('should hide stale upstream version-check data while preserving the response shape', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ checkedAt: '2024-01-01', releaseVersion: 'v100.0.0' });
+
+      await expect(sut.getVersionCheckState()).resolves.toEqual({ checkedAt: null, releaseVersion: null });
+      expect(mocks.systemMetadata.get).not.toHaveBeenCalled();
+    });
+  });
 });

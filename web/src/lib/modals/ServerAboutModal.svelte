@@ -22,7 +22,7 @@
         <Alert color="warning" title={$t('main_branch_warning')} class="col-span-full" size="small" />
       {/if}
 
-      <ServerAboutItem id="immich" title="Immich" version={info.version} versionHref={info.versionUrl} />
+      <ServerAboutItem id="inhouse-photos" title="Inhouse Photos server" version={info.version} />
       <ServerAboutItem id="exif" title="ExifTool" version={info.exiftool} />
       <ServerAboutItem id="nodejs" title="Node.js" version={info.nodejs} />
       <ServerAboutItem id="libvips" title="Libvips" version={info.libvips} />
@@ -39,36 +39,19 @@
         class={(info.ffmpeg?.length || 0) > 10 ? 'col-span-2' : ''}
       />
 
-      {#if info.repository && info.repositoryUrl}
-        <ServerAboutItem
-          id="repository"
-          title={$t('repository')}
-          version={info.repository}
-          versionHref={info.repositoryUrl}
-        />
-      {/if}
+      <ServerAboutItem
+        id="repository"
+        title={$t('repository')}
+        version="miguelcoxcaballero/Inhouse-Photos"
+        versionHref="https://github.com/miguelcoxcaballero/Inhouse-Photos"
+      />
 
-      {#if info.sourceRef && info.sourceCommit && info.sourceUrl}
-        <ServerAboutItem
-          id="source"
-          title={$t('source')}
-          version="{info.sourceRef}@{info.sourceCommit.slice(0, 9)}"
-          versionHref={info.sourceUrl}
-        />
-      {/if}
-
-      {#if info.build && info.buildUrl}
-        <ServerAboutItem id="build" title={$t('build')} version={info.build} versionHref={info.buildUrl} />
-      {/if}
-
-      {#if info.buildImage && info.buildImageUrl}
-        <ServerAboutItem
-          id="build-image"
-          title={$t('build_image')}
-          version={info.buildImage}
-          versionHref={info.buildImageUrl}
-        />
-      {/if}
+      <ServerAboutItem
+        id="open-source-foundation"
+        title="Open-source foundation"
+        version="Immich (AGPL-3.0)"
+        versionHref="https://github.com/immich-app/immich"
+      />
 
       <div class="col-span-full">
         <Label size="small" color="primary" for="version-history">{$t('version_history')}</Label>

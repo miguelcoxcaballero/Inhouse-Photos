@@ -1,6 +1,7 @@
 # Inhouse Photos Server for Windows
 
-Native WPF management application for an existing Inhouse/Immich installation.
+Native WPF management application for an existing Inhouse Photos library or a
+compatible installation.
 It adopts the existing Compose project without replacing images, accounts or
 volumes. Closing the app does not stop the server. No credentials are embedded
 in the executable. Requires Windows 10/11 with .NET Framework 4.8.
@@ -22,11 +23,11 @@ container identities and configuration hashes before saving a receipt. Original
 containers and media stay in place. Configuration copies use current-user DPAPI.
 The database snapshot does not include media files.
 
-Manager 1.2.1 uses five clear destinations: Overview, Connect mobile, Backups,
-Storage, and Settings. Its darker, higher-contrast interface uses status cards,
-storage and backup progress visuals, and guided steps instead of a dense list
-of technical controls. The installer, existing-library adoption, and new-server
-wizard have matching progress and confirmation screens. Windows and the setup
+Manager 1.2.2 uses five clear destinations: Overview, Connect mobile, Backups,
+Storage, and Settings. Its restrained light interface uses typography, spacing,
+and a small number of status surfaces instead of a dense list of technical
+controls or decorative cards. The installer, existing-library adoption, and
+new-server wizard follow the same visual hierarchy. Windows and the setup
 wizard fit within the available desktop area at higher display scaling. A
 loopback-only new server is never offered as a mobile address; the HTTPS
 address can be configured from the main Settings page. Changing backup
@@ -43,7 +44,7 @@ controls, not the normal route through the product.
 
 Full backup now records a success marker only after both a database SQL dump
 and a media copy have completed. The database is captured before the media
-copy, following Immich's recommended order when uploads may continue. The
+copy to preserve a consistent recovery point while uploads may continue. The
 copy checks source/target names, sizes and timestamps before marking success;
 it refuses to overwrite an existing file that changed, to protect the prior
 copy. This is not a checksum audit or a tested full restore. Optional weekly

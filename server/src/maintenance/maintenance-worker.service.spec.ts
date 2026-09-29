@@ -104,7 +104,7 @@ describe(MaintenanceWorkerService.name, () => {
   });
 
   describe('logSecret', () => {
-    const RE_LOGIN_URL = /https:\/\/my.immich.app\/maintenance\?token=([A-Za-z0-9-_]*\.[A-Za-z0-9-_]*\.[A-Za-z0-9-_]*)/;
+    const RE_LOGIN_URL = /http:\/\/localhost:2283\/maintenance\?token=([A-Za-z0-9-_]*\.[A-Za-z0-9-_]*\.[A-Za-z0-9-_]*)/;
 
     it('should log a valid login URL', async () => {
       mocks.systemMetadata.get.mockResolvedValue({

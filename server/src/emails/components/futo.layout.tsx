@@ -78,7 +78,7 @@ export const FutoLayout = ({ children, preview }: FutoLayoutProps) => (
 
           <Hr className="my-2 text-futo-gray" />
 
-          <ImmichFooter />
+          <ImmichFooter upstreamLicense />
         </Container>
       </Body>
     </Tailwind>

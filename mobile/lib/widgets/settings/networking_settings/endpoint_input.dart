@@ -116,7 +116,7 @@ class EndpointInputState extends ConsumerState<EndpointInput> {
           autovalidateMode: .onUserInteraction,
           validator: validateUrl,
           keyboardAction: .next,
-          hintText: 'http(s)://immich.domain.com',
+          hintText: 'https://fotos.miguelcoxcaballero.com',
           controller: controller,
           focusNode: focusNode,
         ),

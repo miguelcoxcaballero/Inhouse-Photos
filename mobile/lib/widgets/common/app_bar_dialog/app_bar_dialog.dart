@@ -175,7 +175,10 @@ class ImmichAppBarDialog extends HookConsumerWidget {
             InkWell(
               onTap: () {
                 ContextHelper(context).pop();
-                launchUrl(Uri.parse('https://docs.immich.app'), mode: LaunchMode.externalApplication);
+                launchUrl(
+                  Uri.parse('https://github.com/miguelcoxcaballero/Inhouse-Photos#readme'),
+                  mode: LaunchMode.externalApplication,
+                );
               },
               child: Text("documentation", style: context.textTheme.bodySmall).tr(),
             ),
@@ -183,7 +186,10 @@ class ImmichAppBarDialog extends HookConsumerWidget {
             InkWell(
               onTap: () {
                 ContextHelper(context).pop();
-                launchUrl(Uri.parse('https://github.com/immich-app/immich'), mode: LaunchMode.externalApplication);
+                launchUrl(
+                  Uri.parse('https://github.com/miguelcoxcaballero/Inhouse-Photos'),
+                  mode: LaunchMode.externalApplication,
+                );
               },
               child: Text("profile_drawer_github", style: context.textTheme.bodySmall).tr(),
             ),

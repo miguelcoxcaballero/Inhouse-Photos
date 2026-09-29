@@ -131,7 +131,7 @@ Write-InhouseLogoPng 'assets\inhouse-photos-icon-foreground.png' 1024 0.60 $null
 Write-InhouseLogoPng 'assets\inhouse-photos-icon-foreground-light.png' 1024 0.60 $null
 Copy-Item `
   (Join-Path $mobileRoot 'assets\inhouse-photos-icon-light.png') `
-  (Join-Path $mobileRoot 'assets\immich-logo.png') `
+  (Join-Path $mobileRoot 'assets\inhouse-photos-logo.png') `
   -Force
 
 # Android 12 masks splash artwork to a circle. These bounds stay entirely inside its safe circle.

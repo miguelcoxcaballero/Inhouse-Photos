@@ -9,19 +9,19 @@ namespace InhousePhotos {
   public sealed partial class ServerWindow {
     StackPanel SetupCard(string number,string eyebrow,string title,string description,bool highlighted=false) {
       var card=new Border {
-        Background=new SolidColorBrush(Color.FromRgb(highlighted?(byte)47:(byte)35,highlighted?(byte)34:(byte)28,highlighted?(byte)26:(byte)23)),
-        BorderBrush=highlighted?accent:new SolidColorBrush(Color.FromRgb(70,53,42)),
-        BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(14),
-        Padding=new Thickness(20),Margin=new Thickness(0,0,0,14)
+        Background=new SolidColorBrush(highlighted?Color.FromRgb(255,250,245):Color.FromRgb(255,252,248)),
+        BorderBrush=divider,
+        BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(9),
+        Padding=new Thickness(20),Margin=new Thickness(0,0,0,12)
       };
       var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(50)});row.ColumnDefinitions.Add(new ColumnDefinition());
       card.Child=row;
-      var marker=new Border{Width=38,Height=38,CornerRadius=new CornerRadius(11),Background=new SolidColorBrush(Color.FromRgb(94,61,41)),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top};
+      var marker=new Border{Width=38,Height=38,CornerRadius=new CornerRadius(9),Background=new SolidColorBrush(Color.FromRgb(240,225,211)),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top};
       marker.Child=new TextBlock{Text=number,Foreground=accent,FontSize=14,FontWeight=FontWeights.Bold,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
       row.Children.Add(marker);
       var body=new StackPanel();Grid.SetColumn(body,1);row.Children.Add(body);
-      var caption=Label(eyebrow.ToUpperInvariant(),11,accent);caption.FontWeight=FontWeights.SemiBold;caption.Margin=new Thickness(0,0,0,6);body.Children.Add(caption);
-      var heading=Label(title,22);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new Thickness(0,0,0,7);body.Children.Add(heading);
+      var caption=Label(eyebrow,12,muted);caption.FontWeight=FontWeights.SemiBold;caption.Margin=new Thickness(0,0,0,5);body.Children.Add(caption);
+      var heading=Label(title,20);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new Thickness(0,0,0,7);body.Children.Add(heading);
       var detail=Label(description,14,muted);detail.Margin=new Thickness(0,0,0,12);body.Children.Add(detail);
       content.Children.Add(card);
       return body;

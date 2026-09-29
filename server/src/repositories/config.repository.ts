@@ -73,10 +73,6 @@ export interface EnvData {
     server: string;
   };
 
-  versionCheck: {
-    url: string;
-  };
-
   network: {
     trustedProxies: string[];
   };
@@ -318,10 +314,6 @@ const getEnv = (): EnvData => {
     },
 
     licensePublicKey: isProd ? productionKeys : stagingKeys,
-
-    versionCheck: {
-      url: isProd ? 'https://version.immich.cloud/version' : 'https://version.dev.immich.cloud/version',
-    },
 
     network: {
       trustedProxies: dto.IMMICH_TRUSTED_PROXIES ?? ['linklocal', 'uniquelocal'],

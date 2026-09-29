@@ -41,7 +41,7 @@ export const loadSharedLink = async ({
     setSharedLink(sharedLink);
     const assetCount = sharedLink.assets.length;
     const assetId = sharedLink.album?.albumThumbnailAssetId || sharedLink.assets[0]?.id;
-    const assetPath = assetId ? getAssetMediaUrl({ id: assetId }) : '/feature-panel.png';
+    const assetPath = assetId ? getAssetMediaUrl({ id: assetId }) : '/inhouse-pwa-512.png';
 
     return {
       ...common,

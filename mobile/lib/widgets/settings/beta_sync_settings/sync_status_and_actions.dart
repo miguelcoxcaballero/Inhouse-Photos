@@ -49,14 +49,14 @@ class SyncStatusAndActions extends HookConsumerWidget {
         }
 
         final timestamp = DateTime.now().millisecondsSinceEpoch;
-        final exportFile = File(path.join(documentsDir.path, 'immich_export_$timestamp.sqlite'));
+        final exportFile = File(path.join(documentsDir.path, 'inhouse_photos_export_$timestamp.sqlite'));
 
         await dbFile.copy(exportFile.path);
 
         final size = MediaQuery.of(context).size;
         await Share.shareXFiles(
           [XFile(exportFile.path)],
-          text: 'Immich Database Export',
+          text: 'Inhouse Photos Database Export',
           sharePositionOrigin: Rect.fromPoints(Offset.zero, Offset(size.width / 3, size.height)),
         );
 

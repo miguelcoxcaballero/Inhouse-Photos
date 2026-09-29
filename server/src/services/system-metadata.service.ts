@@ -27,7 +27,7 @@ export class SystemMetadataService extends BaseService {
   }
 
   async getVersionCheckState(): Promise<VersionCheckStateResponseDto> {
-    const value = await this.systemMetadataRepository.get(SystemMetadataKey.VersionCheckState);
-    return { checkedAt: null, releaseVersion: null, ...value };
+    // Keep the API response shape, but do not expose stale upstream release data.
+    return { checkedAt: null, releaseVersion: null };
   }
 }

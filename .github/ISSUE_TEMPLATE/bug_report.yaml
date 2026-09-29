@@ -1,5 +1,5 @@
-name: Report an issue with Immich
-description: Report an issue with Immich
+name: Report an issue with Inhouse Photos
+description: Report an issue with Inhouse Photos
 body:
   - type: checkboxes
     attributes:
@@ -14,7 +14,7 @@ body:
 
         If you have a feature or enhancement request, please use the [feature request][fr] section of our [GitHub Discussions][fr].
 
-        [fr]: https://github.com/immich-app/immich/discussions/new?category=feature-request
+        [fr]: https://github.com/miguelcoxcaballero/Inhouse-Photos/issues/new
 
   - type: textarea
     validations:
@@ -36,7 +36,7 @@ body:
     validations:
       required: true
     attributes:
-      label: The OS that Immich Server is running on
+      label: The OS that Inhouse Photos Server is running on
       placeholder: Ubuntu 22.10, Debian, Arch...etc
 
   - type: input
@@ -44,14 +44,14 @@ body:
     validations:
       required: true
     attributes:
-      label: Version of Immich Server
+      label: Version of Inhouse Photos Server
       placeholder: v1.0.0
 
   - type: input
     validations:
       required: true
     attributes:
-      label: Version of Immich Mobile App
+      label: Version of Inhouse Photos Mobile App
       placeholder: v1.0.0
 
   - type: checkboxes

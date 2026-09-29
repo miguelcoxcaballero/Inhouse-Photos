@@ -1,4 +1,4 @@
-import { Body, Container, Font, Head, Hr, Html, Img, Preview, Section, Tailwind, Text } from '@react-email/components';
+import { Body, Container, Font, Head, Hr, Html, Preview, Section, Tailwind, Text } from '@react-email/components';
 import * as React from 'react';
 import { ImmichFooter } from 'src/emails/components/footer.template';
 
@@ -17,7 +17,7 @@ export const ImmichLayout = ({ children, preview }: ImmichLayoutProps) => (
           extend: {
             colors: {
               // Light Theme
-              'immich-primary': '#4250AF',
+              'immich-primary': '#ED995A',
               'immich-bg': 'white',
               'immich-fg': 'black',
               'immich-gray': '#F6F6F4',
@@ -44,15 +44,15 @@ export const ImmichLayout = ({ children, preview }: ImmichLayoutProps) => (
         />
       </Head>
       <Preview>{preview}</Preview>
-      <Body className="bg-[#F4F4f4] my-auto mx-auto px-2 font-sans text-base text-gray-800">
+      <Body className="bg-[#F6F3EF] my-auto mx-auto px-2 font-sans text-base text-gray-800">
         <Container className="my-[40px] mx-auto max-w-[465px]">
-          <Section className="my-6 p-12 border border-red-400 rounded-[50px] bg-gray-50">
+          <Section className="my-6 p-12 border border-[#E8DED5] rounded-[24px] bg-white">
             <Section className="flex justify-center mb-12">
-              <Img
-                src="https://immich.app/img/immich-logo-inline-light.png"
-                className="h-12 antialiased rounded-none w-full"
-                alt="Immich"
-              />
+              <Text
+                style={{ color: '#ED995A', fontSize: '30px', fontWeight: 700, letterSpacing: '-0.04em', margin: 0 }}
+              >
+                inhouse photos
+              </Text>
             </Section>
 
             {children}

@@ -216,7 +216,7 @@ export class DatabaseRepository {
     }>`SELECT column_name as "columnName" FROM information_schema.columns WHERE table_name = ${table}`.execute(this.db);
     if (rows.length === 0) {
       this.logger.warn(
-        `Table ${table} does not exist, skipping reindexing. This is only normal if this is a new Immich instance.`,
+        `Table ${table} does not exist, skipping reindexing. This is only normal if this is a new Inhouse Photos instance.`,
       );
       return;
     }

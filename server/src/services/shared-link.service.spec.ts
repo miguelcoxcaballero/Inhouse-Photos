@@ -377,7 +377,7 @@ describe(SharedLinkService.name, () => {
 
       await expect(sut.getMetadataTags(authStub.adminSharedLink)).resolves.toEqual({
         description: '1 shared photos & videos',
-        imageUrl: `https://my.immich.app/api/assets/${sharedLink.assets[0].id}/thumbnail?key=${sharedLink.key.toString('base64url')}`,
+        imageUrl: `http://localhost:2283/api/assets/${sharedLink.assets[0].id}/thumbnail?key=${sharedLink.key.toString('base64url')}`,
         title: 'Public Share',
       });
 
@@ -388,7 +388,7 @@ describe(SharedLinkService.name, () => {
       mocks.sharedLink.get.mockResolvedValue({ ...sharedLinkStub.individual, album: null, assets: [] });
       await expect(sut.getMetadataTags(authStub.adminSharedLink)).resolves.toEqual({
         description: '0 shared photos & videos',
-        imageUrl: `https://my.immich.app/feature-panel.png`,
+        imageUrl: `http://localhost:2283/feature-panel.png`,
         title: 'Public Share',
       });
 

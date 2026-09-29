@@ -150,18 +150,6 @@ class LoginForm extends HookConsumerWidget {
       return null;
     }, []);
 
-    populateTestLoginInfo() {
-      emailController.text = 'demo@immich.app';
-      passwordController.text = 'demo';
-      serverEndpointController.text = 'https://demo.immich.app';
-    }
-
-    populateTestLoginInfo1() {
-      emailController.text = 'testuser@email.com';
-      passwordController.text = 'password';
-      serverEndpointController.text = 'http://10.1.15.216:2283/api';
-    }
-
     Future<void> handleSyncFlow() async {
       final backgroundManager = ref.read(backgroundSyncProvider);
       final viewIntentHandler = ref.read(viewIntentHandlerProvider);
@@ -493,16 +481,12 @@ class LoginForm extends HookConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(height: constraints.maxHeight / 5),
-                  Column(
+                  const Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      GestureDetector(
-                        onDoubleTap: () => populateTestLoginInfo(),
-                        onLongPress: () => populateTestLoginInfo1(),
-                        child: const ImmichLogo(heroTag: 'logo'),
-                      ),
-                      const Padding(
+                      ImmichLogo(heroTag: 'logo'),
+                      Padding(
                         padding: EdgeInsets.only(top: 8.0, bottom: 16),
                         child: SizedBox(
                           width: double.infinity,

@@ -55,7 +55,7 @@ export class MaintenanceController {
   @Post()
   @Endpoint({
     summary: 'Set maintenance mode',
-    description: 'Put Immich into or take it out of maintenance mode',
+    description: 'Put Inhouse Photos into or take it out of maintenance mode',
     history: new HistoryBuilder().added('v2.3.0').alpha('v2.3.0'),
   })
   @Authenticated({ permission: Permission.Maintenance, admin: true })

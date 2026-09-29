@@ -36,9 +36,7 @@ export const WelcomeEmail = ({ baseUrl, displayName, username, password, customT
   );
 
   return (
-    <ImmichLayout
-      preview={customTemplate ? emailContent.toString() : 'You have been invited to a new Immich instance.'}
-    >
+    <ImmichLayout preview={customTemplate ? emailContent.toString() : 'You have been invited to Inhouse Photos.'}>
       {customTemplate && (
         <Text className="m-0">
           <div dangerouslySetInnerHTML={{ __html: emailContent }}></div>
@@ -61,9 +59,9 @@ export const WelcomeEmail = ({ baseUrl, displayName, username, password, customT
 };
 
 WelcomeEmail.PreviewProps = {
-  baseUrl: 'https://demo.immich.app/auth/login',
+  baseUrl: 'https://fotos.miguelcoxcaballero.com/auth/login',
   displayName: 'Alan Turing',
-  username: 'alanturing@immich.app',
+  username: 'alanturing@example.com',
   password: 'mysuperpassword',
 } as WelcomeEmailProps;
 

@@ -44,9 +44,9 @@ const List<(String, String)> kWidgetNames = [
 
 const int kMinMonthsToEnableScrubberSnap = 12;
 
-const String kImmichAppStoreLink = "https://apps.apple.com/app/immich/id1613945652";
-const String kImmichPlayStoreLink = "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/latest";
-const String kImmichLatestRelease = "https://github.com/immich-app/immich/releases/latest";
+// Both app and server updates are distributed by Inhouse Photos, not by the
+// upstream project's app-store listing or release feed.
+const String kInhouseDownloadsLink = "https://fotos.miguelcoxcaballero.com/descargas/";
 
 const int kPhotoTabIndex = 0;
 const int kSearchTabIndex = 1;
