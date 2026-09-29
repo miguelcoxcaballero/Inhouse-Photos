@@ -1,6 +1,6 @@
 {
-  "Version": "1.2.12",
-  "InstallerUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.12/Inhouse-Photos-Server-Setup.exe",
-  "Sha256": "4b75f2c26157df8950b42a1b61c771fa5b915a702cb11e1a714ca048b52958f2",
-  "Notes": "Gestión remota de discos, copias e inicio desde la app. El servidor de fotos sigue encendido."
+  "Version": "1.2.13",
+  "InstallerUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.13/Inhouse-Photos-Server-Setup.exe",
+  "Sha256": "3ea076eb71402e96037d660fc30f0c4881de5587a03fd7b93bc433dcda44cd38",
+  "Notes": "Corrige la conexión del gestor desde el móvil, incluso sin disco de copia configurado. Activa y verifica la ruta remota al arrancar."
 }

@@ -1,8 +1,8 @@
 {
-  "version": "3.1.91",
-  "versionCode": 7149,
+  "version": "3.1.92",
+  "versionCode": 7150,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.91-live-upload-speed/Inhouse-Photos.apk",
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.92-server-management-fix/Inhouse-Photos.apk",
   "sizeBytes": 74903045,
   "sha256": "36779569db6d3a6b99fe44a43b8ab296344974fe5003193b19b985aad0befdf6"
 }

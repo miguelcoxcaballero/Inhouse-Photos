@@ -63,6 +63,7 @@ namespace InhousePhotos {
     readonly string secret;
     readonly TcpListener listener;
     readonly SemaphoreSlim capacity=new SemaphoreSlim(4,4);
+    string publishedContainer,publishedConfigurationHash;
     bool disposed;
     static string SecretPath {get{return System.IO.Path.Combine(Backend.SettingsDir,"manager-bridge.dpapi");}}
 
@@ -218,6 +219,9 @@ namespace InhousePhotos {
         "\t\t}"+newline+
         "\t}"+newline+EndMarker+newline;
       var begin=source.IndexOf(BeginMarker,StringComparison.Ordinal);var end=source.IndexOf(EndMarker,StringComparison.Ordinal);
+      if((begin>=0&&source.IndexOf(BeginMarker,begin+BeginMarker.Length,StringComparison.Ordinal)>=0)||
+         (end>=0&&source.IndexOf(EndMarker,end+EndMarker.Length,StringComparison.Ordinal)>=0))
+        throw new IOException("Hay varias rutas remotas guardadas. No se cambiará Caddy.");
       if(begin>=0&&end>begin){
         var after=end+EndMarker.Length;while(after<source.Length&&(source[after]=='\r'||source[after]=='\n'))after++;
         return source.Substring(0,begin)+block+source.Substring(after);
@@ -234,10 +238,26 @@ namespace InhousePhotos {
       var caddyfile=System.IO.Path.Combine(prefs.Installation,"Caddyfile");if(!File.Exists(caddyfile))return;
       var source=File.ReadAllText(caddyfile);
       var changed=WithRoute(source,secret);
-      if(changed==source)return;
       Backend.ValidateManagedConfiguration(prefs);
       var container=(await Backend.Compose(prefs,"ps -q caddy",15)).Trim();
       if(!Regex.IsMatch(container,"^[a-f0-9]{64}$"))throw new IOException("El proxy HTTPS no está disponible.");
+      var sourceHash=Backend.Hash(caddyfile);
+      if(File.ReadAllText(caddyfile)!=source)throw new IOException("La configuración cambió durante la comprobación de la ruta.");
+      if(changed==source) {
+        if(container==publishedContainer&&sourceHash==publishedConfigurationHash)return;
+        // A saved route is not proof that the running proxy loaded it. Verify
+        // the mounted configuration and hot-reload once per manager launch,
+        // or when the proxy/container changes. No file or receipt is rewritten.
+        var mounted=await Backend.Docker("exec "+container+" cat /etc/caddy/Caddyfile",20);
+        if(mounted!=source)throw new IOException("El proxy no ve la configuración verificada de la ruta remota.");
+        await Backend.Docker("exec "+container+" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile",30);
+        if(Backend.Hash(caddyfile)!=sourceHash)throw new IOException("La configuración cambió durante la comprobación de la ruta.");
+        await Backend.Docker("exec "+container+" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile",30);
+        Backend.ValidateManagedConfiguration(prefs);
+        if(Backend.Hash(caddyfile)!=sourceHash)throw new IOException("La configuración cambió durante la comprobación de la ruta.");
+        publishedContainer=container;publishedConfigurationHash=sourceHash;
+        return;
+      }
       Backend.PrivateDirectory(Backend.SettingsDir);
       var id=Guid.NewGuid().ToString("N");var candidate=System.IO.Path.Combine(Backend.SettingsDir,"Caddyfile-manager-"+id);
       var backup=System.IO.Path.Combine(Backend.SettingsDir,"Caddyfile.before-manager-"+id);
@@ -247,13 +267,15 @@ namespace InhousePhotos {
       try {
         await Backend.Docker("cp "+Backend.Quote(candidate)+" "+Backend.Quote(container+":"+inside),30);
         await Backend.Docker("exec "+container+" caddy validate --config "+inside+" --adapter caddyfile",30);
+        Backend.ValidateManagedConfiguration(prefs);
+        if(Backend.Hash(caddyfile)!=sourceHash)throw new IOException("La configuración cambió durante la comprobación de la ruta.");
         // Preserve the original bytes. The running Caddy process keeps serving
         // traffic while its new configuration is validated and hot-reloaded.
         File.Copy(caddyfile,backup,false);
         File.WriteAllText(caddyfile,changed,new UTF8Encoding(false));wrote=true;
         if(!File.ReadAllText(caddyfile).Contains(BeginMarker))throw new IOException("La nueva ruta no quedó guardada.");
         var mounted=await Backend.Docker("exec "+container+" cat /etc/caddy/Caddyfile",20);
-        if(!mounted.Contains(BeginMarker)||!mounted.Contains(secret))throw new IOException("El proxy no ve la nueva ruta; se conserva la configuración anterior.");
+        if(mounted!=changed)throw new IOException("El proxy no ve la nueva ruta; se conserva la configuración anterior.");
         await Backend.Docker("exec "+container+" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile",30);
         var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));
         var actual=Backend.ConfigurationHashes(prefs);
@@ -264,6 +286,7 @@ namespace InhousePhotos {
         File.WriteAllText(receiptTemp,Backend.Json.Serialize(receipt),new UTF8Encoding(false));
         File.Replace(receiptTemp,prefs.ReceiptPath,prefs.ReceiptPath+"."+id+".before-manager");
         wrote=false;
+        publishedContainer=container;publishedConfigurationHash=actual["Caddyfile"];
       }catch {
         if(wrote) {
           try{File.Copy(backup,caddyfile,true);await Backend.Docker("exec "+container+" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile",30);}catch{}

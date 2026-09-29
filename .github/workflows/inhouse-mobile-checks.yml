@@ -39,6 +39,8 @@ jobs:
           test/domain/models/config/backup_config_test.dart
           test/unit/adaptive_upload_limiter_test.dart
           test/services/pairing.service_test.dart
+          test/services/server_management.service_test.dart
+          test/widgets/settings/server_management_settings_test.dart
           test/widgets/forms/login/pairing_login_test.dart
           test/domain/services/timeline_norefresh_test.dart
           test/domain/services/timeline_service_performance_test.dart

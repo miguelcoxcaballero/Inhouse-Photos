@@ -36,6 +36,11 @@ container identities and configuration hashes before saving a receipt. Original
 containers and media stay in place. Configuration copies use current-user DPAPI.
 The database snapshot does not include media files.
 
+Manager 1.2.13 starts the remote management bridge immediately when opened,
+including a normal visible launch. It validates and hot-reloads the existing
+HTTPS route once per launch or proxy/configuration change, so a saved Caddyfile
+is not mistaken for an active route. The photo server remains running.
+
 Manager 1.2.12 extends the administrator-only HTTPS bridge with read-only
 server, drive and backup status, plus fixed actions for full backup, weekly
 schedule, snapshot, backup-drive selection and Windows startup. The mobile app

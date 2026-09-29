@@ -11,53 +11,78 @@ import 'package:immich_mobile/services/server_management.service.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
 
 class ServerManagementSettings extends ConsumerStatefulWidget {
-  const ServerManagementSettings({super.key});
+  const ServerManagementSettings({super.key, this.service});
+
+  final ServerManagementService? service;
 
   @override
   ConsumerState<ServerManagementSettings> createState() => _ServerManagementSettingsState();
 }
 
-class _ServerManagementSettingsState extends ConsumerState<ServerManagementSettings> {
-  late final http.Client _client;
+class _ServerManagementSettingsState extends ConsumerState<ServerManagementSettings> with WidgetsBindingObserver {
+  http.Client? _client;
   late final ServerManagementService _service;
   ServerManagementStatus? _status;
-  String? _error;
+  ServerManagementException? _error;
   bool _loading = false;
   bool _acting = false;
   Timer? _poll;
+  bool _foreground = true;
+  int _failures = 0;
 
   @override
   void initState() {
     super.initState();
-    _client = http.Client();
-    _service = ServerManagementService(_client);
+    WidgetsBinding.instance.addObserver(this);
+    _client = widget.service == null ? http.Client() : null;
+    _service = widget.service ?? ServerManagementService(_client!);
     unawaited(_refresh());
-    _poll = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (_status?.busy == true) {
-        unawaited(_refresh());
-      }
-    });
   }
 
   @override
   void dispose() {
     _poll?.cancel();
-    _client.close();
+    WidgetsBinding.instance.removeObserver(this);
+    _client?.close();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    _poll?.cancel();
+    if (_foreground) {
+      unawaited(_refresh());
+    }
+  }
+
+  void _scheduleRefresh() {
+    _poll?.cancel();
+    if (!mounted || !_foreground || (_error != null && !_error!.canRetry)) {
+      return;
+    }
+    final seconds = _error != null ? (15 * _failures).clamp(15, 60) : (_status?.busy == true ? 5 : 15);
+    _poll = Timer(Duration(seconds: seconds), () => unawaited(_refresh()));
   }
 
   Uri? get _url => ServerManagementService.urlForEndpoint(Store.tryGet(StoreKey.serverEndpoint));
   String? get _token => Store.tryGet(StoreKey.accessToken);
 
   Future<void> _refresh() async {
-    if (_loading || !ref.read(authProvider).isAdmin) {
+    if (!mounted || !_foreground || _loading || !ref.read(authProvider).isAdmin) {
       return;
     }
+    _poll?.cancel();
     final url = _url;
     final token = _token;
     if (url == null || token == null || token.isEmpty) {
       if (mounted) {
-        setState(() => _error = 'Connect to your HTTPS server as an administrator.');
+        setState(() {
+          _error = const ServerManagementException(
+            'Connect to your HTTPS server as an administrator.',
+            failure: ServerManagementFailure.authentication,
+          );
+        });
       }
       return;
     }
@@ -68,15 +93,20 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
         setState(() {
           _status = status;
           _error = null;
+          _failures = 0;
         });
       }
     } on ServerManagementException catch (error) {
       if (mounted) {
-        setState(() => _error = error.message);
+        setState(() {
+          _error = error;
+          _failures++;
+        });
       }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
+        _scheduleRefresh();
       }
     }
   }
@@ -98,7 +128,13 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
   Future<void> _act(ServerManagementAction action, String title, String detail) async {
     final url = _url;
     final token = _token;
-    if (_acting || url == null || token == null || !await _confirm(title, detail)) {
+    if (_acting ||
+        _loading ||
+        _error != null ||
+        url == null ||
+        token == null ||
+        !await _confirm(title, detail) ||
+        !mounted) {
       return;
     }
     setState(() => _acting = true);
@@ -117,6 +153,9 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
   }
 
   Future<void> _chooseBackupDrive(ServerManagementStatus status) async {
+    if (_acting || _loading || _error != null) {
+      return;
+    }
     final choices = status.disks.where((disk) => disk.canUseForBackup).toList();
     if (choices.isEmpty) {
       return;
@@ -147,9 +186,10 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
       return;
     }
     if (!await _confirm(
-      'Use $root for backups?',
-      'This changes only the destination for future backups. Existing photos and backups will not be moved or deleted.',
-    )) {
+          'Use $root for backups?',
+          'This changes only the destination for future backups. Existing photos and backups will not be moved or deleted.',
+        ) ||
+        !mounted) {
       return;
     }
     final url = _url;
@@ -183,29 +223,56 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<bool>(authProvider.select((auth) => auth.isAdmin), (_, isAdmin) {
+      if (isAdmin) {
+        unawaited(_refresh());
+      }
+    });
     if (!ref.watch(authProvider).isAdmin) {
       return const Center(child: Text('Administrator access is required to manage the PC.'));
     }
     final status = _status;
-    final working = _acting || status?.busy == true;
+    final unavailable = _loading || _error != null;
+    final working = _acting || unavailable || status?.busy == true;
     return RefreshIndicator(
       onRefresh: _refresh,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 80),
         children: [
           ListTile(
             leading: Icon(
-              status?.serverOnline == true ? Icons.check_circle_rounded : Icons.dns_outlined,
-              color: status?.serverOnline == true ? context.colorScheme.primary : context.colorScheme.error,
+              _error != null
+                  ? Icons.cloud_off_rounded
+                  : status?.serverOnline == true
+                  ? Icons.check_circle_rounded
+                  : Icons.dns_outlined,
+              color: _error != null
+                  ? context.colorScheme.error
+                  : status?.serverOnline == true
+                  ? context.colorScheme.primary
+                  : context.colorScheme.onSurfaceVariant,
             ),
             title: Text(
-              status == null
+              _error != null
+                  ? 'Windows manager unavailable'
+                  : status == null
                   ? 'Windows server'
                   : status.serverOnline
                   ? 'Server online'
                   : 'Server unavailable',
             ),
-            subtitle: Text(status == null ? 'Checking connection…' : 'Windows manager ${status.version}'),
+            subtitle: Text(
+              _loading
+                  ? 'Checking connection…'
+                  : _error != null
+                  ? status == null
+                        ? 'Connection could not be confirmed'
+                        : 'Last known status · Windows manager ${status.version}'
+                  : status == null
+                  ? 'Connection not checked yet'
+                  : 'Windows manager ${status.version}',
+            ),
             trailing: _loading
                 ? const SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2))
                 : IconButton(tooltip: 'Refresh', onPressed: _refresh, icon: const Icon(Icons.refresh_rounded)),
@@ -213,7 +280,7 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
           if (_error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-              child: Text(_error!, style: TextStyle(color: context.colorScheme.error)),
+              child: Text(_error!.message, style: TextStyle(color: context.colorScheme.error)),
             ),
           if (status != null) ...[
             if (status.operation.isNotEmpty || status.progress.isNotEmpty)
@@ -277,7 +344,9 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: status.backupRunning
+                      onPressed: unavailable || _acting
+                          ? null
+                          : status.backupRunning
                           ? () => _act(
                               ServerManagementAction.cancelBackup,
                               'Stop backup?',

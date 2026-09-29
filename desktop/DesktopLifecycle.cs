@@ -28,7 +28,7 @@ namespace InhousePhotos {
       Closed+=(s,e)=>{if(monitor!=null)monitor.Stop();remoteManagement?.Dispose();tray.Dispose();};
       monitor=new DispatcherTimer{Interval=TimeSpan.FromSeconds(45)};
       monitor.Tick+=async(s,e)=>await Supervise();monitor.Start();
-      if(hidden)Dispatcher.BeginInvoke(new Action(async()=>await Supervise()));
+      Dispatcher.BeginInvoke(new Action(async()=>await Supervise()));
     }
     internal void BringToFront(){Show();WindowState=WindowState.Normal;Activate();}
     async Task Supervise() {
@@ -43,7 +43,6 @@ namespace InhousePhotos {
           online=true;notice.Text="Servidor disponible.";
         }
         if(online) {
-          try {await LanRoute.Publish(prefs);} catch { /* Public HTTPS remains available if LAN discovery cannot be published. */ }
           try {
             if(remoteManagement==null)remoteManagement=new RemoteManagement(prefs,
               ()=>Dispatcher.Invoke(()=>!busy&&!monitorBusy&&!updatingManager&&backupCancellation==null),
@@ -51,6 +50,7 @@ namespace InhousePhotos {
               ReadRemoteStatus,PerformRemoteAction);
             await remoteManagement.EnsurePublished();
           }catch(Exception ex){notice.Text="Actualizaciones remotas no disponibles: "+ex.Message;}
+          try {await LanRoute.Publish(prefs);} catch { /* Public HTTPS remains available if LAN discovery cannot be published. */ }
           try {
             var update=await ManagerUpdates.Check();
             if(update.Available&&String.IsNullOrWhiteSpace(notice.Text))notice.Text="Nueva versión del gestor: "+update.LatestVersion+". Abre Ajustes para actualizar.";
@@ -87,7 +87,16 @@ namespace InhousePhotos {
       }catch(Exception ex){notice.Text=ex.Message;retryAfter=DateTime.UtcNow.AddMinutes(2);}
       finally{monitorBusy=false;}
     }
+    internal static string OptionalDriveRoot(string path) {
+      // .NET Framework throws for an empty path. A missing or malformed
+      // optional backup destination must not hide the entire manager status.
+      if(String.IsNullOrWhiteSpace(path))return null;
+      try {var root=Path.GetPathRoot(path);return String.IsNullOrEmpty(root)?null:root;}
+      catch(ArgumentException){return null;}
+      catch(NotSupportedException){return null;}
+    }
     async Task<RemoteManagerStatus> ReadRemoteStatus() {
+      try {
       var ui=Dispatcher.Invoke(()=>new {
         Busy=busy||updatingManager||backupCancellation!=null,
         BackupRunning=backupCancellation!=null,
@@ -95,12 +104,14 @@ namespace InhousePhotos {
         Progress=backupProgressText??"",
         Error=remoteError
       });
-      var libraryRoot=Path.GetPathRoot(Backend.Library(prefs));
+      var library=Backend.Library(prefs);
+      var libraryRoot=Path.GetPathRoot(library);
+      var backupRoot=OptionalDriveRoot(prefs.BackupDestination);
       var disks=Backend.Disks().Select(d=>{
         var isLibrary=String.Equals(d.Root,libraryRoot,StringComparison.OrdinalIgnoreCase);
-        var isBackup=String.Equals(d.Root,Path.GetPathRoot(prefs.BackupDestination??""),StringComparison.OrdinalIgnoreCase);
+        var isBackup=backupRoot!=null&&String.Equals(d.Root,backupRoot,StringComparison.OrdinalIgnoreCase);
         var canBackup=false;
-        try{Backend.ValidateBackup(Backend.Library(prefs),d.Root);canBackup=!isLibrary;}catch{}
+        try{Backend.ValidateBackup(library,d.Root);canBackup=!isLibrary;}catch{}
         return new RemoteDiskStatus {Root=d.Root,Name=d.Name,Total=d.Total,Free=d.Free,
           IsLibrary=isLibrary,IsBackup=isBackup,CanUseForBackup=canBackup};
       }).ToArray();
@@ -117,6 +128,14 @@ namespace InhousePhotos {
         BackupCompletedUtc=backup.CompletedUtc??"",WeeklyBackupEnabled=schedule.Enabled,
         NextBackupUtc=schedule.NextDueUtc??"",StartupEnabled=startup,StartupKnown=known,Disks=disks
       };
+      }catch(Exception ex) {
+        // This method receives no credentials. Keep only the failure type and
+        // message on this PC, never request headers or a full exception dump.
+        try {var directory=Path.Combine(Backend.SettingsDir,"diagnostics");Backend.PrivateDirectory(directory);
+          File.WriteAllText(Path.Combine(directory,"manager-status-error.txt"),ex.GetType().Name+": "+ex.Message);}
+        catch{}
+        throw;
+      }
     }
     Task<bool> PerformRemoteAction(string action) {
       return Task.FromResult(Dispatcher.Invoke(()=>BeginRemoteAction(action)));

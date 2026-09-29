@@ -19,7 +19,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.2.12.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.13.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -480,6 +480,21 @@ namespace InhousePhotos {
           if(withManager==sampleCaddy||!withManager.Contains("reverse_proxy host.docker.internal:52187")||
              !withManager.Contains("header_up X-Inhouse-Bridge "+managerKey)||RemoteManagement.WithRoute(withManager,managerKey)!=withManager)return 40;
           try{RemoteManagement.WithRoute(sampleCaddy,"short");return 41;}catch(ArgumentException){}
+          var rotatedKey=new string('b',64);
+          if(RemoteManagement.WithRoute(withManager,rotatedKey)!=withManager.Replace(managerKey,rotatedKey))return 43;
+          var windowsCaddy=sampleCaddy.Replace("\n","\r\n");
+          var windowsRoute=RemoteManagement.WithRoute(windowsCaddy,managerKey);
+          if(windowsRoute.Replace("\r\n","").Contains("\n")||RemoteManagement.WithRoute(windowsRoute,managerKey)!=windowsRoute)return 44;
+          foreach(var malformed in new[]{
+            sampleCaddy+"# INHOUSE-MANAGER-ROUTE-BEGIN\n",
+            sampleCaddy+"# INHOUSE-MANAGER-ROUTE-END\n",
+            withManager+"# INHOUSE-MANAGER-ROUTE-BEGIN\n# INHOUSE-MANAGER-ROUTE-END\n",
+            sampleCaddy.Replace(" handle {"," handle {\n }\n handle {")}) {
+            try{RemoteManagement.WithRoute(malformed,managerKey);return 45;}catch(IOException){}
+          }
+          foreach(var missing in new[]{null,"","   ","relative-backups","\0"})
+            if(ServerWindow.OptionalDriveRoot(missing)!=null)return 46;
+          if(ServerWindow.OptionalDriveRoot(@"E:\backups")!=@"E:\"||ServerWindow.OptionalDriveRoot(@"D:\")!=@"D:\")return 47;
           if(!RemoteManagement.Allowed("GET",RemoteManagement.StatusPath)||
              !RemoteManagement.Allowed("POST",RemoteManagement.StatusPath+"/backup/start")||
              !RemoteManagement.Allowed("POST",RemoteManagement.StatusPath+"/backup/destination/E")||

@@ -1,10 +1,31 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+enum ServerManagementFailure {
+  connection,
+  timeout,
+  unavailable,
+  notPublished,
+  authentication,
+  configuration,
+  invalidResponse,
+  rejected,
+}
+
 class ServerManagementException implements Exception {
-  const ServerManagementException(this.message);
+  const ServerManagementException(this.message, {this.failure = ServerManagementFailure.unavailable});
   final String message;
+  final ServerManagementFailure failure;
+
+  bool get canRetry => switch (failure) {
+    ServerManagementFailure.connection ||
+    ServerManagementFailure.timeout ||
+    ServerManagementFailure.unavailable ||
+    ServerManagementFailure.notPublished => true,
+    _ => false,
+  };
 
   @override
   String toString() => message;
@@ -125,8 +146,9 @@ enum ServerManagementAction {
 /// the phone. The Windows manager authorizes every request against the photo
 /// server's current administrator session.
 class ServerManagementService {
-  const ServerManagementService(this.client);
+  const ServerManagementService(this.client, {this.readTimeout = const Duration(seconds: 15)});
   final http.Client client;
+  final Duration readTimeout;
 
   static Uri? urlForEndpoint(String? endpoint) {
     final uri = endpoint == null ? null : Uri.tryParse(endpoint);
@@ -137,16 +159,35 @@ class ServerManagementService {
   }
 
   Future<ServerManagementStatus> read(Uri url, String token) async {
+    _requireToken(token);
     try {
-      final response = await client.get(url, headers: _headers(token)).timeout(const Duration(seconds: 25));
+      final response = await client.get(url, headers: _headers(token)).timeout(readTimeout);
       if (response.statusCode != 200) {
-        throw ServerManagementException(_message(response, 'Windows server manager is unavailable.'));
+        throw _failure(response);
+      }
+      // A missing proxy route can return the photo web app with HTTP 200.
+      // It is not a successful manager connection.
+      if (response.headers['content-type']?.toLowerCase().contains('text/html') == true ||
+          response.body.trimLeft().startsWith('<')) {
+        throw _notPublished;
       }
       return ServerManagementStatus.fromJson(jsonDecode(response.body));
     } on ServerManagementException {
       rethrow;
+    } on TimeoutException {
+      throw const ServerManagementException(
+        'The Windows manager took too long to respond. Retrying the connection…',
+        failure: ServerManagementFailure.timeout,
+      );
+    } on FormatException {
+      throw _invalidResponse;
+    } on TypeError {
+      throw _invalidResponse;
     } catch (_) {
-      throw const ServerManagementException('Could not read the Windows server manager. Your photos remain available.');
+      throw const ServerManagementException(
+        'Could not connect to the Windows manager. Check your connection; retrying automatically.',
+        failure: ServerManagementFailure.connection,
+      );
     }
   }
 
@@ -162,10 +203,11 @@ class ServerManagementService {
   }
 
   Future<void> _post(Uri url, String token) async {
+    _requireToken(token);
     try {
       final response = await client.post(url, headers: _headers(token)).timeout(const Duration(seconds: 20));
       if (response.statusCode != 202) {
-        throw ServerManagementException(_message(response, 'The PC did not accept this change.'));
+        throw _failure(response, action: true);
       }
     } on ServerManagementException {
       rethrow;
@@ -179,6 +221,52 @@ class ServerManagementService {
     'Accept': 'application/json',
     'Cache-Control': 'no-store',
   };
+
+  static void _requireToken(String token) {
+    if (token.trim().isEmpty) {
+      throw const ServerManagementException(
+        'Sign in again as an administrator to manage your PC.',
+        failure: ServerManagementFailure.authentication,
+      );
+    }
+  }
+
+  static const _notPublished = ServerManagementException(
+    'Remote management is not set up yet. Open or update Inhouse Photos Server on your PC to enable it.',
+    failure: ServerManagementFailure.notPublished,
+  );
+
+  static const _invalidResponse = ServerManagementException(
+    'The Windows manager returned an incompatible response. Update the manager on your PC, then try again.',
+    failure: ServerManagementFailure.invalidResponse,
+  );
+
+  static ServerManagementException _failure(http.Response response, {bool action = false}) {
+    return switch (response.statusCode) {
+      401 => const ServerManagementException(
+        'The PC could not verify your administrator session. Sign in again, then retry.',
+        failure: ServerManagementFailure.authentication,
+      ),
+      403 => const ServerManagementException(
+        'Remote management was refused by the PC. Open Inhouse Photos Server on your PC to repair its connection.',
+        failure: ServerManagementFailure.configuration,
+      ),
+      404 => _notPublished,
+      502 || 503 || 504 => ServerManagementException(
+        action
+            ? 'The Windows manager is offline or restarting. This change was not confirmed. Refresh the connection before trying again.'
+            : 'The Windows manager is offline or restarting. Retrying automatically; open Inhouse Photos Server on the PC if this continues.',
+        failure: ServerManagementFailure.unavailable,
+      ),
+      _ => ServerManagementException(
+        _message(
+          response,
+          action ? 'The PC did not accept this change.' : 'Could not read the Windows manager status.',
+        ),
+        failure: ServerManagementFailure.rejected,
+      ),
+    };
+  }
 
   static String _message(http.Response response, String fallback) {
     try {
