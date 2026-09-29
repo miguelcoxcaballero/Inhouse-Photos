@@ -16,13 +16,22 @@
       "iconURL": "https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/1024.png",
       "tintColor": "#D97736",
       "category": "utilities",
-      "version": "3.1.85",
-      "versionDate": "2026-09-29T11:08:31Z",
-      "versionDescription": "Fixes QR pairing sign-in so the new session works immediately.",
-      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.85-inhouse-ios.1/Inhouse-Photos.ipa",
-      "size": 32447272,
+      "version": "3.1.87",
+      "versionDate": "2026-09-29T16:07:56Z",
+      "versionDescription": "Speeds up foreground backups over the local Wi-Fi network with secure HTTPS routing and automatic Internet fallback.",
+      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.87-inhouse-ios.1/Inhouse-Photos.ipa",
+      "size": 32454964,
       "minOSVersion": "15.0",
       "versions": [
+        {
+          "version": "3.1.87",
+          "buildVersion": "5145",
+          "date": "2026-09-29T16:07:56Z",
+          "localizedDescription": "Speeds up foreground backups over the local Wi-Fi network with secure HTTPS routing and automatic Internet fallback.",
+          "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.87-inhouse-ios.1/Inhouse-Photos.ipa",
+          "size": 32454964,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "3.1.85",
           "buildVersion": "5143",

@@ -1,7 +1,7 @@
 {
-  "version": "3.1.85",
-  "versionCode": 5143,
+  "version": "3.1.87",
+  "versionCode": 5145,
   "required": true,
-  "ipaUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.85-inhouse-ios.1/Inhouse-Photos.ipa",
-  "sha256": "dace1cba94d2f6e10f58d78d8bf1e6894a11f3ac992cc494dc5238aaaa8d3859"
+  "ipaUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.87-inhouse-ios.1/Inhouse-Photos.ipa",
+  "sha256": "0a921eea7f5e65792f72f89ab266bbf6f0ea978adf4d40be3aea4786ebfab174"
 }
