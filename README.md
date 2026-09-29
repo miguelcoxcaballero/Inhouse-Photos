@@ -2,13 +2,13 @@
 
 A private photo and video library for your own computer. Browse from Android or the web, back up new files, and manage the Windows server from one clear dashboard.
 
-[Download Inhouse Photos](https://fotos.miguelcoxcaballero.com/descargas/) · [Windows server installer](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.4/Inhouse-Photos-Server-Setup.exe) · [Latest Android APK](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/latest/download/Inhouse-Photos.apk)
+[Download Inhouse Photos](https://fotos.miguelcoxcaballero.com/descargas/) · [Windows server installer](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.5/Inhouse-Photos-Server-Setup.exe) · [Latest Android APK](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/latest/download/Inhouse-Photos.apk)
 
 ## Get started
 
 1. Install Inhouse Photos Server on a Windows 10/11 computer. Choose an empty folder for a new library, or connect an existing library without moving its photos or changing its accounts.
-2. Open **Conectar móvil** in the Windows manager and copy your HTTPS server address. A local-only address cannot be used on the phone.
-3. Install the Android app and sign in using that address and your existing library account. On iPhone, use the HTTPS web app in Safari and add it to the Home Screen. An unsigned iOS build is also available through the [SideStore source](https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/altstore-source.json), which requires SideStore setup and periodic signing renewal.
+2. Open **Conectar móvil** in the Windows manager. Sign in as an administrator there once; the manager saves only a Windows-encrypted session, not the password. Show the temporary QR code.
+3. In the updated Android or iOS app, scan the QR (or open the link with the phone camera), check the matching six-digit number and approve on both phone and PC. The QR expires after three minutes and cannot be reused. Manual HTTPS address and account sign-in remain available. On iPhone, an unsigned build is available through the [SideStore source](https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/altstore-source.json), which requires SideStore setup and periodic signing renewal; the in-app scanner works even when iOS does not open an unsigned app directly from a web link.
 
 The computer must remain on for remote access. Check the address from the phone using mobile data; a successful test on the PC alone does not prove that it works outside your home. The Windows manager keeps your existing library in place and makes backup status and disk space visible, but a second copy on another disk is still recommended.
 

@@ -15,9 +15,9 @@ namespace InhousePhotos {
     public Dictionary<string,string> Hashes {get;set;}
   }
   public static class NewServer {
-    public const string ImageName="inhouse-photos-server:v3.1.0-storage-saver";
-    public const string ImageId="sha256:c4d5d8b8751deac177e4f5f3cdbeee21e6ff38f77046405032e90587b3df90bd";
-    public const string BundleHash="aad723cdc100ca0b5beb204c004307ffd7c17e4dbda3c0cfb53c5eebc983c70f";
+    public const string ImageName="inhouse-photos-server:v3.1.0-pairing-20260929";
+    public const string ImageId="sha256:283fb546c253d70c3e984062a2d2ebc08ce4547ef799e0ffba634222e4b5c16d";
+    public const string BundleHash="3218c14df0af80c85c5b01d2631ae8341294393f50f9eae05b4505c34b735541";
     static readonly System.Threading.SemaphoreSlim Gate=new System.Threading.SemaphoreSlim(1,1);
     public static string PendingFile {get{return Path.Combine(Backend.SettingsDir,"setup-pending.json");}}
     public static void Validate(string folder,string email,string password,string name,string domain) {
@@ -44,8 +44,8 @@ namespace InhousePhotos {
     }
     static async Task EnsureImage(Action<string> progress) {
       try{if((await Backend.Docker("image inspect "+ImageName+" --format {{.Id}}",15)).Trim()==ImageId)return;}catch{}
-      var archive=Path.Combine(Backend.SettingsDir,"components","inhouse-server-3.1.0.tar.gz");
-      await Download("https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.1.0/inhouse-server-3.1.0.tar.gz",archive,BundleHash,progress);
+      var archive=Path.Combine(Backend.SettingsDir,"components","inhouse-server-3.1.0-pairing-20260929.tar.gz");
+      await Download("https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.5/inhouse-server-3.1.0-pairing-20260929.tar.gz",archive,BundleHash,progress);
       progress("Preparando los componentes descargados…");
       await Backend.Docker("load --input "+Backend.Quote(archive),900);
       if((await Backend.Docker("image inspect "+ImageName+" --format {{.Id}}",15)).Trim()!=ImageId)throw new IOException("El componente del servidor no pasa la verificación.");
@@ -53,7 +53,7 @@ namespace InhousePhotos {
     public static string ComposeText(bool remote) {
       return @"services:
   immich-server:
-    image: inhouse-photos-server:v3.1.0-storage-saver
+    image: inhouse-photos-server:v3.1.0-pairing-20260929
     platform: linux/amd64
     env_file: .env
     volumes:
