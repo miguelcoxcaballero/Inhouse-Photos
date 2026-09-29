@@ -1,7 +1,8 @@
 {
-  "version": "3.1.84",
-  "versionCode": 7142,
+  "version": "3.1.85",
+  "versionCode": 7143,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.84-pairing/Inhouse-Photos.apk",
-  "sha256": "717f130c255d2ac89c7b1c76c90a6cb95401b58519457efba31e9737cb37f178"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.85-pairing-login/Inhouse-Photos.apk",
+  "sizeBytes": 74902341,
+  "sha256": "08c2dee077d896b2f9e9fbc636c41c3166adcd37401838e0cd3b09fadcff6094"
 }
