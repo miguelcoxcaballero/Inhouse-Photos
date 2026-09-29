@@ -19,7 +19,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.2.13.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.14.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -368,6 +368,7 @@ namespace InhousePhotos {
     [STAThread] public static int Main(string[] args){
       PairingClient.RegisterQrAssembly();
       ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
+      if(args.Length==1&&args[0]==UsbNetworkSafety.HelperArgument)return UsbNetworkSafety.RunElevated();
       if(args.Length==2&&args[0]=="--render-setup-preview") {
         var previewApp=new Application();var setupWindow=new NewServerWindow();
         previewApp.Dispatcher.BeginInvoke(new Action(()=>{var root=(FrameworkElement)setupWindow.Content;root.Width=660;root.Height=1000;root.Measure(new Size(660,1000));root.Arrange(new Rect(0,0,660,1000));root.UpdateLayout();var bmp=new RenderTargetBitmap(660,1000,96,96,PixelFormats.Pbgra32);bmp.Render(root);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bmp));using(var stream=File.Create(args[1]))encoder.Save(stream);previewApp.Shutdown();}));return previewApp.Run();
@@ -402,6 +403,7 @@ namespace InhousePhotos {
       }
       if(args.Contains("--self-test")){
         try {
+          if(UsbNetworkSafety.SelfTest()!=0)return 29;
           var sample=Path.Combine(Path.GetTempPath(),"inhouse-validation-only");
           NewServer.Validate(sample,"test@example.com","test-password-long","Test","");
           foreach(var bad in new[]{"https://photos.example.com","a.example.com/route","a.example.com\nextra",""}) {
@@ -495,6 +497,49 @@ namespace InhousePhotos {
           foreach(var missing in new[]{null,"","   ","relative-backups","\0"})
             if(ServerWindow.OptionalDriveRoot(missing)!=null)return 46;
           if(ServerWindow.OptionalDriveRoot(@"E:\backups")!=@"E:\"||ServerWindow.OptionalDriveRoot(@"D:\")!=@"D:\")return 47;
+          foreach(var usb in new[]{
+            new[]{@"USB\VID_18D1&PID_4EE3\phone","Remote NDIS based Internet Sharing Device"},
+            new[]{@"USB\VID_04E8&PID_6863\phone","Samsung Mobile USB RNDIS"},
+            new[]{@"USB\VID_18D1&PID_4EE3\phone","USB NCM Host Device"},
+            new[]{@"USB\VID_05AC&PID_12A8\phone","Apple Mobile Device Ethernet"}})
+            if(!LanRoute.IsPhoneUsbTether(usb[0],usb[1]))return 48;
+          foreach(var notUsb in new[]{
+            new[]{@"PCI\VEN_10EC&DEV_8168","Realtek PCIe GbE Family Controller"},
+            new[]{@"USB\VID_0BDA&PID_8153\dongle","Realtek USB GbE Family Controller"},
+            new[]{@"USB\VID_0BDA&PID_8153\dongle","USB NCM Host Device"},
+            new[]{@"ROOT\NET\0000","Remote NDIS Internet Sharing Device"},
+            new[]{@"USB\VID_18D1&PID_4EE1\phone","Android MTP Device"},
+            new[]{"","Apple Mobile Device Ethernet"}})
+            if(LanRoute.IsPhoneUsbTether(notUsb[0],notUsb[1]))return 49;
+          var ethernetType=System.Net.NetworkInformation.NetworkInterfaceType.Ethernet;
+          var lanAdapter=new LanRoute.Adapter{Up=true,Physical=true,HasGateway=true,Type=ethernetType,
+            Description="Realtek PCIe GbE Family Controller",PnpDeviceId=@"PCI\VEN_10EC&DEV_8168",
+            Speed=100000000L,Addresses=new[]{"192.168.1.237","192.168.1.237","127.0.0.1","8.8.8.8","::1","169.254.1.1"}};
+          var usbAdapter=new LanRoute.Adapter{Up=true,Physical=false,HasGateway=false,Type=ethernetType,
+            Description="Remote NDIS based Internet Sharing Device",PnpDeviceId=@"USB\VID_18D1&PID_4EE3\phone",
+            Speed=480000000L,Addresses=new[]{"192.168.42.2"}};
+          var virtualAdapter=new LanRoute.Adapter{Up=true,Physical=false,HasGateway=true,Type=ethernetType,
+            Description="Hyper-V Virtual Ethernet Adapter",Speed=10000000000L,Addresses=new[]{"172.20.1.1"}};
+          var localCandidates=LanRoute.Candidates(new[]{virtualAdapter,lanAdapter,usbAdapter});
+          if(localCandidates.Length!=2||localCandidates[0].kind!="usb"||localCandidates[0].ipv4!="192.168.42.2"||
+             localCandidates[1].kind!="lan"||localCandidates[1].linkMbps!=100)return 50;
+          usbAdapter.Up=false;lanAdapter.HasGateway=false;
+          if(LanRoute.Candidates(new[]{lanAdapter,usbAdapter,virtualAdapter}).Length!=0)return 51;
+          usbAdapter.Up=true;lanAdapter.HasGateway=true;
+          var manyAddresses=Enumerable.Range(1,20).Select(number=>"10.0.0."+number).ToArray();
+          if(LanRoute.Candidates(new[]{new LanRoute.Adapter{Up=true,Physical=true,HasGateway=true,Type=ethernetType,
+            Description="Ethernet",Addresses=manyAddresses}}).Length!=LanRoute.MaximumRoutes)return 52;
+          var routeDocument=LanRoute.Document("https://photos.example.com",new[]{usbAdapter,lanAdapter});
+          var routeFields=Backend.Json.Deserialize<Dictionary<string,object>>(routeDocument);
+          var routeRows=((System.Collections.IEnumerable)routeFields["routes"]).Cast<object>().ToArray();
+          if((string)routeFields["origin"]!="https://photos.example.com"||(string)routeFields["ipv4"]!="192.168.1.237"||
+             Convert.ToInt32(routeFields["port"])!=443||routeRows.Length!=2||
+             routeDocument==LanRoute.Document("https://photos.example.com",new[]{lanAdapter}))return 53;
+          var emptyRouteFields=Backend.Json.Deserialize<Dictionary<string,object>>(LanRoute.Document("https://photos.example.com",null));
+          if(emptyRouteFields["ipv4"]!=null||((System.Collections.IEnumerable)emptyRouteFields["routes"]).Cast<object>().Any())return 54;
+          foreach(var invalidOrigin in new[]{null,"","http://photos.example.com","https://user:pass@photos.example.com",
+            "https://photos.example.com:444","https://photos.example.com/api","https://photos.example.com?token=secret","https://photos.example.com#secret"})
+            if(LanRoute.Document(invalidOrigin,new[]{lanAdapter})!=null)return 55;
           if(!RemoteManagement.Allowed("GET",RemoteManagement.StatusPath)||
              !RemoteManagement.Allowed("POST",RemoteManagement.StatusPath+"/backup/start")||
              !RemoteManagement.Allowed("POST",RemoteManagement.StatusPath+"/backup/destination/E")||

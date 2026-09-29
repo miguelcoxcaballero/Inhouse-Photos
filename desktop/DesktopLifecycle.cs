@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -15,6 +16,9 @@ namespace InhousePhotos {
   public sealed partial class ServerWindow {
     Forms.NotifyIcon tray;
     DispatcherTimer monitor;
+    DispatcherTimer lanMonitor, lanDebounce;
+    NetworkAddressChangedEventHandler networkAddressChanged;
+    bool lanPublishBusy;
     RemoteManagement remoteManagement;
     string remoteOperation="",remoteError="";
     bool monitorBusy, exitRequested, updateClose, updatingManager;
@@ -25,10 +29,34 @@ namespace InhousePhotos {
       menu.Items.Add("Salir del gestor",null,(s,e)=>Dispatcher.Invoke(()=>{if(busy){notice.Text="Espera a que termine la operación antes de salir.";return;}exitRequested=true;Close();}));
       tray.ContextMenuStrip=menu;tray.DoubleClick+=(s,e)=>Dispatcher.Invoke(BringToFront);
       Closing+=(s,e)=>{if((busy||monitorBusy)&&!updateClose){e.Cancel=true;notice.Text="Espera a que termine la operación antes de salir.";return;}if(!exitRequested){e.Cancel=true;Hide();}};
-      Closed+=(s,e)=>{if(monitor!=null)monitor.Stop();remoteManagement?.Dispose();tray.Dispose();};
+      Closed+=(s,e)=>{
+        if(monitor!=null)monitor.Stop();lanMonitor?.Stop();lanDebounce?.Stop();
+        if(networkAddressChanged!=null)NetworkChange.NetworkAddressChanged-=networkAddressChanged;
+        remoteManagement?.Dispose();tray.Dispose();
+      };
       monitor=new DispatcherTimer{Interval=TimeSpan.FromSeconds(45)};
       monitor.Tick+=async(s,e)=>await Supervise();monitor.Start();
       Dispatcher.BeginInvoke(new Action(async()=>await Supervise()));
+      // A USB tether can appear while backups are already running. Discovery
+      // must not wait for the full supervisor, or be paused by a disk backup.
+      // Publish only private address hints; do not alter gateways or adapters.
+      lanDebounce=new DispatcherTimer{Interval=TimeSpan.FromSeconds(2)};
+      lanDebounce.Tick+=async(s,e)=>{lanDebounce.Stop();await RefreshLocalRoutes();};
+      networkAddressChanged=(s,e)=>{
+        if(Dispatcher.HasShutdownStarted)return;
+        try{Dispatcher.BeginInvoke(new Action(()=>{lanDebounce.Stop();lanDebounce.Start();}));}
+        catch(InvalidOperationException){ /* The window may be closing. */ }
+      };
+      NetworkChange.NetworkAddressChanged+=networkAddressChanged;
+      lanMonitor=new DispatcherTimer{Interval=TimeSpan.FromSeconds(10)};
+      lanMonitor.Tick+=async(s,e)=>await RefreshLocalRoutes();lanMonitor.Start();
+    }
+    async Task RefreshLocalRoutes() {
+      if(lanPublishBusy||exitRequested||updatingManager||!prefs.Managed)return;
+      lanPublishBusy=true;
+      try{await Task.Run(()=>LanRoute.Publish(prefs));}
+      catch{ /* Discovery outages never stop the existing HTTPS server. */ }
+      finally{lanPublishBusy=false;}
     }
     internal void BringToFront(){Show();WindowState=WindowState.Normal;Activate();}
     async Task Supervise() {
@@ -322,6 +350,22 @@ namespace InhousePhotos {
       // The Windows task query can take seconds; the Settings page stays usable
       // while the switch remains unavailable until its actual state is known.
       _=RefreshStartupState();
+      Rule();content.Children.Add(Label("Transferencia por cable",22));
+      content.Children.Add(Label("Conecta el móvil con un cable de datos. En Android activa Compartir conexión por USB; en iPhone activa Punto de acceso personal y confía en este PC. Si Windows no reconoce el iPhone, instala Apple Devices. Mantén la app del móvil abierta.",14,muted));
+      content.Children.Add(Label("Preparar USB evita que este PC use los datos móviles como acceso a Internet. Después, la app detectará el cable y mostrará la velocidad real en los detalles de la copia. Un cable en modo carga o archivos no basta.",14,muted));
+      var prepareCable=new Button{Content="Preparar USB",HorizontalAlignment=HorizontalAlignment.Left};
+      content.Children.Add(prepareCable);
+      prepareCable.Click+=async(s,e)=>{
+        if(busy||monitorBusy||updatingManager){notice.Text="Espera a que termine la operación actual antes de preparar el cable.";return;}
+        if(!Confirm("Se cambiará únicamente la prioridad de la red USB del móvil y se quitarán sus rutas predeterminadas a Internet. No se cambiará Ethernet, Wi-Fi, DNS ni tus fotos. El PC seguirá usando su conexión habitual a Internet. Windows pedirá permiso de administrador. ¿Preparar USB?"))return;
+        busy=true;prepareCable.IsEnabled=false;
+        try {
+          await UsbNetworkSafety.PrepareWithConsent();
+          notice.Text=UsbNetworkSafety.MessageFor(0);
+          await RefreshLocalRoutes();
+        }catch(Exception ex){notice.Text=ex.Message;}
+        finally{busy=false;if(content.Children.Contains(prepareCable))prepareCable.IsEnabled=true;}
+      };
       Rule();content.Children.Add(Label("Conexión del servidor",22));
       if(prefs.Managed&&File.Exists(prefs.ReceiptPath)) {
         var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));
