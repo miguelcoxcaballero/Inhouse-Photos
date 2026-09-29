@@ -4,6 +4,11 @@ import 'package:immich_mobile/repositories/lan_upload_route.dart';
 void main() {
   final origin = Uri.parse('https://fotos.miguelcoxcaballero.com/');
 
+  test('discovers at the public root even when the saved API endpoint ends in /api', () {
+    final discovered = LanUploadRouteResolver.publicOriginForApiEndpoint('https://fotos.miguelcoxcaballero.com/api');
+    expect(discovered, origin);
+  });
+
   test('accepts only a private LAN address for the current HTTPS origin', () {
     final route = LanUploadRoute.fromHint(origin, {
       'origin': 'https://fotos.miguelcoxcaballero.com',

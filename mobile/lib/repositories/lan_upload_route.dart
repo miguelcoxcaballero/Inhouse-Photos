@@ -82,6 +82,17 @@ class LanUploadRoute {
 class LanUploadRouteResolver {
   const LanUploadRouteResolver();
 
+  static Uri? publicOriginForApiEndpoint(String? endpoint) {
+    final apiEndpoint = endpoint == null ? null : Uri.tryParse(endpoint);
+    if (apiEndpoint == null ||
+        apiEndpoint.scheme != 'https' ||
+        apiEndpoint.host.isEmpty ||
+        apiEndpoint.userInfo.isNotEmpty) {
+      return null;
+    }
+    return apiEndpoint.resolve('/');
+  }
+
   Future<LanUploadRoute?> resolve(Uri origin) async {
     if (origin.scheme != 'https' || origin.port != 443 || (origin.path.isNotEmpty && origin.path != '/')) {
       return null;

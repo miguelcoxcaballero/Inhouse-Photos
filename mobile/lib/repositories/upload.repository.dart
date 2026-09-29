@@ -46,17 +46,21 @@ class UploadRepository {
   /// The hint arrives over the already-authenticated public HTTPS origin and
   /// the local connection must still present that origin's valid TLS cert.
   Future<bool> prepareLocalRoute({required bool isUnmetered}) async {
-    _lanRoute = null;
-    _lanClient?.close();
-    _lanClient = null;
     if (!isUnmetered) {
+      _disableLocalRoute();
       return false;
     }
     final endpoint = Store.tryGet(StoreKey.serverEndpoint);
-    final origin = endpoint == null ? null : Uri.tryParse(endpoint);
+    // Stored server endpoints normally end in /api. Discovery is hosted at
+    // the public site's root, while actual uploads stay on /api/assets.
+    final origin = LanUploadRouteResolver.publicOriginForApiEndpoint(endpoint);
     if (origin == null) {
       return false;
     }
+    if (_lanRoute?.origin == origin && _lanClient != null) {
+      return true;
+    }
+    _disableLocalRoute();
     final route = await const LanUploadRouteResolver().resolve(origin);
     if (route == null) {
       return false;

@@ -9,7 +9,12 @@ Future<void> main(List<String> args) async {
     exitCode = 2;
     return;
   }
-  final origin = Uri.parse(args[0]);
+  final origin = LanUploadRouteResolver.publicOriginForApiEndpoint(args[0]);
+  if (origin == null) {
+    stderr.writeln('The server endpoint must be an HTTPS URL');
+    exitCode = 2;
+    return;
+  }
   final route = args.length == 1
       ? await const LanUploadRouteResolver().resolve(origin)
       : LanUploadRoute.fromHint(origin, {'origin': origin.toString(), 'ipv4': args[1], 'port': 443});
