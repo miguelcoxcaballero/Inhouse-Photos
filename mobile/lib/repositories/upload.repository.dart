@@ -10,12 +10,17 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/network.repository.dart';
 import 'package:logging/logging.dart';
 import 'package:http/http.dart';
+import 'package:http/io_client.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
+
+import 'package:immich_mobile/repositories/lan_upload_route.dart';
 
 final uploadRepositoryProvider = Provider((ref) => UploadRepository());
 
 class UploadRepository {
   final Logger logger = Logger('UploadRepository');
+  IOClient? _lanClient;
+  LanUploadRoute? _lanRoute;
   void Function(TaskStatusUpdate)? onUploadStatus;
   void Function(TaskProgressUpdate)? onTaskProgress;
 
@@ -35,6 +40,41 @@ class UploadRepository {
       taskStatusCallback: (update) => onUploadStatus?.call(update),
       taskProgressCallback: (update) => onTaskProgress?.call(update),
     );
+  }
+
+  /// Resolve the server's trusted LAN hint once per foreground backup run.
+  /// The hint arrives over the already-authenticated public HTTPS origin and
+  /// the local connection must still present that origin's valid TLS cert.
+  Future<bool> prepareLocalRoute({required bool isUnmetered}) async {
+    _lanRoute = null;
+    _lanClient?.close();
+    _lanClient = null;
+    if (!isUnmetered) {
+      return false;
+    }
+    final endpoint = Store.tryGet(StoreKey.serverEndpoint);
+    final origin = endpoint == null ? null : Uri.tryParse(endpoint);
+    if (origin == null) {
+      return false;
+    }
+    final route = await const LanUploadRouteResolver().resolve(origin);
+    if (route == null) {
+      return false;
+    }
+    _lanRoute = route;
+    _lanClient = route.createClient();
+    logger.info('Using verified local HTTPS route for foreground uploads');
+    return true;
+  }
+
+  void _disableLocalRoute() {
+    if (_lanRoute == null) {
+      return;
+    }
+    logger.warning('Local upload route stopped responding; falling back to the public server');
+    _lanRoute = null;
+    _lanClient?.close();
+    _lanClient = null;
   }
 
   Future<void> enqueueBackground(UploadTask task) {
@@ -146,6 +186,48 @@ class UploadRepository {
     void Function(int bytes, int totalBytes)? onProgress,
     required String logContext,
   }) async {
+    final lanClient = _lanClient;
+    if (_lanRoute != null && lanClient != null) {
+      final localResult = await _sendFileOnce(
+        file: file,
+        originalFileName: originalFileName,
+        fields: fields,
+        cancelToken: cancelToken,
+        onProgress: onProgress,
+        logContext: '$logContext/local',
+        client: lanClient,
+        useBearerToken: true,
+      );
+      if (localResult.isSuccess || localResult.isCancelled || localResult.statusCode != null) {
+        return localResult;
+      }
+      // A local TCP/TLS failure is not an upload failure. Retry the same asset
+      // immediately via the existing public route and keep future uploads on
+      // that route until the next backup run probes the LAN again.
+      _disableLocalRoute();
+    }
+    return _sendFileOnce(
+      file: file,
+      originalFileName: originalFileName,
+      fields: fields,
+      cancelToken: cancelToken,
+      onProgress: onProgress,
+      logContext: logContext,
+      client: NetworkRepository.client,
+      useBearerToken: false,
+    );
+  }
+
+  Future<UploadResult> _sendFileOnce({
+    required File file,
+    required String originalFileName,
+    required Map<String, String> fields,
+    required Completer<void>? cancelToken,
+    void Function(int bytes, int totalBytes)? onProgress,
+    required String logContext,
+    required Client client,
+    required bool useBearerToken,
+  }) async {
     final String savedEndpoint = Store.get(StoreKey.serverEndpoint);
     final baseRequest = ProgressMultipartRequest(
       'POST',
@@ -153,6 +235,10 @@ class UploadRepository {
       abortTrigger: cancelToken?.future,
       onProgress: onProgress,
     );
+    baseRequest.followRedirects = false;
+    if (useBearerToken) {
+      baseRequest.headers[HttpHeaders.authorizationHeader] = 'Bearer ${Store.get(StoreKey.accessToken)}';
+    }
 
     try {
       final fileStream = file.openRead();
@@ -161,7 +247,7 @@ class UploadRepository {
       baseRequest.fields.addAll(fields);
       baseRequest.files.add(assetRawUploadData);
 
-      final response = await NetworkRepository.client.send(baseRequest);
+      final response = await client.send(baseRequest);
       final responseBodyString = await response.stream.bytesToString();
 
       if (![200, 201].contains(response.statusCode)) {

@@ -19,7 +19,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.2.5.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.6.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {

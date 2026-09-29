@@ -39,6 +39,9 @@ namespace InhousePhotos {
           await Backend.StartManaged(prefs,text=>Dispatcher.Invoke(()=>notice.Text=text));
           online=true;notice.Text="Servidor disponible.";
         }
+        if(online) {
+          try {await LanRoute.Publish(prefs);} catch { /* Public HTTPS remains available if LAN discovery cannot be published. */ }
+        }
         if(Backend.IsBackupDue()) {
           if(String.IsNullOrWhiteSpace(prefs.BackupDestination)) {
             Backend.RecordScheduledBackupResult(false,"destination");

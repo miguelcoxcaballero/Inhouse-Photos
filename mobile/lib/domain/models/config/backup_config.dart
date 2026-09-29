@@ -54,15 +54,15 @@ extension BackupSpeedModeProfile on BackupSpeedMode {
   /// HTTPS request latency is significant when backing up many small photos.
   /// Wi-Fi therefore uses enough concurrent requests to keep the connection
   /// saturated. Metered networks remain deliberately more conservative.
-  BackupTransferPlan transferPlan({required bool isUnmetered, required int itemCount}) {
+  BackupTransferPlan transferPlan({required bool isUnmetered, required int itemCount, bool isLocal = false}) {
     if (itemCount <= 0) {
       return BackupTransferPlan.empty;
     }
 
     final uploadLimit = switch (this) {
-      .balanced => isUnmetered ? 6 : 3,
-      .fast => isUnmetered ? 12 : 6,
-      .maximum => isUnmetered ? 24 : 12,
+      .balanced => isLocal ? 6 : (isUnmetered ? 6 : 3),
+      .fast => isLocal ? 10 : (isUnmetered ? 12 : 6),
+      .maximum => isLocal ? 16 : (isUnmetered ? 24 : 12),
     };
     final preparationLimit = switch (this) {
       .balanced => isUnmetered ? 4 : 2,

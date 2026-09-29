@@ -199,6 +199,8 @@ class ForegroundUploadService {
     final networkCapabilities = await _connectivityApi.getCapabilities();
     final hasWifi = networkCapabilities.isUnmetered;
     _logger.info('Network capabilities: $networkCapabilities, hasWifi/isUnmetered: $hasWifi');
+    final usingLocalRoute = await _uploadRepository.prepareLocalRoute(isUnmetered: hasWifi);
+    _logger.info('Foreground upload route: ${usingLocalRoute ? 'verified LAN HTTPS' : 'public HTTPS'}');
 
     if (useSequentialUpload) {
       await _uploadSequentially(items: candidates, cancelToken: cancelToken, hasWifi: hasWifi, callbacks: callbacks);
@@ -207,6 +209,7 @@ class ForegroundUploadService {
         items: candidates,
         cancelToken: cancelToken,
         isUnmetered: hasWifi,
+        isLocal: usingLocalRoute,
         shouldSkip: (asset) {
           final requireWifi = _shouldRequireWiFi(asset);
           return requireWifi && !hasWifi;
@@ -225,6 +228,7 @@ class ForegroundUploadService {
     required List<LocalAsset> items,
     required Completer<void>? cancelToken,
     required bool isUnmetered,
+    required bool isLocal,
     required bool Function(LocalAsset) shouldSkip,
     required UploadCallbacks callbacks,
   }) async {
@@ -232,7 +236,7 @@ class ForegroundUploadService {
     shouldAbortUpload = false;
 
     final speed = SettingsRepository.instance.appConfig.backup.speed;
-    final transferPlan = speed.transferPlan(isUnmetered: isUnmetered, itemCount: items.length);
+    final transferPlan = speed.transferPlan(isUnmetered: isUnmetered, itemCount: items.length, isLocal: isLocal);
     final waitsForServerCompression =
         SettingsRepository.instance.appConfig.backup.quality == BackupQuality.storageSaver &&
         callbacks.onServerCompressionExpected != null &&
@@ -246,7 +250,7 @@ class ForegroundUploadService {
     // measured network throughput, while a separate semaphore bounds how many
     // assets may be awaiting compression on the server.
     final uploadWorkerCount = transferPlan.uploadWorkers;
-    final adaptiveLimit = AdaptiveUploadLimiter(maximum: uploadWorkerCount, isUnmetered: isUnmetered);
+    final adaptiveLimit = AdaptiveUploadLimiter(maximum: uploadWorkerCount, isUnmetered: isUnmetered, isLocal: isLocal);
     final uploadGate = UploadCapacityGate(adaptiveLimit.current);
     final compressionWindow = waitsForServerCompression ? transferPlan.compressionWindow(isUnmetered: isUnmetered) : 0;
     final compressionGate = UploadCapacityGate(compressionWindow);
@@ -450,6 +454,9 @@ class ForegroundUploadService {
       return;
     }
 
+    final networkCapabilities = await _connectivityApi.getCapabilities();
+    await _uploadRepository.prepareLocalRoute(isUnmetered: networkCapabilities.isUnmetered);
+
     await _executeWithWorkerPool<LocalAsset>(
       items: localAssets,
       cancelToken: cancelToken,
@@ -468,6 +475,8 @@ class ForegroundUploadService {
     if (files.isEmpty) {
       return;
     }
+    final networkCapabilities = await _connectivityApi.getCapabilities();
+    await _uploadRepository.prepareLocalRoute(isUnmetered: networkCapabilities.isUnmetered);
     await _executeWithWorkerPool<File>(
       items: files,
       cancelToken: cancelToken,

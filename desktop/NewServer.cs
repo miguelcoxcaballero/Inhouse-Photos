@@ -125,7 +125,7 @@ namespace InhousePhotos {
           state=new SetupState{Project="inhouse-"+Backend.RandomHex(8),Port=port,Domain=domain};
           File.WriteAllText(Path.Combine(folder,"docker-compose.yml"),ComposeText(!String.IsNullOrEmpty(domain)),new UTF8Encoding(false));
           File.WriteAllText(Path.Combine(folder,".env"),"UPLOAD_LOCATION=./library\nINHOUSE_PORT="+port+"\nDB_HOSTNAME=database\nDB_USERNAME=postgres\nDB_DATABASE_NAME=immich\nREDIS_HOSTNAME=redis\nDB_PASSWORD="+Backend.RandomHex(32)+"\n",new UTF8Encoding(false));
-          if(!String.IsNullOrEmpty(domain))File.WriteAllText(Path.Combine(folder,"Caddyfile"),domain+" {\n reverse_proxy immich-server:2283\n}\n",new UTF8Encoding(false));
+          if(!String.IsNullOrEmpty(domain))File.WriteAllText(Path.Combine(folder,"Caddyfile"),domain+" {\n handle "+LanRoute.RoutePath+" {\n  root * /data\n  rewrite * /inhouse-lan.json\n  header Cache-Control \"no-store\"\n  file_server\n }\n handle {\n  reverse_proxy immich-server:2283\n }\n}\n",new UTF8Encoding(false));
           state.Hashes=Backend.ConfigurationHashes(new Preferences{Installation=folder});File.WriteAllText(stateFile,Backend.Json.Serialize(state));
         }
         if(persist){Backend.PrivateDirectory(Backend.SettingsDir);File.WriteAllText(PendingFile,Backend.Json.Serialize(new{Folder=folder,Domain=domain,Email=email,Name=name}));}
@@ -141,7 +141,10 @@ namespace InhousePhotos {
         catch(WebException){ /* A previous attempt may have already created it. */ }
         var login=await Post(p.LocalEndpoint,"/api/auth/login",new{email=email,password=password});
         if(!login.ContainsKey("isAdmin")||!(bool)login["isAdmin"])throw new IOException("No se ha podido verificar la cuenta administradora.");
-        if(!String.IsNullOrEmpty(domain))await Backend.Compose(p,"up -d caddy",300);
+        if(!String.IsNullOrEmpty(domain)) {
+          await Backend.Compose(p,"up -d caddy",300);
+          try {await LanRoute.Publish(p);} catch {progress("La conexión local rápida se activará cuando el gestor vuelva a comprobar la red.");}
+        }
         progress("Verificando la copia de recuperación…");await Backend.Adopt(p,progress,persist);
         if(persist) {
           try {PairingClient.SaveSession(p,Convert.ToString(login["accessToken"]),Convert.ToString(login["userEmail"]));}

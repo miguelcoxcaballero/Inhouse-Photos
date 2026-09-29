@@ -2,6 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/config/backup_config.dart';
 
 void main() {
+  test('verified LAN transfers cap connections at sixteen instead of crowding the server', () {
+    final plan = BackupSpeedMode.maximum.transferPlan(isUnmetered: true, isLocal: true, itemCount: 100);
+    expect(plan.uploadWorkers, 16);
+  });
   test('the compression window prevents an unbounded server backlog', () {
     for (final mode in BackupSpeedMode.values) {
       for (final isUnmetered in [true, false]) {

@@ -4,8 +4,8 @@ import 'dart:math' as math;
 /// Samples completed transfers rather than guessing throughput from the
 /// connection type. The caller owns the actual concurrency gate.
 class AdaptiveUploadLimiter {
-  AdaptiveUploadLimiter({required this.maximum, required bool isUnmetered})
-    : current = math.min(maximum, isUnmetered ? 4 : 2),
+  AdaptiveUploadLimiter({required this.maximum, required bool isUnmetered, bool isLocal = false})
+    : current = math.min(maximum, isLocal ? 8 : (isUnmetered ? 4 : 2)),
       _minimum = math.min(maximum, isUnmetered ? 4 : 2);
 
   final int maximum;

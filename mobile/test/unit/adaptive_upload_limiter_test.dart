@@ -21,4 +21,14 @@ void main() {
     }
     expect(limiter.record(bytes: 0, success: false, now: start.add(const Duration(seconds: 5))), 2);
   });
+
+  test('a verified LAN path starts with eight transfers but still backs off on failures', () {
+    final limiter = AdaptiveUploadLimiter(maximum: 16, isUnmetered: true, isLocal: true);
+    final start = DateTime.utc(2026);
+    expect(limiter.current, 8);
+    for (var i = 0; i < 3; i++) {
+      limiter.record(bytes: 1000, success: true, now: start.add(Duration(seconds: i)));
+    }
+    expect(limiter.record(bytes: 0, success: false, now: start.add(const Duration(seconds: 5))), 4);
+  });
 }

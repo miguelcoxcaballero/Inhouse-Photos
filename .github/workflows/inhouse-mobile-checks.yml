@@ -33,6 +33,11 @@ jobs:
           test/unit/required_update_gate_test.dart
           test/services/auth.service_test.dart
           test/providers/auth_pairing_cookie_test.dart
+          test/repositories/lan_upload_route_test.dart
+          test/repositories/upload_repository_test.dart
+          test/services/foreground_upload.service_test.dart
+          test/domain/models/config/backup_config_test.dart
+          test/unit/adaptive_upload_limiter_test.dart
           test/services/pairing.service_test.dart
           test/widgets/forms/login/pairing_login_test.dart
           test/domain/services/timeline_norefresh_test.dart
