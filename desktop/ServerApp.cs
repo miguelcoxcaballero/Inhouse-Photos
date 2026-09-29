@@ -13,12 +13,13 @@ using System.Web.Script.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.2.3.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.4.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -247,12 +248,15 @@ namespace InhousePhotos {
   public sealed partial class ServerWindow : Window {
     Preferences prefs=Backend.Load();
     readonly StackPanel content=new StackPanel();
+    readonly TranslateTransform contentMotion=new TranslateTransform();
     readonly TextBlock notice=new TextBlock();
     readonly Dictionary<string,Button> tabs=new Dictionary<string,Button>();
     readonly Dictionary<string,Border> navRails=new Dictionary<string,Border>();
     readonly Dictionary<string,TextBlock> navTitles=new Dictionary<string,TextBlock>();
     readonly TextBlock sidebarLocation=new TextBlock();
     string page="Inicio"; bool busy, refreshing;
+    string renderedPage;
+    internal bool DisableTransitions {get;set;}
     CancellationTokenSource backupCancellation;
     readonly Brush accent=new SolidColorBrush(Color.FromRgb(169,71,18));
     readonly Brush muted=new SolidColorBrush(Color.FromRgb(104,95,85));
@@ -294,6 +298,7 @@ namespace InhousePhotos {
       var noticePanel=new Border{Background=new SolidColorBrush(Color.FromRgb(246,231,216)),BorderBrush=accent,BorderThickness=new Thickness(3,0,0,0),CornerRadius=new CornerRadius(6),Padding=new Thickness(14,10,14,10),Margin=new Thickness(0,10,0,0),Child=notice,Visibility=Visibility.Collapsed};
       DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty,typeof(TextBlock)).AddValueChanged(notice,(s,e)=>noticePanel.Visibility=String.IsNullOrWhiteSpace(notice.Text)?Visibility.Collapsed:Visibility.Visible);
       DockPanel.SetDock(noticePanel,Dock.Bottom);right.Children.Add(noticePanel);
+      content.RenderTransform=contentMotion;
       right.Children.Add(new ScrollViewer{Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
       Loaded+=async(s,e)=>await Render();
       Closing+=(s,e)=>{if(busy){e.Cancel=true;notice.Text="Espera a que termine la operación antes de cerrar.";}};
@@ -316,9 +321,19 @@ namespace InhousePhotos {
       if(refreshing)return;
       if(!busy)prefs=Backend.Load();
       if(!prefs.Managed)page="Inicio";
-      try{sidebarLocation.Text=prefs.Managed?Backend.Library(prefs):"Aún sin conectar";sidebarLocation.ToolTip=sidebarLocation.Text;}
+      var pageChanged=renderedPage!=null&&!String.Equals(renderedPage,page,StringComparison.Ordinal);
+      try{
+        var library=prefs.Managed?Backend.Library(prefs):null;
+        sidebarLocation.Text=prefs.Managed?"Fotos en "+Path.GetPathRoot(library).TrimEnd('\\'):"Aún sin conectar";
+        sidebarLocation.ToolTip=library??sidebarLocation.Text;
+      }
       catch{sidebarLocation.Text="Biblioteca no disponible";sidebarLocation.ToolTip=null;}
       refreshing=true;
+      // A refresh must never inherit an unfinished page animation.
+      content.BeginAnimation(UIElement.OpacityProperty,null);
+      contentMotion.BeginAnimation(TranslateTransform.YProperty,null);
+      content.Opacity=1;
+      contentMotion.Y=0;
       content.Children.Clear();
       foreach(var item in tabs) {
         item.Value.IsEnabled=false;
@@ -329,12 +344,21 @@ namespace InhousePhotos {
         navRails[item.Key].Visibility=selected?Visibility.Visible:Visibility.Hidden;
         navTitles[item.Key].Foreground=selected?Foreground:muted;
       }
+      var pageRendered=false;
       try {
         if(prefs.Managed)await RenderManagedPage();
         else await RenderSimpleHome();
+        pageRendered=true;
       } catch(Exception ex) {
         content.Children.Add(Label(ex.Message,16,accent));
       } finally {
+        if(pageRendered&&pageChanged&&!DisableTransitions&&SystemParameters.ClientAreaAnimation){
+          var duration=new Duration(TimeSpan.FromMilliseconds(160));
+          var easing=new QuadraticEase{EasingMode=EasingMode.EaseOut};
+          content.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(0,1,duration){EasingFunction=easing,FillBehavior=FillBehavior.Stop});
+          contentMotion.BeginAnimation(TranslateTransform.YProperty,new DoubleAnimation(7,0,duration){EasingFunction=easing,FillBehavior=FillBehavior.Stop});
+        }
+        renderedPage=page;
         refreshing=false;
         foreach(var item in tabs)item.Value.IsEnabled=prefs.Managed||item.Key=="Inicio";
       }
@@ -454,6 +478,7 @@ namespace InhousePhotos {
       if(!first){if(!args.Contains("--startup")){try{using(var activate=EventWaitHandle.OpenExisting(@"Local\InhousePhotosServer.Activate"))activate.Set();}catch{}}return 0;}
       var app=new Application();var window=new ServerWindow();
       if(preview){
+        window.DisableTransitions=true;
         var previewWidth=args.Length>=5?int.Parse(args[3]):1080;
         var previewHeight=args.Length>=5?int.Parse(args[4]):760;
         if(previewWidth<760||previewHeight<600||previewWidth>2400||previewHeight>1800)throw new ArgumentOutOfRangeException("preview","Tamaño de vista previa no válido.");

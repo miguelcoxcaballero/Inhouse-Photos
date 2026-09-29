@@ -6,8 +6,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Markup;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 
 namespace InhousePhotos {
   public sealed class NewServerWindow:Window {
@@ -27,7 +29,7 @@ namespace InhousePhotos {
     readonly CheckBox consent=new CheckBox(),startup=new CheckBox();
     readonly RadioButton localAccess=new RadioButton(),remoteAccess=new RadioButton();
     TextBlock feedback,progressText;
-    int step;
+    int step,lastRenderedStep=-1;
     bool busy,resuming,pendingReadFailed;
     public Preferences Result {get;private set;}
 
@@ -72,7 +74,10 @@ namespace InhousePhotos {
     }
 
     void Render() {
+      var stepChanged=lastRenderedStep>=0&&lastRenderedStep!=step;
       root.Children.OfType<FrameworkElement>().Where(x=>Grid.GetRow(x)==0).ToList().ForEach(x=>root.Children.Remove(x));
+      foreach(var control in new FrameworkElement[]{folder,email,name,domain,password,consent,startup,localAccess,remoteAccess})
+        if(control.Parent is Panel parent)parent.Children.Remove(control);
       content.Children.Clear();footer.Children.Clear();
       RenderHeader();
       if(step==0)RenderLocation();
@@ -82,6 +87,12 @@ namespace InhousePhotos {
       else RenderInstalling();
       RenderFooter();
       viewer.ScrollToTop();
+      if(stepChanged&&IsLoaded&&SystemParameters.ClientAreaAnimation&&!Environment.GetCommandLineArgs().Contains("--render-setup-preview")){
+        var fade=new DoubleAnimation(0,1,new Duration(TimeSpan.FromMilliseconds(160))){
+          EasingFunction=new QuadraticEase{EasingMode=EasingMode.EaseOut},FillBehavior=FillBehavior.Stop};
+        content.BeginAnimation(OpacityProperty,fade);
+      }
+      lastRenderedStep=step;
     }
 
     void RenderHeader() {
@@ -89,17 +100,20 @@ namespace InhousePhotos {
       var titleRow=new Grid();titleRow.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
       titleRow.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
       var identity=new StackPanel();identity.Children.Add(Label("INHOUSE PHOTOS",12,Accent,new Thickness(0,0,0,3)));
-      identity.Children.Add(Label("Tu biblioteca, bajo tu control",22,Ink,new Thickness(0,0,0,0)));
+      var windowTitle=Label("Crear mi biblioteca",23,Ink,new Thickness(0));windowTitle.FontWeight=FontWeights.SemiBold;
+      identity.Children.Add(windowTitle);
       titleRow.Children.Add(identity);
-      var count=Label(step==4?"PREPARANDO":"PASO "+(step+1)+" DE 4",12,Muted,new Thickness(12,8,0,0));
+      var count=Label(step==4?"Preparando":"Paso "+(step+1)+" de 4",13,Muted,new Thickness(12,8,0,0));
       Grid.SetColumn(count,1);titleRow.Children.Add(count);wrap.Children.Add(titleRow);
-      var stages=new Grid{Margin=new Thickness(0,22,0,0)};
+      var stages=new Grid{Margin=new Thickness(0,20,0,0)};
       var names=new[]{"Ubicación","Cuenta","Acceso","Confirmar"};
       for(int i=0;i<4;i++)stages.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
       for(int i=0;i<4;i++) {
         var part=new StackPanel{Margin=new Thickness(i==0?0:3,0,i==3?0:3,0)};
         part.Children.Add(new Border{Background=i<=step?Accent:Outline,Height=3,CornerRadius=new CornerRadius(2)});
-        part.Children.Add(Label(names[i],12,i==step?Ink:Muted,new Thickness(0,7,0,0)));
+        var stageLabel=Label((i<step?"✓":(i+1).ToString())+"  "+names[i],12,i==step?Ink:Muted,new Thickness(0,7,0,0));
+        if(i==step)stageLabel.FontWeight=FontWeights.SemiBold;
+        part.Children.Add(stageLabel);
         Grid.SetColumn(part,i);stages.Children.Add(part);
       }
       wrap.Children.Add(stages);Grid.SetRow(wrap,0);root.Children.Add(wrap);
@@ -107,24 +121,19 @@ namespace InhousePhotos {
 
     void RenderLocation() {
       Heading("Elige dónde guardar las fotos","Esta será la biblioteca nueva. La instalación no moverá ni borrará fotos de otras carpetas.");
-      var location=Card();
+      var location=Section();
       var drive=SafeDrive(folder.Text);
-      var disk=new Grid();disk.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
-      disk.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
-      var mark=new Border{Width=54,Height=54,CornerRadius=new CornerRadius(13),Background=Field,Margin=new Thickness(0,0,16,0),Child=Label(drive==null?"PC":drive.Name.TrimEnd('\\').ToUpperInvariant(),17,Accent,new Thickness(0))};
-      disk.Children.Add(mark);var description=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
-      description.Children.Add(Label(drive==null?"Almacenamiento local":"Disco "+drive.Name.TrimEnd('\\'),17,Ink,new Thickness(0)));
-      description.Children.Add(Label(drive==null?"Elige una carpeta en un disco interno":FormatSize(drive.AvailableFreeSpace)+" disponibles",14,Muted,new Thickness(0,4,0,0)));
-      Grid.SetColumn(description,1);disk.Children.Add(description);location.Children.Add(disk);
-      location.Children.Add(Label("CARPETA DE LA BIBLIOTECA",12,Muted,new Thickness(0,20,0,8)));
+      var disk=Label(drive==null?"Disco local · Elige una carpeta en un disco interno":"Disco "+drive.Name.TrimEnd('\\')+" · "+FormatSize(drive.AvailableFreeSpace)+" disponibles",14,Muted,new Thickness(0,0,0,19));
+      location.Children.Add(disk);
+      location.Children.Add(FieldLabel("CARPETA DE LA BIBLIOTECA",new Thickness(0,0,0,8)));
       AddInput(location,folder);
-      location.Children.Add(ActionButton("Elegir carpeta",async()=>{
+      var choose=ActionButton("Elegir carpeta",async()=>{
         using(var picker=new System.Windows.Forms.FolderBrowserDialog()){
           picker.Description="Elige una carpeta vacía para la biblioteca nueva";
           if(picker.ShowDialog()==System.Windows.Forms.DialogResult.OK){folder.Text=picker.SelectedPath;Render();}
         }
         await Task.CompletedTask;
-      }));
+      });choose.Margin=new Thickness(0,10,0,0);location.Children.Add(choose);
       if(resuming)Note("Preparación pendiente","Puedes continuar en la misma carpeta. La aplicación no sustituirá los datos que ya haya creado.",true);
       else if(pendingReadFailed)Note("Comprueba la carpeta","No se pudo leer una preparación anterior. Selecciona la misma carpeta si quieres reanudarla; nunca se borrará automáticamente.",true);
       else Note("Antes de empezar","Necesitas una carpeta vacía y al menos 10 GB libres. Recomendamos un disco con espacio para el crecimiento de tu biblioteca.",false);
@@ -132,10 +141,10 @@ namespace InhousePhotos {
 
     void RenderAccount() {
       Heading("Tu cuenta de administrador","La usarás para entrar desde el móvil y gestionar tu biblioteca.");
-      var account=Card();
-      account.Children.Add(Label("NOMBRE",12,Muted,new Thickness(0,0,0,8)));AddInput(account,name);
-      account.Children.Add(Label("CORREO ELECTRÓNICO",12,Muted,new Thickness(0,10,0,8)));AddInput(account,email);
-      account.Children.Add(Label("CONTRASEÑA",12,Muted,new Thickness(0,10,0,8)));AddPassword(account,password);
+      var account=Section();
+      account.Children.Add(FieldLabel("NOMBRE",new Thickness(0,0,0,8)));AddInput(account,name);
+      account.Children.Add(FieldLabel("CORREO ELECTRÓNICO",new Thickness(0,18,0,8)));AddInput(account,email);
+      account.Children.Add(FieldLabel("CONTRASEÑA",new Thickness(0,18,0,8)));AddPassword(account,password);
       account.Children.Add(Label("Mínimo 12 caracteres. No se mostrará en el resumen.",13,Muted,new Thickness(0,4,0,0)));
       Note("Tu cuenta es privada","La contraseña se utiliza para crear y verificar tu cuenta; no se guardará en el asistente.",false);
       if(resuming)Note("Si estás reanudando","Introduce la misma contraseña de la primera vez para comprobar la cuenta que ya se haya creado.",true);
@@ -143,14 +152,14 @@ namespace InhousePhotos {
 
     void RenderAccess() {
       Heading("¿Desde dónde quieres entrar?","Puedes usar la biblioteca en este PC o preparar el acceso con tu propio dominio.");
-      var access=Card();
+      var access=Section();
       StyleChoice(localAccess);StyleChoice(remoteAccess);
       access.Children.Add(localAccess);
       access.Children.Add(Label("Sin configurar internet ahora. Más adelante podrás preparar el acceso externo con ayuda técnica.",14,Muted,new Thickness(31,3,0,19)));
       access.Children.Add(new Border{Height=1,Background=Outline,Margin=new Thickness(0,0,0,16)});
       access.Children.Add(remoteAccess);
       access.Children.Add(Label("Para entrar desde el móvil fuera de casa necesitas un dominio.",14,Muted,new Thickness(31,3,0,13)));
-      access.Children.Add(Label("DOMINIO",12,Muted,new Thickness(31,0,0,8)));
+      access.Children.Add(FieldLabel("DOMINIO",new Thickness(31,0,0,8)));
       domain.Margin=new Thickness(31,0,0,0);AddInput(access,domain);
       domain.IsEnabled=remoteAccess.IsChecked==true;
       Note("Para que funcione desde internet","Tu dominio debe apuntar a este PC y el router debe dirigir los puertos 80 y 443. Escribir el dominio aquí no realiza esos cambios por sí solo.",true);
@@ -158,13 +167,13 @@ namespace InhousePhotos {
 
     void RenderReview() {
       Heading("Revisa y crea tu biblioteca","Solo comenzaremos la instalación cuando pulses el botón de abajo.");
-      var review=Card();
+      var review=Section();
       Summary(review,"FOTOS EN",folder.Text);
       Summary(review,"CUENTA",email.Text);
       Summary(review,"ACCESO",String.IsNullOrEmpty(SelectedDomain())?"Solo en este PC":"https://"+SelectedDomain());
       Summary(review,"COMPONENTES",EngineSetup.Installed?"Listos":"Se prepararán en este PC");
       startup.Content="Abrir Inhouse Photos al entrar en Windows";
-      startup.Foreground=Ink;startup.Margin=new Thickness(0,18,0,2);
+      startup.Foreground=Ink;startup.Margin=new Thickness(0,10,0,2);
       review.Children.Add(startup);
       review.Children.Add(Label("El servidor seguirá funcionando aunque cierres esta ventana.",13,Muted,new Thickness(26,0,0,0)));
       if(!EngineSetup.Installed) {
@@ -186,7 +195,7 @@ namespace InhousePhotos {
 
     void RenderInstalling() {
       Heading("Preparando tu biblioteca","Esto puede tardar unos minutos. Puedes seguir el avance aquí.");
-      var card=Card();
+      var card=Section();
       var ring=new ProgressBar{IsIndeterminate=true,Height=5,Foreground=Accent,Background=Outline,Margin=new Thickness(0,10,0,22)};
       card.Children.Add(ring);
       progressText=Label("Comprobando los componentes…",18,Ink,new Thickness(0,0,0,12));
@@ -196,7 +205,8 @@ namespace InhousePhotos {
     }
 
     void RenderFooter() {
-      footer.Background=Page;footer.Margin=new Thickness(30,14,30,18);
+      footer.Background=Page;footer.Margin=new Thickness(30,0,30,18);
+      footer.Children.Add(new Border{Height=1,Background=Outline,Margin=new Thickness(0,0,0,15)});
       feedback=Label("",13,Accent,new Thickness(0,0,0,0));feedback.TextWrapping=TextWrapping.Wrap;
       footer.Children.Add(feedback);
       if(step==4)return;
@@ -248,24 +258,31 @@ namespace InhousePhotos {
     void ShowFeedback(string text){if(feedback!=null){feedback.Text=text;feedback.Margin=new Thickness(0,0,0,String.IsNullOrEmpty(text)?0:12);}if(step==4&&progressText!=null)progressText.Text=text;}
 
     void Heading(string title,string subtitle){
-      content.Children.Add(Label(title,28,Ink,new Thickness(0,4,0,9)));
-      content.Children.Add(Label(subtitle,15,Muted,new Thickness(0,0,0,20)));
+      var heading=Label(title,28,Ink,new Thickness(0,4,0,9));heading.FontWeight=FontWeights.SemiBold;
+      content.Children.Add(heading);
+      content.Children.Add(Label(subtitle,15,Muted,new Thickness(0,0,0,24)));
     }
-    StackPanel Card(){
-      var inside=new StackPanel();
-      content.Children.Add(new Border{Child=inside,Background=Surface,CornerRadius=new CornerRadius(10),Padding=new Thickness(22),Margin=new Thickness(0,0,0,16)});
-      return inside;
+    StackPanel Section(){
+      var section=new StackPanel{Margin=new Thickness(0,0,0,16)};
+      content.Children.Add(section);
+      return section;
     }
     void Note(string title,string detail,bool highlight){
-      var box=new StackPanel();box.Children.Add(Label(title,15,highlight?Accent:Ink,new Thickness(0,0,0,5)));
-      box.Children.Add(Label(detail,14,Muted,new Thickness(0)));
-      content.Children.Add(new Border{Child=box,BorderBrush=highlight?Accent:Outline,BorderThickness=new Thickness(2,0,0,0),Padding=new Thickness(14,3,0,3),Margin=new Thickness(0,1,0,19)});
+      var note=Label("",14,Muted,new Thickness(0,0,0,19));
+      note.Inlines.Add(new Run(title+"  "){FontWeight=FontWeights.SemiBold,Foreground=highlight?Accent:Ink});
+      note.Inlines.Add(new Run(detail));
+      content.Children.Add(note);
     }
     static void Summary(StackPanel target,string title,string value){
-      target.Children.Add(Label(title,12,Muted,new Thickness(0,0,0,5)));
-      target.Children.Add(Label(value,17,Ink,new Thickness(0,0,0,16)));
+      var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(125)});
+      row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
+      row.Children.Add(FieldLabel(title,new Thickness(0,2,12,0)));
+      var answer=Label(value,16,Ink,new Thickness(0));answer.FontWeight=FontWeights.Medium;
+      Grid.SetColumn(answer,1);row.Children.Add(answer);target.Children.Add(row);
+      target.Children.Add(new Border{Height=1,Background=Outline,Margin=new Thickness(0,13,0,13)});
     }
     static TextBlock Label(string value,int size,Brush color,Thickness margin){return new TextBlock{Text=value,FontSize=size,Foreground=color,TextWrapping=TextWrapping.Wrap,Margin=margin};}
+    static TextBlock FieldLabel(string value,Thickness margin){var label=Label(value,12,Muted,margin);label.FontWeight=FontWeights.SemiBold;return label;}
     static void AddInput(StackPanel parent,TextBox input){
       input.Padding=new Thickness(12,11,12,11);input.Background=Field;input.Foreground=Ink;
       input.CaretBrush=Accent;input.BorderBrush=Outline;input.BorderThickness=new Thickness(1);

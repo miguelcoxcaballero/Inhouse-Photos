@@ -18,6 +18,7 @@ namespace InhousePhotos {
     bool? lastLocal, lastEndpoint, lastVerified;
     DateTime lastHealthCheck=DateTime.MinValue;
     int overviewGeneration;
+    int connectGeneration;
     string backupProgressText;
     TextBlock backupProgressView;
 
@@ -39,14 +40,21 @@ namespace InhousePhotos {
     }
 
     Border Panel(Panel inside) {
-      return new Border {Background=surface,BorderBrush=divider,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(10),Padding=new Thickness(21,19,21,19),
-        Margin=new Thickness(0,4,0,16),Child=inside};
+      return new Border {Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(0),
+        Margin=new Thickness(0,4,0,12),Child=inside};
     }
     StackPanel Column() {return new StackPanel{Orientation=Orientation.Vertical};}
     Button PlaceAction(Panel host,string caption,Func<Task> task,bool primary=false) {
       var button=Action(caption,task,primary);
       content.Children.Remove(button);
       host.Children.Add(button);
+      return button;
+    }
+    Button PlaceLink(Panel host,string caption,Func<Task> task) {
+      var button=PlaceAction(host,caption,task);
+      button.Background=Brushes.Transparent;button.BorderBrush=Brushes.Transparent;
+      button.BorderThickness=new Thickness(0);button.Padding=new Thickness(0);
+      button.Margin=new Thickness(0,10,0,0);button.MinHeight=28;button.Foreground=accent;
       return button;
     }
     TextBlock Fine(string text,Brush color=null) {return Label(text,14,color??muted);}
@@ -82,10 +90,6 @@ namespace InhousePhotos {
       row.Children.Add(new TextBlock{Text=text,FontSize=13,FontWeight=FontWeights.SemiBold,Foreground=color});
       return row;
     }
-    Border SummaryCard(StackPanel inside,int side=0) {
-      return new Border{Background=surface,BorderBrush=divider,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(9),Padding=new Thickness(19,17,19,17),
-        Margin=new Thickness(side==0?0:8,4,side==0?8:0,12),Child=inside};
-    }
     ProgressBar SpaceBar(long total,long free) {
       return new ProgressBar{Minimum=0,Maximum=Math.Max(1,total),Value=Math.Max(0,Math.Min(total,total-free)),Height=8,
         Foreground=accent,Background=divider,
@@ -93,26 +97,25 @@ namespace InhousePhotos {
     }
     StackPanel StepHeading(string number,string name) {
       var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,4,0,12)};
-      row.Children.Add(new Border{Width=27,Height=27,CornerRadius=new CornerRadius(14),Background=new SolidColorBrush(Color.FromRgb(240,225,211)),
-        Child=new TextBlock{Text=number,Foreground=accent,FontSize=14,FontWeight=FontWeights.SemiBold,
-          HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center},Margin=new Thickness(0,0,12,0)});
+      row.Children.Add(new TextBlock{Text=number.PadLeft(2,'0'),Foreground=accent,FontSize=13,FontWeight=FontWeights.SemiBold,
+        Width=35,VerticalAlignment=VerticalAlignment.Center});
       row.Children.Add(new TextBlock{Text=name,Foreground=Foreground,FontSize=18,FontWeight=FontWeights.SemiBold});
       return row;
     }
 
     Task RenderOverview() {
-      Heading("Tu biblioteca","Estado del servidor, espacio y copias de seguridad.");
+      Heading("Tu biblioteca","Estado y próximos pasos, sin tener que revisar cada ajuste.");
       var disk=default(DiskInfo);
       string diskIssue=null;
       try {disk=LibraryDisk();if(disk==null)diskIssue="No se encuentra el disco de tu biblioteca.";}
       catch(Exception ex){diskIssue=ex.Message;}
       var hero=Column();
-      var healthLine=StatusLine("BIBLIOTECA",diskIssue==null&&lastLocal==true&&lastVerified!=false?good:accent);
+      var healthLine=StatusLine("SERVIDOR",diskIssue==null&&lastLocal==true&&lastVerified!=false?good:accent);
       var healthDot=(Ellipse)healthLine.Children[0];hero.Children.Add(healthLine);
       var state=Label(diskIssue!=null?"No encuentro el disco de tus fotos":lastLocal==true?(lastVerified==false?"Hay que verificar la biblioteca":"Tus fotos están disponibles"):lastLocal==false?"El servidor está detenido":"Comprobando el servidor…",25);
       state.FontWeight=FontWeights.SemiBold;
       hero.Children.Add(state);
-      hero.Children.Add(Fine(diskIssue??(disk==null?"": "Biblioteca en "+disk.Root+" · "+Backend.Size(disk.Free)+" libres")));
+      hero.Children.Add(Fine(diskIssue??(disk==null?"": "Fotos guardadas en el disco "+disk.Root.TrimEnd('\\'))));
       var mainAction=PlaceAction(hero,"Comprobar servidor",async()=>{
         if(diskIssue!=null)await GoTo("Discos");
         else if(lastVerified==false){await Backend.ReverifyExisting(prefs,text=>Dispatcher.Invoke(()=>notice.Text=text));lastVerified=true;lastHealthCheck=DateTime.MinValue;await Render();}
@@ -132,63 +135,43 @@ namespace InhousePhotos {
       DateTime completed;
       var backupOld=backup.FilesPresent&&DateTime.TryParse(backup.CompletedUtc,out completed)&&
         DateTime.UtcNow-completed.ToUniversalTime()>TimeSpan.FromDays(8);
-      var metrics=new Grid();
+      var metrics=new Grid{Margin=new Thickness(0,2,0,13)};
       metrics.ColumnDefinitions.Add(new ColumnDefinition());metrics.ColumnDefinitions.Add(new ColumnDefinition());
-      var spaceCard=Column();spaceCard.Children.Add(Fine("Espacio de tus fotos",muted));
+      var spaceCard=Column();spaceCard.Margin=new Thickness(0,0,20,0);
+      spaceCard.Children.Add(Fine("ALMACENAMIENTO",muted));
       var free=Label(disk==null?"No disponible":Backend.Size(disk.Free)+" libres",23,disk!=null&&LowSpace(disk)?accent:Foreground);
       free.FontWeight=FontWeights.SemiBold;spaceCard.Children.Add(free);
       spaceCard.Children.Add(Fine(disk==null?"Conecta el disco de la biblioteca":disk.Root+" · "+Backend.Size(disk.Total)+" en total"));
       if(disk!=null)spaceCard.Children.Add(SpaceBar(disk.Total,disk.Free));
-      PlaceAction(spaceCard,"Ver disco  →",()=>GoTo("Discos"));
-      var backupCard=Column();backupCard.Children.Add(Fine("Segunda copia",muted));
+      PlaceLink(spaceCard,"Ver almacenamiento  →",()=>GoTo("Discos"));
+      var backupCard=Column();backupCard.Margin=new Thickness(20,0,0,0);
+      backupCard.Children.Add(Fine("SEGUNDA COPIA",muted));
       var backupValue=String.IsNullOrWhiteSpace(prefs.BackupDestination)?"No configurada":
         backup.HasCompletedRecord&&!backupAtSelectedDestination?"Pendiente en esta unidad":
         backup.FilesPresent?(backupOld?"Conviene renovarla":"Copia disponible"):
         backup.HasCompletedRecord?"Disco no disponible":"Pendiente de crear";
       var backupState=Label(backupValue,23,backupAtSelectedDestination&&backup.FilesPresent&&!backupOld?good:Foreground);backupState.FontWeight=FontWeights.SemiBold;backupCard.Children.Add(backupState);
-      backupCard.Children.Add(Fine(backup.HasCompletedRecord&&!backupAtSelectedDestination?
+      backupCard.Children.Add(Fine(!String.IsNullOrWhiteSpace(schedule.LastError)?"Último intento: "+schedule.LastError:
+        backup.HasCompletedRecord&&!backupAtSelectedDestination?
         backup.FilesPresent?"La copia anterior sigue en "+Path.GetDirectoryName(backup.BackupFolder):"La copia anterior no está disponible":
         backup.FilesPresent?"Última: "+DateLabel(backup.CompletedUtc):
         String.IsNullOrWhiteSpace(prefs.BackupDestination)?"Elige otra unidad, mejor en otro disco":"Todavía no hay una copia completa"));
-      PlaceAction(backupCard,"Ver copias  →",()=>GoTo("Protección"));
-      var spacePanel=SummaryCard(spaceCard);var backupPanel=SummaryCard(backupCard,1);
-      Grid.SetColumn(spacePanel,0);Grid.SetColumn(backupPanel,1);metrics.Children.Add(spacePanel);metrics.Children.Add(backupPanel);
+      PlaceLink(backupCard,String.IsNullOrWhiteSpace(prefs.BackupDestination)?"Preparar copia  →":"Ver copias  →",()=>GoTo("Protección"));
+      var separator=new Border{Width=1,Background=line,HorizontalAlignment=HorizontalAlignment.Left};
+      Grid.SetColumn(spaceCard,0);Grid.SetColumn(separator,1);Grid.SetColumn(backupCard,1);
+      metrics.Children.Add(spaceCard);metrics.Children.Add(separator);metrics.Children.Add(backupCard);
       content.Children.Add(metrics);
-
-      var accessRow=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,4,0,12)};
-      accessRow.Children.Add(new TextBlock{Text="ACCESO DESDE EL MÓVIL",Foreground=muted,FontSize=12,FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,14,0)});
+      Rule();
+      var accessRow=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,8)};
+      accessRow.Children.Add(new TextBlock{Text="MÓVIL",Foreground=muted,FontSize=12,FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,14,0),VerticalAlignment=VerticalAlignment.Center});
       var localOnly=LocalOnlyEndpoint(prefs.Endpoint);
       var accessText=new TextBlock{Text=localOnly?"Solo en este PC":String.IsNullOrWhiteSpace(prefs.Endpoint)?"Sin configurar":lastEndpoint==true?"Responde desde este PC":lastEndpoint==false?"No responde desde este PC":"Comprobando…",
         Foreground=!localOnly&&lastEndpoint==true?good:accent,FontSize=14,TextWrapping=TextWrapping.Wrap};
       accessRow.Children.Add(accessText);content.Children.Add(accessRow);
-      content.Children.Add(Fine(localOnly?"Esta dirección no funciona en un móvil. Configura acceso HTTPS para conectarlo.":
-        String.IsNullOrWhiteSpace(prefs.Endpoint)?"Configura una dirección HTTPS para conectar el móvil.":"Comprueba el acceso externo en el móvil con datos móviles."));
-      Action("Conectar un móvil  →",()=>GoTo("Conectar"));
-
-      Rule();
-      content.Children.Add(Label("Qué hacer ahora",21));
-      if(String.IsNullOrWhiteSpace(prefs.BackupDestination)) {
-        content.Children.Add(Fine("Prepara una copia en otra unidad; mejor si es otro disco físico."));
-        Action("Preparar copia  →",()=>GoTo("Protección"),true);
-      } else if(backup.HasCompletedRecord&&!backupAtSelectedDestination) {
-        content.Children.Add(Fine("La unidad elegida aún no tiene una copia completa registrada. La anterior no se ha borrado."));
-        Action("Crear copia en esta unidad  →",()=>GoTo("Protección"),true);
-      } else if(!backup.FilesPresent) {
-        content.Children.Add(Fine(backup.HasCompletedRecord?"Conecta el disco donde está la última copia.":"El destino está listo. Falta crear la primera copia completa."));
-        Action("Revisar copias  →",()=>GoTo("Protección"),true);
-      } else if(schedule.Enabled&&!String.IsNullOrWhiteSpace(schedule.LastError)) {
-        content.Children.Add(Fine("La última copia automática no terminó. Revisa el motivo."));
-        Action("Revisar copias  →",()=>GoTo("Protección"),true);
-      } else if(backupOld) {
-        content.Children.Add(Fine("La última copia completa tiene más de una semana."));
-        Action("Crear una nueva copia  →",()=>GoTo("Protección"),true);
-      } else if(LowSpace(disk)) {
-        content.Children.Add(Fine("Queda poco espacio para nuevas fotos."));
-        Action("Ver almacenamiento  →",()=>GoTo("Discos"),true);
-      } else {
-        content.Children.Add(Fine("La biblioteca tiene espacio y la última copia está disponible."));
-        Action("Conectar otro dispositivo  →",()=>GoTo("Conectar"),true);
-      }
+      content.Children.Add(Fine(localOnly?"La dirección actual solo funciona en este PC.":
+        String.IsNullOrWhiteSpace(prefs.Endpoint)?"Configura una dirección HTTPS para conectar el móvil.":"Prueba desde el móvil con datos móviles para verificar el acceso exterior."));
+      var accessActions=Column();content.Children.Add(accessActions);
+      PlaceLink(accessActions,"Conectar un móvil  →",()=>GoTo("Conectar"));
       var generation=++overviewGeneration;
       RefreshOverviewHealth(generation,state,mainAction,accessText,healthDot,diskIssue==null);
       return Task.FromResult(0);
@@ -295,7 +278,7 @@ namespace InhousePhotos {
     Task RenderStoragePage() {
       Heading("Almacenamiento","Mira cuánto sitio queda antes de subir más fotos.");
       try {
-        var library=Backend.Library(prefs);var disk=LibraryDisk();
+        var disk=LibraryDisk();
         if(disk==null)throw new IOException("El disco de la biblioteca no está disponible.");
         var summary=Column();summary.Children.Add(StatusLine("BIBLIOTECA DE FOTOS",LowSpace(disk)?accent:good));
         var diskTitle=Label("Disco "+disk.Root.TrimEnd('\\'),26);diskTitle.FontWeight=FontWeights.SemiBold;summary.Children.Add(diskTitle);
@@ -303,7 +286,7 @@ namespace InhousePhotos {
         summary.Children.Add(SpaceBar(disk.Total,disk.Free));
         var used=Math.Max(0,disk.Total-disk.Free);
         summary.Children.Add(Fine(Backend.Size(used)+" usados  ·  "+Backend.Size(disk.Total)+" en total"));
-        summary.Children.Add(Fine("Tus archivos: "+library));
+        summary.Children.Add(Fine("Este es el disco que guarda tu biblioteca de fotos."));
         if(LowSpace(disk))summary.Children.Add(Fine("Queda poco espacio. Amplía el disco antes de seguir subiendo fotos.",accent));
         content.Children.Add(Panel(summary));
       }catch(Exception ex){content.Children.Add(Label(ex.Message,17,accent));}
@@ -330,9 +313,9 @@ namespace InhousePhotos {
       return Task.FromResult(0);
     }
 
-    async Task RenderConnectPage() {
+    Task RenderConnectPage() {
+      var generation=++connectGeneration;
       Heading("Conectar un móvil","Solo necesitas la dirección y tu cuenta habitual.");
-      Action("←  Volver al resumen",()=>GoTo("Inicio"));
       var address=String.IsNullOrWhiteSpace(prefs.Endpoint)?null:Backend.CanonicalEndpoint(prefs.Endpoint);
       if(address==null||LocalOnlyEndpoint(address)) {
         var localBox=Column();localBox.Children.Add(StatusLine(address==null?"FALTA CONFIGURAR EL ACCESO":"ACCESO SOLO EN ESTE PC",accent));
@@ -341,7 +324,7 @@ namespace InhousePhotos {
         content.Children.Add(Panel(localBox));
         content.Children.Add(Fine("Para entrar desde el móvil, prepara un dominio HTTPS que apunte a este PC y configura el router. Después guarda esa dirección en Ajustes."));
         Action("Abrir Ajustes  →",()=>GoTo("Configuración"),true);
-        return;
+        return Task.CompletedTask;
       }
       var box=Column();box.Children.Add(StatusLine("DIRECCIÓN DE TU BIBLIOTECA",address==null?accent:good));
       var addressBox=new TextBox{Text=address??"Aún no hay una dirección configurada",IsReadOnly=true,TextWrapping=TextWrapping.Wrap,
@@ -358,10 +341,22 @@ namespace InhousePhotos {
       content.Children.Add(StepHeading("3","Inicia sesión"));
       content.Children.Add(Fine("Usa la cuenta que ya tienes en esta biblioteca."));
       if(address!=null) {
-        var checkedFromHere=await Backend.Ping(address);
-        Rule();content.Children.Add(StatusLine(checkedFromHere?"RESPONDE DESDE ESTE PC":"NO RESPONDE DESDE ESTE PC",checkedFromHere?good:accent));
-        content.Children.Add(Fine(checkedFromHere?"Para comprobar el acceso fuera de casa, abre la app con datos móviles.":"Comprueba la dirección en Ajustes."));
+        Rule();
+        var reachability=StatusLine("COMPROBANDO LA DIRECCIÓN",muted);content.Children.Add(reachability);
+        var reachabilityDetail=Fine("La comprobación de este PC no confirma el acceso desde fuera de casa.");content.Children.Add(reachabilityDetail);
+        _=RefreshConnectHealth(generation,address,reachability,reachabilityDetail);
       }
+      return Task.CompletedTask;
+    }
+
+    async Task RefreshConnectHealth(int generation,string address,StackPanel status,TextBlock detail) {
+      bool reached;
+      try {reached=await Backend.Ping(address);} catch {reached=false;}
+      if(generation!=connectGeneration||page!="Conectar"||!content.Children.Contains(status))return;
+      ((Ellipse)status.Children[0]).Fill=reached?good:accent;
+      var label=(TextBlock)status.Children[1];label.Foreground=reached?good:accent;
+      label.Text=reached?"RESPONDE DESDE ESTE PC":"NO RESPONDE DESDE ESTE PC";
+      detail.Text=reached?"Para comprobar el acceso fuera de casa, abre la app con datos móviles.":"Comprueba la dirección en Ajustes.";
     }
 
     async Task RenderSettingsPage() {

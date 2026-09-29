@@ -23,11 +23,12 @@ container identities and configuration hashes before saving a receipt. Original
 containers and media stay in place. Configuration copies use current-user DPAPI.
 The database snapshot does not include media files.
 
-Manager 1.2.3 uses five clear destinations: Overview, Connect mobile, Backups,
-Storage, and Settings. Its restrained light interface uses typography, spacing,
-and a small number of status surfaces instead of a dense list of technical
-controls or decorative cards. The installer, existing-library adoption, and
-new-server wizard follow the same visual hierarchy. Windows and the setup
+Manager 1.2.4 uses five clear destinations: Overview, Connect mobile, Backups,
+Storage, and Settings. Its layout gives the server state one primary action,
+shows space and backup facts without nested cards, and moves technical controls
+out of the everyday flow. Page and setup-step transitions are brief and respect
+Windows reduced-motion preferences. The installer, existing-library adoption,
+and new-server wizard follow the same visual hierarchy. Windows and the setup
 wizard fit within the available desktop area at higher display scaling. A
 loopback-only new server is never offered as a mobile address; the HTTPS
 address can be configured from the main Settings page. Changing backup

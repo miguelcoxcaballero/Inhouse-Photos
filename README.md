@@ -2,7 +2,7 @@
 
 A private photo and video library for your own computer. Browse from Android or the web, back up new files, and manage the Windows server from one clear dashboard.
 
-[Download Inhouse Photos](https://fotos.miguelcoxcaballero.com/descargas/) · [Windows server installer](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.3/Inhouse-Photos-Server-Setup.exe) · [Latest Android APK](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/latest/download/Inhouse-Photos.apk)
+[Download Inhouse Photos](https://fotos.miguelcoxcaballero.com/descargas/) · [Windows server installer](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.4/Inhouse-Photos-Server-Setup.exe) · [Latest Android APK](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/latest/download/Inhouse-Photos.apk)
 
 ## Get started
 

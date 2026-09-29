@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Markup;
@@ -69,35 +70,79 @@ namespace InhousePhotos {
       }catch(Exception ex){notice.Text=ex.Message;retryAfter=DateTime.UtcNow.AddMinutes(2);}
       finally{monitorBusy=false;}
     }
-    async Task RenderManagement() {
+    Task RenderManagement() {
       Rule();content.Children.Add(Label("Inicio automático",22));
-      var auto=new CheckBox{Content="Iniciar con Windows",IsChecked=await Startup.IsEnabled(),IsEnabled=prefs.Managed,Foreground=Foreground,FontSize=17,Margin=new Thickness(0,8,0,10)};
+      var startupRow=new Grid{Margin=new Thickness(0,4,0,4)};
+      startupRow.ColumnDefinitions.Add(new ColumnDefinition());
+      startupRow.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+      var startupDetails=new StackPanel{Margin=new Thickness(0,0,20,0)};
+      var startupTitle=Label("Iniciar con Windows",17);startupTitle.FontWeight=FontWeights.SemiBold;startupTitle.Margin=new Thickness(0,0,0,4);
+      startupDetails.Children.Add(startupTitle);
+      startupDetails.Children.Add(Label("El gestor arranca en segundo plano al iniciar sesión. No necesitas abrir Docker; apagarlo no detiene el servidor ni una copia en curso.",14,muted));
+      var startupState=Label("Comprobando el inicio automático…",13,muted);startupDetails.Children.Add(startupState);
+      var retry=new Button{Content="Volver a comprobar",Visibility=Visibility.Collapsed,HorizontalAlignment=HorizontalAlignment.Left};startupDetails.Children.Add(retry);
+      startupRow.Children.Add(startupDetails);
+      var auto=new CheckBox{IsEnabled=false,Visibility=Visibility.Hidden,VerticalAlignment=VerticalAlignment.Center,Foreground=Foreground};
+      AutomationProperties.SetName(auto,"Iniciar con Windows");Grid.SetColumn(auto,1);startupRow.Children.Add(auto);
       auto.Template=(ControlTemplate)XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='CheckBox'><StackPanel Orientation='Horizontal'><Border x:Name='track' Width='44' Height='26' CornerRadius='13' Background='#DCD5CB' Margin='0,0,12,0'><Ellipse x:Name='thumb' Width='20' Height='20' Fill='#FFFFFF' HorizontalAlignment='Left' Margin='3'/></Border><ContentPresenter VerticalAlignment='Center'/></StackPanel><ControlTemplate.Triggers><Trigger Property='IsChecked' Value='True'><Setter TargetName='track' Property='Background' Value='#A94712'/><Setter TargetName='thumb' Property='HorizontalAlignment' Value='Right'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.45'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
-      auto.Click+=async(s,e)=>{
-        if(busy){auto.IsChecked=await Startup.IsEnabled();return;}
-        if(auto.IsChecked==false&&Backend.ReadBackupSchedule().Enabled&&
-           !Confirm("La copia semanal está activada. Si el gestor no se inicia con Windows, solo podrá copiar cuando lo abras manualmente. ¿Desactivar el inicio automático?")){
-          auto.IsChecked=true;return;
+      content.Children.Add(startupRow);
+      bool startupKnown=false,startupEnabled=false;
+      async Task RefreshStartupState() {
+        startupKnown=false;auto.IsEnabled=false;auto.Visibility=Visibility.Hidden;
+        startupState.Text="Comprobando el inicio automático…";startupState.Visibility=Visibility.Visible;retry.Visibility=Visibility.Collapsed;
+        try {
+          var enabled=await Startup.IsEnabled();
+          if(!content.Children.Contains(startupRow))return;
+          startupEnabled=enabled;startupKnown=true;auto.IsChecked=enabled;
+          auto.Visibility=Visibility.Visible;auto.IsEnabled=prefs.Managed;
+          startupState.Visibility=Visibility.Collapsed;
+        } catch(Exception ex) {
+          if(!content.Children.Contains(startupRow))return;
+          startupState.Text="No se pudo comprobar el inicio automático: "+ex.Message;
+          retry.Visibility=Visibility.Visible;
         }
-        busy=true;auto.IsEnabled=false;
-        try {await Startup.SetEnabled(prefs,auto.IsChecked==true);notice.Text=auto.IsChecked==true?"Inicio automático activado. El servidor se preparará al iniciar sesión.":"Inicio automático desactivado. El servidor actual no se ha detenido.";}
-        catch(Exception ex){notice.Text=ex.Message;auto.IsChecked=await Startup.IsEnabled();}
-        finally{busy=false;auto.IsEnabled=true;}
-      };content.Children.Add(auto);
-      content.Children.Add(Label("Arranca en segundo plano al iniciar sesión en tu cuenta de Windows. No es necesario abrir Docker. Apagar este interruptor no detiene una copia en curso ni el servidor.",14,muted));
+      }
+      retry.Click+=async(s,e)=>await RefreshStartupState();
+      auto.Click+=async(s,e)=>{
+        if(busy||!startupKnown){auto.IsChecked=startupEnabled;if(busy)notice.Text="Espera a que termine la operación antes de cambiar el inicio automático.";return;}
+        try {
+          var enabled=auto.IsChecked==true;
+          if(!enabled&&Backend.ReadBackupSchedule().Enabled&&
+             !Confirm("La copia semanal está activada. Si el gestor no se inicia con Windows, solo podrá copiar cuando lo abras manualmente. ¿Desactivar el inicio automático?")){
+            auto.IsChecked=startupEnabled;return;
+          }
+          busy=true;auto.IsEnabled=false;
+          await Startup.SetEnabled(prefs,enabled);startupEnabled=enabled;
+          notice.Text=enabled?"Inicio automático activado. El servidor se preparará al iniciar sesión.":"Inicio automático desactivado. El servidor actual no se ha detenido.";
+        }
+        catch(Exception ex){notice.Text=ex.Message;await RefreshStartupState();}
+        finally{busy=false;auto.IsEnabled=startupKnown&&prefs.Managed&&content.Children.Contains(startupRow);}
+      };
+      // The Windows task query can take seconds; the Settings page stays usable
+      // while the switch remains unavailable until its actual state is known.
+      _=RefreshStartupState();
       Rule();content.Children.Add(Label("Conexión del servidor",22));
       if(prefs.Managed&&File.Exists(prefs.ReceiptPath)) {
         var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));
-        var counts=receipt.Counts.Split('|');content.Children.Add(Label("Base de datos verificada al vincular",17,accent));
-        content.Children.Add(Label(counts[0]+" fotos y vídeos · "+counts[1]+" cuentas · "+counts[2]+" álbumes en aquella instantánea. No es una copia de las fotos.",14,muted));
-        content.Children.Add(Label("Ya está conectado. No necesitas vincularlo de nuevo.",15,muted));
+        var counts=receipt.Counts.Split('|');
+        var connectionRow=new StackPanel{Margin=new Thickness(0,4,0,4)};
+        var connectionTitle=Label("Biblioteca vinculada",17);connectionTitle.FontWeight=FontWeights.SemiBold;connectionTitle.Margin=new Thickness(0,0,0,4);connectionRow.Children.Add(connectionTitle);
+        connectionRow.Children.Add(Label("Ya está conectada. No necesitas vincularla de nuevo.",14,muted));
+        connectionRow.Children.Add(Label("Al vincularla se verificaron "+counts[0]+" fotos y vídeos, "+counts[1]+" cuentas y "+counts[2]+" álbumes. Esa instantánea no es una copia de las fotos.",14,muted));
+        content.Children.Add(connectionRow);
         int detailsStart=content.Children.Count;
         Action("Abrir informe y copia de migración",()=>{Open(Path.GetDirectoryName(prefs.ReceiptPath));return Task.FromResult(0);});
         Action("Desvincular el gestor",async()=>{if(!Confirm("Se devolverá el inicio automático al sistema anterior. No se tocarán las fotos, la base de datos ni las cuentas. ¿Continuar?"))return;await Startup.ReleaseOwnership(prefs);notice.Text="Gestor desvinculado. El servidor y sus datos permanecen intactos.";await Render();});
         var details=new StackPanel();while(content.Children.Count>detailsStart){var child=content.Children[detailsStart];content.Children.RemoveAt(detailsStart);details.Children.Add(child);}
-        content.Children.Add(new Expander{Header="Informe y recuperación",Content=details,Foreground=muted,Margin=new Thickness(0,12,0,12)});
-      } else content.Children.Add(Label("Antes de gestionar el arranque, comprobaremos tu biblioteca y restauraremos una copia en una base de datos temporal aislada. No se detendrá el servidor original.",15,muted));
+        content.Children.Add(new Expander{Header="Informe y recuperación",Content=details,Foreground=muted,Margin=new Thickness(0,4,0,8)});
+      } else {
+        var connectionRow=new StackPanel{Margin=new Thickness(0,4,0,4)};
+        var connectionTitle=Label("Biblioteca pendiente de vincular",17);connectionTitle.FontWeight=FontWeights.SemiBold;connectionTitle.Margin=new Thickness(0,0,0,4);connectionRow.Children.Add(connectionTitle);
+        connectionRow.Children.Add(Label("Antes de gestionar el arranque, comprobaremos la biblioteca y restauraremos una copia en una base de datos temporal aislada. No se detendrá el servidor original.",14,muted));
+        content.Children.Add(connectionRow);
+      }
       if(!prefs.Managed)Action("Preparar mi biblioteca",async()=>{page="Inicio";await Render();},true);
+      return Task.FromResult(0);
     }
   }
 }
