@@ -48,8 +48,11 @@ class ApiService {
   }
   final _log = Logger("ApiService");
 
-  Future<void> updateHeaders() async {
-    await NetworkRepository.setHeaders(getRequestHeaders(), getServerUrls());
+  Future<void> updateHeaders({String? token}) async {
+    // Pairing exchanges its invite with a fresh access token using a separate
+    // HTTP client. Seed the native cookie jar before the first authenticated
+    // API request; password and OAuth sign-in also use this path.
+    await NetworkRepository.setHeaders(getRequestHeaders(), getServerUrls(), token: token);
     _apiClient.client = NetworkRepository.client;
   }
 
