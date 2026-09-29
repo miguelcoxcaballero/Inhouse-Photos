@@ -16,13 +16,22 @@
       "iconURL": "https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/1024.png",
       "tintColor": "#D97736",
       "category": "utilities",
-      "version": "3.1.88",
-      "versionDate": "2026-09-29T17:35:21Z",
-      "versionDescription": "Allows administrators to monitor and install Windows server manager updates from the app without stopping photo access.",
-      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.88-inhouse-ios.1/Inhouse-Photos.ipa",
-      "size": 32459509,
+      "version": "3.1.89",
+      "versionDate": "2026-09-29T19:07:40Z",
+      "versionDescription": "Adds secure remote controls for Windows backups, storage and startup, plus a local-network upload indicator.",
+      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.89-inhouse-ios.1/Inhouse-Photos.ipa",
+      "size": 32479559,
       "minOSVersion": "15.0",
       "versions": [
+        {
+          "version": "3.1.89",
+          "buildVersion": "5147",
+          "date": "2026-09-29T19:07:40Z",
+          "localizedDescription": "Adds secure remote controls for Windows backups, storage and startup, plus a local-network upload indicator.",
+          "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.89-inhouse-ios.1/Inhouse-Photos.ipa",
+          "size": 32479559,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "3.1.88",
           "buildVersion": "5146",
