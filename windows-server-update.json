@@ -1,6 +1,6 @@
 {
-  "Version": "1.2.9",
-  "InstallerUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.9/Inhouse-Photos-Server-Setup.exe",
-  "Sha256": "9e5fd8e6b79c8d811ddeb667002b462b0e8cd436dd12e3fcbe1ea2371990603b",
+  "Version": "1.2.11",
+  "InstallerUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.11/Inhouse-Photos-Server-Setup.exe",
+  "Sha256": "1e56db79ec6b22c6122c83ce7d0094db555c888b17f7d1531f3e916887b6fca5",
   "Notes": "Actualización segura desde el PC o el móvil. El servidor de fotos permanece encendido."
 }
