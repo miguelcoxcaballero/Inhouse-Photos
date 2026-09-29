@@ -1,13 +1,11 @@
 name: Verify Inhouse Android release
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - android-update.json
-      - .github/scripts/verify_android_release.py
-      - .github/scripts/test_verify_android_release.py
-      - .github/workflows/verify-inhouse-android-release.yml
+  # The manifest is committed before the release asset exists. Checking on
+  # that push creates a predictable 404 and sends a false failure email.
+  # A published Android release is the first point when the URL is verifiable.
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -15,6 +13,7 @@ permissions:
 
 jobs:
   verify:
+    if: github.event_name == 'workflow_dispatch' || (startsWith(github.event.release.tag_name, 'v') && !contains(github.event.release.tag_name, 'ios'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
