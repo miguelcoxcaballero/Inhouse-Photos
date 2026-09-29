@@ -42,6 +42,7 @@ class DriftUploadStatus {
   final int originalFileSize;
   final int fileSize;
   final String networkSpeedAsString;
+  final bool uploadStarted;
   final bool compressionExpected;
   final String compressionState;
   final bool? isFailed;
@@ -55,13 +56,16 @@ class DriftUploadStatus {
     required this.originalFileSize,
     required this.fileSize,
     required this.networkSpeedAsString,
+    this.uploadStarted = false,
     this.compressionExpected = false,
     this.compressionState = 'none',
     this.isFailed,
     this.error,
   });
 
-  bool get isActivelyUploading => isFailed != true && progress < 0.999;
+  bool get isQueued => isFailed != true && compressionExpected && !uploadStarted && progress < 0.999;
+
+  bool get isActivelyUploading => isFailed != true && !isQueued && progress < 0.999;
 
   bool get isCloudProcessing =>
       isFailed != true && progress >= 0.999 && compressionExpected && preparationProgress < 0.999;
@@ -74,6 +78,7 @@ class DriftUploadStatus {
     int? originalFileSize,
     int? fileSize,
     String? networkSpeedAsString,
+    bool? uploadStarted,
     bool? compressionExpected,
     String? compressionState,
     bool? isFailed,
@@ -87,6 +92,7 @@ class DriftUploadStatus {
       originalFileSize: originalFileSize ?? this.originalFileSize,
       fileSize: fileSize ?? this.fileSize,
       networkSpeedAsString: networkSpeedAsString ?? this.networkSpeedAsString,
+      uploadStarted: uploadStarted ?? this.uploadStarted,
       compressionExpected: compressionExpected ?? this.compressionExpected,
       compressionState: compressionState ?? this.compressionState,
       isFailed: isFailed ?? this.isFailed,
@@ -96,7 +102,7 @@ class DriftUploadStatus {
 
   @override
   String toString() {
-    return 'DriftUploadStatus(taskId: $taskId, filename: $filename, preparationProgress: $preparationProgress, progress: $progress, originalFileSize: $originalFileSize, fileSize: $fileSize, networkSpeedAsString: $networkSpeedAsString, compressionExpected: $compressionExpected, compressionState: $compressionState, isFailed: $isFailed, error: $error)';
+    return 'DriftUploadStatus(taskId: $taskId, filename: $filename, preparationProgress: $preparationProgress, progress: $progress, originalFileSize: $originalFileSize, fileSize: $fileSize, networkSpeedAsString: $networkSpeedAsString, uploadStarted: $uploadStarted, compressionExpected: $compressionExpected, compressionState: $compressionState, isFailed: $isFailed, error: $error)';
   }
 
   @override
@@ -112,6 +118,7 @@ class DriftUploadStatus {
         other.originalFileSize == originalFileSize &&
         other.fileSize == fileSize &&
         other.networkSpeedAsString == networkSpeedAsString &&
+        other.uploadStarted == uploadStarted &&
         other.compressionExpected == compressionExpected &&
         other.compressionState == compressionState &&
         other.isFailed == isFailed &&
@@ -127,6 +134,7 @@ class DriftUploadStatus {
         originalFileSize.hashCode ^
         fileSize.hashCode ^
         networkSpeedAsString.hashCode ^
+        uploadStarted.hashCode ^
         compressionExpected.hashCode ^
         compressionState.hashCode ^
         isFailed.hashCode ^
@@ -471,6 +479,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
         currentItem?.copyWith(
           filename: filename,
           progress: progress,
+          uploadStarted: true,
           fileSize: currentItem.compressionExpected ? currentItem.fileSize : totalBytes,
           networkSpeedAsString: networkSpeedAsString,
         ) ??
@@ -479,6 +488,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
           filename: filename,
           preparationProgress: 1,
           progress: progress,
+          uploadStarted: true,
           originalFileSize: totalBytes,
           fileSize: totalBytes,
           networkSpeedAsString: networkSpeedAsString,

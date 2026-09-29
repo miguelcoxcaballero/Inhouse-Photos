@@ -1,8 +1,8 @@
 {
-  "version": "3.1.89",
-  "versionCode": 7147,
+  "version": "3.1.90",
+  "versionCode": 7148,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.89-remote-server-management/Inhouse-Photos.apk",
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.90-video-upload-bandwidth/Inhouse-Photos.apk",
   "sizeBytes": 74903029,
-  "sha256": "f1719b4d7ac4bc995f8e206f8be0dcd500533ec825fbad35d80b20f90a17cc34"
+  "sha256": "105a05b8dacb5a7e37e262d668eda585ec5f0215ef59e022c67e1f47ead6912b"
 }

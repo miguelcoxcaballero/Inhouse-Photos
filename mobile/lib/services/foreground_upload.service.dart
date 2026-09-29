@@ -22,6 +22,7 @@ import 'package:immich_mobile/providers/infrastructure/storage.provider.dart';
 import 'package:immich_mobile/repositories/asset_media.repository.dart';
 import 'package:immich_mobile/repositories/upload.repository.dart';
 import 'package:immich_mobile/utils/adaptive_upload_limiter.dart';
+import 'package:immich_mobile/utils/media_upload_gate.dart';
 import 'package:immich_mobile/utils/upload_capacity_gate.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
@@ -251,13 +252,13 @@ class ForegroundUploadService {
     // assets may be awaiting compression on the server.
     final uploadWorkerCount = transferPlan.uploadWorkers;
     final adaptiveLimit = AdaptiveUploadLimiter(maximum: uploadWorkerCount, isUnmetered: isUnmetered, isLocal: isLocal);
-    final uploadGate = UploadCapacityGate(adaptiveLimit.current);
+    final uploadGate = MediaUploadGate(adaptiveLimit.current);
     final compressionWindow = waitsForServerCompression ? transferPlan.compressionWindow(isUnmetered: isUnmetered) : 0;
     final compressionGate = UploadCapacityGate(compressionWindow);
     final outstandingAcknowledgements = <Future<void>>{};
     _logger.info(
       'Backup transfer plan: speed=$speed, unmetered=$isUnmetered, '
-      'prepare=${transferPlan.preparationWorkers}, upload=$uploadWorkerCount, '
+      'prepare=${transferPlan.preparationWorkers}, upload=$uploadWorkerCount (videos serial), '
       'acknowledge=${transferPlan.acknowledgementWorkers}, '
       'compressionWindow=${waitsForServerCompression ? compressionWindow : 'off'}',
     );
@@ -346,7 +347,8 @@ class ForegroundUploadService {
           continue;
         }
 
-        if (!await uploadGate.acquire()) {
+        final isVideo = item.asset.isVideo;
+        if (!await uploadGate.acquire(isVideo: isVideo)) {
           compressionGate.release();
           await _cleanupPreparedAsset(item);
           continue;
@@ -354,16 +356,20 @@ class ForegroundUploadService {
         _UploadAcknowledgement? acknowledgement;
         try {
           acknowledgement = await _uploadPreparedAsset(item, cancelToken, callbacks: callbacks);
-          final newLimit = adaptiveLimit.record(
-            bytes: acknowledgement == null ? 0 : item.file.lengthSync(),
-            success: acknowledgement != null,
-            now: DateTime.now(),
-          );
+          // Video transfers are deliberately serial and must not make the
+          // photo-only adaptive controller ramp up its parallelism.
+          final newLimit = isVideo
+              ? null
+              : adaptiveLimit.record(
+                  bytes: acknowledgement == null ? 0 : item.file.lengthSync(),
+                  success: acknowledgement != null,
+                  now: DateTime.now(),
+                );
           if (newLimit != null) {
-            uploadGate.updateLimit(newLimit);
+            uploadGate.updatePhotoLimit(newLimit);
           }
         } finally {
-          uploadGate.release();
+          uploadGate.release(isVideo: isVideo);
         }
         if (acknowledgement == null) {
           compressionGate.release();

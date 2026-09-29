@@ -43,6 +43,7 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
     final usingLocalNetwork = ref.watch(localUploadRouteActiveProvider);
 
     final uploadingItems = uploadItems.values.where((item) => item.isActivelyUploading).toList();
+    final queuedItems = uploadItems.values.where((item) => item.isQueued).toList();
     final processingItems = uploadItems.values.where((item) => item.isCloudProcessing).toList()
       ..sort((a, b) {
         final aActive = a.compressionState == 'compressing' ? 0 : 1;
@@ -68,7 +69,7 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
         elevation: 0,
         scrolledUnderElevation: 1,
       ),
-      body: _buildTwoSectionLayout(context, uploadingItems, processingItems, failedItems, iCloudProgress),
+      body: _buildTwoSectionLayout(context, uploadingItems, queuedItems, processingItems, failedItems, iCloudProgress),
     );
   }
 
@@ -149,6 +150,7 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
   Widget _buildTwoSectionLayout(
     BuildContext context,
     List<DriftUploadStatus> uploadingItems,
+    List<DriftUploadStatus> queuedItems,
     List<DriftUploadStatus> processingItems,
     List<DriftUploadStatus> failedItems,
     Map<String, double> iCloudProgress,
@@ -203,11 +205,34 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
               ),
             ),
           )
-        else if (processingItems.isEmpty)
+        else if (queuedItems.isEmpty && processingItems.isEmpty)
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: _sectionInset),
             sliver: SliverToBoxAdapter(child: _buildEmptyUploadState(context)),
           ),
+
+        if (queuedItems.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: _buildSectionHeader(
+              context,
+              title: 'Waiting for upload',
+              count: queuedItems.length,
+              color: context.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: _sectionInset),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => Padding(
+                  padding: const EdgeInsets.only(bottom: _cardGap),
+                  child: _buildCurrentUploadCard(context, queuedItems[index]),
+                ),
+                childCount: queuedItems.length,
+              ),
+            ),
+          ),
+        ],
 
         // Uploading and server-side optimization are separate stages. A fast
         // network should never make completed transfers look as if they are
@@ -368,7 +393,11 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
 
   Widget _buildCurrentUploadCard(BuildContext context, DriftUploadStatus item) {
     final isUploading = item.isActivelyUploading;
-    final activeProgress = isUploading ? item.progress : item.preparationProgress;
+    final activeProgress = isUploading
+        ? item.progress
+        : item.isQueued
+        ? 0.0
+        : item.preparationProgress;
     final activeColor = isUploading ? context.colorScheme.primary : context.colorScheme.tertiary;
     return Card(
       margin: EdgeInsets.zero,
@@ -403,9 +432,9 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '${(activeProgress.clamp(0.0, 1.0) * 100).round()}%',
+                            item.isQueued ? 'Queued' : '${(activeProgress.clamp(0.0, 1.0) * 100).round()}%',
                             style: context.textTheme.labelSmall?.copyWith(
-                              color: activeColor,
+                              color: item.isQueued ? context.colorScheme.onSurfaceVariant : activeColor,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -414,7 +443,12 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
                       const SizedBox(height: 3),
                       _buildCompactSizeSummary(context, item),
                       const SizedBox(height: 6),
-                      if (isUploading)
+                      if (item.isQueued)
+                        Text(
+                          'Waiting for upload',
+                          style: context.textTheme.labelSmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
+                        )
+                      else if (isUploading)
                         _buildCompactStageProgress(
                           context,
                           label: "backup_upload_stage".t(context: context),
