@@ -1,10 +1,10 @@
 name: Inhouse mobile regression checks
 on:
   pull_request:
-    paths: ['mobile/**', '.github/workflows/inhouse-mobile-checks.yml']
+    paths: ['mobile/**', 'android-update.json', '.github/workflows/inhouse-mobile-checks.yml']
   push:
     branches: [main]
-    paths: ['mobile/**', '.github/workflows/inhouse-mobile-checks.yml']
+    paths: ['mobile/**', 'android-update.json', '.github/workflows/inhouse-mobile-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,6 +32,7 @@ jobs:
           flutter test
           test/unit/required_update_gate_test.dart
           test/services/auth.service_test.dart
+          test/providers/auth_pairing_cookie_test.dart
           test/services/pairing.service_test.dart
           test/widgets/forms/login/pairing_login_test.dart
           test/domain/services/timeline_norefresh_test.dart
