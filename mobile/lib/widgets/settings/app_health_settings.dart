@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/config/image_config.dart';
 import 'package:immich_mobile/domain/models/log.model.dart';
@@ -13,10 +15,12 @@ import 'package:immich_mobile/infrastructure/repositories/settings.repository.da
 import 'package:immich_mobile/models/server_info/server_info.model.dart';
 import 'package:immich_mobile/providers/backup/backup.provider.dart';
 import 'package:immich_mobile/providers/backup/drift_backup.provider.dart';
+import 'package:immich_mobile/providers/auth.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:immich_mobile/services/manager_update.service.dart';
 import 'package:immich_mobile/utils/app_health.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
 import 'package:immich_mobile/utils/cache/custom_image_cache.dart';
@@ -198,6 +202,7 @@ class _AppHealthSettingsState extends ConsumerState<AppHealthSettings> {
                   ? 'Unavailable'
                   : '${disk.diskUse} / ${disk.diskSize} · ${disk.diskUsagePercentage.toStringAsFixed(0)}%',
             ),
+            if (ref.watch(authProvider).isAdmin) const _WindowsManagerUpdateSection(),
             const Divider(height: 24),
             const _SectionLabel('BACKUP'),
             ListTile(
@@ -275,6 +280,200 @@ class _AppHealthSettingsState extends ConsumerState<AppHealthSettings> {
           ],
         );
       },
+    );
+  }
+}
+
+class _WindowsManagerUpdateSection extends ConsumerStatefulWidget {
+  const _WindowsManagerUpdateSection();
+
+  @override
+  ConsumerState<_WindowsManagerUpdateSection> createState() => _WindowsManagerUpdateSectionState();
+}
+
+class _WindowsManagerUpdateSectionState extends ConsumerState<_WindowsManagerUpdateSection> {
+  late final http.Client _client;
+  late final ManagerUpdateService _service;
+  ManagerUpdateStatus? _status;
+  String? _message;
+  bool _checking = false;
+  bool _updating = false;
+  Timer? _poll;
+  DateTime? _startedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    _client = http.Client();
+    _service = ManagerUpdateService(_client);
+    unawaited(_refresh());
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    _client.close();
+    super.dispose();
+  }
+
+  Uri? get _url => ManagerUpdateService.urlForEndpoint(Store.tryGet(StoreKey.serverEndpoint));
+  String? get _token => Store.tryGet(StoreKey.accessToken);
+
+  Future<void> _refresh() async {
+    if (_checking) {
+      return;
+    }
+    final url = _url;
+    final token = _token;
+    if (url == null || token == null || token.isEmpty) {
+      if (mounted) {
+        setState(() => _message = 'Connect to your HTTPS server to manage the Windows app.');
+      }
+      return;
+    }
+    setState(() => _checking = true);
+    try {
+      final status = await _service.check(url, token);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _status = status;
+        _message = null;
+        if (_updating && !status.available && status.phase == 'idle') {
+          _updating = false;
+          _poll?.cancel();
+        }
+        if (status.phase == 'error') {
+          _updating = false;
+          _poll?.cancel();
+          _message = status.error;
+        }
+      });
+    } on ManagerUpdateException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      // The manager briefly restarts after installation. The photo API stays
+      // up, so keep polling instead of presenting this as a server outage.
+      if (!_updating) {
+        setState(() => _message = error.message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _checking = false);
+      }
+    }
+  }
+
+  void _startPolling() {
+    _startedAt = DateTime.now();
+    _poll?.cancel();
+    _poll = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (_startedAt != null && DateTime.now().difference(_startedAt!) > const Duration(minutes: 5)) {
+        _poll?.cancel();
+        if (mounted) {
+          setState(() {
+            _updating = false;
+            _message = 'The update could not be confirmed. Check the Windows app; your photos remain connected.';
+          });
+        }
+      } else {
+        unawaited(_refresh());
+      }
+    });
+  }
+
+  Future<void> _update() async {
+    final status = _status;
+    final url = _url;
+    final token = _token;
+    if (status == null || !status.available || url == null || token == null || _updating) {
+      return;
+    }
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Windows manager?'),
+        content: Text(
+          'Install version ${status.latestVersion} on your PC. Only the Windows manager restarts. '
+          'Your photo server and uploads stay online.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Update PC')),
+        ],
+      ),
+    );
+    if (approved != true || !mounted) {
+      return;
+    }
+    setState(() {
+      _updating = true;
+      _message = null;
+    });
+    try {
+      await _service.start(url, token);
+      if (mounted) {
+        _startPolling();
+      }
+    } on ManagerUpdateException catch (error) {
+      if (mounted) {
+        setState(() {
+          _updating = false;
+          _message = error.message;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _status;
+    final progress = status?.progress ?? 0;
+    final phase = status?.phase ?? 'idle';
+    final description = _updating
+        ? switch (phase) {
+            'downloading' => 'Downloading on your PC · $progress%',
+            'verifying' => 'Verifying the installer on your PC…',
+            'installing' => 'Restarting the Windows manager…',
+            _ => 'Updating the Windows manager… Photos remain available.',
+          }
+        : _message ??
+              (status == null
+                  ? 'Checking your Windows manager…'
+                  : status.available
+                  ? 'Version ${status.currentVersion} → ${status.latestVersion} available'
+                  : 'Version ${status.currentVersion} · up to date');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SectionLabel('WINDOWS MANAGER'),
+        ListTile(
+          leading: const Icon(Icons.desktop_windows_outlined),
+          title: const Text('Server app updates'),
+          subtitle: Text(description),
+          trailing: _checking && status == null
+              ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : IconButton(
+                  onPressed: _checking || _updating ? null : _refresh,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+        ),
+        if (_updating)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(72, 0, 20, 8),
+            child: LinearProgressIndicator(value: phase == 'downloading' ? progress / 100 : null, minHeight: 3),
+          ),
+        if (status?.available == true && !_updating)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(72, 0, 20, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.tonal(onPressed: _update, child: const Text('Update Windows manager')),
+            ),
+          ),
+      ],
     );
   }
 }
