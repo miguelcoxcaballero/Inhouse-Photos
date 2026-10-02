@@ -1,8 +1,8 @@
 {
-  "version": "3.1.92",
-  "versionCode": 7150,
+  "version": "3.1.93",
+  "versionCode": 7151,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.92-server-management-fix/Inhouse-Photos.apk",
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.93-usb-upload/Inhouse-Photos.apk",
   "sizeBytes": 74903045,
   "sha256": "d5425909306369b57cb7971ed27e2ddc6383d9499bbf17423f4e9a05e5d83430"
 }

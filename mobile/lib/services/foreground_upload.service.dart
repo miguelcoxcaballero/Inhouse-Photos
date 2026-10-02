@@ -201,22 +201,24 @@ class ForegroundUploadService {
     final hasWifi = networkCapabilities.isUnmetered;
     _logger.info('Network capabilities: $networkCapabilities, hasWifi/isUnmetered: $hasWifi');
     final usingLocalRoute = await _uploadRepository.prepareLocalRoute(isUnmetered: hasWifi);
-    _logger.info('Foreground upload route: ${usingLocalRoute ? 'verified LAN HTTPS' : 'public HTTPS'}');
-
-    if (useSequentialUpload) {
-      await _uploadSequentially(items: candidates, cancelToken: cancelToken, hasWifi: hasWifi, callbacks: callbacks);
-    } else {
-      await _uploadWithPipeline(
-        items: candidates,
-        cancelToken: cancelToken,
-        isUnmetered: hasWifi,
-        isLocal: usingLocalRoute,
-        shouldSkip: (asset) {
-          final requireWifi = _shouldRequireWiFi(asset);
-          return requireWifi && !hasWifi;
-        },
-        callbacks: callbacks,
-      );
+    _logger.info('Foreground upload route: ${usingLocalRoute ? 'verified direct HTTPS' : 'public HTTPS'}');
+    _uploadRepository.startLocalRouteMonitoring();
+    try {
+      if (useSequentialUpload) {
+        await _uploadSequentially(items: candidates, cancelToken: cancelToken, hasWifi: hasWifi, callbacks: callbacks);
+      } else {
+        await _uploadWithPipeline(
+          items: candidates,
+          cancelToken: cancelToken,
+          isUnmetered: hasWifi || usingLocalRoute,
+          isLocal: usingLocalRoute,
+          shouldSkip: (asset) => _shouldRequireWiFi(asset) && !hasWifi && !_uploadRepository.hasLocalRoute,
+          callbacks: callbacks,
+          enforceBackupNetworkPolicy: true,
+        );
+      }
+    } finally {
+      _uploadRepository.stopLocalRouteMonitoring();
     }
   }
 
@@ -232,6 +234,7 @@ class ForegroundUploadService {
     required bool isLocal,
     required bool Function(LocalAsset) shouldSkip,
     required UploadCallbacks callbacks,
+    bool enforceBackupNetworkPolicy = false,
   }) async {
     await _storageRepository.clearCache();
     shouldAbortUpload = false;
@@ -250,7 +253,9 @@ class ForegroundUploadService {
     // compression are now separate concerns. Upload concurrency adapts to
     // measured network throughput, while a separate semaphore bounds how many
     // assets may be awaiting compression on the server.
-    final uploadWorkerCount = transferPlan.uploadWorkers;
+    // Enough sockets to fill a fast local link without exhausting file
+    // descriptors or saturating the server with dozens of simultaneous POSTs.
+    final uploadWorkerCount = transferPlan.uploadWorkers.clamp(1, 16);
     final adaptiveLimit = AdaptiveUploadLimiter(maximum: uploadWorkerCount, isUnmetered: isUnmetered, isLocal: isLocal);
     final uploadGate = MediaUploadGate(adaptiveLimit.current);
     final compressionWindow = waitsForServerCompression ? transferPlan.compressionWindow(isUnmetered: isUnmetered) : 0;
@@ -355,7 +360,12 @@ class ForegroundUploadService {
         }
         _UploadAcknowledgement? acknowledgement;
         try {
-          acknowledgement = await _uploadPreparedAsset(item, cancelToken, callbacks: callbacks);
+          acknowledgement = await _uploadPreparedAsset(
+            item,
+            cancelToken,
+            callbacks: callbacks,
+            enforceBackupNetworkPolicy: enforceBackupNetworkPolicy,
+          );
           // Video transfers are deliberately serial and must not make the
           // photo-only adaptive controller ramp up its parallelism.
           final newLimit = isVideo
@@ -441,12 +451,12 @@ class ForegroundUploadService {
       }
 
       final requireWifi = _shouldRequireWiFi(asset);
-      if (requireWifi && !hasWifi) {
+      if (requireWifi && !hasWifi && !_uploadRepository.hasLocalRoute) {
         _logger.warning('Skipping upload for ${asset.id} because it requires WiFi');
         continue;
       }
 
-      await uploadSingleAsset(asset, cancelToken, callbacks: callbacks);
+      await uploadSingleAsset(asset, cancelToken, callbacks: callbacks, enforceBackupNetworkPolicy: true);
     }
   }
 
@@ -461,13 +471,22 @@ class ForegroundUploadService {
     }
 
     final networkCapabilities = await _connectivityApi.getCapabilities();
-    await _uploadRepository.prepareLocalRoute(isUnmetered: networkCapabilities.isUnmetered);
-
-    await _executeWithWorkerPool<LocalAsset>(
-      items: localAssets,
-      cancelToken: cancelToken,
-      processItem: (asset) => uploadSingleAsset(asset, cancelToken, callbacks: callbacks),
-    );
+    final isLocal = await _uploadRepository.prepareLocalRoute(isUnmetered: networkCapabilities.isUnmetered);
+    _uploadRepository.startLocalRouteMonitoring();
+    try {
+      // Manual selection is explicit permission to upload on the current
+      // network, just as before. Use the same bounded photo/video scheduler.
+      await _uploadWithPipeline(
+        items: localAssets,
+        cancelToken: cancelToken,
+        isUnmetered: networkCapabilities.isUnmetered || isLocal,
+        isLocal: isLocal,
+        shouldSkip: (_) => false,
+        callbacks: callbacks,
+      );
+    } finally {
+      _uploadRepository.stopLocalRouteMonitoring();
+    }
   }
 
   /// Upload files from shared intent
@@ -483,26 +502,31 @@ class ForegroundUploadService {
     }
     final networkCapabilities = await _connectivityApi.getCapabilities();
     await _uploadRepository.prepareLocalRoute(isUnmetered: networkCapabilities.isUnmetered);
-    await _executeWithWorkerPool<File>(
-      items: files,
-      cancelToken: cancelToken,
-      processItem: (file) async {
-        final fileId = p.hash(file.path).toString();
+    _uploadRepository.startLocalRouteMonitoring();
+    try {
+      await _executeWithWorkerPool<File>(
+        items: files,
+        cancelToken: cancelToken,
+        processItem: (file) async {
+          final fileId = p.hash(file.path).toString();
 
-        final result = await _uploadSingleFile(
-          file,
-          deviceAssetId: fileId,
-          cancelToken: cancelToken,
-          onProgress: (bytes, totalBytes) => onProgress?.call(fileId, bytes, totalBytes),
-        );
+          final result = await _uploadSingleFile(
+            file,
+            deviceAssetId: fileId,
+            cancelToken: cancelToken,
+            onProgress: (bytes, totalBytes) => onProgress?.call(fileId, bytes, totalBytes),
+          );
 
-        if (result.isSuccess) {
-          onSuccess?.call(fileId, result.remoteAssetId!);
-        } else if (!result.isCancelled && result.errorMessage != null) {
-          onError?.call(fileId, result.errorMessage!);
-        }
-      },
-    );
+          if (result.isSuccess) {
+            onSuccess?.call(fileId, result.remoteAssetId!);
+          } else if (!result.isCancelled && result.errorMessage != null) {
+            onError?.call(fileId, result.errorMessage!);
+          }
+        },
+      );
+    } finally {
+      _uploadRepository.stopLocalRouteMonitoring();
+    }
   }
 
   void cancel() {
@@ -564,6 +588,7 @@ class ForegroundUploadService {
     LocalAsset asset,
     Completer<void>? cancelToken, {
     required UploadCallbacks callbacks,
+    bool enforceBackupNetworkPolicy = false,
   }) async {
     final item = await _prepareAsset(asset, callbacks: callbacks);
     if (item == null) {
@@ -571,7 +596,12 @@ class ForegroundUploadService {
     }
 
     try {
-      final acknowledgement = await _uploadPreparedAsset(item, cancelToken, callbacks: callbacks);
+      final acknowledgement = await _uploadPreparedAsset(
+        item,
+        cancelToken,
+        callbacks: callbacks,
+        enforceBackupNetworkPolicy: enforceBackupNetworkPolicy,
+      );
       if (acknowledgement != null) {
         final onSuccess = callbacks.onSuccess;
         if (onSuccess != null) {
@@ -739,6 +769,7 @@ class ForegroundUploadService {
     _PreparedAsset item,
     Completer<void>? cancelToken, {
     required UploadCallbacks callbacks,
+    bool enforceBackupNetworkPolicy = false,
   }) async {
     final asset = item.asset;
     final onProgress = callbacks.onProgress;
@@ -757,6 +788,7 @@ class ForegroundUploadService {
               ? (bytes, totalBytes) => onProgress(asset.localId!, livePhotoTitle, bytes, totalBytes)
               : null,
           logContext: 'livePhotoVideo[${asset.localId}]',
+          canUsePublicRoute: enforceBackupNetworkPolicy ? () => _canUsePublicRoute(asset) : null,
         );
         if (livePhotoResult.isCancelled) {
           shouldAbortUpload = true;
@@ -780,6 +812,7 @@ class ForegroundUploadService {
             ? (bytes, totalBytes) => onProgress(asset.localId!, item.originalFileName, bytes, totalBytes)
             : null,
         logContext: 'asset[${asset.localId}]',
+        canUsePublicRoute: enforceBackupNetworkPolicy ? () => _canUsePublicRoute(asset) : null,
       );
 
       if (result.isSuccess && result.remoteAssetId != null) {
@@ -874,5 +907,17 @@ class ForegroundUploadService {
       return false;
     }
     return true;
+  }
+
+  Future<bool> _canUsePublicRoute(LocalAsset asset) async {
+    if (!_shouldRequireWiFi(asset)) {
+      return true;
+    }
+    try {
+      return (await _connectivityApi.getCapabilities()).isUnmetered;
+    } catch (_) {
+      // An unknown default network must never imply permission for mobile data.
+      return false;
+    }
   }
 }

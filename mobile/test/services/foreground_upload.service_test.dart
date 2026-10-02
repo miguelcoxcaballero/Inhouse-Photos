@@ -10,6 +10,7 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/platform/connectivity_api.g.dart';
 import 'package:immich_mobile/repositories/upload.repository.dart';
 import 'package:immich_mobile/services/foreground_upload.service.dart';
 import 'package:mocktail/mocktail.dart';
@@ -72,6 +73,7 @@ void main() {
         cancelToken: any(named: 'cancelToken'),
         onProgress: any(named: 'onProgress'),
         logContext: any(named: 'logContext'),
+        canUsePublicRoute: any(named: 'canUsePublicRoute'),
       ),
     ).thenAnswer((invocation) async {
       final fields = invocation.namedArguments[#fields] as Map<String, String>;
@@ -91,6 +93,7 @@ void main() {
         cancelToken: any(named: 'cancelToken'),
         onProgress: any(named: 'onProgress'),
         logContext: any(named: 'logContext'),
+        canUsePublicRoute: any(named: 'canUsePublicRoute'),
       ),
     ).thenAnswer((invocation) async {
       captured.add(invocation.namedArguments[#originalFileName] as String);
@@ -144,6 +147,50 @@ void main() {
       expect(captured, hasLength(1));
       expect(captured[0].containsKey('visibility'), isFalse);
       expect(captured[0]['storageSaver'], equals('true'));
+    });
+
+    test('backup fallback checks the actual current network before permitting public upload', () async {
+      final asset = LocalAssetStub.image1;
+      final entity = MockAssetEntity();
+      when(() => entity.isLivePhoto).thenReturn(false);
+      when(() => mockStorageRepository.getAssetEntityForAsset(asset)).thenAnswer((_) async => entity);
+      when(() => mockStorageRepository.isAssetAvailableLocally(asset.id)).thenAnswer((_) async => true);
+      when(() => mockStorageRepository.getFileForAsset(asset.id)).thenAnswer((_) async => File('/path/photo.jpg'));
+      when(() => mockAssetMediaRepository.getOriginalFilename(asset.id)).thenAnswer((_) async => 'photo.jpg');
+      when(() => mockConnectivityApi.getCapabilities()).thenAnswer((_) async => [NetworkCapability.cellular]);
+      bool? permitted;
+      when(
+        () => mockUploadRepository.uploadFile(
+          file: any(named: 'file'),
+          originalFileName: any(named: 'originalFileName'),
+          fields: any(named: 'fields'),
+          cancelToken: any(named: 'cancelToken'),
+          onProgress: any(named: 'onProgress'),
+          logContext: any(named: 'logContext'),
+          canUsePublicRoute: any(named: 'canUsePublicRoute'),
+        ),
+      ).thenAnswer((invocation) async {
+        final policy = invocation.namedArguments[#canUsePublicRoute] as Future<bool> Function();
+        permitted = await policy();
+        return UploadResult.networkPolicyBlocked();
+      });
+      await sut.uploadSingleAsset(asset, null, callbacks: const UploadCallbacks(), enforceBackupNetworkPolicy: true);
+      expect(permitted, isFalse);
+      verify(() => mockConnectivityApi.getCapabilities()).called(1);
+    });
+
+    test('explicit manual asset uploads do not inherit the automatic backup cellular restriction', () async {
+      final asset = LocalAssetStub.image1;
+      final entity = MockAssetEntity();
+      when(() => entity.isLivePhoto).thenReturn(false);
+      when(() => mockStorageRepository.getAssetEntityForAsset(asset)).thenAnswer((_) async => entity);
+      when(() => mockStorageRepository.isAssetAvailableLocally(asset.id)).thenAnswer((_) async => true);
+      when(() => mockStorageRepository.getFileForAsset(asset.id)).thenAnswer((_) async => File('/path/photo.jpg'));
+      when(() => mockAssetMediaRepository.getOriginalFilename(asset.id)).thenAnswer((_) async => 'photo.jpg');
+      final captured = captureFields();
+      await sut.uploadSingleAsset(asset, null, callbacks: const UploadCallbacks());
+      expect(captured, hasLength(1));
+      verifyNever(() => mockConnectivityApi.getCapabilities());
     });
 
     test('waits for the successful-upload callback before completing', () async {

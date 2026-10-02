@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -9,9 +7,8 @@ import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/providers/backup/drift_backup.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
-import 'package:immich_mobile/repositories/upload.repository.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
-import 'package:immich_mobile/utils/upload_speed_calculator.dart';
+import 'package:immich_mobile/widgets/backup/upload_connection_indicator.dart';
 import 'package:path/path.dart' as path;
 
 @RoutePage()
@@ -57,7 +54,7 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text("upload_details".t(context: context)),
-        actions: const [_ConnectionSpeedIndicator()],
+        actions: const [UploadConnectionIndicator()],
         backgroundColor: context.colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 1,
@@ -604,85 +601,6 @@ class _DriftUploadDetailPageState extends ConsumerState<DriftUploadDetailPage> {
     return showDialog(
       context: context,
       builder: (context) => FileDetailDialog(uploadStatus: item),
-    );
-  }
-}
-
-/// Refreshes only the small connection readout, not the entire upload list.
-class _ConnectionSpeedIndicator extends ConsumerStatefulWidget {
-  const _ConnectionSpeedIndicator();
-
-  @override
-  ConsumerState<_ConnectionSpeedIndicator> createState() => _ConnectionSpeedIndicatorState();
-}
-
-class _ConnectionSpeedIndicatorState extends ConsumerState<_ConnectionSpeedIndicator> {
-  Timer? _refreshTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isLocal = ref.watch(localUploadRouteActiveProvider);
-    final rate = ref.read(driftBackupProvider.notifier).currentUploadBytesPerSecond;
-    final route = isLocal ? 'Local Wi-Fi' : 'Internet';
-    final speed = rate == null ? 'Idle' : '↑ ${formatAggregateUploadSpeed(rate)}';
-    return Tooltip(
-      message: '$route · Actual upload speed to the server, measured during active transfers',
-      child: Semantics(
-        label: '$route, $speed',
-        child: Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: SizedBox(
-            width: 118,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Icon(
-                      isLocal ? Icons.lan_rounded : Icons.public_rounded,
-                      size: 15,
-                      color: context.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      route,
-                      style: context.textTheme.labelSmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-                Text(
-                  speed,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.textTheme.labelMedium?.copyWith(
-                    color: context.colorScheme.primary,
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

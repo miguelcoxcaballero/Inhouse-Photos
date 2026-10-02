@@ -37,7 +37,7 @@ class UploadSpeedCalculator {
   /// [currentBytes] is the number of bytes transferred so far.
   /// [totalBytes] is the total size of the file being uploaded.
   ///
-  /// Returns the calculated speed in MB/s, or -1 if not enough data.
+  /// Returns the calculated speed in MiB/s, or -1 if not enough data.
   double update(int currentBytes, int totalBytes) {
     final now = DateTime.now();
     _totalBytes = totalBytes;
@@ -58,7 +58,7 @@ class UploadSpeedCalculator {
     final bytesTransferred = currentBytes - _lastBytes;
     final elapsedSeconds = elapsed.inMilliseconds / 1000.0;
 
-    // Calculate bytes per second, then convert to MB/s
+    // Calculate bytes per second, then convert to MiB/s.
     final bytesPerSecond = bytesTransferred / elapsedSeconds;
     final mbPerSecond = bytesPerSecond / (1024 * 1024);
 
@@ -74,7 +74,7 @@ class UploadSpeedCalculator {
     return _currentSpeed;
   }
 
-  /// Returns the current calculated speed in MB/s.
+  /// Returns the current calculated speed in MiB/s.
   ///
   /// Returns -1 if no valid speed has been calculated yet.
   double get _currentSpeed {
@@ -86,18 +86,18 @@ class UploadSpeedCalculator {
     return sum / _speedSamples.length;
   }
 
-  /// Returns the current speed in MB/s, or -1 if not available.
+  /// Returns the current speed in MiB/s, or -1 if not available.
   double get speed => _currentSpeed;
 
   /// Returns a human-readable string representation of the current speed.
   ///
-  /// Returns '-- MB/s' if N/A, otherwise in MB/s or kB/s format.
+  /// Returns '-- MiB/s' if N/A, otherwise in MiB/s or KiB/s format.
   String get speedAsString {
     final s = _currentSpeed;
     return switch (s) {
-      <= 0 => '-- MB/s',
-      >= 1 => '${s.round()} MB/s',
-      _ => '${(s * 1000).round()} kB/s',
+      <= 0 => '-- MiB/s',
+      >= 1 => '${s.round()} MiB/s',
+      _ => '${(s * 1024).round()} KiB/s',
     };
   }
 
@@ -137,55 +137,62 @@ class UploadSpeedCalculator {
 
 /// Measures the bytes actually sent by all foreground uploads in a short
 /// sliding window. A first progress event establishes the baseline; retries
-/// reset it rather than producing a negative or inflated speed.
+/// reset it rather than producing a negative or inflated speed. Completed
+/// uploads keep contributing until their recent bytes leave the window, so
+/// finishing many small photos cannot make a busy connection appear idle.
 class AggregateUploadSpeed {
   AggregateUploadSpeed({this.window = const Duration(seconds: 3)});
 
   final Duration window;
-  final Map<String, (int bytes, DateTime since)> _active = {};
-  final List<(String taskId, DateTime time, int bytes)> _samples = [];
+  final Map<String, int> _active = {};
+  final List<(DateTime time, int bytes)> _samples = [];
+  DateTime? _measurementStartedAt;
 
   void update(String taskId, int currentBytes, DateTime now) {
-    final previous = _active[taskId];
-    if (previous == null || currentBytes < previous.$1) {
-      _samples.removeWhere((sample) => sample.$1 == taskId);
-      _active[taskId] = (currentBytes, now);
-    } else {
-      final delta = currentBytes - previous.$1;
-      if (delta > 0) {
-        _samples.add((taskId, now, delta));
-      }
-      _active[taskId] = (currentBytes, previous.$2);
-    }
     _prune(now);
+    if (_active.isEmpty && _samples.isEmpty) {
+      _measurementStartedAt = now;
+    }
+    final previous = _active[taskId];
+    if (previous != null && currentBytes >= previous) {
+      final delta = currentBytes - previous;
+      if (delta > 0) {
+        _samples.add((now, delta));
+      }
+    }
+    // A smaller count starts a retry (or the next part of a Live Photo).
+    // Already-sent bytes remain genuine network traffic; only the baseline
+    // resets, without subtracting history or adding the new count twice.
+    _active[taskId] = currentBytes;
   }
 
-  /// Null means no uploads are active; zero means active but no recent bytes.
+  /// Null means no active uploads and no recent traffic. Zero means a transfer
+  /// is active but has made no measurable progress in the current window.
   double? bytesPerSecond(DateTime now) {
-    if (_active.isEmpty) {
+    _prune(now);
+    if (_active.isEmpty && _samples.isEmpty) {
+      _measurementStartedAt = null;
       return null;
     }
-    _prune(now);
-    final firstStart = _active.values.map((sample) => sample.$2).reduce((a, b) => a.isBefore(b) ? a : b);
-    final elapsedMs = now.difference(firstStart).inMilliseconds;
+    final elapsedMs = now.difference(_measurementStartedAt ?? now).inMilliseconds;
     final durationSeconds = (elapsedMs.clamp(500, window.inMilliseconds)) / 1000;
-    final bytes = _samples.fold<int>(0, (sum, sample) => sum + sample.$3);
+    final bytes = _samples.fold<int>(0, (sum, sample) => sum + sample.$2);
     return bytes / durationSeconds;
   }
 
   void remove(String taskId) {
     _active.remove(taskId);
-    _samples.removeWhere((sample) => sample.$1 == taskId);
   }
 
   void clear() {
     _active.clear();
     _samples.clear();
+    _measurementStartedAt = null;
   }
 
   void _prune(DateTime now) {
     final cutoff = now.subtract(window);
-    _samples.removeWhere((sample) => sample.$2.isBefore(cutoff));
+    _samples.removeWhere((sample) => sample.$1.isBefore(cutoff));
   }
 }
 
@@ -197,10 +204,10 @@ String formatAggregateUploadSpeed(double? bytesPerSecond) {
     return '${bytesPerSecond.round()} B/s';
   }
   if (bytesPerSecond < 1024 * 1024) {
-    return '${(bytesPerSecond / 1024).round()} kB/s';
+    return '${(bytesPerSecond / 1024).round()} KiB/s';
   }
   final mbPerSecond = bytesPerSecond / (1024 * 1024);
-  return '${mbPerSecond.toStringAsFixed(mbPerSecond >= 10 ? 0 : 1)} MB/s';
+  return '${mbPerSecond.toStringAsFixed(mbPerSecond >= 10 ? 0 : 1)} MiB/s';
 }
 
 /// Manager for tracking upload speeds for multiple concurrent uploads.
@@ -234,7 +241,7 @@ class UploadSpeedManager {
 
   /// Gets the current speed string for a specific task.
   String getSpeedAsString(String taskId) {
-    return _calculators[taskId]?.speedAsString ?? '-- MB/s';
+    return _calculators[taskId]?.speedAsString ?? '-- MiB/s';
   }
 
   /// Gets the time remaining string for a specific task.

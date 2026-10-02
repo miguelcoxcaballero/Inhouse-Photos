@@ -36,8 +36,11 @@ jobs:
           test/repositories/lan_upload_route_test.dart
           test/repositories/upload_repository_test.dart
           test/services/foreground_upload.service_test.dart
+          test/services/background_upload.service_test.dart
           test/domain/models/config/backup_config_test.dart
           test/unit/adaptive_upload_limiter_test.dart
+          test/unit/aggregate_upload_speed_test.dart
+          test/widgets/backup/upload_connection_indicator_test.dart
           test/services/pairing.service_test.dart
           test/services/server_management.service_test.dart
           test/widgets/settings/server_management_settings_test.dart
