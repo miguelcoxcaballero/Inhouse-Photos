@@ -1,0 +1,54 @@
+services:
+  database:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: immich
+      POSTGRES_PASSWORD: runtime-test-only-local-password
+      POSTGRES_INITDB_ARGS: --data-checksums
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    labels:
+      inhouse-runtime-test: 'true'
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'postgres', '-d', 'immich']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    shm_size: 128mb
+  redis:
+    image: docker.io/valkey/valkey:9@sha256:8e8d64b405ce18f41b8e5ee20aa4687a8ed0022d1298f2ce31cdcf3a76e09411
+    labels:
+      inhouse-runtime-test: 'true'
+  server:
+    image: ${RUNTIME_TEST_IMAGE:-inhouse-photos-server:v3.1.0-storage-saver-20261002}
+    environment:
+      DB_HOSTNAME: database
+      DB_DATABASE_NAME: immich
+      DB_USERNAME: postgres
+      DB_PASSWORD: runtime-test-only-local-password
+      REDIS_HOSTNAME: redis
+      INHOUSE_STORAGE_SAVER_CONCURRENCY: '2'
+      CPU_CORES: '5'
+    volumes:
+      - library:/data
+    ports:
+      - '127.0.0.1:${RUNTIME_TEST_PORT:-19283}:2283'
+    labels:
+      inhouse-runtime-test: 'true'
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_started
+volumes:
+  pgdata:
+    labels:
+      inhouse-runtime-test: 'true'
+  library:
+    labels:
+      inhouse-runtime-test: 'true'
+networks:
+  default:
+    labels:
+      inhouse-runtime-test: 'true'
