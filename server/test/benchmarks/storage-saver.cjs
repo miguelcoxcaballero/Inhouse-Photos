@@ -10,12 +10,11 @@ const Module = require('node:module');
 const os = require('node:os');
 const path = require('node:path');
 const { performance } = require('node:perf_hooks');
-const swc = require('@swc/core');
 const sharp = require('sharp');
 const { exiftool } = require('exiftool-vendored');
-const { MediaRepository } = require('../../dist/repositories/media.repository');
 
-const serverRoot = path.resolve(__dirname, '../..');
+const serverRoot = process.env.BENCHMARK_SERVER_ROOT || path.resolve(__dirname, '../..');
+const { MediaRepository } = require(path.join(serverRoot, 'dist/repositories/media.repository'));
 const baseRef = process.env.BENCHMARK_BASE_REF || '67b8d77eb710211b13dc7a7ef469054b98962657';
 const directory = path.resolve(process.argv[2] || path.join(os.tmpdir(), 'inhouse-storage-saver-benchmark'));
 const repetitions = 3;
@@ -23,6 +22,10 @@ const logger = { setContext() {}, debug() {}, warn: console.warn };
 const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
 function loadBaseline() {
+  if (process.env.BENCHMARK_BASELINE_MODULE) {
+    return new (require(process.env.BENCHMARK_BASELINE_MODULE).MediaRepository)(logger);
+  }
+  const swc = require('@swc/core');
   const source = execFileSync('git', ['show', `${baseRef}:server/src/repositories/media.repository.ts`], {
     cwd: serverRoot,
     encoding: 'utf8',

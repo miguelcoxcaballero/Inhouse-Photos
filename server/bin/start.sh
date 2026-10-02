@@ -44,7 +44,7 @@ read_file_and_export "REDIS_PASSWORD_FILE" "REDIS_PASSWORD"
 
 if CPU_CORES="${CPU_CORES:=$(get-cpus.sh 2>/dev/null)}"; then
   log_message "Detected CPU Cores: $CPU_CORES"
-  if [ "$CPU_CORES" -gt 4 ]; then
+  if [ "$CPU_CORES" -gt 4 ] && [ -z "${UV_THREADPOOL_SIZE:-}" ]; then
     export UV_THREADPOOL_SIZE=$CPU_CORES
   fi
 else
