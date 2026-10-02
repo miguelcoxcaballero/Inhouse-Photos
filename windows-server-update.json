@@ -1,6 +1,6 @@
 {
-  "Version": "1.2.14",
-  "InstallerUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.14/Inhouse-Photos-Server-Setup.exe",
-  "Sha256": "2c9220f07312e882725eec65e5fc167aa7a34a6200f4c129f6811c52f707c9cf",
-  "Notes": "Añade detección verificada de red USB y preparación guiada del cable. Publica los cambios de red sin depender de las copias de seguridad y conserva la biblioteca y la conexión habitual."
+  "Version": "1.2.15",
+  "InstallerUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.15/Inhouse-Photos-Server-Setup.exe",
+  "Sha256": "b1cce4d6f62c6e1f939a4ee4ac7da8ef9edb193358f719c6da1eecd781bb8902",
+  "Notes": "Detecta automáticamente móviles USB, incluso antes de compartir red. Muestra permisos y pasos pendientes en el programa y el panel web en directo. Conserva biblioteca, cuentas y conexión habitual; no cambia la red ni instala controladores sin permiso."
 }
