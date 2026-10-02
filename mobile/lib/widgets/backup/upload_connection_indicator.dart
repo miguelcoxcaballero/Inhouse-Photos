@@ -25,7 +25,9 @@ class _UploadConnectionIndicatorState extends ConsumerState<UploadConnectionIndi
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     });
   }
 
