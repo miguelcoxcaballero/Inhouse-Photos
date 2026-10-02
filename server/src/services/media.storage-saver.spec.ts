@@ -1,5 +1,5 @@
 import { Readable } from 'node:stream';
-import { JobName, JobStatus } from 'src/enum';
+import { AssetType, JobName, JobStatus } from 'src/enum';
 import { MediaService } from 'src/services/media.service';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { getForAsset } from 'test/mappers';
@@ -14,12 +14,11 @@ describe('Storage Saver commit safety', () => {
   beforeEach(() => {
     ({ sut, mocks } = newTestService(MediaService));
     mocks.asset.getById.mockResolvedValue(getForAsset(asset));
-    mocks.storage.stat.mockImplementation(
-      async (path) =>
-        ({
-          size: path === outputPath ? 60 : 100,
-          mtime: new Date(),
-        }) as Awaited<ReturnType<typeof mocks.storage.stat>>,
+    mocks.storage.stat.mockImplementation((path) =>
+      Promise.resolve({
+        size: path === outputPath ? 60 : 100,
+        mtime: new Date(),
+      } as Awaited<ReturnType<typeof mocks.storage.stat>>),
     );
     mocks.storage.createPlainReadStream.mockReturnValue(Readable.from([Buffer.from('encoded')]));
     mocks.storage.checkFileExists.mockResolvedValue(true);
@@ -63,5 +62,34 @@ describe('Storage Saver commit safety', () => {
     expect(await sut.handleStorageSaverCompression({ id: asset.id })).toBe(JobStatus.Failed);
     expect(mocks.storage.unlink).toHaveBeenCalledWith(outputPath);
     expect(mocks.asset.update).not.toHaveBeenCalled();
+  });
+
+  it('moves an old queued video out of the photo workers without scheduling premature metadata', async () => {
+    mocks.asset.getById.mockResolvedValue(getForAsset({ ...asset, type: AssetType.Video }));
+
+    expect(await sut.handleStorageSaverCompression({ id: asset.id })).toBe(JobStatus.Success);
+    expect(mocks.job.queue).toHaveBeenCalledExactlyOnceWith({
+      name: JobName.AssetCompressStorageSaverVideo,
+      data: { id: asset.id },
+    });
+    expect(mocks.media.compressStorageSaverVideo).not.toHaveBeenCalled();
+    expect(mocks.storage.stat).not.toHaveBeenCalled();
+  });
+
+  it('keeps an efficient video unchanged and continues metadata extraction', async () => {
+    mocks.asset.getById.mockResolvedValue(getForAsset({ ...asset, type: AssetType.Video }));
+    mocks.media.compressStorageSaverVideo.mockResolvedValue(false);
+
+    expect(await sut.handleStorageSaverVideoCompression({ id: asset.id })).toBe(JobStatus.Skipped);
+    expect(mocks.asset.update).not.toHaveBeenCalled();
+    expect(mocks.storage.unlink).not.toHaveBeenCalled();
+    expect(mocks.job.queue).toHaveBeenCalledWith({
+      name: JobName.AssetExtractMetadata,
+      data: { id: asset.id, source: 'upload' },
+    });
+    expect(mocks.websocket.serverSend).toHaveBeenCalledWith(
+      'StorageSaverProgress',
+      expect.objectContaining({ state: 'skipped', progress: 1 }),
+    );
   });
 });

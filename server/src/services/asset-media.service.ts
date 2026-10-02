@@ -20,6 +20,7 @@ import { AssetDownloadOriginalDto } from 'src/dtos/asset.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
   AssetFileType,
+  AssetType,
   AssetVisibility,
   CacheControl,
   ChecksumAlgorithm,
@@ -183,10 +184,17 @@ export class AssetMediaService extends BaseService {
         lockedPropertiesBehavior: 'override',
       });
 
-      await this.jobRepository.queue({
-        name: JobName.AssetExtractMetadata,
-        data: { id: asset.id, source: dto.storageSaver ? 'storage-saver-upload' : 'upload' },
-      });
+      await this.jobRepository.queue(
+        dto.storageSaver
+          ? {
+              name:
+                asset.type === AssetType.Video
+                  ? JobName.AssetCompressStorageSaverVideo
+                  : JobName.AssetCompressStorageSaver,
+              data: { id: asset.id },
+            }
+          : { name: JobName.AssetExtractMetadata, data: { id: asset.id, source: 'upload' } },
+      );
       if (dto.storageSaver) {
         this.websocketRepository.clientSend('StorageSaverProgressV1', asset.ownerId, {
           assetId: asset.id,

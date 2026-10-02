@@ -354,24 +354,27 @@ describe(AssetMediaService.name, () => {
       });
     });
 
-    it('should request server-side Storage Saver only for a new upload that opts in', async () => {
-      const file = {
-        uuid: 'random-uuid',
-        originalPath: 'fake_path/asset_1.jpeg',
-        mimeType: 'image/jpeg',
-        checksum: Buffer.from('file hash', 'utf8'),
-        originalName: 'asset_1.jpeg',
-        size: 42,
-      };
-      mocks.asset.create.mockResolvedValue(assetEntity);
+    it.each([AssetType.Image, AssetType.Video])(
+      'routes a new Storage Saver %s upload straight to its encoder queue',
+      async (type) => {
+        const file = {
+          uuid: 'random-uuid',
+          originalPath: 'fake_path/asset_1.jpeg',
+          mimeType: 'image/jpeg',
+          checksum: Buffer.from('file hash', 'utf8'),
+          originalName: 'asset_1.jpeg',
+          size: 42,
+        };
+        mocks.asset.create.mockResolvedValue({ ...assetEntity, type });
 
-      await sut.uploadAsset(authStub.user1, { ...createDto, storageSaver: true }, file);
+        await sut.uploadAsset(authStub.user1, { ...createDto, storageSaver: true }, file);
 
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.AssetExtractMetadata,
-        data: { id: assetEntity.id, source: 'storage-saver-upload' },
-      });
-    });
+        expect(mocks.job.queue).toHaveBeenCalledWith({
+          name: type === AssetType.Video ? JobName.AssetCompressStorageSaverVideo : JobName.AssetCompressStorageSaver,
+          data: { id: assetEntity.id },
+        });
+      },
+    );
 
     it('should handle a duplicate', async () => {
       const file = {

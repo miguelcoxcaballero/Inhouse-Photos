@@ -75,10 +75,29 @@ export class MediaService extends BaseService {
   }
 
   @OnJob({ name: JobName.AssetCompressStorageSaver, queue: QueueName.StorageSaverCompression })
-  async handleStorageSaverCompression({ id }: JobOf<JobName.AssetCompressStorageSaver>): Promise<JobStatus> {
+  handleStorageSaverCompression(data: JobOf<JobName.AssetCompressStorageSaver>): Promise<JobStatus> {
+    return this.compressStorageSaverAsset(data, false);
+  }
+
+  @OnJob({ name: JobName.AssetCompressStorageSaverVideo, queue: QueueName.StorageSaverVideoCompression })
+  handleStorageSaverVideoCompression(data: JobOf<JobName.AssetCompressStorageSaverVideo>): Promise<JobStatus> {
+    return this.compressStorageSaverAsset(data, true);
+  }
+
+  private async compressStorageSaverAsset(
+    { id }: JobOf<JobName.AssetCompressStorageSaver>,
+    videoWorker: boolean,
+  ): Promise<JobStatus> {
     const asset = await this.assetRepository.getById(id);
     if (!asset?.originalPath) {
       return JobStatus.Failed;
+    }
+
+    // Drain videos already waiting in the old mixed queue without encoding
+    // them there. New uploads go directly to the appropriate queue.
+    if (asset.type === AssetType.Video && !videoWorker) {
+      await this.jobRepository.queue({ name: JobName.AssetCompressStorageSaverVideo, data: { id } });
+      return JobStatus.Success;
     }
 
     const sourcePath = asset.originalPath;
@@ -127,9 +146,13 @@ export class MediaService extends BaseService {
     try {
       report(0.01, 'compressing');
       if (asset.type === AssetType.Video) {
-        await this.mediaRepository.compressStorageSaverVideo(sourcePath, outputPath, (progress) =>
+        const encoded = await this.mediaRepository.compressStorageSaverVideo(sourcePath, outputPath, (progress) =>
           report(progress, 'compressing'),
         );
+        if (!encoded) {
+          report(1, 'skipped', sourceStats.size);
+          return JobStatus.Skipped;
+        }
       } else if (asset.type === AssetType.Image && !isGif) {
         const encoded = await this.mediaRepository.compressStorageSaverImage(
           sourcePath,
@@ -147,7 +170,7 @@ export class MediaService extends BaseService {
       }
 
       const outputStats = await this.storageRepository.stat(outputPath);
-      if (outputStats.size <= 0 || outputStats.size >= sourceStats.size) {
+      if (outputStats.size === 0 || outputStats.size >= sourceStats.size) {
         await this.storageRepository.unlink(outputPath);
         report(1, 'skipped', sourceStats.size);
         return JobStatus.Skipped;
@@ -179,7 +202,8 @@ export class MediaService extends BaseService {
       // transaction committed. Re-read the durable reference before cleanup.
       if (!pathCommitted) {
         try {
-          pathCommitted = (await this.assetRepository.getById(id))?.originalPath === outputPath;
+          const durableAsset = await this.assetRepository.getById(id);
+          pathCommitted = durableAsset?.originalPath === outputPath;
         } catch {
           // An unavailable database is not proof that the file is disposable.
           pathCommitted = true;

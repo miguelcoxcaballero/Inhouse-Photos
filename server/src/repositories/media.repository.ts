@@ -36,6 +36,7 @@ import {
   VideoPacketInfo,
 } from 'src/types';
 import { handlePromiseError } from 'src/utils/misc';
+import { getStorageSaverResources, getStorageSaverVideoPreset } from 'src/utils/storage-saver';
 import { createAffineMatrix } from 'src/utils/transform';
 
 const probe = (input: string, options: string[]): Promise<FfprobeData> =>
@@ -193,8 +194,8 @@ export class MediaRepository {
     onProgress?.(0.08);
     const metadata = await sharp(input, { failOn: 'none', limitInputPixels: false, unlimited: true }).metadata();
     onProgress?.(0.18);
-    const width = metadata.width ?? 0;
-    const height = metadata.height ?? 0;
+    const width = metadata.autoOrient?.width ?? metadata.width ?? 0;
+    const height = metadata.autoOrient?.height ?? metadata.height ?? 0;
     const maxPixels = 16_000_000;
     const scale = width > 0 && height > 0 && width * height > maxPixels ? Math.sqrt(maxPixels / (width * height)) : 1;
 
@@ -217,29 +218,63 @@ export class MediaRepository {
       // libjpeg-turbo is substantially faster than mozjpeg and produces the
       // same visual quality target. The caller still rejects any output that
       // is not smaller than the source.
-      .jpeg({ quality: 85, progressive: true, chromaSubsampling: '4:2:0', mozjpeg: false })
+      // Copy EXIF, XMP, IPTC and ICC in the native encoder, avoiding a second
+      // file rewrite through ExifTool. Pixels have already been auto-oriented.
+      .keepMetadata()
+      .withExifMerge({ IFD0: { Orientation: '1' } })
+      .jpeg({ quality: 85, progressive: false, chromaSubsampling: '4:2:0', mozjpeg: false, optimiseCoding: false })
       .toFile(output);
     onProgress?.(0.88);
 
-    // Keep capture date, camera and location metadata in the server copy.
-    await this.copyTagGroup('all', input, output);
     onProgress?.(0.96);
     return true;
   }
 
   /** Encode a newly uploaded video to a broadly compatible 1080p Storage Saver copy. */
-  compressStorageSaverVideo(input: string, output: string, onProgress?: (progress: number) => void): Promise<void> {
+  async compressStorageSaverVideo(
+    input: string,
+    output: string,
+    onProgress?: (progress: number) => void,
+  ): Promise<boolean> {
+    const info = await probe(input, []);
+    const video = info.streams.find((stream) => stream.codec_type === 'video' && !stream.disposition?.attached_pic);
+    const audio = info.streams.filter((stream) => stream.codec_type === 'audio');
+    const bitrate = Number(video?.bit_rate);
+    // Re-encoding an already small H.264/AAC video often makes it larger.
+    // Keep its bytes and quality, and free its queue slot immediately.
+    if (
+      video?.codec_name === 'h264' &&
+      video.pix_fmt === 'yuv420p' &&
+      (video.width ?? 0) > 0 &&
+      (video.height ?? 0) > 0 &&
+      Math.max(video.width!, video.height!) <= 1920 &&
+      bitrate > 0 &&
+      bitrate <= 2_500_000 &&
+      audio.every(
+        (stream) => stream.codec_name === 'aac' && Number(stream.bit_rate) > 0 && Number(stream.bit_rate) <= 160_000,
+      )
+    ) {
+      onProgress?.(1);
+      return false;
+    }
+
+    const { videoThreads } = getStorageSaverResources();
     return new Promise((resolve, reject) => {
       ffmpeg(input, { niceness: 10 })
+        .inputOptions([`-threads ${videoThreads}`])
         .outputOptions([
           '-map 0:v:0',
           '-map 0:a?',
           '-map_metadata 0',
-          '-vf scale=1920:1920:force_original_aspect_ratio=decrease:force_divisible_by=2',
+          "-vf scale=w='min(1920,iw)':h='min(1920,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
           '-c:v libx264',
-          '-preset faster',
+          // Fastest software path at the existing CRF quality target. This can
+          // produce larger files than slower presets; the caller keeps the
+          // original whenever encoding would increase storage usage.
+          `-preset ${getStorageSaverVideoPreset()}`,
           '-crf 24',
-          '-threads 2',
+          `-threads ${videoThreads}`,
+          '-filter_threads 1',
           '-pix_fmt yuv420p',
           '-c:a aac',
           '-b:a 128k',
@@ -253,7 +288,7 @@ export class MediaRepository {
           }
         })
         .on('error', reject)
-        .on('end', () => resolve())
+        .on('end', () => resolve(true))
         .run();
     });
   }

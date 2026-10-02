@@ -219,6 +219,7 @@ export type ConcurrentQueueName = Exclude<
   | QueueName.DuplicateDetection
   | QueueName.BackupDatabase
   | QueueName.StorageSaverCompression
+  | QueueName.StorageSaverVideoCompression
 >;
 
 export type Jobs = { [K in JobItem['name']]: (JobItem & { name: K })['data'] };
@@ -391,6 +392,7 @@ export type JobItem =
   | { name: JobName.AssetExtractMetadataQueueAll; data: IBaseJob }
   | { name: JobName.AssetExtractMetadata; data: IEntityJob }
   | { name: JobName.AssetCompressStorageSaver; data: IEntityJob }
+  | { name: JobName.AssetCompressStorageSaverVideo; data: IEntityJob }
 
   // Notifications
   | { name: JobName.NotificationsCleanup; data?: IBaseJob }

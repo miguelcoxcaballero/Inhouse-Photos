@@ -84,6 +84,7 @@ FROM ghcr.io/immich-app/base-server-prod:202607211135@sha256:ced131da7523544fe97
 
 WORKDIR /usr/src/app
 ENV NODE_ENV=production \
+  UV_THREADPOOL_SIZE=16 \
   NVIDIA_DRIVER_CAPABILITIES=all \
   NVIDIA_VISIBLE_DEVICES=all
 
