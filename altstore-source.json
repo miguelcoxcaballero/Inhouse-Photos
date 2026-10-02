@@ -16,13 +16,22 @@
       "iconURL": "https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/1024.png",
       "tintColor": "#D97736",
       "category": "utilities",
-      "version": "3.1.92",
-      "versionDate": "2026-09-29T22:31:18Z",
-      "versionDescription": "Fixes Windows server management availability and shows clear connection errors with automatic reconnection.",
-      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.92-inhouse-ios.1/Inhouse-Photos.ipa",
-      "size": 32487568,
+      "version": "3.1.93",
+      "versionDate": "2026-10-02T15:09:37Z",
+      "versionDescription": "Adds verified USB upload routing with local Wi-Fi and Internet fallback, resilient transfers, and measured connection speed.",
+      "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.93-inhouse-ios.1/Inhouse-Photos.ipa",
+      "size": 32503084,
       "minOSVersion": "15.0",
       "versions": [
+        {
+          "version": "3.1.93",
+          "buildVersion": "5151",
+          "date": "2026-10-02T15:09:37Z",
+          "localizedDescription": "Adds verified USB upload routing with local Wi-Fi and Internet fallback, resilient transfers, and measured connection speed.",
+          "downloadURL": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.93-inhouse-ios.1/Inhouse-Photos.ipa",
+          "size": 32503084,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "3.1.92",
           "buildVersion": "5150",
