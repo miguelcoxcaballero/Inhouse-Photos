@@ -235,7 +235,21 @@ namespace InhousePhotos {
     public static string WithRoute(string source,string secret) {
       if(String.IsNullOrEmpty(source)||!Regex.IsMatch(secret??"","^[a-f0-9]{64}$"))throw new ArgumentException("Invalid manager route inputs");
       var newline=source.Contains("\r\n")?"\r\n":"\n";
-      var block=BeginMarker+newline+
+      // The download landing page deliberately forbids network requests.
+      // Only the authenticated diagnostics UI needs same-origin fetch; serve
+      // it through a narrower path rather than relaxing the entire website.
+      var usbWeb=source.Contains("handle_path /descargas/*")?
+        "\thandle_path /descargas/servidor/* {"+newline+
+        "\t\troot * /data/inhouse-downloads/servidor"+newline+
+        "\t\theader {"+newline+
+        "\t\t\tX-Content-Type-Options nosniff"+newline+
+        "\t\t\tReferrer-Policy no-referrer"+newline+
+        "\t\t\tContent-Security-Policy \"default-src 'none'; style-src 'self'; img-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'\""+newline+
+        "\t\t\tCache-Control \"no-cache\""+newline+
+        "\t\t}"+newline+
+        "\t\tfile_server"+newline+
+        "\t}"+newline:"";
+      var block=BeginMarker+newline+usbWeb+
         "\thandle /inhouse-manager/* {"+newline+
         "\t\treverse_proxy host.docker.internal:"+Port+" {"+newline+
         "\t\t\theader_up X-Inhouse-Bridge "+secret+newline+

@@ -19,7 +19,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.2.15.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.16.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -413,6 +413,12 @@ namespace InhousePhotos {
              RemoteManagement.ReadOnlyBrowserToken("GET",RemoteManagement.UsbPath,"immich_access_token="+browserToken+"; immich_access_token="+browserToken)!=null||
              RemoteManagement.ReadOnlyBrowserToken("GET",RemoteManagement.UsbPath,"immich_access_token=bad%0Atoken")!=null||
              !RemoteManagement.Allowed("GET",RemoteManagement.UsbPath)||RemoteManagement.Allowed("POST",RemoteManagement.UsbPath))return 57;
+          var downloadsFixture="photos.example.com {\n\thandle_path /descargas/* {\n\t\troot * /data/inhouse-downloads\n\t\tfile_server\n\t}\n\thandle {\n\t\treverse_proxy photos:2283\n\t}\n}\n";
+          var browserRoute=RemoteManagement.WithRoute(downloadsFixture,new string('a',64));
+          if(!browserRoute.Contains("handle_path /descargas/servidor/*")||!browserRoute.Contains("connect-src 'self'")||
+             RemoteManagement.WithRoute(browserRoute,new string('a',64))!=browserRoute||
+             !browserRoute.Contains("reverse_proxy photos:2283")||
+             System.Text.RegularExpressions.Regex.Matches(browserRoute,"handle_path /descargas/servidor/\\*").Count!=1)return 58;
           var sample=Path.Combine(Path.GetTempPath(),"inhouse-validation-only");
           NewServer.Validate(sample,"test@example.com","test-password-long","Test","");
           foreach(var bad in new[]{"https://photos.example.com","a.example.com/route","a.example.com\nextra",""}) {
