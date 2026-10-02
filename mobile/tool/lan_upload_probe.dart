@@ -16,7 +16,7 @@ Future<void> main(List<String> args) async {
     return;
   }
   final route = args.length == 1
-      ? await const LanUploadRouteResolver().resolve(origin)
+      ? await LanUploadRouteResolver().resolve(origin)
       : LanUploadRoute.fromHint(origin, {'origin': origin.toString(), 'ipv4': args[1], 'port': 443});
   if (route == null) {
     stderr.writeln('Not a valid HTTPS origin/private LAN address');
