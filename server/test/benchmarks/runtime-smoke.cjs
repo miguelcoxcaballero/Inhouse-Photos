@@ -13,8 +13,7 @@ assert.ok(Number.isSafeInteger(port) && port >= 1024 && port <= 65535);
 const base = `http://127.0.0.1:${port}/api`;
 const composeFile = path.resolve(process.env.RUNTIME_TEST_COMPOSE || path.join(__dirname, 'runtime-smoke.compose.yml'));
 const composeArgs = ['compose', '-p', project, '-f', composeFile];
-assert.ok(process.env.RUNTIME_TEST_FIXTURES, 'Set RUNTIME_TEST_FIXTURES to the generated benchmark fixtures directory');
-const fixtureRoot = path.resolve(process.env.RUNTIME_TEST_FIXTURES);
+const fixtureRoot = process.env.RUNTIME_TEST_FIXTURES ? path.resolve(process.env.RUNTIME_TEST_FIXTURES) : undefined;
 const resultsFile = path.resolve(
   process.env.RUNTIME_TEST_RESULTS || path.join(process.cwd(), 'runtime-smoke-results.json'),
 );
@@ -72,7 +71,63 @@ async function upload(filename) {
   return response.id;
 }
 
+function assetMatchesExpected(asset, expected) {
+  if (!asset || !expected || typeof asset.originalPath !== 'string') return false;
+  const metadata = asset.exifInfo;
+  const bytes = metadata?.fileSizeInByte;
+  if (!Number.isSafeInteger(bytes) || bytes <= 0 || !(metadata.exifImageWidth > 0) || !(metadata.exifImageHeight > 0)) {
+    return false;
+  }
+  return expected.extension
+    ? asset.originalPath.endsWith(expected.extension) && bytes < expected.inputBytes
+    : !asset.originalPath.includes('.storage-saver.') && bytes === expected.inputBytes;
+}
+
+async function waitForProcessedAssets(
+  expected,
+  {
+    getAssets,
+    getQueues,
+    now = Date.now,
+    delay = () => new Promise((resolve) => setTimeout(resolve, 1000)),
+    timeout = 180000,
+  },
+) {
+  const deadline = now() + timeout;
+  let assets = [];
+  let pending;
+  while (now() < deadline) {
+    // Upload creates EXIF.fileSizeInByte with the original size. Queue completion
+    // alone cannot prove that an earlier GET includes the final path or refreshed
+    // metadata, so obtain a fresh snapshot and verify both final properties.
+    pending = await getQueues();
+    assets = await getAssets();
+    if (
+      pending.activeJobs === 0 &&
+      pending.videoUnfinishedJobs === 0 &&
+      pending.queues.storageSaverCompression.unfinishedJobs === 0 &&
+      assets.length === expected.size &&
+      assets.every((asset) => assetMatchesExpected(asset, expected.get(asset.id)))
+    ) {
+      return assets;
+    }
+    await delay();
+  }
+  throw new Error(
+    `Timed out waiting for final Storage Saver paths and metadata: ${JSON.stringify({
+      assets: assets.map((asset) => ({
+        id: asset.id,
+        originalPath: asset.originalPath,
+        bytes: asset.exifInfo?.fileSizeInByte,
+        expected: expected.get(asset.id),
+      })),
+      queues: pending,
+    })}`,
+  );
+}
+
 async function main() {
+  assert.ok(fixtureRoot, 'Set RUNTIME_TEST_FIXTURES to the generated benchmark fixtures directory');
   const runtimeThreads = JSON.parse(
     nodeInServer(`
     const fs=require('node:fs');
@@ -152,30 +207,23 @@ async function main() {
   queueAction('resume', pause.previousPausedStates);
 
   const expected = new Map([
-    [legacyVideoId, '.storage-saver.mp4'],
-    [imageId, '.storage-saver.jpg'],
-    [efficientVideoId, null],
+    [
+      legacyVideoId,
+      { extension: '.storage-saver.mp4', inputBytes: fs.statSync(path.join(fixtureRoot, 'video-1080p.mp4')).size },
+    ],
+    [
+      imageId,
+      { extension: '.storage-saver.jpg', inputBytes: fs.statSync(path.join(fixtureRoot, 'jpeg-12mp.jpg')).size },
+    ],
+    [
+      efficientVideoId,
+      { extension: null, inputBytes: fs.statSync(path.join(fixtureRoot, 'video-efficient-720p.mp4')).size },
+    ],
   ]);
-  let assets;
-  const deadline = Date.now() + 180000;
-  while (Date.now() < deadline) {
-    assets = await Promise.all([...expected.keys()].map((id) => api('GET', `/assets/${id}`)));
-    const pending = queueAction('inspect');
-    if (
-      pending.activeJobs === 0 &&
-      pending.videoUnfinishedJobs === 0 &&
-      pending.queues.storageSaverCompression.unfinishedJobs === 0 &&
-      assets.every((asset) => asset.exifInfo?.fileSizeInByte > 0)
-    )
-      break;
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
-  for (const asset of assets) {
-    const extension = expected.get(asset.id);
-    if (extension) assert.ok(asset.originalPath.endsWith(extension), `${asset.id}: ${asset.originalPath}`);
-    else assert.ok(!asset.originalPath.includes('.storage-saver.'), 'Efficient video should keep its original');
-    assert.ok(asset.exifInfo.fileSizeInByte > 0);
-  }
+  const assets = await waitForProcessedAssets(expected, {
+    getAssets: () => Promise.all([...expected.keys()].map((id) => api('GET', `/assets/${id}`))),
+    getQueues: () => queueAction('inspect'),
+  });
   const finalPause = queueAction('pause');
   const final = queueAction('assert-video-empty');
   assert.equal(final.activeJobs, 0);
@@ -231,7 +279,11 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+module.exports = { assetMatchesExpected, waitForProcessedAssets };
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

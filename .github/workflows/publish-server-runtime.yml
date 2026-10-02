@@ -37,7 +37,7 @@ jobs:
           npm install --global pnpm@11.13.1
           pnpm --filter immich... --filter @immich/sdk... install --frozen-lockfile
           pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter immich build
-          node --test desktop/server-runtime-queue-handoff.test.cjs
+          node --test desktop/server-runtime-queue-handoff.test.cjs server/test/benchmarks/runtime-smoke.test.cjs
           pwsh -NoProfile -File desktop/server-runtime-update.tests.ps1
           bash -n server/bin/start.sh
       - name: Build and load the verified server image
@@ -69,6 +69,7 @@ jobs:
           RUNTIME_TEST_RESULTS: ${{ github.workspace }}/.runtime/release/runtime-smoke-results.json
           RUNTIME_TEST_IMAGE: inhouse-photos-server:v${{ env.RUNTIME_VERSION }}
         run: |
+          trap 'docker compose -p inhouse-runtime-test -f "$RUNTIME_TEST_COMPOSE" logs --no-color --tail 120' ERR
           docker compose -p inhouse-runtime-test -f "$RUNTIME_TEST_COMPOSE" up -d --wait --wait-timeout 300
           node server/test/benchmarks/runtime-smoke.cjs
       - name: Package and publish the installable update
