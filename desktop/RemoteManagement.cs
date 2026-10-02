@@ -39,6 +39,7 @@ namespace InhousePhotos {
     public bool StartupEnabled {get;set;}
     public bool StartupKnown {get;set;}
     public RemoteDiskStatus[] Disks {get;set;}
+    public UsbDeviceStatus Usb {get;set;}
   }
   /// A tiny, fixed-purpose bridge for an administrator's phone. Only the
   /// Windows manager restarts after an update; the photo API stays in Docker.
@@ -53,6 +54,7 @@ namespace InhousePhotos {
     public const int Port=52187;
     public const string Path="/inhouse-manager/v1/update";
     public const string StatusPath="/inhouse-manager/v1/status";
+    public const string UsbPath="/inhouse-manager/v1/usb";
     const string BeginMarker="# INHOUSE-MANAGER-ROUTE-BEGIN";
     const string EndMarker="# INHOUSE-MANAGER-ROUTE-END";
     readonly Preferences prefs;
@@ -125,6 +127,21 @@ namespace InhousePhotos {
       }
       return null;
     }
+    internal static string ReadOnlyBrowserToken(string method,string path,string cookie) {
+      // Only read-only diagnostics accept the existing web session. All
+      // mutating routes still require an explicit bearer token, preventing
+      // a browser's ambient cookies from authorising cross-site actions.
+      if(method!="GET"||(path!=StatusPath&&path!=UsbPath)||String.IsNullOrEmpty(cookie)||cookie.Length>2048)return null;
+      string found=null;
+      foreach(var part in cookie.Split(';')) {
+        var pair=part.Trim();var separator=pair.IndexOf('=');
+        if(separator<1||pair.Substring(0,separator)!="immich_access_token")continue;
+        var value=pair.Substring(separator+1);
+        if(found!=null||!Regex.IsMatch(value,"^[A-Za-z0-9._~-]{20,1024}$"))return null;
+        found=value;
+      }
+      return found;
+    }
     async Task<bool> IsAdmin(string token) {
       if(String.IsNullOrWhiteSpace(token)||token.Length>2048)return false;
       Uri uri;if(!Uri.TryCreate(prefs.LocalEndpoint,UriKind.Absolute,out uri)||!uri.IsLoopback||uri.AbsolutePath!="/")return false;
@@ -162,14 +179,20 @@ namespace InhousePhotos {
             headers[name]=line.Substring(colon+1).Trim();
             if(i==39){await Reply(stream,400,new{message="Invalid request"});return;}
           }
-          string key,authorization,length;
+          string key,authorization,length,cookie;
           headers.TryGetValue("X-Inhouse-Bridge",out key);
           if(!SameSecret(key,secret)){await Reply(stream,403,new{message="Forbidden"});return;}
           headers.TryGetValue("Content-Length",out length);
           if(length!=null&&length!="0"){await Reply(stream,400,new{message="Body not allowed"});return;}
           headers.TryGetValue("Authorization",out authorization);
-          if(authorization==null||!authorization.StartsWith("Bearer ",StringComparison.Ordinal)||
-             !await IsAdmin(authorization.Substring(7))){await Reply(stream,401,new{message="Administrator sign-in required"});return;}
+          headers.TryGetValue("Cookie",out cookie);
+          var token=authorization!=null&&authorization.StartsWith("Bearer ",StringComparison.Ordinal)?authorization.Substring(7):
+            authorization==null?ReadOnlyBrowserToken(parts[0],parts[1],cookie):null;
+          if(!await IsAdmin(token)){await Reply(stream,401,new{message="Administrator sign-in required"});return;}
+          if(parts[1]==UsbPath) {
+            await Reply(stream,200,UsbDeviceMonitor.Current.Snapshot);
+            return;
+          }
           if(parts[1]==StatusPath) {
             try{await Reply(stream,200,await readStatus());}
             catch{await Reply(stream,503,new{message="Could not read the Windows manager status."});}
@@ -200,7 +223,7 @@ namespace InhousePhotos {
       }catch{ /* An interrupted management request must not affect the photo server. */ }
     }
     public static bool Allowed(string method,string path) {
-      if(method=="GET")return path==Path||path==StatusPath;
+      if(method=="GET")return path==Path||path==StatusPath||path==UsbPath;
       if(method!="POST")return false;
       if(path==Path)return true;
       if(path==StatusPath+"/backup/start"||path==StatusPath+"/backup/cancel"||

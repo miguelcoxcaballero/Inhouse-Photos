@@ -19,7 +19,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.2.14.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.15.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -404,6 +404,15 @@ namespace InhousePhotos {
       if(args.Contains("--self-test")){
         try {
           if(UsbNetworkSafety.SelfTest()!=0)return 29;
+          if(UsbDeviceMonitor.SelfTest()!=0)return 56;
+          var browserToken=new string('A',43);
+          if(RemoteManagement.ReadOnlyBrowserToken("GET",RemoteManagement.UsbPath,"other=1; immich_access_token="+browserToken)!=browserToken||
+             RemoteManagement.ReadOnlyBrowserToken("GET",RemoteManagement.StatusPath,"immich_access_token="+browserToken)!=browserToken||
+             RemoteManagement.ReadOnlyBrowserToken("POST",RemoteManagement.StatusPath+"/backup/start","immich_access_token="+browserToken)!=null||
+             RemoteManagement.ReadOnlyBrowserToken("GET",RemoteManagement.Path,"immich_access_token="+browserToken)!=null||
+             RemoteManagement.ReadOnlyBrowserToken("GET",RemoteManagement.UsbPath,"immich_access_token="+browserToken+"; immich_access_token="+browserToken)!=null||
+             RemoteManagement.ReadOnlyBrowserToken("GET",RemoteManagement.UsbPath,"immich_access_token=bad%0Atoken")!=null||
+             !RemoteManagement.Allowed("GET",RemoteManagement.UsbPath)||RemoteManagement.Allowed("POST",RemoteManagement.UsbPath))return 57;
           var sample=Path.Combine(Path.GetTempPath(),"inhouse-validation-only");
           NewServer.Validate(sample,"test@example.com","test-password-long","Test","");
           foreach(var bad in new[]{"https://photos.example.com","a.example.com/route","a.example.com\nextra",""}) {

@@ -28,7 +28,7 @@ namespace InhousePhotos {
       public int Index;
       public Guid Id;
       public string PnpDeviceId,Description;
-      public bool Connected,Physical,HasPrivateIpv4;
+      public bool Connected,Physical,HasPrivateIpv4,Prepared;
       public NetworkInterfaceType Type;
       public string[] Gateways=new string[0];
     }
@@ -43,6 +43,10 @@ namespace InhousePhotos {
     }
     internal sealed class Plan {
       public AdapterProof Phone,Internet;
+    }
+    internal sealed class PreparationStatus {
+      public bool CanPrepare,Prepared;
+      public int Code;
     }
     sealed class GuardFailure:InvalidOperationException {
       public readonly int Code;
@@ -153,6 +157,17 @@ namespace InhousePhotos {
       return new Plan{Phone=phone,Internet=internet};
     }
 
+    /// Background-only, read-only assessment. Merely connecting a phone or
+    /// opening a status page must never change Windows' network settings.
+    internal static PreparationStatus AssessPreparation() {
+      try {
+        var snapshot=ReadSnapshot();var plan=SelectPlan(snapshot);
+        return new PreparationStatus{CanPrepare=true,
+          Prepared=plan.Phone.Prepared&&DefaultRoutes(snapshot,plan.Phone.Index).Length==0};
+      } catch(GuardFailure failure) {return new PreparationStatus{Code=failure.Code};}
+      catch {return new PreparationStatus{Code=20};}
+    }
+
     static Snapshot ReadSnapshot() {
       var hardware=new Dictionary<Guid,AdapterProof>();
       using(var query=new ManagementObjectSearcher("root\\CIMV2","SELECT GUID, InterfaceIndex, Name, PNPDeviceID, PhysicalAdapter FROM Win32_NetworkAdapter")) {
@@ -180,11 +195,20 @@ namespace InhousePhotos {
         } catch(NetworkInformationException) { /* Hot-unplugged adapter: not a verified target. */ }
       }
       var metrics=new Dictionary<int,long>();
-      using(var query=new ManagementObjectSearcher("root\\StandardCimv2","SELECT InterfaceIndex, InterfaceMetric FROM MSFT_NetIPInterface WHERE AddressFamily = 2 AND CompartmentId = 1")) {
+      var prepared=new Dictionary<int,bool>();
+      using(var query=new ManagementObjectSearcher("root\\StandardCimv2","SELECT InterfaceIndex, AddressFamily, InterfaceMetric, IgnoreDefaultRoutes FROM MSFT_NetIPInterface WHERE CompartmentId = 1")) {
         query.Options.Timeout=TimeSpan.FromSeconds(3);
-        using(var results=query.Get())foreach(ManagementObject item in results)using(item)
-          metrics[Convert.ToInt32(item["InterfaceIndex"],CultureInfo.InvariantCulture)]=Convert.ToInt64(item["InterfaceMetric"],CultureInfo.InvariantCulture);
+        using(var results=query.Get())foreach(ManagementObject item in results)using(item) {
+          var index=Convert.ToInt32(item["InterfaceIndex"],CultureInfo.InvariantCulture);
+          var family=Convert.ToInt32(item["AddressFamily"],CultureInfo.InvariantCulture);
+          if(family!=2&&family!=23)continue;
+          var metric=Convert.ToInt64(item["InterfaceMetric"],CultureInfo.InvariantCulture);
+          if(family==2)metrics[index]=metric;
+          var safe=item["IgnoreDefaultRoutes"]!=null&&Convert.ToInt32(item["IgnoreDefaultRoutes"],CultureInfo.InvariantCulture)==1&&metric>=CableMetric;
+          bool previous;prepared[index]=!prepared.TryGetValue(index,out previous)?safe:previous&&safe;
+        }
       }
+      foreach(var adapter in adapters){bool safe;adapter.Prepared=prepared.TryGetValue(adapter.Index,out safe)&&safe;}
       var routes=new List<RouteProof>();
       using(var query=new ManagementObjectSearcher("root\\StandardCimv2","SELECT InterfaceIndex, AddressFamily, DestinationPrefix, NextHop, RouteMetric FROM MSFT_NetRoute WHERE CompartmentId = 1")) {
         query.Options.Timeout=TimeSpan.FromSeconds(3);

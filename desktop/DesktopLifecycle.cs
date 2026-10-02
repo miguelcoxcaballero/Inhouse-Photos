@@ -19,6 +19,7 @@ namespace InhousePhotos {
     DispatcherTimer lanMonitor, lanDebounce;
     NetworkAddressChangedEventHandler networkAddressChanged;
     bool lanPublishBusy;
+    EventHandler usbDevicesChanged;
     RemoteManagement remoteManagement;
     string remoteOperation="",remoteError="";
     bool monitorBusy, exitRequested, updateClose, updatingManager;
@@ -32,6 +33,8 @@ namespace InhousePhotos {
       Closed+=(s,e)=>{
         if(monitor!=null)monitor.Stop();lanMonitor?.Stop();lanDebounce?.Stop();
         if(networkAddressChanged!=null)NetworkChange.NetworkAddressChanged-=networkAddressChanged;
+        if(usbDevicesChanged!=null)UsbDeviceMonitor.Current.Changed-=usbDevicesChanged;
+        UsbDeviceMonitor.Current.Dispose();
         remoteManagement?.Dispose();tray.Dispose();
       };
       monitor=new DispatcherTimer{Interval=TimeSpan.FromSeconds(45)};
@@ -50,6 +53,16 @@ namespace InhousePhotos {
       NetworkChange.NetworkAddressChanged+=networkAddressChanged;
       lanMonitor=new DispatcherTimer{Interval=TimeSpan.FromSeconds(10)};
       lanMonitor.Tick+=async(s,e)=>await RefreshLocalRoutes();lanMonitor.Start();
+      // Phone presence changes even when no tether interface exists yet.
+      // Observe it independently of backup supervision and update only the
+      // cable section; never rebuild the whole dashboard on a USB event.
+      usbDevicesChanged=(s,e)=>{
+        if(Dispatcher.HasShutdownStarted)return;
+        try{Dispatcher.BeginInvoke(new Action(()=>{lanDebounce.Stop();lanDebounce.Start();}));}
+        catch(InvalidOperationException){}
+      };
+      UsbDeviceMonitor.Current.Changed+=usbDevicesChanged;
+      UsbDeviceMonitor.Current.Start();
     }
     async Task RefreshLocalRoutes() {
       if(lanPublishBusy||exitRequested||updatingManager||!prefs.Managed)return;
@@ -154,7 +167,8 @@ namespace InhousePhotos {
         BackupConfigured=!String.IsNullOrWhiteSpace(prefs.BackupDestination),
         BackupRunning=ui.BackupRunning,BackupPresent=backup.FilesPresent,
         BackupCompletedUtc=backup.CompletedUtc??"",WeeklyBackupEnabled=schedule.Enabled,
-        NextBackupUtc=schedule.NextDueUtc??"",StartupEnabled=startup,StartupKnown=known,Disks=disks
+        NextBackupUtc=schedule.NextDueUtc??"",StartupEnabled=startup,StartupKnown=known,Disks=disks,
+        Usb=UsbDeviceMonitor.Current.Snapshot
       };
       }catch(Exception ex) {
         // This method receives no credentials. Keep only the failure type and
@@ -350,22 +364,8 @@ namespace InhousePhotos {
       // The Windows task query can take seconds; the Settings page stays usable
       // while the switch remains unavailable until its actual state is known.
       _=RefreshStartupState();
-      Rule();content.Children.Add(Label("Transferencia por cable",22));
-      content.Children.Add(Label("Conecta el móvil con un cable de datos. En Android activa Compartir conexión por USB; en iPhone activa Punto de acceso personal y confía en este PC. Si Windows no reconoce el iPhone, instala Apple Devices. Mantén la app del móvil abierta.",14,muted));
-      content.Children.Add(Label("Preparar USB evita que este PC use los datos móviles como acceso a Internet. Después, la app detectará el cable y mostrará la velocidad real en los detalles de la copia. Un cable en modo carga o archivos no basta.",14,muted));
-      var prepareCable=new Button{Content="Preparar USB",HorizontalAlignment=HorizontalAlignment.Left};
-      content.Children.Add(prepareCable);
-      prepareCable.Click+=async(s,e)=>{
-        if(busy||monitorBusy||updatingManager){notice.Text="Espera a que termine la operación actual antes de preparar el cable.";return;}
-        if(!Confirm("Se cambiará únicamente la prioridad de la red USB del móvil y se quitarán sus rutas predeterminadas a Internet. No se cambiará Ethernet, Wi-Fi, DNS ni tus fotos. El PC seguirá usando su conexión habitual a Internet. Windows pedirá permiso de administrador. ¿Preparar USB?"))return;
-        busy=true;prepareCable.IsEnabled=false;
-        try {
-          await UsbNetworkSafety.PrepareWithConsent();
-          notice.Text=UsbNetworkSafety.MessageFor(0);
-          await RefreshLocalRoutes();
-        }catch(Exception ex){notice.Text=ex.Message;}
-        finally{busy=false;if(content.Children.Contains(prepareCable))prepareCable.IsEnabled=true;}
-      };
+      Rule();RenderUsbConnection();
+      Action("Ver conexión USB en la web  ↗",()=>{Open(Backend.CanonicalEndpoint(prefs.Endpoint)+"/descargas/servidor/");return Task.CompletedTask;});
       Rule();content.Children.Add(Label("Conexión del servidor",22));
       if(prefs.Managed&&File.Exists(prefs.ReceiptPath)) {
         var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));

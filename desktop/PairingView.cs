@@ -34,6 +34,7 @@ namespace InhousePhotos {
 
       content.Children.Add(Fine("Instala Inhouse Photos en el móvil, abre su cámara y escanea el código. El enlace se genera aquí, sin enviarlo a ningún servicio de QR."));
       Action("Abrir página de descargas  ↗",()=>{Open("https://fotos.miguelcoxcaballero.com/descargas/");return Task.CompletedTask;});
+      RenderUsbConnection();
       Rule();
 
       if(DisablePairingRequests) {

@@ -84,7 +84,7 @@ namespace InhousePhotos {
     static string AdapterKey(string id) {
       Guid parsed;return Guid.TryParse(id,out parsed)?parsed.ToString("D"):id??"";
     }
-    static Adapter[] ReadAdapters() {
+    internal static Adapter[] ReadAdapters() {
       var hardware=new Dictionary<string,Hardware>(StringComparer.OrdinalIgnoreCase);
       try {
         using(var query=new ManagementObjectSearcher("root\\CIMV2","SELECT GUID, Name, PNPDeviceID, PhysicalAdapter FROM Win32_NetworkAdapter")) {

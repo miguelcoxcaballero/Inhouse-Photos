@@ -41,6 +41,15 @@ including a normal visible launch. It validates and hot-reloads the existing
 HTTPS route once per launch or proxy/configuration change, so a saved Caddyfile
 is not mistaken for an active route. The photo server remains running.
 
+Manager 1.2.15 detects present USB phones independently of network sharing.
+Overview, Connect mobile and Settings show whether Windows sees the cable and
+the exact next step. The live web panel at `/descargas/servidor/` uses the
+existing administrator web session for read-only diagnostics. USB presence,
+network availability and actual transfer are separate: an MTP/charging phone
+is not reported as uploading. Detection never changes routes or installs
+drivers; the explicit preparation action remains limited to a verified phone
+network. The existing mobile version 3.1.93 needs no rebuild for these changes.
+
 Manager 1.2.12 extends the administrator-only HTTPS bridge with read-only
 server, drive and backup status, plus fixed actions for full backup, weekly
 schedule, snapshot, backup-drive selection and Windows startup. The mobile app

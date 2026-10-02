@@ -6,8 +6,10 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using Ellipse = System.Windows.Shapes.Ellipse;
 
 namespace InhousePhotos {
@@ -90,6 +92,81 @@ namespace InhousePhotos {
       row.Children.Add(new TextBlock{Text=text,FontSize=13,FontWeight=FontWeights.SemiBold,Foreground=color});
       return row;
     }
+    // USB device detection and USB network readiness are different facts. Keep
+    // both visible, and update this section rather than rebuilding the page.
+    // In particular, a charging/MTP phone must never be labelled ready to upload.
+    void RenderUsbConnection(bool compact=false) {
+      var section=Column();section.Margin=new Thickness(0,compact?8:2,0,2);
+      var heading=Label(compact?"CABLE USB":"Transferencia por cable",compact?12:22,compact?muted:Foreground);
+      heading.FontWeight=FontWeights.SemiBold;heading.Margin=new Thickness(0,0,0,compact?9:13);section.Children.Add(heading);
+      var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(38)});row.ColumnDefinitions.Add(new ColumnDefinition());
+      var cableDrawing=new DrawingGroup();
+      cableDrawing.Children.Add(new GeometryDrawing(null,new Pen(accent,1.8){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round},
+        Geometry.Parse("M 12,27 L 12,5 M 8,9 L 12,5 L 16,9 M 12,19 L 6,15 L 6,12 M 12,23 L 19,18 L 19,14")));
+      cableDrawing.Children.Add(new GeometryDrawing(accent,null,new EllipseGeometry(new Point(6,10),2,2)));
+      cableDrawing.Children.Add(new GeometryDrawing(accent,null,new RectangleGeometry(new Rect(17,10,4,4))));
+      cableDrawing.Children.Add(new GeometryDrawing(accent,null,new EllipseGeometry(new Point(12,29),2.5,2.5)));
+      var cableIcon=new Image{Source=new DrawingImage(cableDrawing),Width=24,Height=32,VerticalAlignment=VerticalAlignment.Top,
+        HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,1,0,0)};row.Children.Add(cableIcon);
+      var body=Column();Grid.SetColumn(body,1);row.Children.Add(body);
+      var title=Label("Detectando el móvil…",compact?17:19);title.FontWeight=FontWeights.SemiBold;title.Margin=new Thickness(0,0,0,4);body.Children.Add(title);
+      var detail=Fine("Conecta un móvil con un cable de datos. Se detectará automáticamente.");detail.Margin=new Thickness(0,0,0,6);body.Children.Add(detail);
+      var next=Fine("");next.Margin=new Thickness(0,2,0,7);next.Visibility=Visibility.Collapsed;body.Children.Add(next);
+      var network=Fine("");network.Margin=new Thickness(0,0,0,7);network.Visibility=Visibility.Collapsed;body.Children.Add(network);
+      section.Children.Add(row);
+      var actions=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(38,0,0,0)};
+      var prepare=new Button{Content="Preparar red USB",HorizontalAlignment=HorizontalAlignment.Left,Visibility=Visibility.Collapsed,
+        Margin=new Thickness(0,4,12,0)};AutomationProperties.SetName(prepare,"Preparar la red del móvil detectado por USB");actions.Children.Add(prepare);
+      var check=new Button{Content="Volver a detectar",HorizontalAlignment=HorizontalAlignment.Left,Background=Brushes.Transparent,
+        BorderBrush=Brushes.Transparent,BorderThickness=new Thickness(0),Foreground=accent,Padding=new Thickness(0),
+        Margin=new Thickness(0,4,0,0),MinHeight=28};actions.Children.Add(check);section.Children.Add(actions);
+      var activity=Fine("");activity.Margin=new Thickness(38,7,0,0);activity.Visibility=Visibility.Collapsed;section.Children.Add(activity);
+      content.Children.Add(section);
+      var monitor=UsbDeviceMonitor.Current;string lastSignature=null;bool preparing=false;
+      void Update() {
+        if(!content.Children.Contains(section))return;
+        var status=monitor.Snapshot;
+        var signature=status.State+"|"+status.Title+"|"+status.Message+"|"+status.Action+"|"+status.DeviceName+"|"+status.LinkMbps+"|"+status.CanPrepare;
+        title.Text=status.Title;detail.Text=status.Message;
+        title.Foreground=status.State=="ready"?good:Foreground;
+        cableIcon.Opacity=status.Connected?1:0.45;
+        next.Text=status.Action=="Volver a comprobar"||status.Action=="Preparar conexión USB"?"":status.Action??"";
+        next.Visibility=String.IsNullOrWhiteSpace(next.Text)?Visibility.Collapsed:Visibility.Visible;
+        network.Text=status.State=="ready"?"Red por cable disponible"+(status.LinkMbps>0?" · enlace de "+status.LinkMbps+" Mbps":"")+". La velocidad real de subida aparece en el móvil.":"";
+        network.Visibility=String.IsNullOrWhiteSpace(network.Text)?Visibility.Collapsed:Visibility.Visible;
+        prepare.Visibility=status.CanPrepare&&status.NeedsPreparation?Visibility.Visible:Visibility.Collapsed;
+        prepare.IsEnabled=status.CanPrepare&&status.NeedsPreparation&&!preparing;
+        // No-device is already watched automatically. Reserve a manual retry
+        // for a connected phone or a failed detection, not a required step.
+        check.Visibility=!compact||status.Connected||status.State=="detection_unavailable"?Visibility.Visible:Visibility.Collapsed;
+        check.IsEnabled=!preparing&&status.State!="checking";
+        if(lastSignature!=null&&lastSignature!=signature&&!DisableTransitions&&SystemParameters.ClientAreaAnimation)
+          body.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(0.65,1,new Duration(TimeSpan.FromMilliseconds(140))){FillBehavior=FillBehavior.Stop});
+        lastSignature=signature;
+      }
+      EventHandler changed=(s,e)=>{
+        if(Dispatcher.HasShutdownStarted)return;
+        try{Dispatcher.BeginInvoke(new Action(Update));}catch(InvalidOperationException){}
+      };
+      bool listening=false;
+      section.Loaded+=(s,e)=>{if(!listening){monitor.Changed+=changed;listening=true;}Update();};
+      section.Unloaded+=(s,e)=>{if(listening){monitor.Changed-=changed;listening=false;}};
+      check.Click+=(s,e)=>monitor.Refresh();
+      prepare.Click+=async(s,e)=>{
+        if(busy||monitorBusy||updatingManager){activity.Text="Espera a que termine la operación actual antes de preparar la red USB.";activity.Foreground=accent;activity.Visibility=Visibility.Visible;return;}
+        if(!monitor.Snapshot.CanPrepare){monitor.Refresh();Update();return;}
+        if(!Confirm("El móvil ya está detectado. Se preparará únicamente su conexión de red USB para que el PC mantenga Internet por Ethernet o Wi-Fi. No se cambiarán DNS, fotos ni la red habitual. Windows pedirá permiso de administrador. ¿Preparar esta red USB?"))return;
+        busy=true;preparing=true;prepare.IsEnabled=false;check.IsEnabled=false;
+        activity.Text="Preparando la red USB…";activity.Foreground=muted;activity.Visibility=Visibility.Visible;
+        try {
+          await UsbNetworkSafety.PrepareWithConsent();
+          activity.Text="Red USB preparada. Mantén Inhouse Photos abierto en el móvil para subir por cable.";activity.Foreground=good;
+          await RefreshLocalRoutes();monitor.Refresh();
+        }catch(Exception ex){activity.Text=ex.Message;activity.Foreground=accent;}
+        finally{busy=false;preparing=false;Update();}
+      };
+      Update();
+    }
     ProgressBar SpaceBar(long total,long free) {
       return new ProgressBar{Minimum=0,Maximum=Math.Max(1,total),Value=Math.Max(0,Math.Min(total,total-free)),Height=8,
         Foreground=accent,Background=divider,
@@ -127,6 +204,7 @@ namespace InhousePhotos {
       else if(lastLocal==true)mainAction.Content="Abrir mis fotos  ↗";
       else if(lastLocal==false)mainAction.Content="Iniciar servidor";
       content.Children.Add(hero);
+      RenderUsbConnection(true);
       Rule();
 
       var backup=Backend.ReadFullBackupStatus(prefs);
