@@ -38,17 +38,17 @@ namespace InhousePhotos {
   /// The manager pins the already verified public engine. No phone input can
   /// select a release, URL, script, command, Docker context or recovery path.
   public static class RuntimeUpdates {
-    public const string LatestVersion="3.1.0-durable-upload-20261003";
-    public const string LatestImage="inhouse-photos-server:v3.1.0-durable-upload-20261003";
-    public const string LatestImageId="sha256:dd8c68b182ef2cade7002e7625c43e60ee89e27ee42eec0fb4b6e392d34a8a75";
-    public const string SourceCommit="f661cdd96ebfb50349ca60a40a7cff3e4511f995";
+    public const string LatestVersion="3.1.96";
+    public const string LatestImage="inhouse-photos-server:v3.1.96";
+    public const string LatestImageId="sha256:0781b4081482853b34963f4e8faefc4c92d4a25da87f45dd3cf9f93ce645062c";
+    public const string SourceCommit="2c36a66f40347273f9f2f75242e42cda3091a1a3";
     public const string SchemaSha256="ab48e687123b61185a4467ca2b70a3a66ebfdaa93f5a78b5d7ae9eed613c699f";
-    public const string ArchiveFile="inhouse-server-3.1.0-durable-upload-20261003.tar.gz";
-    public const string ArchiveSha256="e291e6433c6238e5819e04ee578b2324c4539d19f92c622878f994561422f147";
-    public const string ManifestSha256="4b75f5d1049bdb350e0b76ee789c6ba0b437bc622c3e0c25d5072212e8f8c513";
-    public const string PackageSha256="ac0e1e8e0691544376b982f3d7b9bd784fa24a4db2aef2dbbe552db2e410aaf3";
-    public const string PackageFile="Inhouse-Photos-Server-Runtime-3.1.0-durable-upload-20261003.zip";
-    public const string PackageUrl="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-runtime-v3.1.0-durable-upload-20261003/"+PackageFile;
+    public const string ArchiveFile="inhouse-server-3.1.96.tar.gz";
+    public const string ArchiveSha256="bd3317ed4080c837ac10ee45d07bd03d390e83d7c14d74907ba55e16293d1d29";
+    public const string ManifestSha256="2827fb5a1b630396f0f0b3a98a99b727d8671f900a09d774e71f008d278bbe6e";
+    public const string PackageSha256="991b0f1735adf03dedf5b69ce299a778397399e8dc5cdc2fc65ed116fc005e97";
+    public const string PackageFile="Inhouse-Photos-Server-Runtime-3.1.96.zip";
+    public const string PackageUrl="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-runtime-v3.1.96/"+PackageFile;
     const string OriginalImage="sha256:283fb546c253d70c3e984062a2d2ebc08ce4547ef799e0ffba634222e4b5c16d";
     const string OriginalConfig="sha256:ac66612c5815b715123e1946fb833cc3baa5adcb404f774ded31307d82c1e368";
     const string FastImage="sha256:0034cd9b0031574479c192ed8be48212f6e57012785d804beb171ed8a2d5a8ac";

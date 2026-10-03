@@ -70,6 +70,13 @@ jobs:
           & .\desktop\server-runtime-update.transaction.tests.ps1
           $global:LASTEXITCODE = 0
 
+      - name: Verify durable product updates and manager restart recovery
+        if: steps.existing.outputs.published != 'true'
+        shell: pwsh
+        run: |
+          & .\desktop\system-update.tests.ps1
+          $global:LASTEXITCODE = 0
+
       - name: Download the verified 1.2.17 upgrade and 1.2.16 bootstrap fixtures
         if: steps.existing.outputs.published != 'true'
         env:
