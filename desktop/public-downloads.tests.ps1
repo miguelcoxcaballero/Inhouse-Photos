@@ -42,7 +42,7 @@ namespace InhousePhotos {
    foreach(var argument in args.Skip(6))start.ArgumentList.Add(ShellPath(Translate(argument)));
    using(var process=Process.Start(start)){
     var output=process.StandardOutput.ReadToEndAsync();var error=process.StandardError.ReadToEndAsync();await process.WaitForExitAsync();
-    var result=await output;await error;if(process.ExitCode!=0)throw new IOException("fixture shell rejected transaction "+process.ExitCode);return result;
+    var result=await output;var detail=await error;if(process.ExitCode!=0)throw new IOException("fixture shell rejected transaction "+process.ExitCode+": "+detail+"; script="+args[4]);return result;
    }
   }
  }
