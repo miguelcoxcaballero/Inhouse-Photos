@@ -80,7 +80,9 @@ foreach ($field in @('LatestVersion', 'LatestImage', 'LatestImageId', 'SourceCom
   $runtimePins[$field] = $runtimeType.GetField($field).GetRawConstantValue()
 }
 if ($runtimePins.LatestImage -ne "inhouse-photos-server:v$Version" -or
-    -not $runtimePins.PackageUrl.StartsWith("https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-runtime-v$Version/")) {
+    -not [Regex]::IsMatch($runtimePins.PackageUrl,
+      '^https://github\.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-runtime-v' +
+      [Regex]::Escape($Version) + '(?:-r[1-9][0-9]*)?/Inhouse-Photos-Server-Runtime-' + [Regex]::Escape($Version) + '\.zip$')) {
   throw 'The installer must pin the verified runtime release for this product version'
 }
 $serverVersion = (Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\server\package.json') -Raw | ConvertFrom-Json).version

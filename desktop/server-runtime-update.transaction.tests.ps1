@@ -56,7 +56,10 @@ function Journal {
   if ($files.Count -ne 1) { throw 'Fixture must have one durable journal.' }
   return $files[0].FullName
 }
-function Get-Containers($Preferences, [string]$ComposeFile) { return Clone $script:fixture.Rows }
+function Get-Containers($Preferences, [string]$ComposeFile) {
+  $rows = Clone $script:fixture.Rows
+  foreach ($row in $rows) { $row }
+}
 function Invoke-Docker([string[]]$Arguments) {
   $fixture.Commands.Add(($Arguments -join ' '))
   if ($Arguments[0] -ceq 'compose') {

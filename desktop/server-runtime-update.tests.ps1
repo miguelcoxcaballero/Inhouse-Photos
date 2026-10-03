@@ -112,6 +112,29 @@ try {
   Check ($parsed[0].Mounts.Count -eq 1 -and $parsed[2].Mounts.Count -eq 0) 'native inspect retains mount array shape'
 } finally { ${function:Invoke-Docker} = $originalDocker }
 
+# Exercise the actual context writer under the running PowerShell version.
+# JSON arrays in Windows PowerShell 5.1 must become separate env-file lines,
+# including values containing spaces. Never print their contents.
+$contextDirectory = Join-Path ([IO.Path]::GetTempPath()) ('inhouse-env-check-' + [Guid]::NewGuid().ToString('N'))
+$originalDocker = ${function:Invoke-Docker}
+try {
+  [void][IO.Directory]::CreateDirectory($contextDirectory)
+  $expectedEnvironment = @('DB_HOSTNAME=fixture-db', 'DB_PASSWORD=fixture with spaces', 'REDIS_HOSTNAME=fixture-redis', 'REDIS_PORT=6380')
+  function Invoke-Docker([string[]]$Arguments) {
+    if ($Arguments[2] -ceq '{{json .NetworkSettings.Networks}}') { return '{"fixture_network":{}}' }
+    if ($Arguments[2] -ceq '{{json .Config.Env}}') { return ConvertTo-Json -InputObject $expectedEnvironment -Compress }
+    throw 'Unexpected environment fixture query.'
+  }
+  $context = New-QueueContext ('1'*64) $contextDirectory
+  $lines = [IO.File]::ReadAllLines($context.EnvironmentFile)
+  Check ($context.Network -ceq 'fixture_network') 'queue helper uses the verified server network'
+  Check ($lines.Count -eq $expectedEnvironment.Count) 'every Docker environment variable occupies its own line in PowerShell 5.1'
+  Check ((ConvertTo-Json -InputObject $lines -Compress) -ceq (ConvertTo-Json -InputObject $expectedEnvironment -Compress)) 'queue context preserves exact variable values including spaces without printing them'
+} finally {
+  ${function:Invoke-Docker} = $originalDocker
+  if ([IO.Directory]::Exists($contextDirectory)) { [IO.Directory]::Delete($contextDirectory, $true) }
+}
+
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ('inhouse-runtime-check-' + [Guid]::NewGuid().ToString('N'))
 try {
   $journalDir = Join-Path $temporary 'runtime-updates/transaction'

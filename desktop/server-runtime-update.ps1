@@ -332,7 +332,10 @@ function New-QueueContext([string]$ServerId, [string]$Directory) {
   if ($names.Count -ne 1) { throw 'La red del servidor necesita revisión manual antes de actualizar.' }
   # Docker inspect is deliberately filtered. Keep Env only in memory and a
   # current-user ACL directory; never emit it as output or in the journal.
-  $environment = @((Invoke-Docker @('inspect', '--format', '{{json .Config.Env}}', $ServerId)) | ConvertFrom-Json)
+  # PowerShell 5.1 emits a JSON array as one pipeline object. Assign it before
+  # array collection so WriteAllLines receives one string per variable.
+  $parsedEnvironment = (Invoke-Docker @('inspect', '--format', '{{json .Config.Env}}', $ServerId)) | ConvertFrom-Json
+  $environment = @($parsedEnvironment)
   if (@($environment | Where-Object { $_ -match '[\r\n]' }).Count) { throw 'Una variable del servidor no es compatible con el helper de colas.' }
   if (@($environment | Where-Object { $_ -match '^REDIS_(PASSWORD_FILE|SOCKET)=.+' }).Count) {
     throw 'Redis utiliza un archivo secreto o un socket local; esta instalación necesita una actualización adaptada a esos montajes.'
