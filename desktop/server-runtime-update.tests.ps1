@@ -32,6 +32,15 @@ $bad = Clone $manifest; $bad.platform='linux/arm64'; Reject { Assert-Manifest $b
 $bad = Clone $manifest; $bad.compatibleServerImageIds=@(); Reject { Assert-Manifest $bad } 'unknown baseline'
 $bad = Clone $manifest; $bad.image='postgres:latest'; Reject { Assert-Manifest $bad } 'unrelated image'
 $bad = Clone $manifest; $bad.PSObject.Properties.Remove('archiveSha256'); Reject { Assert-Manifest $bad } 'missing archive integrity'
+$additive = Clone $manifest
+$additive.databaseMigrations = 'additive-upload-outbox'
+$additive | Add-Member baselineDatabaseSchemaSha256 'e4da4ec029df53f7657b2a81776bb48806c419ecfb509c95e5e84e128dbd4824'
+$additive | Add-Member addedDatabaseMigrations @('1790985600000-DurableUploadProcessing')
+Assert-Manifest $additive; Check $true 'exact additive durable outbox migration accepted'
+$bad = Clone $additive; $bad.baselineDatabaseSchemaSha256='f'*64; Reject { Assert-Manifest $bad } 'unknown source schema'
+$bad = Clone $additive; $bad.addedDatabaseMigrations=@('1790985600000-DurableUploadProcessing', 'OtherMigration'); Reject { Assert-Manifest $bad } 'unexpected additional migrations'
+$bad = Clone $additive; $bad.addedDatabaseMigrations=@('OtherMigration'); Reject { Assert-Manifest $bad } 'unverified migration'
+$bad = Clone $additive; $bad.PSObject.Properties.Remove('baselineDatabaseSchemaSha256'); Reject { Assert-Manifest $bad } 'missing migration baseline'
 
 $mount = [pscustomobject]@{Type='bind';Source='/library';Destination='/data';Mode='rw';RW=$true;Propagation='rprivate'}
 $dbMount = [pscustomobject]@{Type='volume';Name='inhouse_pgdata';Source='/var/lib/docker/volumes/inhouse_pgdata/_data';Destination='/var/lib/postgresql/data';Driver='local';Mode='rw';RW=$true;Propagation=''}

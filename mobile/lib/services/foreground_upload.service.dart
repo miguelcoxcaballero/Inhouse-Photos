@@ -23,7 +23,6 @@ import 'package:immich_mobile/repositories/asset_media.repository.dart';
 import 'package:immich_mobile/repositories/upload.repository.dart';
 import 'package:immich_mobile/utils/adaptive_upload_limiter.dart';
 import 'package:immich_mobile/utils/media_upload_gate.dart';
-import 'package:immich_mobile/utils/upload_capacity_gate.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
 import 'package:path/path.dart' as p;
@@ -81,11 +80,6 @@ class _UploadAcknowledgement {
 
 /// A small async queue with disk-safe back pressure. [close] stops producers
 /// but permits consumers to drain items that were already prepared.
-/// Bounds how many assets may be awaiting server-side compression at once.
-///
-/// A permit is held from just before an upload starts until that asset's
-/// compression has settled. With a limit of zero the gate is inert, which is
-/// the original-quality path where nothing waits on the server at all.
 class _BoundedAsyncQueue<T> {
   final int capacity;
   final Queue<T> _items = Queue<T>();
@@ -241,31 +235,18 @@ class ForegroundUploadService {
 
     final speed = SettingsRepository.instance.appConfig.backup.speed;
     final transferPlan = speed.transferPlan(isUnmetered: isUnmetered, itemCount: items.length, isLocal: isLocal);
-    final waitsForServerCompression =
-        SettingsRepository.instance.appConfig.backup.quality == BackupQuality.storageSaver &&
-        callbacks.onServerCompressionExpected != null &&
-        callbacks.onSuccess != null;
-    // Waiting for the server to finish compressing used to happen on the
-    // upload worker itself, which made the phone's upload concurrency equal to
-    // the server's compression latency: a worker that had already pushed its
-    // bytes sat idle until a websocket said the server was done, and the pool
-    // was clamped to the size of that window. Pushing bytes and waiting for
-    // compression are now separate concerns. Upload concurrency adapts to
-    // measured network throughput, while a separate semaphore bounds how many
-    // assets may be awaiting compression on the server.
+    // The server acknowledges durable receipt of the original. Compression
+    // continues independently after that response, including after the phone
+    // disconnects, so its backlog must never reserve a network upload slot.
     // Enough sockets to fill a fast local link without exhausting file
     // descriptors or saturating the server with dozens of simultaneous POSTs.
     final uploadWorkerCount = transferPlan.uploadWorkers.clamp(1, 16);
     final adaptiveLimit = AdaptiveUploadLimiter(maximum: uploadWorkerCount, isUnmetered: isUnmetered, isLocal: isLocal);
     final uploadGate = MediaUploadGate(adaptiveLimit.current);
-    final compressionWindow = waitsForServerCompression ? transferPlan.compressionWindow(isUnmetered: isUnmetered) : 0;
-    final compressionGate = UploadCapacityGate(compressionWindow);
-    final outstandingAcknowledgements = <Future<void>>{};
     _logger.info(
       'Backup transfer plan: speed=$speed, unmetered=$isUnmetered, '
       'prepare=${transferPlan.preparationWorkers}, upload=$uploadWorkerCount (videos serial), '
-      'acknowledge=${transferPlan.acknowledgementWorkers}, '
-      'compressionWindow=${waitsForServerCompression ? compressionWindow : 'off'}',
+      'acknowledge=${transferPlan.acknowledgementWorkers}, serverProcessing=independent',
     );
     final prepared = _BoundedAsyncQueue<_PreparedAsset>(transferPlan.preparedQueueCapacity);
     final acknowledgements = _BoundedAsyncQueue<_UploadAcknowledgement>(transferPlan.acknowledgementQueueCapacity);
@@ -273,7 +254,6 @@ class ForegroundUploadService {
     void cancelPipeline() {
       prepared.close();
       uploadGate.cancel();
-      compressionGate.cancel();
     }
 
     _cancelPipeline = cancelPipeline;
@@ -339,22 +319,8 @@ class ForegroundUploadService {
           continue;
         }
 
-        if (waitsForServerCompression) {
-          // Stop adding to the server backlog when it is genuinely behind.
-          if (!await compressionGate.acquire()) {
-            await _cleanupPreparedAsset(item);
-            continue;
-          }
-        }
-        if (shouldAbortUpload || (cancelToken?.isCompleted ?? false)) {
-          compressionGate.release();
-          await _cleanupPreparedAsset(item);
-          continue;
-        }
-
         final isVideo = item.asset.isVideo;
         if (!await uploadGate.acquire(isVideo: isVideo)) {
-          compressionGate.release();
           await _cleanupPreparedAsset(item);
           continue;
         }
@@ -382,20 +348,7 @@ class ForegroundUploadService {
           uploadGate.release(isVideo: isVideo);
         }
         if (acknowledgement == null) {
-          compressionGate.release();
           await _cleanupPreparedAsset(item);
-          continue;
-        }
-        if (waitsForServerCompression) {
-          // The bytes are up. Recording the asset waits on the compression
-          // websocket, but it does so off this worker so the next transfer can
-          // start immediately.
-          late final Future<void> pending;
-          pending = acknowledgeUpload(acknowledgement).whenComplete(() {
-            outstandingAcknowledgements.remove(pending);
-            compressionGate.release();
-          });
-          outstandingAcknowledgements.add(pending);
           continue;
         }
         if (!await acknowledgements.add(acknowledgement)) {
@@ -416,20 +369,13 @@ class ForegroundUploadService {
 
     final preparationWorkers = List.generate(transferPlan.preparationWorkers, (_) => prepareWorker());
     final uploadWorkers = List.generate(uploadWorkerCount, (_) => uploadWorker());
-    final acknowledgementWorkers = waitsForServerCompression
-        ? <Future<void>>[]
-        : List.generate(transferPlan.acknowledgementWorkers, (_) => acknowledgementWorker());
+    final acknowledgementWorkers = List.generate(transferPlan.acknowledgementWorkers, (_) => acknowledgementWorker());
 
     await Future.wait(preparationWorkers);
     prepared.close();
     await Future.wait(uploadWorkers);
     acknowledgements.close();
     await Future.wait(acknowledgementWorkers);
-    // Compression waits outlive their upload worker, so the run is only over
-    // once each one has recorded its asset.
-    while (outstandingAcknowledgements.isNotEmpty) {
-      await Future.wait(outstandingAcknowledgements.toList());
-    }
     if (identical(_cancelPipeline, cancelPipeline)) {
       _cancelPipeline = null;
     }

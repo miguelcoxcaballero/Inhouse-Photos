@@ -29,6 +29,8 @@ def package(directory, performance):
     payload = {"server-runtime-update.json": manifest_data,
                "storage-saver-performance.json": performance.read_bytes(),
                "LEEME-Actualizar.md": (desktop / "SERVER-RUNTIME-UPDATES.md").read_bytes()}
+    for filename in ["runtime-smoke-results.json", "durable-backlog-results.json"]:
+        payload[filename] = (directory / filename).read_bytes()
     for filename in ["server-runtime-update.ps1", "server-runtime-queue-handoff.cjs"]:
         data = (desktop / filename).read_bytes()
         # Windows PowerShell 5.1 needs a BOM to display Spanish UTF-8 correctly.
@@ -76,6 +78,8 @@ $parameters = @{
     (directory / "storage-saver-performance.json").write_bytes(payload["storage-saver-performance.json"])
     external = {output.name: file_sha(output), "server-runtime-update.json": sha(manifest_data),
                 "storage-saver-performance.json": sha(payload["storage-saver-performance.json"])}
+    for filename in ["runtime-smoke-results.json", "durable-backlog-results.json"]:
+        external[filename] = sha(payload[filename])
     (directory / "SHA256SUMS.txt").write_text("".join(value + "  " + name + "\n" for name, value in sorted(external.items())))
     print(json.dumps({"package": str(output), "checksums": external}, indent=2))
 

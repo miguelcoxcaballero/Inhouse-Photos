@@ -138,6 +138,67 @@ test("invalid counts fail closed", async () => {
   );
 });
 
+test("rollback preserves pending durable uploads even when both Redis queues are empty", async () => {
+  const queues = [fakeQueue(true), fakeQueue(true)];
+  await assert.rejects(
+    runAction("assert-rollback-safe", undefined, queues, async () => ({
+      present: true,
+      pending: true,
+    })),
+    /persistent upload backlog contains unfinished/,
+  );
+  assert.deepEqual(
+    queues.flatMap((queue) => queue.calls),
+    [],
+  );
+});
+
+test("rollback refuses an installed migration after the outbox drains", async () => {
+  await assert.rejects(
+    runAction(
+      "assert-rollback-safe",
+      undefined,
+      [fakeQueue(true), fakeQueue(true)],
+      async () => ({
+        present: true,
+        pending: false,
+      }),
+    ),
+    /previous image cannot read this migration/,
+  );
+});
+
+test("rollback allows the original schema and fails closed without a verified database state", async () => {
+  const queues = [fakeQueue(true), fakeQueue(true)];
+  const result = await runAction(
+    "assert-rollback-safe",
+    undefined,
+    queues,
+    async () => ({
+      present: false,
+      pending: false,
+    }),
+  );
+  assert.deepEqual(result.durableUploadProcessing, {
+    present: false,
+    pending: false,
+  });
+  await assert.rejects(
+    runAction("assert-rollback-safe", undefined, queues),
+    /check is required/,
+  );
+  await assert.rejects(
+    runAction("assert-rollback-safe", undefined, queues, async () => ({})),
+    /invalid persistent backlog state/,
+  );
+  await assert.rejects(
+    runAction("assert-rollback-safe", undefined, queues, async () => {
+      throw new Error("Database unavailable");
+    }),
+    /Database unavailable/,
+  );
+});
+
 test("connection options match server Redis settings without exposing credentials in errors", () => {
   assert.throws(
     () => redisConnection({ REDIS_PASSWORD_FILE: "/secret/path" }),

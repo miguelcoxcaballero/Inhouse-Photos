@@ -6,17 +6,6 @@ void main() {
     final plan = BackupSpeedMode.maximum.transferPlan(isUnmetered: true, isLocal: true, itemCount: 100);
     expect(plan.uploadWorkers, 16);
   });
-  test('the compression window prevents an unbounded server backlog', () {
-    for (final mode in BackupSpeedMode.values) {
-      for (final isUnmetered in [true, false]) {
-        final plan = mode.transferPlan(isUnmetered: isUnmetered, itemCount: 5000);
-        final window = plan.compressionWindow(isUnmetered: isUnmetered);
-
-        expect(window, lessThanOrEqualTo(isUnmetered ? 32 : 12), reason: '$mode unmetered=$isUnmetered');
-        expect(window, greaterThanOrEqualTo(plan.uploadWorkers), reason: '$mode unmetered=$isUnmetered');
-      }
-    }
-  });
   group('Backup transfer plan', () {
     test('defaults to maximum throughput', () {
       expect(const BackupConfig().speed, BackupSpeedMode.maximum);

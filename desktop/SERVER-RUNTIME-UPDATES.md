@@ -1,8 +1,8 @@
 # Actualizar el motor del servidor Windows
 
-Actualizar el gestor Windows 1.2.16 no cambia la imagen que procesa las fotos.
-Las mejoras de compresión necesitan instalar el paquete de actualización del
-motor en el PC que ejecuta Docker Desktop. Este actualizador se aplica a una
+La versión del gestor Windows y la del motor de fotos se actualizan por separado.
+La recepción con cola persistente y las mejoras de compresión necesitan instalar
+el paquete del motor en el PC que ejecuta Docker Desktop. Este actualizador se aplica a una
 biblioteca previamente vinculada y verificada por Inhouse Photos Server.
 
 Descarga el ZIP del motor desde la publicación oficial, extráelo en una carpeta
@@ -22,9 +22,14 @@ actualización correcta muestra la nueva versión y el commit instalado.
 
 `server-runtime-update.ps1` verifica el SHA-256 publicado del manifiesto y del
 archivo `docker save`, el commit OCI de la imagen, su ID y la plataforma
-`linux/amd64`. El manifiesto permite únicamente imágenes de origen cuya
-compatibilidad se verificó y una actualización sin cambios de esquema de base
-de datos. Los SHA-256 de la imagen/configuración originales pueden diferir entre
+`linux/amd64` y el hash del esquema compilado. El manifiesto permite únicamente
+imágenes de origen cuya compatibilidad se verificó. La versión
+`3.1.0-durable-upload-20261003` admite el motor original publicado y el motor
+`3.1.0-storage-saver-20261002`. Añade una sola migración identificada:
+`1790985600000-DurableUploadProcessing`, que crea la cola persistente y los
+recibos de subida en PostgreSQL sin sustituir ni borrar las tablas existentes.
+Los recibos permiten reconocer reintentos del archivo original después de
+comprimirlo. Los SHA-256 de la imagen/configuración originales pueden diferir entre
 almacenes Docker; ambos identificadores deben constar explícitamente en la
 lista de imágenes compatibles de la publicación.
 
@@ -48,7 +53,8 @@ conservar la misma identidad. Tras confirmar salud y montajes, actualiza el
 recibo y restaura el estado de pausa que tenían las colas.
 
 El helper de colas se ejecuta en un contenedor temporal sin montajes y con
-entrada `node`; usa únicamente las APIs de pausa y consulta de BullMQ. Las
+entrada `node`; usa las APIs de pausa y consulta de BullMQ y consultas de lectura
+en PostgreSQL para verificar si se puede volver a un motor anterior. Las
 variables del servidor se copian de forma temporal a un archivo privado del
 usuario, no se registran ni se muestran, y se eliminan al finalizar.
 
@@ -59,10 +65,14 @@ ID de la imagen anterior y un registro de transacción dentro de
 `%LOCALAPPDATA%\Inhouse Photos Server\runtime-updates`. No elimina la imagen
 anterior. Evita limpiar imágenes Docker hasta confirmar la actualización.
 
-Si el arranque falla, intenta volver a la imagen anterior conservando los
-trabajos. La versión anterior no procesa la cola nueva de vídeos: si quedan
-trabajos en ella, el rollback se rechaza y se conserva el motor nuevo. No se
-deben borrar colas ni restaurar la base de datos para resolver ese caso. Tras
+Si el arranque falla antes de aplicar la migración, intenta volver a la imagen
+anterior conservando los trabajos. Si quedan vídeos en la cola nueva, archivos
+en la cola persistente o ya se instaló la migración de esa cola, se rechaza el
+rollback. El motor anterior tampoco reconoce una migración más reciente aunque
+la cola ya esté vacía. La recuperación continúa con el motor nuevo mediante
+`-ResumeRecord`; el actualizador no revierte migraciones ni elimina archivos o
+filas de la base de datos. No se deben borrar colas ni restaurar la base de datos
+para resolver ese caso. Tras
 un fallo que requiera recuperación, las colas pueden quedar pausadas; el
 registro y las copias indican qué paso se completó.
 
@@ -89,8 +99,8 @@ Para solicitar una recuperación posterior, con el gestor cerrado:
 ```
 
 La segunda instrucción verifica que sigue siendo la misma instalación, pausa
-las colas, espera los trabajos activos y comprueba que la cola nueva está vacía
-antes de restaurar la imagen y su recibo. La restauración se rechaza si cambió
+las colas, espera los trabajos activos y comprueba las colas y el esquema antes
+de restaurar la imagen y su recibo. La restauración se rechaza si cambió
 la configuración, otro contenedor o un montaje. No ejecuta `compose down`, no
 elimina volúmenes y no modifica cuentas.
 
@@ -99,9 +109,13 @@ elimina volúmenes y no modifica cuentas.
 ```powershell
 powershell -NoProfile -File desktop\server-runtime-update.tests.ps1
 node --test desktop/server-runtime-queue-handoff.test.cjs
+python desktop/build-server-runtime.test.py
 ```
 
 Los checks comprueban rechazo de cambios de base de datos, montajes, identidad,
 configuración, manifiestos incompatibles y YAML ambiguo, así como pausa y
-recuperación de colas sin pérdida de trabajos. Una instalación real debe
+recuperación de colas sin pérdida de trabajos. El empaquetado exige dependencias
+idénticas a las del motor base y un build completo limpio, incluida la migración.
+La publicación verifica subidas con el procesado detenido y recuperación tras
+reiniciar el servidor y perder las colas Redis. Una instalación real debe
 confirmar además la salud de la imagen publicada en Docker Desktop.

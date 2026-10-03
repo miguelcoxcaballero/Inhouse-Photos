@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   ExpressionBuilder,
   Insertable,
@@ -25,6 +25,7 @@ import {
   AssetType,
   AssetVisibility,
   CalendarHeatmapType,
+  JobName,
 } from 'src/enum';
 import { DB } from 'src/schema';
 import { AssetAudioTable, AssetKeyframeTable, AssetVideoTable } from 'src/schema/tables/asset-av.table';
@@ -32,6 +33,7 @@ import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
 import { AssetFileTable } from 'src/schema/tables/asset-file.table';
 import { AssetJobStatusTable } from 'src/schema/tables/asset-job-status.table';
 import { AssetMetadataTable } from 'src/schema/tables/asset-metadata.table';
+import { UploadProcessingJob } from 'src/schema/tables/asset-upload-processing.table';
 import { AssetTable } from 'src/schema/tables/asset.table';
 import {
   anyUuid,
@@ -56,6 +58,14 @@ import {
 import { globToSqlPattern } from 'src/utils/misc';
 
 export type AssetStats = Record<AssetType, number>;
+
+export interface UploadProcessingOptions {
+  storageSaver: boolean;
+  fileSize: number;
+  sidecarPath?: string;
+  metadata?: Array<{ key: string; value: Record<string, unknown> }>;
+  sharedLink?: { id: string; albumId: string | null };
+}
 
 export interface BoundingBox {
   west: number;
@@ -446,6 +456,169 @@ export class AssetRepository {
     return this.db.insertInto('asset').values(asset).returningAll().executeTakeFirstOrThrow();
   }
 
+  /** Commit the original, its receipt and the processing outbox together. Redis is not part of admission. */
+  createForUpload(asset: Insertable<AssetTable>, options: UploadProcessingOptions) {
+    return this.db.transaction().execute(async (tx) => {
+      // This conditional update also serializes concurrent uploads against the actual quota,
+      // rather than the older quota snapshot in the caller's authentication context.
+      const owner = await tx
+        .updateTable('user')
+        .set({ quotaUsageInBytes: sql`"quotaUsageInBytes" + ${options.fileSize}`, updatedAt: new Date() })
+        .where('id', '=', asset.ownerId)
+        .where('deletedAt', 'is', null)
+        .where((eb) =>
+          eb.or([
+            eb('quotaSizeInBytes', 'is', null),
+            sql<boolean>`"quotaUsageInBytes" + ${options.fileSize} <= "quotaSizeInBytes"`,
+          ]),
+        )
+        .returning('id')
+        .executeTakeFirst();
+      if (!owner) {
+        throw new BadRequestException('Quota has been exceeded!');
+      }
+
+      const created = await tx.insertInto('asset').values(asset).returningAll().executeTakeFirstOrThrow();
+      await tx
+        .insertInto('asset_upload_receipt')
+        .values({
+          assetId: created.id,
+          ownerId: created.ownerId,
+          checksum: created.checksum,
+          originalPath: created.originalPath,
+        })
+        .execute();
+      if (options.metadata?.length) {
+        await tx
+          .insertInto('asset_metadata')
+          .values(options.metadata.map((item) => ({ assetId: created.id, ...item })))
+          .execute();
+      }
+      if (options.sidecarPath) {
+        await tx
+          .insertInto('asset_file')
+          .values({ assetId: created.id, path: options.sidecarPath, type: AssetFileType.Sidecar })
+          .execute();
+      }
+      await tx.insertInto('asset_exif').values({ assetId: created.id, fileSizeInByte: options.fileSize }).execute();
+      if (options.sharedLink) {
+        if (options.sharedLink.albumId) {
+          await tx
+            .insertInto('album_asset')
+            .values({ assetId: created.id, albumId: options.sharedLink.albumId })
+            .execute();
+        } else {
+          await tx
+            .insertInto('shared_link_asset')
+            .values({ assetId: created.id, sharedLinkId: options.sharedLink.id })
+            .execute();
+        }
+      }
+      await tx
+        .insertInto('asset_upload_processing')
+        .values({
+          assetId: created.id,
+          jobName: options.storageSaver
+            ? created.type === AssetType.Video
+              ? JobName.AssetCompressStorageSaverVideo
+              : JobName.AssetCompressStorageSaver
+            : JobName.AssetExtractMetadata,
+        })
+        .execute();
+      return created;
+    });
+  }
+
+  getPendingUploadProcessing(jobName: UploadProcessingJob, limit: number) {
+    return this.db
+      .selectFrom('asset_upload_processing')
+      .select('assetId')
+      .where('jobName', '=', jobName)
+      .where('availableAt', '<=', new Date())
+      .orderBy('availableAt')
+      .orderBy('assetId')
+      .limit(limit)
+      .execute();
+  }
+
+  getUploadReceipt(ownerId: string, checksum: Buffer) {
+    return this.db
+      .selectFrom('asset_upload_receipt')
+      .select(['assetId', 'originalPath'])
+      .where('ownerId', '=', ownerId)
+      .where('checksum', '=', checksum)
+      .executeTakeFirst();
+  }
+
+  async deferUploadProcessing(ids: string[], jobName: UploadProcessingJob, availableAt: Date) {
+    if (ids.length === 0) {
+      return;
+    }
+    await this.db
+      .updateTable('asset_upload_processing')
+      .set({ availableAt })
+      .where('assetId', 'in', ids)
+      .where('jobName', '=', jobName)
+      .execute();
+  }
+
+  async advanceUploadProcessing(id: string, completed: UploadProcessingJob, next?: UploadProcessingJob) {
+    if (next) {
+      await this.db
+        .updateTable('asset_upload_processing')
+        .set({ jobName: next, availableAt: new Date() })
+        .where('assetId', '=', id)
+        .where('jobName', '=', completed)
+        .execute();
+    } else {
+      await this.db
+        .deleteFrom('asset_upload_processing')
+        .where('assetId', '=', id)
+        .where('jobName', '=', completed)
+        .execute();
+    }
+  }
+
+  commitStorageSaver(options: {
+    id: string;
+    sourcePath: string;
+    outputPath: string;
+    originalFileName: string;
+    checksum: Buffer;
+    outputBytes: number;
+    sourceBytes: number;
+  }) {
+    return this.db.transaction().execute(async (tx) => {
+      const asset = await tx
+        .updateTable('asset')
+        .set({
+          originalPath: options.outputPath,
+          originalFileName: options.originalFileName,
+          checksum: options.checksum,
+        })
+        .where('id', '=', options.id)
+        .where('originalPath', '=', options.sourcePath)
+        .returning('ownerId')
+        .executeTakeFirst();
+      if (!asset) {
+        throw new Error(`Storage Saver source changed for asset ${options.id}`);
+      }
+      await tx
+        .updateTable('asset_exif')
+        .set({ fileSizeInByte: options.outputBytes })
+        .where('assetId', '=', options.id)
+        .execute();
+      await tx
+        .updateTable('user')
+        .set({
+          quotaUsageInBytes: sql`"quotaUsageInBytes" + ${options.outputBytes - options.sourceBytes}`,
+          updatedAt: new Date(),
+        })
+        .where('id', '=', asset.ownerId)
+        .execute();
+    });
+  }
+
   @ChunkedArray({ chunkSize: 4000 })
   async createAll(assets: Insertable<AssetTable>[]) {
     const ids = await this.db.insertInto('asset').values(assets).returning('id').execute();
@@ -664,14 +837,26 @@ export class AssetRepository {
   getByChecksums(userId: string, checksums: Buffer[]) {
     return this.db
       .selectFrom('asset')
-      .select(['id', 'checksum', 'deletedAt'])
-      .where('ownerId', '=', asUuid(userId))
-      .where('checksum', 'in', checksums)
+      .select(['asset.id', 'asset.checksum', 'asset.deletedAt'])
+      .where('asset.ownerId', '=', asUuid(userId))
+      .where('asset.checksum', 'in', checksums)
+      .unionAll(
+        this.db
+          .selectFrom('asset_upload_receipt')
+          .innerJoin('asset', 'asset.id', 'asset_upload_receipt.assetId')
+          .select(['asset.id', 'asset_upload_receipt.checksum', 'asset.deletedAt'])
+          .where('asset_upload_receipt.ownerId', '=', asUuid(userId))
+          .where('asset_upload_receipt.checksum', 'in', checksums),
+      )
       .execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.BUFFER] })
   async getUploadAssetIdByChecksum(ownerId: string, checksum: Buffer): Promise<string | undefined> {
+    const receipt = await this.getUploadReceipt(ownerId, checksum);
+    if (receipt) {
+      return receipt.assetId;
+    }
     const asset = await this.db
       .selectFrom('asset')
       .select('id')

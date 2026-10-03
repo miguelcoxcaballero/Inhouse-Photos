@@ -28,6 +28,7 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: runtime-test-only-local-password
       REDIS_HOSTNAME: redis
+      IMMICH_WORKERS_INCLUDE: ${RUNTIME_TEST_WORKERS:-api,microservices}
       INHOUSE_STORAGE_SAVER_CONCURRENCY: '2'
       CPU_CORES: '5'
     volumes:

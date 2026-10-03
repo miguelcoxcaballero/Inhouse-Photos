@@ -3,7 +3,8 @@
 
 // Run through `docker exec -i <server> node - <action>` with this file on stdin.
 // This helper changes only the paused flags of the two Storage Saver queues.
-// It never deletes, moves, retries, or rewrites jobs.
+// Rollback checks read the durable outbox and migration state in PostgreSQL.
+// It never deletes, moves, retries, or rewrites jobs or database rows.
 const path = require("node:path");
 
 const QUEUE_NAMES = ["storageSaverCompression", "storageSaverVideoCompression"];
@@ -22,6 +23,7 @@ const ACTIONS = new Set([
   "resume",
   "restore",
   "assert-video-empty",
+  "assert-rollback-safe",
 ]);
 
 function integerEnv(env, key, fallback, minimum, maximum) {
@@ -134,10 +136,48 @@ async function inspectQueues(queues) {
   return result;
 }
 
-async function runAction(action, encodedStates, queues) {
+async function inspectDurableBacklog() {
+  let database;
+  try {
+    const {
+      ConfigRepository,
+    } = require("/usr/src/app/server/dist/repositories/config.repository.js");
+    const { createPostgres } = require(
+      require.resolve("@immich/sql-tools", {
+        paths: ["/usr/src/app/server", process.cwd()],
+      }),
+    );
+    database = createPostgres({
+      connection: new ConfigRepository().getEnv().database.config,
+      onNotice: () => {},
+    });
+    const [state] = await database.unsafe(
+      "SELECT to_regclass('public.asset_upload_processing') IS NOT NULL AS present, EXISTS (SELECT 1 FROM kysely_migrations WHERE name = '1790985600000-DurableUploadProcessing') AS migrated",
+    );
+    if (
+      typeof state?.present !== "boolean" ||
+      typeof state?.migrated !== "boolean"
+    )
+      throw new Error();
+    if (!state.present) return { present: state.migrated, pending: false };
+    const [backlog] = await database.unsafe(
+      "SELECT EXISTS (SELECT 1 FROM asset_upload_processing) AS pending",
+    );
+    if (typeof backlog?.pending !== "boolean") throw new Error();
+    return { present: true, pending: backlog.pending };
+  } catch {
+    throw new Error(
+      "Rollback refused: the persistent processing state could not be verified. Keep the current server image.",
+    );
+  } finally {
+    if (database) await database.end({ timeout: 1 }).catch(() => {});
+  }
+}
+
+async function runAction(action, encodedStates, queues, checkDurableBacklog) {
   if (!ACTIONS.has(action))
     throw new Error(
-      "Expected inspect, pause, resume, restore, or assert-video-empty.",
+      "Expected inspect, pause, resume, restore, assert-video-empty, or assert-rollback-safe.",
     );
   const states =
     action === "restore" || action === "resume"
@@ -145,7 +185,7 @@ async function runAction(action, encodedStates, queues) {
       : undefined;
   const before = await inspectQueues(queues);
 
-  if (action === "assert-video-empty") {
+  if (action === "assert-video-empty" || action === "assert-rollback-safe") {
     if (QUEUE_NAMES.some((name) => before.pausedStates[name] !== true)) {
       throw new Error(
         "Rollback refused: pause both Storage Saver queues before checking unfinished jobs.",
@@ -158,6 +198,28 @@ async function runAction(action, encodedStates, queues) {
     }
     if (before.activeJobs !== 0)
       throw new Error("Rollback refused: Storage Saver jobs are still active.");
+    if (action === "assert-rollback-safe") {
+      if (typeof checkDurableBacklog !== "function")
+        throw new Error(
+          "Rollback refused: a persistent backlog check is required.",
+        );
+      const durable = await checkDurableBacklog();
+      if (
+        !durable ||
+        typeof durable.present !== "boolean" ||
+        typeof durable.pending !== "boolean"
+      )
+        throw new Error("Rollback refused: invalid persistent backlog state.");
+      if (durable.pending)
+        throw new Error(
+          "Rollback refused: the persistent upload backlog contains unfinished files. Keep the current server image to process them.",
+        );
+      if (durable.present)
+        throw new Error(
+          "Rollback refused: the durable upload database migration is installed. The previous image cannot read this migration; recover using the current server image.",
+        );
+      return { ...before, durableUploadProcessing: durable };
+    }
     return before;
   }
 
@@ -189,7 +251,7 @@ async function main(args = process.argv.slice(2)) {
       (encodedStates !== undefined)
   ) {
     throw new Error(
-      "Usage: node - inspect|pause|assert-video-empty, or node - restore <base64 pausedStates JSON>.",
+      "Usage: node - inspect|pause|assert-video-empty|assert-rollback-safe, or node - restore <base64 pausedStates JSON>.",
     );
   }
   // Validate restore arguments before creating a connection or mutating Redis.
@@ -217,7 +279,11 @@ async function main(args = process.argv.slice(2)) {
     process.exit(1);
   }, 30000);
   try {
-    console.log(JSON.stringify(await runAction(action, encodedStates, queues)));
+    console.log(
+      JSON.stringify(
+        await runAction(action, encodedStates, queues, inspectDurableBacklog),
+      ),
+    );
   } finally {
     // Disconnect also finishes promptly if Redis is unavailable.
     await Promise.allSettled(queues.map((queue) => queue.disconnect()));
@@ -231,6 +297,7 @@ module.exports = {
   redisConnection,
   parsePausedStates,
   inspectQueues,
+  inspectDurableBacklog,
   runAction,
 };
 

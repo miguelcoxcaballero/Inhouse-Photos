@@ -306,7 +306,7 @@ describe(AssetMediaService.name, () => {
         size: 42,
       };
 
-      mocks.asset.create.mockResolvedValue(assetEntity);
+      mocks.asset.createForUpload.mockRejectedValue(new BadRequestException('Quota has been exceeded!'));
 
       await expect(
         sut.uploadAsset(
@@ -316,13 +316,8 @@ describe(AssetMediaService.name, () => {
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
 
-      expect(mocks.asset.create).not.toHaveBeenCalled();
+      expect(mocks.asset.createForUpload).toHaveBeenCalled();
       expect(mocks.user.updateUsage).not.toHaveBeenCalledWith(authStub.user1.user.id, file.size);
-      expect(mocks.storage.utimes).not.toHaveBeenCalledWith(
-        file.originalPath,
-        expect.any(Date),
-        new Date(createDto.fileModifiedAt),
-      );
     });
 
     it('should handle a file upload', async () => {
@@ -335,27 +330,80 @@ describe(AssetMediaService.name, () => {
         size: 42,
       };
 
-      mocks.asset.create.mockResolvedValue(assetEntity);
+      mocks.asset.createForUpload.mockResolvedValue(assetEntity);
 
       await expect(sut.uploadAsset(authStub.user1, createDto, file)).resolves.toEqual({
         id: 'id_1',
         status: AssetMediaStatus.CREATED,
       });
 
-      expect(mocks.asset.create).toHaveBeenCalled();
+      expect(mocks.asset.createForUpload).toHaveBeenCalled();
       expect(mocks.storage.utimes).toHaveBeenCalledWith(
         file.originalPath,
         expect.any(Date),
         new Date(createDto.fileModifiedAt),
       );
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.AssetExtractMetadata,
-        data: { id: assetEntity.id, source: 'upload' },
+      expect(mocks.asset.createForUpload).toHaveBeenCalledWith(
+        expect.objectContaining({ originalPath: file.originalPath }),
+        expect.objectContaining({ storageSaver: false, fileSize: file.size }),
+      );
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('acknowledges the durable original without waiting for Redis or workflow hooks', async () => {
+      mocks.asset.createForUpload.mockResolvedValue(assetEntity);
+      mocks.event.emit.mockReturnValue(new Promise(() => {}));
+      mocks.job.queue.mockReturnValue(new Promise(() => {}));
+
+      await expect(sut.uploadAsset(authStub.user1, createDto, fileStub.photo)).resolves.toEqual({
+        id: assetEntity.id,
+        status: AssetMediaStatus.CREATED,
       });
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.event.emit).toHaveBeenCalledWith('AssetCreate', { asset: assetEntity });
+    });
+
+    it('keeps an accepted original if a progress notification fails', async () => {
+      mocks.asset.createForUpload.mockResolvedValue(assetEntity);
+      mocks.websocket.clientSend.mockImplementation(() => {
+        throw new Error('notification unavailable');
+      });
+
+      await expect(
+        sut.uploadAsset(authStub.user1, { ...createDto, storageSaver: true }, fileStub.photo),
+      ).resolves.toEqual({ id: assetEntity.id, status: AssetMediaStatus.CREATED });
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.storage.unlink).not.toHaveBeenCalled();
+    });
+
+    it('recovers a lost database acknowledgment from the permanent original receipt', async () => {
+      mocks.asset.createForUpload.mockRejectedValue(new Error('commit acknowledgment lost'));
+      mocks.asset.getUploadReceipt.mockResolvedValue({
+        assetId: assetEntity.id,
+        originalPath: fileStub.photo.originalPath,
+      });
+
+      await expect(sut.uploadAsset(authStub.user1, createDto, fileStub.photo)).resolves.toEqual({
+        id: assetEntity.id,
+        status: AssetMediaStatus.CREATED,
+      });
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.storage.unlink).not.toHaveBeenCalled();
+    });
+
+    it('preserves an original if database ownership cannot be determined', async () => {
+      mocks.asset.createForUpload.mockRejectedValue(new Error('commit acknowledgment lost'));
+      mocks.asset.getUploadReceipt.mockRejectedValue(new Error('database unavailable'));
+
+      await expect(sut.uploadAsset(authStub.user1, createDto, fileStub.photo)).rejects.toThrow(
+        'commit acknowledgment lost',
+      );
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.storage.unlink).not.toHaveBeenCalled();
     });
 
     it.each([AssetType.Image, AssetType.Video])(
-      'routes a new Storage Saver %s upload straight to its encoder queue',
+      'persists a new Storage Saver %s upload for deferred processing',
       async (type) => {
         const file = {
           uuid: 'random-uuid',
@@ -365,14 +413,15 @@ describe(AssetMediaService.name, () => {
           originalName: 'asset_1.jpeg',
           size: 42,
         };
-        mocks.asset.create.mockResolvedValue({ ...assetEntity, type });
+        mocks.asset.createForUpload.mockResolvedValue({ ...assetEntity, type });
 
         await sut.uploadAsset(authStub.user1, { ...createDto, storageSaver: true }, file);
 
-        expect(mocks.job.queue).toHaveBeenCalledWith({
-          name: type === AssetType.Video ? JobName.AssetCompressStorageSaverVideo : JobName.AssetCompressStorageSaver,
-          data: { id: assetEntity.id },
-        });
+        expect(mocks.asset.createForUpload).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ storageSaver: true, fileSize: file.size }),
+        );
+        expect(mocks.job.queue).not.toHaveBeenCalled();
       },
     );
 
@@ -388,7 +437,7 @@ describe(AssetMediaService.name, () => {
       const error = new Error('unique key violation');
       (error as any).constraint_name = ASSET_CHECKSUM_CONSTRAINT;
 
-      mocks.asset.create.mockRejectedValue(error);
+      mocks.asset.createForUpload.mockRejectedValue(error);
       mocks.asset.getUploadAssetIdByChecksum.mockResolvedValue(assetEntity.id);
 
       await expect(sut.uploadAsset(authStub.user1, createDto, file)).resolves.toEqual({
@@ -415,7 +464,7 @@ describe(AssetMediaService.name, () => {
       const error = new Error('unique key violation');
       (error as any).constraint_name = ASSET_CHECKSUM_CONSTRAINT;
 
-      mocks.asset.create.mockRejectedValue(error);
+      mocks.asset.createForUpload.mockRejectedValue(error);
 
       await expect(sut.uploadAsset(authStub.user1, createDto, file)).rejects.toBeInstanceOf(
         InternalServerErrorException,
@@ -434,7 +483,7 @@ describe(AssetMediaService.name, () => {
         .build();
       const asset = AssetFactory.create({ livePhotoVideoId: motionAsset.id });
       mocks.asset.getById.mockResolvedValueOnce(getForAsset(motionAsset));
-      mocks.asset.create.mockResolvedValueOnce(asset);
+      mocks.asset.createForUpload.mockResolvedValueOnce(asset);
 
       await expect(
         sut.uploadAsset(authStub.user1, { ...createDto, livePhotoVideoId: motionAsset.id }, fileStub.livePhotoStill),
@@ -451,7 +500,7 @@ describe(AssetMediaService.name, () => {
       const motionAsset = AssetFactory.from({ type: AssetType.Video }).owner(authStub.user1.user).build();
       const asset = AssetFactory.create();
       mocks.asset.getById.mockResolvedValueOnce(getForAsset(motionAsset));
-      mocks.asset.create.mockResolvedValueOnce(asset);
+      mocks.asset.createForUpload.mockResolvedValueOnce(asset);
 
       await expect(
         sut.uploadAsset(authStub.user1, { ...createDto, livePhotoVideoId: motionAsset.id }, fileStub.livePhotoStill),
@@ -470,7 +519,7 @@ describe(AssetMediaService.name, () => {
     it('should handle a sidecar file', async () => {
       const asset = AssetFactory.from().file({ type: AssetFileType.Sidecar }).build();
       mocks.asset.getById.mockResolvedValueOnce(getForAsset(asset));
-      mocks.asset.create.mockResolvedValueOnce(asset);
+      mocks.asset.createForUpload.mockResolvedValueOnce(asset);
 
       await expect(sut.uploadAsset(authStub.user1, createDto, fileStub.photo, fileStub.photoSidecar)).resolves.toEqual({
         status: AssetMediaStatus.CREATED,
@@ -863,7 +912,8 @@ describe(AssetMediaService.name, () => {
   });
 
   describe('onUploadError', () => {
-    it('should queue a job to delete the uploaded file', async () => {
+    it('deletes a failed partial upload without depending on Redis', async () => {
+      mocks.storage.checkFileExists.mockResolvedValue(true);
       const request = {
         body: {},
         user: authStub.user1,
@@ -882,10 +932,10 @@ describe(AssetMediaService.name, () => {
 
       await sut.onUploadError(request, file);
 
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.FileDelete,
-        data: { files: [expect.stringContaining('/data/upload/user-id/ra/nd/random-uuid.jpg')] },
-      });
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(
+        expect.stringContaining('/data/upload/user-id/ra/nd/random-uuid.jpg'),
+      );
+      expect(mocks.job.queue).not.toHaveBeenCalled();
     });
   });
 });

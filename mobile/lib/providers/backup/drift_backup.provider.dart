@@ -275,7 +275,10 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   late final StreamSubscription<ServerCompressionProgressEvent> _compressionSubscription;
   final Map<String, String> _remoteToLocalAssetIds = {};
   final Map<String, ServerCompressionProgressEvent> _pendingCompressionEvents = {};
-  final Map<String, Completer<void>> _compressionWaiters = {};
+  // Only recent server processing is shown on the phone; the durable backlog
+  // lives on the server and may contain the entire library.
+  static const _maximumTrackedServerAssets = 128;
+  final Map<String, Timer> _uploadItemRemovalTimers = {};
   Future<void> _storageStatsWrite = Future.value();
   bool _failureNotificationSent = false;
 
@@ -299,7 +302,7 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     _progressFlushTimer?.cancel();
     _progressFlushTimer = null;
     _pendingProgress.clear();
-    _releaseCompressionWaiters();
+    _clearUploadItemRemovalTimers();
     unawaited(_compressionSubscription.cancel());
     super.dispose();
   }
@@ -324,15 +327,6 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
   DriftUploadStatus? _currentUploadItem(String localAssetId) =>
       _pendingProgress[localAssetId] ?? state.uploadItems[localAssetId];
 
-  void _releaseCompressionWaiters() {
-    for (final waiter in _compressionWaiters.values) {
-      if (!waiter.isCompleted) {
-        waiter.complete();
-      }
-    }
-    _compressionWaiters.clear();
-  }
-
   /// Remove upload item from state
   void _removeUploadItem(String taskId) {
     if (!mounted) {
@@ -340,6 +334,8 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
       return;
     }
     _pendingProgress.remove(taskId);
+    _uploadItemRemovalTimers.remove(taskId)?.cancel();
+    _remoteToLocalAssetIds.removeWhere((_, localId) => localId == taskId);
     if (state.uploadItems.containsKey(taskId)) {
       final updatedItems = Map<String, DriftUploadStatus>.from(state.uploadItems);
       updatedItems.remove(taskId);
@@ -447,9 +443,9 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     }
     _restartForegroundBackup = false;
     _uploadSpeedManager.clear();
-    _releaseCompressionWaiters();
     _remoteToLocalAssetIds.clear();
     _pendingCompressionEvents.clear();
+    _clearUploadItemRemovalTimers();
     _progressFlushTimer?.cancel();
     _progressFlushTimer = null;
     _pendingProgress.clear();
@@ -529,11 +525,24 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
 
   Future<void> _handleForegroundBackupSuccess(String userId, String localAssetId, String remoteAssetId) async {
     _flushPendingProgress();
-    final expectsCompression = state.uploadItems[localAssetId]?.compressionExpected == true;
-    final compressionWaiter = expectsCompression
-        ? _compressionWaiters.putIfAbsent(remoteAssetId, Completer<void>.new)
-        : null;
     _remoteToLocalAssetIds[remoteAssetId] = localAssetId;
+    while (_remoteToLocalAssetIds.length > _maximumTrackedServerAssets) {
+      _removeUploadItem(_remoteToLocalAssetIds.values.first);
+    }
+    final receivedItem = state.uploadItems[localAssetId];
+    if (receivedItem != null) {
+      state = state.copyWith(
+        uploadItems: {
+          ...state.uploadItems,
+          localAssetId: receivedItem.copyWith(
+            progress: 1,
+            uploadStarted: true,
+            networkSpeedAsString: '',
+            compressionState: receivedItem.compressionState == 'waiting' ? 'queued' : receivedItem.compressionState,
+          ),
+        },
+      );
+    }
     final pendingCompression = _pendingCompressionEvents.remove(remoteAssetId);
     if (pendingCompression != null) {
       _handleServerCompressionProgress(pendingCompression);
@@ -552,6 +561,9 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
       _logger.warning('Unable to register completed upload $remoteAssetId locally', error, stackTrace);
     }
 
+    if (!mounted) {
+      return;
+    }
     state = state.copyWith(backupCount: state.backupCount + 1, remainderCount: state.remainderCount - 1);
     _uploadSpeedManager.removeTask(localAssetId);
 
@@ -561,34 +573,31 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     } else {
       // Do not leave a completed upload pinned forever if the app lost its
       // websocket connection while the server was encoding it.
-      Future.delayed(const Duration(minutes: 15), () => _removeUploadItem(localAssetId));
+      _scheduleUploadItemRemoval(localAssetId, delay: const Duration(minutes: 15));
     }
     if (state.errorCount == 0 && state.remainderCount <= 0) {
       _failureNotificationSent = false;
       unawaited(FlutterLocalNotificationsPlugin().cancel(_backupHealthNotificationId));
     }
 
-    // Keep this upload slot reserved until the server reports that compression
-    // completed, was skipped, or failed. This prevents a fast connection from
-    // continuously outrunning the bounded server encoder queue.
-    if (compressionWaiter != null && !compressionWaiter.isCompleted) {
-      try {
-        await compressionWaiter.future.timeout(const Duration(minutes: 5));
-      } on TimeoutException {
-        _logger.warning('Timed out waiting for server compression of $remoteAssetId; releasing upload slot');
-      } finally {
-        if (identical(_compressionWaiters[remoteAssetId], compressionWaiter)) {
-          _compressionWaiters.remove(remoteAssetId);
-        }
-      }
-    }
+    // Receipt and local registration complete the upload. Websocket events
+    // only update the recent processing display; they cannot delay this
+    // callback, the next transfer, or completion of a backup pass.
   }
 
   bool _isCompressionFinished(String compressionState) =>
       compressionState == 'completed' || compressionState == 'skipped' || compressionState == 'failed';
 
-  void _scheduleUploadItemRemoval(String localAssetId) {
-    Future.delayed(const Duration(milliseconds: 1200), () => _removeUploadItem(localAssetId));
+  void _scheduleUploadItemRemoval(String localAssetId, {Duration delay = const Duration(milliseconds: 1200)}) {
+    _uploadItemRemovalTimers.remove(localAssetId)?.cancel();
+    _uploadItemRemovalTimers[localAssetId] = Timer(delay, () => _removeUploadItem(localAssetId));
+  }
+
+  void _clearUploadItemRemovalTimers() {
+    for (final timer in _uploadItemRemovalTimers.values) {
+      timer.cancel();
+    }
+    _uploadItemRemovalTimers.clear();
   }
 
   void _handleServerCompressionProgress(ServerCompressionProgressEvent event) {
@@ -604,12 +613,6 @@ class DriftBackupNotifier extends StateNotifier<DriftBackupState> {
     }
 
     final finished = event.isFinished;
-    if (finished) {
-      final compressionWaiter = _compressionWaiters.remove(event.assetId);
-      if (compressionWaiter != null && !compressionWaiter.isCompleted) {
-        compressionWaiter.complete();
-      }
-    }
 
     _flushPendingProgress();
     final currentItem = state.uploadItems[localAssetId];

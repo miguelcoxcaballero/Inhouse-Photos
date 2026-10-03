@@ -79,6 +79,15 @@ export class StorageRepository {
     return createWriteStream(filepath, { flags: 'w', flush: true });
   }
 
+  async syncFile(filepath: string): Promise<void> {
+    const handle = await fs.open(filepath, 'r');
+    try {
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  }
+
   createOrOverwriteFile(filepath: string, buffer: Buffer) {
     return fs.writeFile(filepath, buffer, { flag: 'w' });
   }

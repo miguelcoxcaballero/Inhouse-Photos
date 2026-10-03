@@ -43,6 +43,16 @@ function queueAction(action, states) {
   );
 }
 
+async function waitForQueueSnapshot(check) {
+  const deadline = Date.now() + 180000;
+  while (Date.now() < deadline) {
+    const queues = queueAction('inspect');
+    if (check(queues)) return queues;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error('Timed out waiting for the durable outbox execution window');
+}
+
 async function api(method, endpoint, body) {
   const headers = {};
   if (token) headers.authorization = `Bearer ${token}`;
@@ -177,6 +187,7 @@ async function main() {
   // Force one queued video through the old mixed queue, as an existing backlog
   // from the previous runtime would be handed to the new video worker.
   const legacyVideoId = await upload('video-1080p.mp4');
+  await waitForQueueSnapshot((queues) => queues.videoUnfinishedJobs === 1);
   const handoff = JSON.parse(
     nodeInServer(`
     const { Queue } = require('bullmq');
@@ -199,11 +210,15 @@ async function main() {
   assert.equal(handoff.moved, 1);
   const imageId = await upload('jpeg-12mp.jpg');
   const efficientVideoId = await upload('video-efficient-720p.mp4');
-  const queued = queueAction('inspect');
+  const queued = await waitForQueueSnapshot(
+    (queues) =>
+      queues.queues.storageSaverCompression.counts.paused === 2 &&
+      queues.queues.storageSaverVideoCompression.counts.paused === 1,
+  );
   assert.equal(queued.queues.storageSaverCompression.counts.paused, 2);
   assert.equal(queued.queues.storageSaverVideoCompression.counts.paused, 1);
   assert.equal(queued.videoUnfinishedJobs, 1);
-  assert.throws(() => queueAction('assert-video-empty'), /Rollback refused/);
+  assert.throws(() => queueAction('assert-rollback-safe'), /Rollback refused/);
   queueAction('resume', pause.previousPausedStates);
 
   const expected = new Map([
@@ -224,9 +239,27 @@ async function main() {
     getAssets: () => Promise.all([...expected.keys()].map((id) => api('GET', `/assets/${id}`))),
     getQueues: () => queueAction('inspect'),
   });
+  await waitForQueueSnapshot(
+    () =>
+      compose(
+        'exec',
+        '-T',
+        'database',
+        'psql',
+        '-U',
+        'postgres',
+        '-d',
+        'immich',
+        '-tAc',
+        'SELECT count(*) FROM asset_upload_processing',
+      ).trim() === '0',
+  );
   const finalPause = queueAction('pause');
-  const final = queueAction('assert-video-empty');
+  const final = queueAction('inspect');
   assert.equal(final.activeJobs, 0);
+  // The new additive schema needs this runtime's migration files even after
+  // the backlog drains, so an old image cannot be restored by dropping work.
+  assert.throws(() => queueAction('assert-rollback-safe'), /durable upload database migration is installed/);
   queueAction('resume', finalPause.previousPausedStates);
   const migrations = compose(
     'exec',
@@ -264,6 +297,7 @@ async function main() {
     efficientVideoSkipped: true,
     queueHelperPauseRestore: true,
     rollbackBlockedWithPendingVideo: true,
+    rollbackBlockedAfterDurableSchemaMigration: true,
     assets: assets.map((asset) => ({
       id: asset.id,
       type: asset.type,

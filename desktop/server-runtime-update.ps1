@@ -177,10 +177,20 @@ function Assert-Manifest($Manifest) {
     $Manifest.archiveFile -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.tar(\.gz)?$' -or
     $Manifest.archiveSha256 -notmatch '^[a-f0-9]{64}$' -or
     $Manifest.databaseSchemaSha256 -notmatch '^[a-f0-9]{64}$' -or
-    $Manifest.platform -cne 'linux/amd64' -or $Manifest.databaseMigrations -cne 'unchanged' -or
+    $Manifest.platform -cne 'linux/amd64' -or
+    @('unchanged', 'additive-upload-outbox') -cnotcontains $Manifest.databaseMigrations -or
     -not @($Manifest.compatibleServerImageIds).Count -or
     @($Manifest.compatibleServerImageIds | Where-Object { $_ -notmatch '^sha256:[a-f0-9]{64}$' }).Count) {
     throw 'El manifiesto no describe una actualización compatible y verificable.'
+  }
+  if ($Manifest.databaseMigrations -ceq 'additive-upload-outbox') {
+    if (-not $Manifest.PSObject.Properties['baselineDatabaseSchemaSha256'] -or
+      -not $Manifest.PSObject.Properties['addedDatabaseMigrations'] -or
+      $Manifest.baselineDatabaseSchemaSha256 -cne 'e4da4ec029df53f7657b2a81776bb48806c419ecfb509c95e5e84e128dbd4824' -or
+      @($Manifest.addedDatabaseMigrations).Count -ne 1 -or
+      $Manifest.addedDatabaseMigrations[0] -cne '1790985600000-DurableUploadProcessing') {
+      throw 'El manifiesto no identifica la migración aditiva de la cola persistente.'
+    }
   }
 }
 
@@ -272,8 +282,8 @@ function Wait-CompressionIdle([string]$Image, $Context) {
 }
 
 function Restore-Runtime($Record, $Preferences, [string]$ComposeFile, [string]$RecordPath) {
-  # Pending jobs in the new queue have no consumer in the old image. Refuse
-  # rollback rather than strand them. Global pauses block work during readiness.
+  # Pending jobs and durable outbox migrations have no consumer in the old
+  # image. Never revert the database; retain the current image for recovery.
   Invoke-QueueHelper $Record.newImageId $script:QueueContext 'pause' $null | Out-Null
   Wait-CompressionIdle $Record.newImageId $script:QueueContext
   # Restore only our configuration and receipt. Never use down, rm or -V.
@@ -289,10 +299,10 @@ function Restore-Runtime($Record, $Preferences, [string]$ComposeFile, [string]$R
   Assert-Configuration $expectedHashes (Get-ConfigurationHashes $Preferences.Installation)
   $currentServer = @((Get-Containers $Preferences $ComposeFile) | Where-Object { $_.Service -ceq 'immich-server' })[0]
   Invoke-Docker @('stop', $currentServer.Id) | Out-Null
-  try { Invoke-QueueHelper $Record.newImageId $script:QueueContext 'assert-video-empty' $null | Out-Null }
+  try { Invoke-QueueHelper $Record.newImageId $script:QueueContext 'assert-rollback-safe' $null | Out-Null }
   catch {
     Invoke-Docker @('start', $currentServer.Id) | Out-Null
-    throw 'Hay vídeos pendientes para la versión nueva. Se mantiene esa imagen para conservar todos los trabajos.'
+    throw 'La versión anterior no puede recuperar el estado persistente actual. Se mantiene la imagen nueva, los archivos y la base de datos.'
   }
   [IO.File]::Copy($composeBackup, $ComposeFile, $true)
   Invoke-Docker ((Get-ComposeArguments $Preferences $ComposeFile) + @('up', '-d', '--no-deps', '--pull', 'never', 'immich-server')) | Out-Null
@@ -369,7 +379,7 @@ function Invoke-RuntimeUpdate {
       if ($targetImage -ceq $record.previousImageId) {
         $currentServer = @((Get-Containers $prefs $composeFile) | Where-Object { $_.Service -ceq 'immich-server' })[0]
         Invoke-Docker @('stop', $currentServer.Id) | Out-Null
-        try { Invoke-QueueHelper $targetImage $script:QueueContext 'assert-video-empty' $null | Out-Null }
+        try { Invoke-QueueHelper $targetImage $script:QueueContext 'assert-rollback-safe' $null | Out-Null }
         catch { Invoke-Docker @('start', $currentServer.Id) | Out-Null; throw }
       }
       $targetReference = Get-ComposeImage $prefs $composeFile
@@ -465,7 +475,10 @@ function Invoke-RuntimeUpdate {
     $imageFormat = '[{{json .Id}},{{json .Os}},{{json .Architecture}},{{json .Config.Labels}}]'
     $image = (Invoke-Docker @('image', 'inspect', '--format', $imageFormat, $manifest.image)) | ConvertFrom-Json
     $revision = $image[3].PSObject.Properties['org.opencontainers.image.revision']
-    if ($image[0] -cne $manifest.imageId -or $image[1] -cne 'linux' -or $image[2] -cne 'amd64' -or -not $revision -or $revision.Value -cne $manifest.sourceCommit) {
+    $schema = $image[3].PSObject.Properties['inhouse.runtime.database-schema-sha256']
+    if ($image[0] -cne $manifest.imageId -or $image[1] -cne 'linux' -or $image[2] -cne 'amd64' -or
+      -not $revision -or $revision.Value -cne $manifest.sourceCommit -or
+      -not $schema -or $schema.Value -cne $manifest.databaseSchemaSha256) {
       throw 'La imagen cargada no coincide con el commit y la plataforma publicados.'
     }
     $script:QueueContext = New-QueueContext $server.Id $directory
@@ -513,7 +526,7 @@ function Invoke-RuntimeUpdate {
   } catch {
     if ($changed) {
       try { Restore-Runtime $record $prefs $composeFile $recordPath }
-      catch { $record.status = 'rollback-required'; Write-PrivateJson $recordPath $record; throw ('No se confirmó la recuperación automática o hay vídeos pendientes en la cola nueva. Se conservan imagen, trabajos y copias en ' + $directory + '. Revisa el servidor antes de continuar.') }
+      catch { $record.status = 'rollback-required'; Write-PrivateJson $recordPath $record; throw ('No se confirmó la recuperación automática; la imagen anterior no puede leer trabajos o migraciones nuevos. Se conservan la imagen nueva, los archivos y las copias en ' + $directory + '. Usa -ResumeRecord para recuperar el motor nuevo.') }
       $paused = $false
       throw 'La actualización no se confirmó. Se restauró el servidor anterior y su recibo.'
     }

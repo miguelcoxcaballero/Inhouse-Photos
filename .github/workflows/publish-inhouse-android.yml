@@ -1,0 +1,190 @@
+name: Publish signed Inhouse Android
+
+on:
+  push:
+    branches: [feat/durable-upload-backlog]
+    paths:
+      - mobile/**
+      - .github/scripts/package_inhouse_android.py
+      - .github/scripts/test_package_inhouse_android.py
+      - .github/scripts/prepare_android_publication.py
+      - .github/scripts/test_prepare_android_publication.py
+      - .github/workflows/publish-inhouse-android.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: inhouse-android-publication-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/feat/durable-upload-backlog'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      RELEASE_TAG: v3.1.94-durable-upload
+    steps:
+      - name: Checkout the source to publish
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Refuse to replace an already published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/existing-android-release.json" 2>/dev/null; then
+            python -c 'import json,sys; assert json.load(open(sys.argv[1]))["isDraft"], "Refusing to overwrite an already published Android release"' "$RUNNER_TEMP/existing-android-release.json"
+          fi
+
+      - name: Require the permanent signing credentials
+        env:
+          KEYSTORE_BASE64: ${{ secrets.INHOUSE_ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.INHOUSE_ANDROID_STORE_PASSWORD }}
+          ALIAS: ${{ secrets.INHOUSE_ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.INHOUSE_ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in KEYSTORE_BASE64 ANDROID_STORE_PASSWORD ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::The permanent Android signing credential $name is missing; no APK will be published."
+              exit 1
+            fi
+          done
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Install pinned Flutter
+        run: |
+          git clone --depth 1 --branch 3.44.8 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
+
+      - name: Clean build inputs and generate Dart code
+        working-directory: mobile
+        run: |
+          git diff --exit-code
+          flutter clean
+          flutter pub get --enforce-lockfile
+          dart run build_runner build --delete-conflicting-outputs
+          dart run easy_localization:generate -S ../i18n
+          dart run bin/generate_keys.dart
+
+      - name: Test Android publication and upload/authentication regressions
+        run: |
+          python -m unittest discover -s .github/scripts -p 'test_*android*.py'
+          cd mobile
+          dart analyze --fatal-infos
+          flutter test \
+            test/unit/required_update_gate_test.dart \
+            test/services/auth.service_test.dart \
+            test/providers/auth_pairing_cookie_test.dart \
+            test/repositories/lan_upload_route_test.dart \
+            test/repositories/upload_repository_test.dart \
+            test/services/foreground_upload.service_test.dart \
+            test/services/background_upload.service_test.dart \
+            test/domain/models/config/backup_config_test.dart \
+            test/unit/background_backup_concurrency_test.dart \
+            test/unit/media_upload_gate_test.dart \
+            test/unit/adaptive_upload_limiter_test.dart
+
+      - name: Build the signed ARM64 split APK
+        working-directory: mobile
+        env:
+          KEYSTORE_BASE64: ${{ secrets.INHOUSE_ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.INHOUSE_ANDROID_STORE_PASSWORD }}
+          ALIAS: ${{ secrets.INHOUSE_ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.INHOUSE_ANDROID_KEY_PASSWORD }}
+        run: |
+          git diff --exit-code
+          trap 'rm -f android/key.jks' EXIT
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/key.jks
+          test -s android/key.jks
+          flutter build apk --release --split-per-abi --target-platform android-arm64
+          git diff --exit-code
+
+      - name: Verify and stage the matching APK, ZIP and updater manifest
+        run: |
+          python .github/scripts/package_inhouse_android.py \
+            --apk mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            --build-tools "$ANDROID_HOME/build-tools/36.0.0" \
+            --tag "$RELEASE_TAG" --source-commit "$GITHUB_SHA" \
+            --report "$RUNNER_TEMP/android-release-verification.json"
+
+      - name: Save verified artifacts before publication
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Inhouse-Photos-3.1.94-signed
+          path: |
+            Inhouse-Photos.apk
+            Inhouse-Photos-Android.zip
+            android-update.json
+            ${{ runner.temp }}/android-release-verification.json
+          if-no-files-found: error
+
+      - name: Commit the APK, ZIP and manifest atomically
+        id: commit
+        run: |
+          git fetch --no-tags origin "refs/heads/$GITHUB_REF_NAME"
+          python .github/scripts/prepare_android_publication.py \
+            --source "$GITHUB_SHA" --target FETCH_HEAD \
+            --directory "$RUNNER_TEMP/android-publication"
+          cd "$RUNNER_TEMP/android-publication"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- Inhouse-Photos.apk Inhouse-Photos-Android.zip android-update.json
+          git commit -m 'chore(android): publish verified 3.1.94 durable-upload APK'
+          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the verified Android release as latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ steps.commit.outputs.sha }}
+        run: |
+          cat > "$RUNNER_TEMP/android-release-notes.md" <<'NOTES'
+          Inhouse Photos Android 3.1.94 (ARM64, versionCode 7152).
+
+          La copia de seguridad continúa cuando el servidor ha guardado el original. Las fotos y vídeos pendientes de optimización ya no detienen las siguientes subidas. Se necesita la actualización del servidor con cola persistente para recuperar automáticamente el trabajo pendiente tras reinicios.
+
+          Instala Inhouse-Photos.apk o extráelo de Inhouse-Photos-Android.zip sobre la aplicación existente. Se conserva el certificado permanente de Inhouse Photos. El informe adjunto verifica la versión, el paquete, la firma y los ocho símbolos JNI.
+          NOTES
+          if gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/existing-android-release.json" 2>/dev/null; then
+            python -c 'import json,sys; assert json.load(open(sys.argv[1]))["isDraft"], "Refusing to overwrite an already published Android release"' "$RUNNER_TEMP/existing-android-release.json"
+          else
+            gh release create "$RELEASE_TAG" --draft --target "$RELEASE_COMMIT" \
+              --title 'Inhouse Photos Android 3.1.94 — subidas sin bloqueo por optimización' \
+              --notes-file "$RUNNER_TEMP/android-release-notes.md"
+          fi
+          gh release upload "$RELEASE_TAG" Inhouse-Photos.apk Inhouse-Photos-Android.zip \
+            android-update.json "$RUNNER_TEMP/android-release-verification.json" --clobber
+          gh release edit "$RELEASE_TAG" --target "$RELEASE_COMMIT" --draft=false --latest \
+            --notes-file "$RUNNER_TEMP/android-release-notes.md"
+
+      - name: Download the public ZIP and verify the published APK
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ZIP_URL: https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.94-durable-upload/Inhouse-Photos-Android.zip
+        run: |
+          curl --fail --location --retry 5 --retry-delay 2 "$ZIP_URL" --output "$RUNNER_TEMP/public-android.zip"
+          python - "$RUNNER_TEMP/public-android.zip" <<'PY'
+          import hashlib, json, sys, zipfile
+          manifest = json.load(open('android-update.json'))
+          with zipfile.ZipFile(sys.argv[1]) as archive:
+              assert archive.testzip() is None, 'Published ZIP integrity check failed'
+              apk = archive.read('Inhouse-Photos.apk')
+          assert len(apk) == manifest['sizeBytes'], 'Published ZIP contains an APK of a different size'
+          assert hashlib.sha256(apk).hexdigest() == manifest['sha256'], 'Published ZIP APK differs from the signed local build'
+          print('Public ZIP contains the exact verified signed APK')
+          PY
+          python .github/scripts/verify_android_release.py

@@ -5,6 +5,8 @@ import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/domain/models/events.model.dart';
+import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
@@ -13,6 +15,9 @@ import 'package:immich_mobile/infrastructure/repositories/store.repository.dart'
 import 'package:immich_mobile/platform/connectivity_api.g.dart';
 import 'package:immich_mobile/repositories/upload.repository.dart';
 import 'package:immich_mobile/services/foreground_upload.service.dart';
+import 'package:immich_mobile/services/background_upload.service.dart';
+import 'package:immich_mobile/providers/backup/drift_backup.provider.dart';
+import 'package:immich_mobile/utils/upload_speed_calculator.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../api.mocks.dart';
@@ -20,6 +25,8 @@ import '../fixtures/asset.stub.dart';
 import '../infrastructure/repository.mock.dart';
 import '../mocks/asset_entity.mock.dart';
 import '../repository.mocks.dart';
+
+class MockBackgroundUploadService extends Mock implements BackgroundUploadService {}
 
 void main() {
   late ForegroundUploadService sut;
@@ -36,6 +43,10 @@ void main() {
       const MethodChannel('plugins.flutter.io/path_provider'),
       (MethodCall methodCall) async => 'test',
     );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('dexterous.com/flutter/local_notifications'),
+      (MethodCall methodCall) async => null,
+    );
     db = Drift(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     await StoreService.init(storeRepository: DriftStoreRepository(db));
     await SettingsRepository.ensureInitialized(db);
@@ -45,6 +56,7 @@ void main() {
 
     registerFallbackValue(File('file'));
     registerFallbackValue(<String, String>{});
+    registerFallbackValue(LocalAssetStub.image1);
   });
 
   setUp(() {
@@ -101,6 +113,101 @@ void main() {
     });
     return captured;
   }
+
+  test('stores 200 uploads without any compression acknowledgement and bounds the processing display', () async {
+    final temp = await Directory.systemTemp.createTemp('durable-upload-backlog-');
+    final original = await File('${temp.path}/photo.jpg').writeAsBytes(List.filled(1024, 1));
+    final assets = List.generate(200, (index) => LocalAssetStub.image1.copyWith(id: 'photo-$index'));
+    final localAssets = MockDriftLocalAssetRepository();
+    final remoteAssets = MockRemoteAssetRepository();
+    final entity = MockAssetEntity();
+    when(() => entity.isLivePhoto).thenReturn(false);
+    when(() => mockStorageRepository.clearCache()).thenAnswer((_) async {});
+    when(() => mockStorageRepository.getAssetEntityForAsset(any())).thenAnswer((_) async => entity);
+    when(() => mockStorageRepository.isAssetAvailableLocally(any())).thenAnswer((_) async => true);
+    when(() => mockStorageRepository.getFileForAsset(any())).thenAnswer((_) async => original);
+    when(() => mockAssetMediaRepository.getOriginalFilename(any())).thenAnswer((_) async => 'photo.jpg');
+    when(() => mockConnectivityApi.getCapabilities()).thenAnswer((_) async => [NetworkCapability.unmetered]);
+    when(
+      () => mockUploadRepository.prepareLocalRoute(isUnmetered: any(named: 'isUnmetered')),
+    ).thenAnswer((_) async => true);
+    when(() => mockBackupRepository.getCandidates('owner')).thenAnswer((_) async => assets);
+    when(
+      () => mockBackupRepository.getAllCounts('owner'),
+    ).thenAnswer((_) async => (total: assets.length, remainder: assets.length, processing: 0));
+    when(() => localAssets.getById(any())).thenAnswer((invocation) async {
+      return assets.firstWhere((asset) => asset.id == invocation.positionalArguments.first);
+    });
+    when(
+      () => remoteAssets.registerCompletedUpload(
+        remoteId: any(named: 'remoteId'),
+        ownerId: any(named: 'ownerId'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+    final captured = captureFields();
+    final notifier = DriftBackupNotifier(
+      sut,
+      MockBackgroundUploadService(),
+      UploadSpeedManager(),
+      localAssets,
+      remoteAssets,
+      SettingsRepository.instance,
+    );
+    try {
+      await notifier.getBackupStatus('owner');
+      // No websocket connection/event is provided: an arbitrarily slow or
+      // paused compressor must not stop this complete backup pass.
+      await notifier.startForegroundBackup('owner').timeout(const Duration(seconds: 5));
+      expect(captured, hasLength(assets.length));
+      expect(captured.every((fields) => fields['storageSaver'] == 'true'), isTrue);
+      expect(notifier.state.backupCount, assets.length);
+      expect(notifier.state.remainderCount, 0);
+      expect(notifier.state.uploadItems, hasLength(128));
+      expect(notifier.state.uploadItems.values.every((item) => item.progress == 1 && item.isCloudProcessing), isTrue);
+      expect(await original.exists(), isTrue);
+      verify(
+        () => remoteAssets.registerCompletedUpload(
+          remoteId: any(named: 'remoteId'),
+          ownerId: 'owner',
+          source: any(named: 'source'),
+        ),
+      ).called(assets.length);
+
+      // The receipt remains complete while late processing events are still
+      // reflected for recent uploads after the backup pass has returned.
+      EventStream.shared.emit(
+        const ServerCompressionProgressEvent(
+          assetId: 'remote-200',
+          progress: 0.5,
+          state: 'processing',
+          originalBytes: 1024,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(notifier.state.uploadItems['photo-199']?.preparationProgress, 0.5);
+      expect(notifier.state.uploadItems['photo-199']?.progress, 1);
+      expect(notifier.state.backupCount, assets.length);
+
+      // Encoding failure keeps the acknowledged original backed up. It is a
+      // server processing result, not a failed phone transfer to retry.
+      EventStream.shared.emit(
+        const ServerCompressionProgressEvent(assetId: 'remote-200', progress: 1, state: 'failed', originalBytes: 1024),
+      );
+      await Future<void>.delayed(Duration.zero);
+      final storedItem = notifier.state.uploadItems['photo-199'];
+      expect(storedItem?.compressionState, 'failed');
+      expect(storedItem?.progress, 1);
+      expect(storedItem?.isFailed, isNot(true));
+      expect(notifier.state.backupCount, assets.length);
+      expect(notifier.state.remainderCount, 0);
+      expect(notifier.state.errorCount, 0);
+    } finally {
+      notifier.stopForegroundBackup();
+      notifier.dispose();
+      await temp.delete(recursive: true);
+    }
+  });
 
   group('uploadSingleAsset', () {
     test('should upload the motion part hidden and keep the still image visible', () async {

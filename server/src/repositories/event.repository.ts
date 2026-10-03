@@ -49,7 +49,7 @@ type EventMap = {
   AssetShow: [{ assetId: string; userId: string }];
   AssetTrash: [{ assetId: string; userId: string }];
   AssetDelete: [{ assetId: string; userId: string }];
-  AssetMetadataExtracted: [{ assetId: string; userId: string; source?: JobSource }];
+  AssetMetadataExtracted: [{ assetId: string; userId: string; source?: JobSource; durableUpload?: boolean }];
   StorageSaverProgress: [StorageSaverProgressEvent];
 
   // asset bulk events

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Create a Docker-loadable runtime from the verified, published server.
 
-The filesystem and dependencies are preserved except for the eight compiled
-modules in PR #16 and the startup script. Flattening avoids layer snapshots
-on VFS Docker engines. No credentials, media, database, or host files are added.
-Build server/dist first with the repository's pinned pnpm lockfile.
+The published filesystem and dependencies are preserved, while the complete
+clean server build and startup script replace the previous compiled application.
+Dependency inputs must match the verified base source. Flattening avoids layer
+snapshots on VFS Docker engines. No credentials, media, database, or host files
+are added. Remove server/dist before building with the pinned pnpm lockfile.
 """
 import argparse
 import copy
@@ -15,15 +16,74 @@ import json
 import pathlib
 import re
 import shutil
+import subprocess
 import tarfile
 import tempfile
 
 BASE_SHA = "3218c14df0af80c85c5b01d2631ae8341294393f50f9eae05b4505c34b735541"
 BASE_INDEX = "283fb546c253d70c3e984062a2d2ebc08ce4547ef799e0ffba634222e4b5c16d"
-MODULES = ["enum", "types", "dtos/queue-legacy.dto", "repositories/media.repository",
-           "services/asset-media.service", "services/media.service",
-           "services/queue.service", "utils/storage-saver"]
+BASE_SOURCE = "67b8d77eb710211b13dc7a7ef469054b98962657"
+BASE_SCHEMA_SHA = "e4da4ec029df53f7657b2a81776bb48806c419ecfb509c95e5e84e128dbd4824"
+STORAGE_SAVER_IMAGE = "0034cd9b0031574479c192ed8be48212f6e57012785d804beb171ed8a2d5a8ac"
+UPLOAD_MIGRATION = "1790985600000-DurableUploadProcessing"
 PREFIX = "usr/src/app/server/dist/"
+
+
+def verify_dependency_inputs(root, source_commit):
+    paths = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml",
+             "server/package.json", "packages/plugin-sdk/package.json",
+             "packages/sdk/package.json"]
+    for path in paths:
+        baseline = subprocess.check_output(["git", "show", BASE_SOURCE + ":" + path], cwd=root)
+        published = subprocess.check_output(["git", "show", source_commit + ":" + path], cwd=root)
+        if baseline != published or (root / path).read_bytes() != published:
+            raise ValueError("Runtime dependencies differ from the verified base: " + path)
+    if subprocess.check_output(["git", "diff", "--name-only", BASE_SOURCE, source_commit,
+                                "--", "packages/plugin-sdk", "packages/plugin-core"], cwd=root):
+        raise ValueError("Bundled runtime plugins differ from the verified base")
+    if subprocess.check_output(["git", "diff", "--name-only", source_commit,
+                                "--", "server/src", "server/bin/start.sh"], cwd=root):
+        raise ValueError("Application source differs from the declared source commit")
+    if subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard",
+                                "server/src", "server/bin"], cwd=root):
+        raise ValueError("Commit the complete application source before packaging")
+
+
+def compiled_files(dist):
+    files = {}
+    for source in sorted(dist.rglob("*")):
+        if source.is_symlink():
+            raise ValueError("Compiled output cannot contain symbolic links")
+        if not source.is_file():
+            continue
+        relative = source.relative_to(dist).as_posix()
+        if relative.endswith(".tsbuildinfo"):
+            continue
+        if not relative.endswith((".js", ".js.map", ".d.ts")) or ".spec." in relative:
+            raise ValueError("Unexpected compiled artifact; rebuild from a clean dist: " + relative)
+        files[PREFIX + relative] = source
+    for required in ["main.js", "app.module.js", "schema/index.js",
+                     "schema/migrations/" + UPLOAD_MIGRATION + ".js",
+                     "schema/tables/asset-upload-processing.table.js",
+                     "schema/tables/asset-upload-receipt.table.js"]:
+        if PREFIX + required not in files:
+            raise ValueError("Missing compiled application module: " + required)
+    return files
+
+
+def schema_digest(entries):
+    schema = hashlib.sha256()
+    for path in sorted(entries):
+        if path.startswith(PREFIX + "schema/") or path in [PREFIX + "database.js", PREFIX + "repositories/database.repository.js"]:
+            entry, body = entries[path]
+            if entry.isfile():
+                schema.update(path.encode() + b"\0")
+                if isinstance(body, pathlib.Path):
+                    schema.update(body.read_bytes())
+                else:
+                    layer, source = body
+                    schema.update(layer.extractfile(source).read())
+    return schema.hexdigest()
 
 
 def digest(path):
@@ -50,6 +110,8 @@ def add_bytes(out, path, data):
 def build(args):
     if not re.fullmatch(r"[a-f0-9]{40}", args.source_commit):
         raise ValueError("Expected exact source commit")
+    verify_dependency_inputs(args.dist.resolve().parents[1], args.source_commit)
+    compiled = compiled_files(args.dist)
     if digest(args.base_archive) != BASE_SHA:
         raise ValueError("Published base archive checksum mismatch")
     args.output_directory.mkdir(parents=True, exist_ok=True)
@@ -112,26 +174,17 @@ def build(args):
                         linked, body = entries[target]
                         entry.type, entry.size, entry.linkname = tarfile.REGTYPE, linked.size, ""
                     entries[entry.name] = (entry, body)
-            schema = hashlib.sha256()
-            for path in sorted(entries):
-                if path.startswith(PREFIX + "schema/") or path in [PREFIX + "database.js", PREFIX + "repositories/database.repository.js"]:
-                    entry, (layer, source) = entries[path]
-                    if entry.isfile():
-                        schema.update(path.encode() + b"\0")
-                        schema.update(layer.extractfile(source).read())
-            schema_sha = schema.hexdigest()
-            # Exactly the PR's runtime modules; unchanged schema/deps remain base bytes.
-            for module in MODULES:
-                for suffix in [".js", ".js.map", ".d.ts"]:
-                    source = args.dist / (module + suffix)
-                    if not source.is_file():
-                        raise ValueError("Missing compiled module: " + str(source))
-                    path = PREFIX + module + suffix
-                    entry = copy.copy(entries[path][0]) if path in entries else tarfile.TarInfo(path)
-                    entry.name, entry.type, entry.size = path, tarfile.REGTYPE, source.stat().st_size
-                    entry.mode, entry.uid, entry.gid = 0o644, 0, 0
-                    entry.linkname = ""
-                    entries[path] = (entry, source)
+            if schema_digest(entries) != BASE_SCHEMA_SHA:
+                raise ValueError("Published base schema checksum mismatch")
+            # Replace the entire build, including application registration,
+            # database declarations and migrations. Keep no obsolete modules.
+            for path in [path for path in entries if path.startswith(PREFIX)]:
+                del entries[path]
+            for path, source in compiled.items():
+                entry = tarfile.TarInfo(path)
+                entry.size, entry.mode, entry.uid, entry.gid = source.stat().st_size, 0o644, 0, 0
+                entries[path] = (entry, source)
+            schema_sha = schema_digest(entries)
             startup = args.dist.parent / "bin/start.sh"
             path = "usr/src/app/server/bin/start.sh"
             entry = copy.copy(entries[path][0])
@@ -154,11 +207,11 @@ def build(args):
             for layer in handles:
                 layer.close()
         config["rootfs"] = {"type": "layers", "diff_ids": ["sha256:" + digest(flat_path)]}
-        config["history"] = [{"created_by": "Inhouse Photos verified storage saver runtime; original filesystem plus PR16 modules"}]
+        config["history"] = [{"created_by": "Inhouse Photos verified durable upload runtime; published dependencies plus clean application build"}]
         env = config["config"]["Env"]
         env[:] = [item for item in env if not item.startswith(("UV_THREADPOOL_SIZE=", "IMMICH_SOURCE_COMMIT=", "IMMICH_SOURCE_URL=", "IMMICH_SOURCE_REF="))]
         env += ["UV_THREADPOOL_SIZE=16", "IMMICH_SOURCE_COMMIT=" + args.source_commit,
-                "IMMICH_SOURCE_REF=perf/storage-saver-throughput",
+                "IMMICH_SOURCE_REF=feat/durable-upload-backlog",
                 "IMMICH_SOURCE_URL=https://github.com/miguelcoxcaballero/Inhouse-Photos/commit/" + args.source_commit]
         labels = config["config"].setdefault("Labels", {})
         labels.update({"org.opencontainers.image.revision": args.source_commit,
@@ -181,8 +234,11 @@ def build(args):
         release = {"format": 1, "version": args.version, "sourceCommit": args.source_commit,
                    "image": args.image, "imageId": "sha256:" + image_id,
                    "archiveFile": filename, "archiveSha256": digest(output), "platform": "linux/amd64",
-                   "compatibleServerImageIds": ["sha256:" + BASE_INDEX, "sha256:" + config_path.name],
-                   "databaseMigrations": "unchanged", "databaseSchemaSha256": schema_sha}
+                   "compatibleServerImageIds": ["sha256:" + BASE_INDEX, "sha256:" + config_path.name,
+                                                "sha256:" + STORAGE_SAVER_IMAGE],
+                   "databaseMigrations": "additive-upload-outbox", "databaseSchemaSha256": schema_sha,
+                   "baselineDatabaseSchemaSha256": BASE_SCHEMA_SHA,
+                   "addedDatabaseMigrations": [UPLOAD_MIGRATION]}
         (args.output_directory / "server-runtime-update.json").write_text(json.dumps(release, indent=2) + "\n")
         print(json.dumps(release, indent=2), flush=True)
 
@@ -193,6 +249,6 @@ if __name__ == "__main__":
     parser.add_argument("dist", type=pathlib.Path)
     parser.add_argument("output_directory", type=pathlib.Path)
     parser.add_argument("--source-commit", required=True)
-    parser.add_argument("--version", default="3.1.0-storage-saver-20261002")
-    parser.add_argument("--image", default="inhouse-photos-server:v3.1.0-storage-saver-20261002")
+    parser.add_argument("--version", default="3.1.0-durable-upload-20261003")
+    parser.add_argument("--image", default="inhouse-photos-server:v3.1.0-durable-upload-20261003")
     build(parser.parse_args())

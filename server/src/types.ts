@@ -236,6 +236,8 @@ export interface IDelayedJob extends IBaseJob {
 
 export type JobSource = 'upload' | 'storage-saver-upload' | 'sidecar-write' | 'copy' | 'edit';
 export interface IEntityJob extends IBaseJob {
+  /** Processing admitted through the durable upload outbox. Follow-ups are scheduled by its reconciler. */
+  durableUpload?: boolean;
   id: string;
   source?: JobSource;
   notify?: boolean;

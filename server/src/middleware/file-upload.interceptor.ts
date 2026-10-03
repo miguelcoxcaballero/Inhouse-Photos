@@ -95,15 +95,6 @@ export class FileUploadInterceptor implements NestInterceptor {
   }
 
   private handleFile(request: AuthRequest, file: Express.Multer.File, callback: Callback<Partial<ImmichFile>>) {
-    request.on('error', (error) => {
-      if ('code' in error && error.code === 'ECONNRESET') {
-        this.logger.debug('Upload was cancelled');
-      } else {
-        this.logger.error(`Upload failed with: ${error}`);
-      }
-      this.assetService.onUploadError(request, file).catch(this.logger.error);
-    });
-
     try {
       (file as ImmichMulterFile).uuid = randomUUID();
 
@@ -116,6 +107,16 @@ export class FileUploadInterceptor implements NestInterceptor {
 
       const writeStream = this.storageRepository.createWriteStream(path);
       const hash = file.fieldname === UploadFieldName.ASSET_DATA ? createHash('sha1') : null;
+      const onRequestError = (error: Error) => {
+        if ('code' in error && error.code === 'ECONNRESET') {
+          this.logger.debug('Upload was cancelled');
+        } else {
+          this.logger.error(`Upload failed with: ${error}`);
+        }
+        file.stream.destroy(error);
+      };
+
+      request.once('error', onRequestError);
 
       let size = 0;
 
@@ -125,11 +126,16 @@ export class FileUploadInterceptor implements NestInterceptor {
       });
 
       pipeline(file.stream, writeStream, (error) => {
+        // Once the stream has been flushed and closed, the service owns the
+        // completed upload. A later connection error must not delete it.
+        request.off('error', onRequestError);
         if (error) {
           hash?.destroy();
+          this.assetService.onUploadError(request, file).catch((error) => this.logger.error(error));
           return callback(error);
         }
         if (size === 0) {
+          this.assetService.onUploadError(request, file).catch((error) => this.logger.error(error));
           return callback(new BadRequestException('File is empty'));
         }
         callback(null, {

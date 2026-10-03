@@ -1,9 +1,9 @@
-name: Publish optimized Inhouse server runtime
+name: Publish durable upload Inhouse server runtime
 
 on:
   workflow_dispatch:
   push:
-    branches: [perf/storage-saver-throughput]
+    branches: [feat/durable-upload-backlog]
     paths:
       - '.github/workflows/publish-server-runtime.yml'
       - 'desktop/*server-runtime*'
@@ -20,8 +20,8 @@ permissions:
   contents: write
 
 env:
-  RUNTIME_VERSION: 3.1.0-storage-saver-20261002
-  RUNTIME_TAG: server-runtime-v3.1.0-storage-saver-20261002
+  RUNTIME_VERSION: 3.1.0-durable-upload-20261003
+  RUNTIME_TAG: server-runtime-v3.1.0-durable-upload-20261003
 
 jobs:
   publish:
@@ -36,8 +36,10 @@ jobs:
         run: |
           npm install --global pnpm@11.13.1
           pnpm --filter immich... --filter @immich/sdk... install --frozen-lockfile
+          rm -rf server/dist
           pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter immich build
           node --test desktop/server-runtime-queue-handoff.test.cjs server/test/benchmarks/runtime-smoke.test.cjs
+          python3 desktop/build-server-runtime.test.py
           pwsh -NoProfile -File desktop/server-runtime-update.tests.ps1
           bash -n server/bin/start.sh
       - name: Build and load the verified server image
@@ -46,9 +48,9 @@ jobs:
         run: |
           mkdir -p .runtime/release .runtime/validation .runtime/performance
           gh release download server-v1.2.5 --repo "$GITHUB_REPOSITORY" --pattern inhouse-server-3.1.0-pairing-20260929.tar.gz --dir .runtime
+          git fetch --depth=1 origin 67b8d77eb710211b13dc7a7ef469054b98962657
           python3 desktop/build-server-runtime.py .runtime/inhouse-server-3.1.0-pairing-20260929.tar.gz server/dist .runtime/release --source-commit "$GITHUB_SHA" --version "$RUNTIME_VERSION" --image "inhouse-photos-server:v$RUNTIME_VERSION"
           docker load --input ".runtime/release/inhouse-server-$RUNTIME_VERSION.tar.gz"
-          git fetch --depth=1 origin 67b8d77eb710211b13dc7a7ef469054b98962657
           cp server/test/benchmarks/storage-saver.cjs .runtime/validation/benchmark.cjs
           cd server
           node <<'JS'
@@ -72,6 +74,16 @@ jobs:
           trap 'docker compose -p inhouse-runtime-test -f "$RUNTIME_TEST_COMPOSE" logs --no-color --tail 120' ERR
           docker compose -p inhouse-runtime-test -f "$RUNTIME_TEST_COMPOSE" up -d --wait --wait-timeout 300
           node server/test/benchmarks/runtime-smoke.cjs
+          docker compose -p inhouse-runtime-test -f "$RUNTIME_TEST_COMPOSE" down --volumes
+      - name: Verify durable receipt, upload backlog and recovery after Redis loss
+        env:
+          RUNTIME_TEST_COMPOSE: ${{ github.workspace }}/server/test/benchmarks/runtime-smoke.compose.yml
+          RUNTIME_TEST_FIXTURES: ${{ github.workspace }}/.runtime/performance
+          RUNTIME_TEST_RESULTS: ${{ github.workspace }}/.runtime/release/durable-backlog-results.json
+          RUNTIME_TEST_IMAGE: inhouse-photos-server:v${{ env.RUNTIME_VERSION }}
+          RUNTIME_TEST_PROJECT: inhouse-runtime-test-backlog
+          RUNTIME_TEST_PORT: 19284
+        run: node server/test/benchmarks/durable-backlog-smoke.cjs
       - name: Package and publish the installable update
         env:
           GH_TOKEN: ${{ github.token }}
@@ -81,11 +93,10 @@ jobs:
           from pathlib import Path
           import json
           r=json.loads(Path('.runtime/performance/results.json').read_text())
-          notes=Path('desktop/RELEASE-runtime-3.1.0-storage-saver-20261002.md').read_text()
-          notes=notes.replace('3,46',f"{r['encodedBatchSpeedup']:.2f}".replace('.',',')).replace('4,42',f"{r['batchSpeedup']:.2f}".replace('.',','))
-          notes=notes.replace('con cuatro núcleos',f"con {r['cpus']} núcleos")
-          by_name={case['name']:case['speedup'] for case in r['results']}
-          notes=notes.replace('2,58',f"{by_name['jpeg-24mp']:.2f}".replace('.',',')).replace('2,10',f"{by_name['jpeg-24mp-rotated']:.2f}".replace('.',','))
+          notes=Path('desktop/RELEASE-runtime-3.1.0-durable-upload-20261003.md').read_text()
+          notes=notes.replace('{{ENCODED_SPEEDUP}}',f"{r['encodedBatchSpeedup']:.2f}".replace('.',','))
+          notes=notes.replace('{{BATCH_SPEEDUP}}',f"{r['batchSpeedup']:.2f}".replace('.',','))
+          notes=notes.replace('{{CPUS}}',str(r['cpus']))
           Path('.runtime/release/RELEASE.md').write_text(notes)
           PY
           if gh release view "$RUNTIME_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft > .runtime/is-draft; then
@@ -93,8 +104,10 @@ jobs:
           else
             gh release create "$RUNTIME_TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Inhouse Photos - motor $RUNTIME_VERSION" --draft --prerelease --notes-file .runtime/release/RELEASE.md
           fi
-          gh release upload "$RUNTIME_TAG" --repo "$GITHUB_REPOSITORY" --clobber ".runtime/release/Inhouse-Photos-Server-Runtime-$RUNTIME_VERSION.zip" .runtime/release/server-runtime-update.json .runtime/release/storage-saver-performance.json .runtime/release/runtime-smoke-results.json .runtime/release/SHA256SUMS.txt
+          gh release upload "$RUNTIME_TAG" --repo "$GITHUB_REPOSITORY" --clobber ".runtime/release/Inhouse-Photos-Server-Runtime-$RUNTIME_VERSION.zip" .runtime/release/server-runtime-update.json .runtime/release/storage-saver-performance.json .runtime/release/runtime-smoke-results.json .runtime/release/durable-backlog-results.json .runtime/release/SHA256SUMS.txt
           gh release edit "$RUNTIME_TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --notes-file .runtime/release/RELEASE.md --draft=false --prerelease --latest=false
       - name: Remove the isolated test containers and volumes
         if: always()
-        run: docker compose -p inhouse-runtime-test -f server/test/benchmarks/runtime-smoke.compose.yml down --volumes
+        run: |
+          docker compose -p inhouse-runtime-test -f server/test/benchmarks/runtime-smoke.compose.yml down --volumes
+          docker compose -p inhouse-runtime-test-backlog -f server/test/benchmarks/runtime-smoke.compose.yml down --volumes

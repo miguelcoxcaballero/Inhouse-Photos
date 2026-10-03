@@ -117,6 +117,9 @@ export class JobService extends BaseService {
       }
 
       case JobName.StorageTemplateMigrationSingle: {
+        if (item.data.durableUpload) {
+          break;
+        }
         if (item.data.source === 'upload' || item.data.source === 'copy') {
           await this.jobRepository.queue({ name: JobName.AssetGenerateThumbnails, data: item.data });
         }
