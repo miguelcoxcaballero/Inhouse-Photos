@@ -46,9 +46,9 @@ namespace InhousePhotos {
     public const string ArchiveFile="inhouse-server-3.1.96.tar.gz";
     public const string ArchiveSha256="bd3317ed4080c837ac10ee45d07bd03d390e83d7c14d74907ba55e16293d1d29";
     public const string ManifestSha256="2827fb5a1b630396f0f0b3a98a99b727d8671f900a09d774e71f008d278bbe6e";
-    public const string PackageSha256="991b0f1735adf03dedf5b69ce299a778397399e8dc5cdc2fc65ed116fc005e97";
+    public const string PackageSha256="00014fccb90afd3738ec691dd6fb265e1ee71728c22a5fe1da98b5ddbed90b04";
     public const string PackageFile="Inhouse-Photos-Server-Runtime-3.1.96.zip";
-    public const string PackageUrl="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-runtime-v3.1.96/"+PackageFile;
+    public const string PackageUrl="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-runtime-v3.1.96-r2/"+PackageFile;
     const string OriginalImage="sha256:283fb546c253d70c3e984062a2d2ebc08ce4547ef799e0ffba634222e4b5c16d";
     const string OriginalConfig="sha256:ac66612c5815b715123e1946fb833cc3baa5adcb404f774ded31307d82c1e368";
     const string FastImage="sha256:0034cd9b0031574479c192ed8be48212f6e57012785d804beb171ed8a2d5a8ac";
