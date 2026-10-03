@@ -58,6 +58,9 @@ class AtomicVersionPublicationTests(unittest.TestCase):
     def test_clean_published_source_can_build_next_version_with_explicit_flags(self):
         release.validate_target("3.1.94", 5152, "3.1.93", 5151, self.manifest)
 
+    def test_server_update_advances_from_the_published_durable_upload_release(self):
+        release.validate_target("3.1.95", 5153, "3.1.94", 5152, {"version": "3.1.94", "versionCode": 7152})
+
     def test_source_version_cannot_advance_before_its_verified_artifacts(self):
         with self.assertRaisesRegex(ValueError, "currently published Android manifest must match"):
             release.validate_target("3.1.94", 5152, "3.1.94", 5152, self.manifest)
@@ -80,6 +83,26 @@ class AtomicVersionPublicationTests(unittest.TestCase):
             release.updated_pubspec(original, "3.1.94", 5152),
             "name: immich_mobile\nversion: 3.1.94+5152\n\nenvironment:\n  flutter: 3.44.8\n",
         )
+
+
+class AndroidReleaseTagTests(unittest.TestCase):
+    def test_existing_durable_upload_tag_matches_its_version(self):
+        self.assertEqual(release.release_feature("v3.1.94-durable-upload", "3.1.94"), "durable-upload")
+
+    def test_server_update_release_tag_matches_its_version(self):
+        self.assertEqual(release.release_feature("v3.1.95-server-update", "3.1.95"), "server-update")
+
+    def test_tag_cannot_advertise_a_different_version(self):
+        with self.assertRaisesRegex(ValueError, "target Android version"):
+            release.release_feature("v3.1.94-server-update", "3.1.95")
+
+    def test_tag_cannot_use_an_unknown_release_feature(self):
+        with self.assertRaisesRegex(ValueError, "supported release feature"):
+            release.release_feature("v3.1.95-unsigned-test", "3.1.95")
+
+    def test_tag_cannot_include_a_different_download_path(self):
+        with self.assertRaisesRegex(ValueError, "supported release feature"):
+            release.release_feature("v3.1.95-server-update/another-asset", "3.1.95")
 
 
 if __name__ == "__main__":

@@ -98,7 +98,7 @@ class ManagerUpdateService {
     } on ManagerUpdateException {
       rethrow;
     } catch (_) {
-      throw const ManagerUpdateException('Could not reach the Windows manager. No update was started.');
+      throw const ManagerUpdateException('The update request could not be confirmed. Refresh to check its status.');
     }
   }
 

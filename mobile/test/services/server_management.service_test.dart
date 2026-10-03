@@ -59,6 +59,50 @@ void main() {
     client.close();
   });
 
+  test('engine status is optional and preserves older manager backup status', () {
+    final status = ServerManagementStatus.fromJson({
+      'Version': '1.2.16',
+      'ServerOnline': true,
+      'Busy': false,
+      'Disks': [],
+      'BackupConfigured': true,
+    });
+    expect(status.runtimeUpdate, isNull);
+    expect(status.backupConfigured, isTrue);
+
+    final recovery = ServerManagementStatus.fromJson({
+      'Version': '1.2.17',
+      'ServerOnline': true,
+      'Busy': false,
+      'Disks': [],
+      'BackupConfigured': true,
+      'RuntimeUpdate': {
+        'CurrentVersion': '3.1.0',
+        'LatestVersion': '3.1.0-durable-upload',
+        'Available': true,
+        'Phase': 'error',
+        'Progress': 70,
+        'RecoveryRequired': true,
+      },
+    });
+    expect(recovery.runtimeUpdate?.recoveryRequired, isTrue);
+    expect(recovery.runtimeUpdate?.phase, 'error');
+    expect(recovery.backupConfigured, isTrue);
+  });
+
+  test('an incompatible optional engine status does not hide existing backup management', () {
+    final status = ServerManagementStatus.fromJson({
+      'Version': '1.2.17',
+      'ServerOnline': true,
+      'Busy': false,
+      'Disks': [],
+      'BackupConfigured': true,
+      'RuntimeUpdate': {'Available': true},
+    });
+    expect(status.runtimeUpdate, isNull);
+    expect(status.backupConfigured, isTrue);
+  });
+
   test('actions have fixed paths, no arbitrary commands or payloads', () async {
     final client = MockClient((request) async {
       expect(request.method, 'POST');

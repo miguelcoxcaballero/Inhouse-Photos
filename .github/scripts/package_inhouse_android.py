@@ -62,6 +62,26 @@ def updated_pubspec(contents: str, version: str, base_build: int) -> str:
     return updated
 
 
+def release_feature(tag: str, version: str) -> str:
+    match = re.fullmatch(re.escape(f"v{version}") + r"-(durable-upload|server-update)", tag)
+    if not match:
+        raise ValueError("Release tag must match the target Android version and a supported release feature")
+    return match.group(1)
+
+
+def feature_description(feature: str) -> str:
+    if feature == "server-update":
+        return (
+            "En Ajustes > Gestión del servidor puedes consultar y solicitar la actualización "
+            "del motor del servidor. En esa misma pantalla, actualiza primero el gestor Windows "
+            "si se solicita y después pulsa Actualizar servidor.\n\n"
+        )
+    return (
+        "La copia de seguridad continúa después de guardar cada archivo en el servidor; "
+        "la optimización se completa allí por separado.\n\n"
+    )
+
+
 def verify_identity(badging: str, certificates: str, symbols: str, version: str, version_code: int) -> None:
     package = re.search(r"^package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'", badging, re.MULTILINE)
     if not package or package.groups() != (PACKAGE, str(version_code), version):
@@ -84,10 +104,9 @@ def stage(args: argparse.Namespace) -> dict:
     current_version, current_build = version_from_pubspec(pubspec)
     version, base_build = args.version, args.base_build
     version_code = base_build + 2000
-    if args.tag != f"v{version}-durable-upload":
-        raise ValueError("Release tag must match the target Android version")
     old_manifest = json.loads((root / "android-update.json").read_text())
     validate_target(version, base_build, current_version, current_build, old_manifest)
+    feature = release_feature(args.tag, version)
 
     with zipfile.ZipFile(apk) as archive, tempfile.TemporaryDirectory(prefix="inhouse-android-verify-") as temporary:
         if archive.testzip() is not None:
@@ -120,9 +139,8 @@ def stage(args: argparse.Namespace) -> dict:
             "LEEME.txt",
             f"Inhouse Photos {version} (Android ARM64, versionCode {version_code})\n\n"
             "Instala Inhouse-Photos.apk sobre la aplicación existente.\n"
-            "La copia de seguridad continúa después de guardar cada archivo en el servidor; "
-            "la optimización se completa allí por separado.\n\n"
-            f"SHA-256 APK: {digest}\nCertificado SHA-256: {CERTIFICATE}\n",
+            + feature_description(feature)
+            + f"SHA-256 APK: {digest}\nCertificado SHA-256: {CERTIFICATE}\n",
         )
     with zipfile.ZipFile(bundle) as archive:
         if archive.testzip() is not None or hashlib.sha256(archive.read("Inhouse-Photos.apk")).hexdigest() != digest:

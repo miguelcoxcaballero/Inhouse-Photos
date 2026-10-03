@@ -2,15 +2,6 @@ name: Publish durable upload Inhouse server runtime
 
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/durable-upload-backlog]
-    paths:
-      - '.github/workflows/publish-server-runtime.yml'
-      - 'desktop/*server-runtime*'
-      - 'desktop/SERVER-RUNTIME-UPDATES.md'
-      - 'server/bin/start.sh'
-      - 'server/src/**'
-      - 'server/test/benchmarks/**'
 
 concurrency:
   group: inhouse-server-runtime-release

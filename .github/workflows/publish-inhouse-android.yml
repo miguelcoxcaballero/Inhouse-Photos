@@ -1,15 +1,6 @@
 name: Publish signed Inhouse Android
 
 on:
-  push:
-    branches: [feat/durable-upload-backlog]
-    paths:
-      - mobile/**
-      - .github/scripts/package_inhouse_android.py
-      - .github/scripts/test_package_inhouse_android.py
-      - .github/scripts/prepare_android_publication.py
-      - .github/scripts/test_prepare_android_publication.py
-      - .github/workflows/publish-inhouse-android.yml
   workflow_dispatch:
 
 permissions:
@@ -25,9 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      RELEASE_TAG: v3.1.94-durable-upload
-      ANDROID_RELEASE_VERSION: '3.1.94'
-      ANDROID_RELEASE_BASE_BUILD: '5152'
+      RELEASE_TAG: v3.1.95-server-update
+      ANDROID_RELEASE_VERSION: '3.1.95'
+      ANDROID_RELEASE_BASE_BUILD: '5153'
     steps:
       - name: Checkout the source to publish
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -97,7 +88,11 @@ jobs:
             test/domain/models/config/backup_config_test.dart \
             test/unit/background_backup_concurrency_test.dart \
             test/unit/media_upload_gate_test.dart \
-            test/unit/adaptive_upload_limiter_test.dart
+            test/unit/adaptive_upload_limiter_test.dart \
+            test/services/manager_update.service_test.dart \
+            test/services/runtime_update.service_test.dart \
+            test/services/server_management.service_test.dart \
+            test/widgets/settings/server_management_settings_test.dart
 
       - name: Build the signed ARM64 split APK
         working-directory: mobile
@@ -132,7 +127,7 @@ jobs:
       - name: Save verified artifacts before publication
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: Inhouse-Photos-3.1.94-signed
+          name: Inhouse-Photos-${{ env.ANDROID_RELEASE_VERSION }}-signed
           path: |
             Inhouse-Photos.apk
             Inhouse-Photos-Android.zip
@@ -152,7 +147,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- mobile/pubspec.yaml Inhouse-Photos.apk Inhouse-Photos-Android.zip android-update.json
-          git commit -m 'chore(android): publish verified 3.1.94 durable-upload APK'
+          git commit -m "chore(android): publish verified $ANDROID_RELEASE_VERSION server-update APK"
           git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
@@ -161,18 +156,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_COMMIT: ${{ steps.commit.outputs.sha }}
         run: |
-          cat > "$RUNNER_TEMP/android-release-notes.md" <<'NOTES'
-          Inhouse Photos Android 3.1.94 (ARM64, versionCode 7152).
-
-          La copia de seguridad continúa cuando el servidor ha guardado el original. Las fotos y vídeos pendientes de optimización ya no detienen las siguientes subidas. Se necesita la actualización del servidor con cola persistente para recuperar automáticamente el trabajo pendiente tras reinicios.
-
-          Instala Inhouse-Photos.apk o extráelo de Inhouse-Photos-Android.zip sobre la aplicación existente. Se conserva el certificado permanente de Inhouse Photos. El informe adjunto verifica la versión, el paquete, la firma y los ocho símbolos JNI.
-          NOTES
+          python - "$RUNNER_TEMP/android-release-notes.md" <<'PY'
+          import os, sys
+          from pathlib import Path
+          version = os.environ['ANDROID_RELEASE_VERSION']
+          version_code = int(os.environ['ANDROID_RELEASE_BASE_BUILD']) + 2000
+          Path(sys.argv[1]).write_text(
+              f'Inhouse Photos Android {version} (ARM64, versionCode {version_code}).\n\n'
+              'Actualiza el motor del servidor desde Ajustes > Gestión del servidor. En esa misma pantalla, actualiza primero el gestor Windows si se solicita y después pulsa Actualizar servidor. El PC descarga, verifica y aplica el motor; el móvil muestra el progreso.\n\n'
+              'Instala Inhouse-Photos.apk o extráelo de Inhouse-Photos-Android.zip sobre la aplicación existente. Se conserva el certificado permanente de Inhouse Photos. El informe adjunto verifica la versión, el paquete, la firma y los ocho símbolos JNI.\n'
+          )
+          PY
           if gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/existing-android-release.json" 2>/dev/null; then
             python -c 'import json,sys; assert json.load(open(sys.argv[1]))["isDraft"], "Refusing to overwrite an already published Android release"' "$RUNNER_TEMP/existing-android-release.json"
           else
             gh release create "$RELEASE_TAG" --draft --target "$RELEASE_COMMIT" \
-              --title 'Inhouse Photos Android 3.1.94 — subidas sin bloqueo por optimización' \
+              --title "Inhouse Photos Android $ANDROID_RELEASE_VERSION — actualización del motor del servidor" \
               --notes-file "$RUNNER_TEMP/android-release-notes.md"
           fi
           gh release upload "$RELEASE_TAG" Inhouse-Photos.apk Inhouse-Photos-Android.zip \
@@ -183,8 +182,8 @@ jobs:
       - name: Download the public ZIP and verify the published APK
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          ZIP_URL: https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.94-durable-upload/Inhouse-Photos-Android.zip
         run: |
+          ZIP_URL="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/$RELEASE_TAG/Inhouse-Photos-Android.zip"
           curl --fail --location --retry 5 --retry-delay 2 "$ZIP_URL" --output "$RUNNER_TEMP/public-android.zip"
           python - "$RUNNER_TEMP/public-android.zip" <<'PY'
           import hashlib, json, sys, zipfile

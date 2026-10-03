@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:immich_mobile/services/runtime_update.service.dart';
 
 enum ServerManagementFailure {
   connection,
@@ -79,6 +80,7 @@ class ServerManagementStatus {
     required this.startupEnabled,
     required this.startupKnown,
     required this.disks,
+    this.runtimeUpdate,
   });
 
   final String version;
@@ -97,6 +99,7 @@ class ServerManagementStatus {
   final bool startupEnabled;
   final bool startupKnown;
   final List<ManagedDisk> disks;
+  final RuntimeUpdateStatus? runtimeUpdate;
 
   factory ServerManagementStatus.fromJson(Object? value) {
     if (value is! Map<String, dynamic> ||
@@ -105,6 +108,15 @@ class ServerManagementStatus {
         value['Busy'] is! bool ||
         value['Disks'] is! List) {
       throw const FormatException('Invalid server management status');
+    }
+    RuntimeUpdateStatus? runtimeUpdate;
+    if (value['RuntimeUpdate'] != null) {
+      try {
+        runtimeUpdate = RuntimeUpdateStatus.fromJson(value['RuntimeUpdate']);
+      } on FormatException {
+        // Engine status is an optional extension. Its dedicated endpoint can
+        // report incompatibility without hiding existing backup management.
+      }
     }
     return ServerManagementStatus(
       version: value['Version'] as String,
@@ -125,6 +137,7 @@ class ServerManagementStatus {
       disks: (value['Disks'] as List)
           .map((disk) => ManagedDisk.fromJson(Map<String, dynamic>.from(disk as Map)))
           .toList(growable: false),
+      runtimeUpdate: runtimeUpdate,
     );
   }
 }

@@ -8,12 +8,17 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/providers/auth.provider.dart';
 import 'package:immich_mobile/services/server_management.service.dart';
+import 'package:immich_mobile/services/manager_update.service.dart';
+import 'package:immich_mobile/services/runtime_update.service.dart';
 import 'package:immich_mobile/utils/bytes_units.dart';
+import 'package:immich_mobile/widgets/settings/server_updates_settings.dart';
 
 class ServerManagementSettings extends ConsumerStatefulWidget {
-  const ServerManagementSettings({super.key, this.service});
+  const ServerManagementSettings({super.key, this.service, this.managerUpdateService, this.runtimeUpdateService});
 
   final ServerManagementService? service;
+  final ManagerUpdateService? managerUpdateService;
+  final RuntimeUpdateService? runtimeUpdateService;
 
   @override
   ConsumerState<ServerManagementSettings> createState() => _ServerManagementSettingsState();
@@ -22,10 +27,14 @@ class ServerManagementSettings extends ConsumerStatefulWidget {
 class _ServerManagementSettingsState extends ConsumerState<ServerManagementSettings> with WidgetsBindingObserver {
   http.Client? _client;
   late final ServerManagementService _service;
+  late final ManagerUpdateService _managerUpdateService;
+  late final RuntimeUpdateService _runtimeUpdateService;
   ServerManagementStatus? _status;
   ServerManagementException? _error;
   bool _loading = false;
   bool _acting = false;
+  bool _updating = false;
+  int _refreshGeneration = 0;
   Timer? _poll;
   bool _foreground = true;
   int _failures = 0;
@@ -36,6 +45,8 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
     WidgetsBinding.instance.addObserver(this);
     _client = widget.service == null ? http.Client() : null;
     _service = widget.service ?? ServerManagementService(_client!);
+    _managerUpdateService = widget.managerUpdateService ?? ManagerUpdateService(_service.client);
+    _runtimeUpdateService = widget.runtimeUpdateService ?? RuntimeUpdateService(_service.client);
     unawaited(_refresh());
   }
 
@@ -86,7 +97,10 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
       }
       return;
     }
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _refreshGeneration++;
+    });
     try {
       final status = await _service.read(url, token);
       if (mounted) {
@@ -129,6 +143,7 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
     final url = _url;
     final token = _token;
     if (_acting ||
+        _updating ||
         _loading ||
         _error != null ||
         url == null ||
@@ -153,7 +168,7 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
   }
 
   Future<void> _chooseBackupDrive(ServerManagementStatus status) async {
-    if (_acting || _loading || _error != null) {
+    if (_acting || _updating || _loading || _error != null) {
       return;
     }
     final choices = status.disks.where((disk) => disk.canUseForBackup).toList();
@@ -233,7 +248,7 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
     }
     final status = _status;
     final unavailable = _loading || _error != null;
-    final working = _acting || unavailable || status?.busy == true;
+    final working = _acting || _updating || unavailable || status?.busy == true;
     return RefreshIndicator(
       onRefresh: _refresh,
       child: ListView(
@@ -282,6 +297,19 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
               child: Text(_error!.message, style: TextStyle(color: context.colorScheme.error)),
             ),
+          ServerUpdatesSettings(
+            managerUpdateService: _managerUpdateService,
+            runtimeUpdateService: _runtimeUpdateService,
+            managerVersion: status?.version,
+            busy: _acting || status?.busy == true,
+            refreshGeneration: _refreshGeneration,
+            onUpdatingChanged: (updating) {
+              if (mounted) {
+                setState(() => _updating = updating);
+              }
+            },
+            onUpdated: () => unawaited(_refresh()),
+          ),
           if (status != null) ...[
             if (status.operation.isNotEmpty || status.progress.isNotEmpty)
               ListTile(
@@ -344,7 +372,7 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: unavailable || _acting
+                      onPressed: unavailable || _acting || _updating
                           ? null
                           : status.backupRunning
                           ? () => _act(
