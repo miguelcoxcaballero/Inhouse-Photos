@@ -42,13 +42,13 @@ namespace InhousePhotos {
   public static class RuntimeUpdates {
     public const string LatestVersion="3.1.97";
     public const string LatestImage="inhouse-photos-server:v3.1.97";
-    public const string LatestImageId="sha256:0781b4081482853b34963f4e8faefc4c92d4a25da87f45dd3cf9f93ce645062c";
-    public const string SourceCommit="2c36a66f40347273f9f2f75242e42cda3091a1a3";
+    public const string LatestImageId="sha256:232e88db3013f55fa317c11d8776282ec38e9c5cf2f1ee593c8ae8d0c1351e1e";
+    public const string SourceCommit="ff35cc4b08d0cab1da2ee94e5f2449e737cc6f53";
     public const string SchemaSha256="ab48e687123b61185a4467ca2b70a3a66ebfdaa93f5a78b5d7ae9eed613c699f";
     public const string ArchiveFile="inhouse-server-3.1.97.tar.gz";
-    public const string ArchiveSha256="bd3317ed4080c837ac10ee45d07bd03d390e83d7c14d74907ba55e16293d1d29";
-    public const string ManifestSha256="2827fb5a1b630396f0f0b3a98a99b727d8671f900a09d774e71f008d278bbe6e";
-    public const string PackageSha256="00014fccb90afd3738ec691dd6fb265e1ee71728c22a5fe1da98b5ddbed90b04";
+    public const string ArchiveSha256="836f290a8d001e5bc3b96202a8543f772966e9fea8d6095e64019114ad98e226";
+    public const string ManifestSha256="458826ada3a4b598d3196d995e325dc20b65c558402286c1e3644917e0cefc7b";
+    public const string PackageSha256="64f9cef1aac1029a066a5ce022a1fd0d42317c2df0214ba979fabc47bd763813";
     public const string PackageFile="Inhouse-Photos-Server-Runtime-3.1.97.zip";
     public const string PackageUrl="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-runtime-v3.1.97/"+PackageFile;
     const string PreviousImage="sha256:0781b4081482853b34963f4e8faefc4c92d4a25da87f45dd3cf9f93ce645062c";
