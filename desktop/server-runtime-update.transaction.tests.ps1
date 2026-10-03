@@ -178,6 +178,19 @@ try {
   Check (@($fixture.Commands | Where-Object { $_ -like 'load *' }).Count -eq 0) 'do not reimport an already verified Docker image'
   Assert-Preserved
 
+  $script:fixturePhase='classic-Docker-config-identity'
+  New-Fixture; $fixture.ImageAvailable=$true
+  $fixture.Manifest | Add-Member imageConfigId $fixture.New
+  $fixture.Manifest.imageId='sha256:' + '9' * 64
+  Write-PrivateJson $script:ManifestPath $fixture.Manifest
+  $script:ManifestSha256=Get-Sha256 $script:ManifestPath
+  Invoke-RuntimeUpdate | Out-Null
+  $record=Read-Json (Journal)
+  Check ($record.status -ceq 'completed' -and $record.newImageId -ceq $fixture.New) 'journal saves exact actual config digest, not the other backend manifest digest'
+  Check (@($fixture.Commands | Where-Object { $_ -like 'load *' }).Count -eq 0) 'config identity backend does not download or import an already verified image again'
+  Check (@($fixture.Commands | Where-Object { $_ -like '*sha256:999999*' -and $_ -notlike 'image *' }).Count -eq 0) 'queues and restart target only the actual verified image digest'
+  Assert-Preserved
+
   $script:fixturePhase='compose-timeout-recovery'
   New-Fixture; $fixture.TimeoutCompose=$true; $fixture.MigrationInstalled=$true
   Reject { Invoke-RuntimeUpdate } 'Compose timeout ends the operation without racing a rollback'
@@ -284,6 +297,11 @@ try {
   Reject { Set-RuntimeStage 'private-user-data' } 'failure stage accepts only fixed public codes'
   $script:ManagerProcessId=1; Set-RuntimeStage 'queues'
   Check ((Write-RuntimeFailure) -ceq 'INHOUSE_RUNTIME_FAILURE:queues') 'failure protocol contains no paths, credentials or raw Docker output'
+  $script:RuntimeFailureReason='image_identity'
+  Check ((@(Write-RuntimeFailure) -join ',') -ceq 'INHOUSE_RUNTIME_FAILURE:queues,INHOUSE_RUNTIME_REASON:image_identity') 'failure protocol exposes only a safe specific reason code'
+  $script:RuntimeFailureReason='private-user:private-token'
+  Check ((Write-RuntimeFailure) -ceq 'INHOUSE_RUNTIME_FAILURE:queues') 'unknown failure reasons never leak private diagnostic text'
+  $script:RuntimeFailureReason=''
   $script:ManagerProcessId=0
   Write-Output ($script:checks.ToString() + ' runtime transaction checks passed.')
 } finally {

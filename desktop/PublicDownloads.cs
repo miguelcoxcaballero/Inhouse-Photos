@@ -16,6 +16,8 @@ namespace InhousePhotos {
     public string Version {get;set;}
     public string InstallerUrl {get;set;}
     public string Sha256 {get;set;}
+    public string FullInstallerUrl {get;set;}
+    public string FullInstallerSha256 {get;set;}
   }
   internal sealed class PublicAndroidDownload {
     public string version {get;set;}
@@ -119,7 +121,14 @@ namespace InhousePhotos {
     }
     internal static bool Valid(PublicWindowsDownload value) {
       return value!=null&&ValidVersion(value.Version)&&Regex.IsMatch(value.Sha256??"","^[a-f0-9]{64}$")&&
-        value.InstallerUrl==Repository+"server-v"+value.Version+"/Inhouse-Photos-Server-Setup.exe";
+        value.InstallerUrl==Repository+"server-v"+value.Version+"/Inhouse-Photos-Server-Setup.exe"&&
+        ((value.FullInstallerUrl==null&&value.FullInstallerSha256==null)||
+         (value.FullInstallerUrl==Repository+"server-v"+value.Version+"/Inhouse-Photos-Server-Full-Setup.exe"&&
+          Regex.IsMatch(value.FullInstallerSha256??"",@"\A[a-f0-9]{64}\z")));
+    }
+    internal static string PreferredWindowsUrl(PublicWindowsDownload value) {
+      if(!Valid(value))throw new IOException("La descarga de Windows no es válida.");
+      return value.FullInstallerUrl??value.InstallerUrl;
     }
     internal static bool Valid(PublicAndroidDownload value) {
       return value!=null&&ValidVersion(value.version)&&Regex.IsMatch(value.sha256??"","^[a-f0-9]{64}$")&&
@@ -139,15 +148,21 @@ namespace InhousePhotos {
       if(value==null||!Valid(value.windows)||!Valid(value.android))throw new IOException("El catálogo público no es válido.");
       return Callback+Backend.Json.Serialize(value)+");\n";
     }
-    static PublicWindowsDownload Newer(PublicWindowsDownload a,PublicWindowsDownload b) {return Version.Parse(b.Version)>Version.Parse(a.Version)?b:a;}
+    static PublicWindowsDownload Newer(PublicWindowsDownload a,PublicWindowsDownload b) {
+      var comparison=Version.Parse(b.Version).CompareTo(Version.Parse(a.Version));
+      // A newly verified full installer may enrich a catalogue at the same
+      // product version. An old compact catalogue must not undo that choice.
+      return comparison>0||(comparison==0&&a.FullInstallerUrl==null&&b.FullInstallerUrl!=null)?b:a;
+    }
     static PublicAndroidDownload Newer(PublicAndroidDownload a,PublicAndroidDownload b) {return Version.Parse(b.version)>Version.Parse(a.version)?b:a;}
     internal static PublicDownloadCatalogue Merge(PublicDownloadCatalogue a,PublicDownloadCatalogue b) {
       return new PublicDownloadCatalogue{windows=Newer(a.windows,b.windows),android=Newer(a.android,b.android)};
     }
     internal static string RefreshHtml(string html,PublicDownloadCatalogue catalogue,bool landing) {
+      if(catalogue==null||!Valid(catalogue.windows)||!Valid(catalogue.android))throw new IOException("El catálogo público no es válido.");
       foreach(var platform in new[]{"windows","android"}) {
         if(!landing&&platform=="android")continue;
-        var url=platform=="windows"?catalogue.windows.InstallerUrl:catalogue.android.apkUrl;
+        var url=platform=="windows"?PreferredWindowsUrl(catalogue.windows):catalogue.android.apkUrl;
         var version=platform=="windows"?catalogue.windows.Version:catalogue.android.version;
         var anchor=new Regex("(<a\\b[^>]*\\bdata-download=\""+platform+"\"[^>]*\\bhref=\")[^\"]*(\")");
         if(anchor.Matches(html).Count!=1)throw new IOException("Falta el enlace de descarga verificado.");
@@ -155,7 +170,8 @@ namespace InhousePhotos {
         html=Regex.Replace(html,"(<a\\b[^>]*\\bdata-download=\""+platform+"\"[^>]*\\bdata-version=\")[^\"]*(\")",m=>m.Groups[1].Value+version+m.Groups[2].Value);
         if(!landing)continue;
         html=Regex.Replace(html,"(<small\\b[^>]*\\bdata-download-version=\""+platform+"\"[^>]*>)[^<]*(</small>)",m=>m.Groups[1].Value+
-          (platform=="windows"?"Windows 10 y 11 · Versión ":"Android 8 o posterior · ARM64 · Versión ")+version+m.Groups[2].Value);
+          (platform=="windows"?"Windows 10 y 11 · Versión ":"Android 8 o posterior · ARM64 · Versión ")+version+
+          (platform=="windows"&&catalogue.windows.FullInstallerUrl!=null?" · Instalación completa":"")+m.Groups[2].Value);
         var checksum=url.Substring(0,url.LastIndexOf('/')+1)+"SHA256SUMS.txt";
         html=Regex.Replace(html,"(<a\\b[^>]*\\bdata-download-checksum=\""+platform+"\"[^>]*\\bhref=\")[^\"]*(\")",m=>m.Groups[1].Value+checksum+m.Groups[2].Value);
       }

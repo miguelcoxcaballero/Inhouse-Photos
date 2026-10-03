@@ -37,6 +37,26 @@ refreshes, using the last verified static links.
 Only public HTML, styles, scripts and marks belong in this package. The
 catalogue contains no credentials, settings, tokens, library paths or photos.
 
+## Full Windows installation and compact updates
+
+The Windows update manifest keeps `InstallerUrl` and `Sha256` for the compact
+installer used by existing automatic updaters. Do not replace that URL with the
+large installer: older clients enforce a small update-download limit.
+
+For a complete first download, the same manifest may also contain
+`FullInstallerUrl` and `FullInstallerSha256`. Both fields must be present and
+valid together. The URL must be the exact same-version GitHub asset
+`server-v<Version>/Inhouse-Photos-Server-Full-Setup.exe`, and the checksum must
+be 64 lowercase hexadecimal characters. Partial or invalid full metadata is
+rejected rather than silently advertising a different download.
+
+The website, offline HTML package and public catalogue prefer that verified
+full installer, including the photo engine. Manifests without either optional
+field remain compatible with the legacy compact download. A catalogue at the
+same version may add a full installer, but an older compact-only response
+cannot remove one already verified. Never publish either download field until
+its corresponding public asset has been verified.
+
 ## Repairing a PC still installing 3.1.96
 
 Use the [Windows 3.1.97 installer](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.97/Inhouse-Photos-Server-Setup.exe)

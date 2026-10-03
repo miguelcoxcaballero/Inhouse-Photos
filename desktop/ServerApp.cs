@@ -19,7 +19,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("3.1.97.0")]
+[assembly: System.Reflection.AssemblyVersion("3.1.98.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -368,6 +368,7 @@ namespace InhousePhotos {
     [STAThread] public static int Main(string[] args){
       PairingClient.RegisterQrAssembly();
       ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
+      if(args.Length==1&&args[0]=="--complete-product-install")return ProductInstallation.Complete();
       if(args.Length==1&&args[0]==UsbNetworkSafety.HelperArgument)return UsbNetworkSafety.RunElevated();
       if(args.Length==2&&args[0]=="--render-setup-preview") {
         var previewApp=new Application();var setupWindow=new NewServerWindow();

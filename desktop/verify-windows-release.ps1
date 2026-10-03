@@ -2,6 +2,10 @@
 param(
   [Parameter(Mandatory=$true)][ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+$')][string]$Version,
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{40}$')][string]$SourceCommit,
+  [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+$')][string]$PinnedRuntimeVersion,
+  [string]$FullInstallerPath,
+  [switch]$SkipInstallationVerification,
+  [switch]$SkipHandoffVerification,
   [string]$BuildDirectory = (Join-Path $PSScriptRoot 'dist'),
   [string]$ReportPath = (Join-Path $PSScriptRoot 'dist\windows-release-verification.json'),
   [string]$ManifestPath = (Join-Path $PSScriptRoot '..\windows-server-update.json'),
@@ -10,6 +14,7 @@ param(
   [string]$PreviousProductInstallerPath
 )
 $ErrorActionPreference = 'Stop'
+if(-not $PinnedRuntimeVersion){$PinnedRuntimeVersion=$Version}
 
 function Get-LowerSha256([string]$Path) {
   return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -66,8 +71,8 @@ foreach ($binary in @($manager, $installer)) {
   $assembly = [Reflection.Assembly]::LoadFile($binary)
   $backendVersion = $assembly.GetType('InhousePhotos.Backend').GetField('Version').GetRawConstantValue()
   $runtimeVersion = $assembly.GetType('InhousePhotos.RuntimeUpdates').GetField('LatestVersion').GetRawConstantValue()
-  if ($backendVersion -ne $Version -or $runtimeVersion -ne $Version) {
-    throw 'The Windows program and pinned server must use the same public product version'
+  if ($backendVersion -ne $Version -or $runtimeVersion -ne $PinnedRuntimeVersion) {
+    throw 'The Windows product must match its explicitly pinned bill of materials'
   }
   foreach ($name in @('storage.ps1', 'server-runtime-update.ps1', 'server-runtime-queue-handoff.cjs')) {
     if ((Get-EmbeddedResourceHash $assembly "InhousePhotos.$name") -ne (Get-LowerSha256 (Join-Path $PSScriptRoot $name))) {
@@ -83,23 +88,23 @@ $installerHash = Get-LowerSha256 $installer
 $setupAssembly = [Reflection.Assembly]::LoadFile($installer)
 $runtimeType = $setupAssembly.GetType('InhousePhotos.RuntimeUpdates')
 $runtimePins = [ordered]@{}
-foreach ($field in @('LatestVersion', 'LatestImage', 'LatestImageId', 'SourceCommit', 'SchemaSha256', 'ArchiveSha256', 'ManifestSha256', 'PackageSha256', 'PackageUrl')) {
+foreach ($field in @('LatestVersion', 'LatestImage', 'LatestImageId', 'LatestConfigImageId', 'SourceCommit', 'SchemaSha256', 'ArchiveSha256', 'ManifestSha256', 'PackageSha256', 'PackageUrl')) {
   $runtimePins[$field] = $runtimeType.GetField($field).GetRawConstantValue()
 }
-if ($runtimePins.LatestImage -ne "inhouse-photos-server:v$Version" -or
+if ($runtimePins.LatestImage -ne "inhouse-photos-server:v$PinnedRuntimeVersion" -or
     -not [Regex]::IsMatch($runtimePins.PackageUrl,
       '^https://github\.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-runtime-v' +
-      [Regex]::Escape($Version) + '(?:-r[1-9][0-9]*)?/Inhouse-Photos-Server-Runtime-' + [Regex]::Escape($Version) + '\.zip$')) {
+      [Regex]::Escape($PinnedRuntimeVersion) + '(?:-r[1-9][0-9]*)?/Inhouse-Photos-Server-Runtime-' + [Regex]::Escape($PinnedRuntimeVersion) + '\.zip$')) {
   throw 'The installer must pin the verified runtime release for this product version'
 }
 $serverVersion = (Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\server\package.json') -Raw | ConvertFrom-Json).version
-if ($serverVersion -ne $Version) { throw 'Server package version does not match the unified Windows release' }
+if ($serverVersion -ne $PinnedRuntimeVersion) { throw 'Server package does not match the product bill of materials' }
 if ((Get-EmbeddedResourceHash $setupAssembly 'InhousePhotos.payload.exe') -ne $managerHash) {
   throw 'Installer does not contain the exact built manager'
 }
 Invoke-CheckedExecutable $installer @('--verify-payload') | Out-Null
 Invoke-CheckedExecutable $manager @('--self-test') | Out-Null
-Invoke-CheckedExecutable $manager @('--verify-runtime-handoff') | Out-Null
+if(-not $SkipHandoffVerification){Invoke-CheckedExecutable $manager @('--verify-runtime-handoff') | Out-Null}
 Invoke-CheckedExecutable $manager @('--verify-system-update-intent') | Out-Null
 
 # Use the installer's actual stable launcher location. Fixtures are installed
@@ -110,6 +115,7 @@ if ($BootstrapInstallerPath) { $fixtures += @{ path = $BootstrapInstallerPath; v
 if ($PreviousInstallerPath) { $fixtures += @{ path = $PreviousInstallerPath; version = '1.2.17'; sha256 = 'd6eb4b2ce1331f32688f48ab87f649285a84fbe6996b6e8e1c96cb3af12e5981' } }
 if ($PreviousProductInstallerPath) { $fixtures += @{ path = $PreviousProductInstallerPath; version = '3.1.96'; sha256 = '1857acdac75128fc79ab0b2628b704700beaf8dd8117936ba04ace90d8e2b016' } }
 $verifiedPreviousVersions = @()
+if ($SkipInstallationVerification -and $fixtures.Count -gt 0) {throw 'Cannot skip explicitly requested upgrade fixtures.'}
 if ($fixtures.Count -gt 0 -and (Test-Path -LiteralPath $launcher)) {
   throw 'Legacy upgrade verification requires a fresh isolated Windows profile'
 }
@@ -126,7 +132,7 @@ for ($index = 0; $index -lt $fixtures.Count; $index++) {
   if (-not (Invoke-CheckedExecutable $fixturePath @('--verify-installed')).StartsWith("$($fixture.version) ")) {
     throw "The fixture did not install manager $($fixture.version)"
   }
-  Invoke-CheckedExecutable $installer @('--install-current') | Out-Null
+  Invoke-CheckedExecutable $installer @('--install-manager-only-fixture') | Out-Null
   if ((Invoke-CheckedExecutable $installer @('--verify-installed')) -ne "$Version $managerHash") {
     throw "Upgrade from $($fixture.version) did not install the exact built payload"
   }
@@ -142,8 +148,8 @@ for ($index = 0; $index -lt $fixtures.Count; $index++) {
     Remove-Item -LiteralPath $launcher
   }
 }
-if ($fixtures.Count -eq 0) {
-  Invoke-CheckedExecutable $installer @('--install-current') | Out-Null
+if ($fixtures.Count -eq 0 -and -not $SkipInstallationVerification) {
+  Invoke-CheckedExecutable $installer @('--install-manager-only-fixture') | Out-Null
   if ((Invoke-CheckedExecutable $installer @('--verify-installed')) -ne "$Version $managerHash") {
     throw 'Installed manager does not match the built payload'
   }
@@ -157,6 +163,13 @@ $manifest = [ordered]@{
   Sha256 = $installerHash
   Notes = $notes
 }
+if($FullInstallerPath) {
+  $full=[IO.Path]::GetFullPath($FullInstallerPath)
+  if([Reflection.AssemblyName]::GetAssemblyName($full).Version.ToString() -ne "$Version.0"){throw 'Full installer version mismatch.'}
+  Invoke-CheckedExecutable $full @('--verify-full-package') -TimeoutSeconds 90|Out-Null
+  $manifest.FullInstallerUrl="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v$Version/Inhouse-Photos-Server-Full-Setup.exe"
+  $manifest.FullInstallerSha256=Get-LowerSha256 $full
+}
 $utf8 = New-Object Text.UTF8Encoding($false)
 [IO.File]::WriteAllText([IO.Path]::GetFullPath($ManifestPath), ($manifest | ConvertTo-Json).Replace("`r`n", "`n") + "`n", $utf8)
 $hashLines = @(
@@ -164,6 +177,7 @@ $hashLines = @(
   "$managerHash  Inhouse-Photos-Server.exe",
   "$(Get-LowerSha256 $ManifestPath)  windows-server-update.json"
 )
+if($FullInstallerPath){$hashLines+="$($manifest.FullInstallerSha256)  Inhouse-Photos-Server-Full-Setup.exe"}
 [IO.File]::WriteAllText((Join-Path $BuildDirectory 'SHA256SUMS.txt'), ($hashLines -join "`n") + "`n", $utf8)
 $sourceHashes = [ordered]@{}
 $sourceFiles = @((Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.cs' -File).FullName)
@@ -171,6 +185,7 @@ $sourceFiles += @('build.ps1', 'brand.xaml', 'storage.ps1', 'server-runtime-upda
 foreach ($source in ($sourceFiles | Sort-Object)) { $sourceHashes[[IO.Path]::GetFileName($source)] = Get-LowerSha256 $source }
 $report = [ordered]@{
   version = $Version
+  productInstallationChecked = (-not $SkipInstallationVerification)
   sourceCommit = $SourceCommit
   verifiedAt = [DateTime]::UtcNow.ToString('o')
   installerSha256 = $installerHash
@@ -184,10 +199,12 @@ $report = [ordered]@{
   publicDownloadsZipSha256 = $publicDownloadsHash
   embeddedPublicDownloadsMatchArchive = $true
   managerSelfTest = $true
-  runtimeHelperProcessVerified = $true
+  runtimeHelperProcessVerified = (-not $SkipHandoffVerification)
   systemUpdateIntentVerified = $true
   installerPayloadVerified = $true
-  installationVerified = $true
+  installationVerified = (-not $SkipInstallationVerification)
+  fullInstallerVerified = [bool]$FullInstallerPath
+  fullInstallerSha256 = if($FullInstallerPath){$manifest.FullInstallerSha256}else{''}
   bootstrapFromManager1216Verified = $verifiedPreviousVersions -contains '1.2.16'
   upgradeFromManager1217Verified = $verifiedPreviousVersions -contains '1.2.17'
   verifiedFromManager3196 = $verifiedPreviousVersions -contains '3.1.96'

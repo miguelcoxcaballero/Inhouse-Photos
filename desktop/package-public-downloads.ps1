@@ -11,6 +11,12 @@ if($windows.Version -notmatch $versionPattern -or $windows.Sha256 -cnotmatch '^[
    $windows.InstallerUrl -cne ($releaseRoot+'server-v'+$windows.Version+'/Inhouse-Photos-Server-Setup.exe')) {
   throw 'Windows public download manifest is not valid.'
 }
+$hasFullInstaller=$null -ne $windows.FullInstallerUrl -or $null -ne $windows.FullInstallerSha256
+if($hasFullInstaller -and ($windows.FullInstallerUrl -cne ($releaseRoot+'server-v'+$windows.Version+'/Inhouse-Photos-Server-Full-Setup.exe') -or
+   $windows.FullInstallerSha256 -cnotmatch '\A[a-f0-9]{64}\z')) {
+  throw 'Full Windows installer metadata must contain the verified URL and SHA-256 together.'
+}
+$windowsDownloadUrl=if($hasFullInstaller){$windows.FullInstallerUrl}else{$windows.InstallerUrl}
 $androidUrlPattern='^'+[Regex]::Escape($releaseRoot+'v'+$android.version)+'(?:-[A-Za-z0-9._-]+)?/Inhouse-Photos\.apk$'
 if($android.version -notmatch $versionPattern -or $android.sha256 -cnotmatch '^[a-f0-9]{64}$' -or
    $android.apkUrl -cnotmatch $androidUrlPattern) {throw 'Android public download manifest is not valid.'}
@@ -18,13 +24,17 @@ $catalogue=[ordered]@{
   windows=[ordered]@{Version=$windows.Version;InstallerUrl=$windows.InstallerUrl;Sha256=$windows.Sha256}
   android=[ordered]@{version=$android.version;apkUrl=$android.apkUrl;sha256=$android.sha256}
 }
+if($hasFullInstaller) {
+  $catalogue.windows.FullInstallerUrl=$windows.FullInstallerUrl
+  $catalogue.windows.FullInstallerSha256=$windows.FullInstallerSha256
+}
 $catalogueText='window.InhousePhotosDownloads.applyLatest('+($catalogue|ConvertTo-Json -Depth 4 -Compress)+");`n"
 $files=@('index.html','style.css','mark.svg','downloads.js','download-catalogue.js','privacidad/index.html','servidor/index.html','servidor/usb.css','servidor/usb.js')
 $utf8=New-Object Text.UTF8Encoding($false)
 function Update-DownloadHtml([string]$Html,[bool]$Landing) {
   foreach($platform in @('windows','android')) {
     if(-not $Landing -and $platform -eq 'android'){continue}
-    if($platform -eq 'windows'){$downloadUrl=$windows.InstallerUrl;$version=$windows.Version;$label='Windows 10 y 11 · Versión '}
+    if($platform -eq 'windows'){$downloadUrl=$windowsDownloadUrl;$version=$windows.Version;$label='Windows 10 y 11 · Versión '}
     else{$downloadUrl=$android.apkUrl;$version=$android.version;$label='Android 8 o posterior · ARM64 · Versión '}
     $pattern='(<a\b[^>]*\bdata-download="'+$platform+'"[^>]*\bhref=")[^"]*(")'
     if([Regex]::Matches($Html,$pattern).Count -ne 1){throw "Missing unique $platform download link."}
@@ -33,7 +43,8 @@ function Update-DownloadHtml([string]$Html,[bool]$Landing) {
     $Html=[Regex]::Replace($Html,$pattern,[Text.RegularExpressions.MatchEvaluator]{param($match)$match.Groups[1].Value+$version+$match.Groups[2].Value})
     if(-not $Landing){continue}
     $pattern='(<small\b[^>]*\bdata-download-version="'+$platform+'"[^>]*>)[^<]*(</small>)'
-    $Html=[Regex]::Replace($Html,$pattern,[Text.RegularExpressions.MatchEvaluator]{param($match)$match.Groups[1].Value+$label+$version+$match.Groups[2].Value})
+    $suffix=if($platform -eq 'windows' -and $hasFullInstaller){' · Instalación completa'}else{''}
+    $Html=[Regex]::Replace($Html,$pattern,[Text.RegularExpressions.MatchEvaluator]{param($match)$match.Groups[1].Value+$label+$version+$suffix+$match.Groups[2].Value})
     $checksums=$downloadUrl.Substring(0,$downloadUrl.LastIndexOf('/')+1)+'SHA256SUMS.txt'
     $pattern='(<a\b[^>]*\bdata-download-checksum="'+$platform+'"[^>]*\bhref=")[^"]*(")'
     $Html=[Regex]::Replace($Html,$pattern,[Text.RegularExpressions.MatchEvaluator]{param($match)$match.Groups[1].Value+$checksums+$match.Groups[2].Value})

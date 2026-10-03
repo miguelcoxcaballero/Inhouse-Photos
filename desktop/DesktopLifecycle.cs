@@ -277,12 +277,19 @@ namespace InhousePhotos {
       _=RunSystemUpdate(remote);return true;
     }
     async Task RunSystemUpdate(bool remote) {
+      var progressTimer=new DispatcherTimer{Interval=TimeSpan.FromSeconds(1)};
+      progressTimer.Tick+=(sender,e)=>{
+        var state=SystemUpdates.Status();var detail=ProductInstallation.StageMessage(state.Stage);
+        if(state.Busy&&detail!=null)notice.Text=detail;
+        else if(state.Busy&&state.Phase=="downloading")notice.Text="Descargando Inhouse Photos · "+state.Progress+" %";
+      };
+      progressTimer.Start();
       try {
         notice.Text="Actualizando Inhouse Photos. La operación continúa aunque cierres la app del móvil…";
         await Task.Run(()=>SystemUpdates.Apply(prefs,()=>Dispatcher.Invoke(()=>ApplyManagerHandoff(remote))));
         if(SystemUpdates.Status().Phase=="completed")notice.Text="Inhouse Photos "+Backend.Version+" actualizado.";
       }catch(Exception ex){remoteError=ex.Message;notice.Text=ex.Message;}
-      finally{busy=false;remoteOperation="";if(IsVisible&&!updateClose)await Render();}
+      finally{progressTimer.Stop();busy=false;remoteOperation="";if(IsVisible&&!updateClose)await Render();}
     }
     async Task ApplyManagerHandoff(bool remote) {
       if(RuntimeUpdates.IsBusy||backupCancellation!=null)throw new IOException("Espera a que termine la operación actual antes de actualizar.");
@@ -319,6 +326,8 @@ namespace InhousePhotos {
         else if(state.Phase=="error")detail.Text=state.Error;
         else if(state.CurrentVersion==state.LatestVersion)detail.Text="Inhouse Photos está actualizado.";
         else detail.Text=state.Notes;
+        var stageDetail=ProductInstallation.StageMessage(state.Stage);
+        if(state.Busy&&stageDetail!=null)detail.Text=stageDetail;
       }
       update.Click+=async(sender,e)=>{
         update.IsEnabled=false;

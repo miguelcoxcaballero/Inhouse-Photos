@@ -25,8 +25,8 @@ namespace InhousePhotos {
     public string Error {get;set;}
     public string Notes {get;set;}
   }
-  /// Updates only the Windows manager. The Docker Compose project is never
-  /// stopped, recreated, or touched by the installer hand-off.
+  /// Downloads the compact Windows installer. The installer completes its
+  /// pinned product transaction before launching the newly installed manager.
   public static class ManagerUpdates {
     public const string ManifestUrl="https://raw.githubusercontent.com/miguelcoxcaballero/Inhouse-Photos/main/windows-server-update.json";
     static readonly SemaphoreSlim CheckGate=new SemaphoreSlim(1,1);

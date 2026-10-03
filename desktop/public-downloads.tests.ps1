@@ -83,12 +83,35 @@ namespace InhousePhotos {
     var old=Catalogue("3.1.96");var next=Catalogue("3.1.97");Assert(PublicDownloads.ParseCatalogue(PublicDownloads.Document(next)).windows.Version=="3.1.97","valid public callback roundtrip");
     Reject(()=>PublicDownloads.ParseCatalogue(PublicDownloads.Document(next)+"alert('bad');"),"trailing executable content");
     var untrusted=Catalogue("3.1.97");untrusted.windows.InstallerUrl=untrusted.windows.InstallerUrl.Replace("github.com","evil.example");Assert(!PublicDownloads.Valid(untrusted.windows),"untrusted download host rejected");
+    var full=Catalogue("3.1.98");full.windows.FullInstallerUrl="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.98/Inhouse-Photos-Server-Full-Setup.exe";full.windows.FullInstallerSha256=OtherHash;
+    Assert(PublicDownloads.Valid(full.windows)&&PublicDownloads.PreferredWindowsUrl(full.windows)==full.windows.FullInstallerUrl,"verified full installer preferred");
+    Assert(PublicDownloads.PreferredWindowsUrl(next.windows)==next.windows.InstallerUrl,"legacy compact catalogue still supported");
+    Assert(PublicDownloads.ParseCatalogue(PublicDownloads.Document(full)).windows.FullInstallerSha256==OtherHash,"full metadata survives callback roundtrip");
+    Assert(PublicDownloads.Merge(Catalogue("3.1.98"),full).windows.FullInstallerUrl==full.windows.FullInstallerUrl,"same version can add a verified full installer");
+    Assert(PublicDownloads.Merge(full,Catalogue("3.1.98")).windows.FullInstallerUrl==full.windows.FullInstallerUrl,"legacy same-version catalogue cannot remove full installer");
+    foreach(var wrongUrl in new[]{null,"","javascript:alert(1)",full.windows.InstallerUrl,full.windows.FullInstallerUrl+"?redirect=bad",full.windows.FullInstallerUrl.Replace("github.com","evil.example"),full.windows.FullInstallerUrl.Replace("v3.1.98/","v3.1.97/")}) {
+      var invalid=Catalogue("3.1.98");invalid.windows.FullInstallerUrl=wrongUrl;invalid.windows.FullInstallerSha256=OtherHash;
+      Assert(!PublicDownloads.Valid(invalid.windows),"invalid or incomplete full URL rejected");
+      Reject(()=>PublicDownloads.Document(invalid),"invalid full metadata cannot be published");
+    }
+    foreach(var wrongHash in new[]{null,"","not-a-checksum",new string('A',64),OtherHash+"\n"}) {
+      var invalid=Catalogue("3.1.98");invalid.windows.FullInstallerUrl=full.windows.FullInstallerUrl;invalid.windows.FullInstallerSha256=wrongHash;
+      Assert(!PublicDownloads.Valid(invalid.windows),"missing or invalid full checksum rejected");
+      Reject(()=>PublicDownloads.PreferredWindowsUrl(invalid.windows),"invalid full download cannot fall back silently");
+    }
     untrusted=Catalogue("3.1.97");untrusted.android.apkUrl+="?token=secret";Assert(!PublicDownloads.Valid(untrusted.android),"query parameters rejected");
     Assert(PublicDownloads.Merge(next,old).windows.Version=="3.1.97"&&PublicDownloads.Merge(next,old).android.version=="3.1.97","offline fallback cannot downgrade installed catalogue");
     Dictionary<string,byte[]> bundle;using(var stream=File.OpenRead(package))bundle=PublicDownloads.ReadBundle(stream);
     Assert(bundle.Count==9&&!bundle.Keys.Any(n=>n.Contains("..")),"only exact nine public resources packaged");
     var html=PublicDownloads.RefreshHtml(Encoding.UTF8.GetString(bundle["index.html"]),next,true);Assert(html.Contains(next.windows.InstallerUrl)&&html.Contains(next.android.apkUrl)&&html.Contains("Versión 3.1.97"),"HTML offline links and labels refreshed");
     Assert(PublicDownloads.RefreshHtml(Encoding.UTF8.GetString(bundle["servidor/index.html"]),next,false).Contains(next.windows.InstallerUrl),"USB upgrade link refreshed");
+    var fullHtml=PublicDownloads.RefreshHtml(Encoding.UTF8.GetString(bundle["index.html"]),full,true);
+    Assert(fullHtml.Contains(full.windows.FullInstallerUrl)&&fullHtml.Contains("Versión 3.1.98 · Instalación completa"),"static full installer link and description refreshed");
+    Assert(PublicDownloads.RefreshHtml(Encoding.UTF8.GetString(bundle["servidor/index.html"]),full,false).Contains(full.windows.FullInstallerUrl),"USB upgrade offers full installer");
+    // Exercise an actual HTML replacement even when the checked-in manifest
+    // already matches this fixture version. Catalogue-only changes need no
+    // HTML backup and must not make the transaction assertion version-bound.
+    html+="\n<!-- verified publication fixture upgrade -->\n";
     using(var stream=new MemoryStream()){
      using(var zip=new ZipArchive(stream,ZipArchiveMode.Create,true)){using(var output=new StreamWriter(zip.CreateEntry("../library/.env").Open()))output.Write("bad");}
      stream.Position=0;Reject(()=>PublicDownloads.ReadBundle(stream),"archive traversal rejected");
@@ -121,6 +144,7 @@ namespace InhousePhotos {
      try{await PublicDownloads.PublishBundle(p,caddy,bundle,"fixture");throw new Exception("symbolic target accepted");}catch(IOException){checks++;}
      Assert(File.ReadAllText(Path.Combine(p.Installation,".env"))=="PRIVATE=must-never-publish","symbolic target cannot overwrite private data");
     }catch(UnauthorizedAccessException){/* Some Windows hosts do not permit creating test links. */}
+    catch(IOException ex) when((ex.HResult&0xffff)==1314){/* Windows may report missing symlink privilege as IOException. */}
     finally{if(File.Exists(mark))File.Delete(mark);}
     return checks;
    }finally{Directory.Delete(directory,true);}

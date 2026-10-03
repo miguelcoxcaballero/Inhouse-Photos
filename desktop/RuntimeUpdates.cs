@@ -42,16 +42,18 @@ namespace InhousePhotos {
   public static class RuntimeUpdates {
     public const string LatestVersion="3.1.97";
     public const string LatestImage="inhouse-photos-server:v3.1.97";
-    public const string LatestImageId="sha256:232e88db3013f55fa317c11d8776282ec38e9c5cf2f1ee593c8ae8d0c1351e1e";
+    public const string LatestImageId="sha256:0ec3b4b5226a68e34d1bde5030c7881f834ca5cf8cf68da1a8f8ae194217ee4f";
+    public const string LatestConfigImageId="sha256:232e88db3013f55fa317c11d8776282ec38e9c5cf2f1ee593c8ae8d0c1351e1e";
     public const string SourceCommit="ff35cc4b08d0cab1da2ee94e5f2449e737cc6f53";
     public const string SchemaSha256="ab48e687123b61185a4467ca2b70a3a66ebfdaa93f5a78b5d7ae9eed613c699f";
     public const string ArchiveFile="inhouse-server-3.1.97.tar.gz";
     public const string ArchiveSha256="836f290a8d001e5bc3b96202a8543f772966e9fea8d6095e64019114ad98e226";
-    public const string ManifestSha256="458826ada3a4b598d3196d995e325dc20b65c558402286c1e3644917e0cefc7b";
-    public const string PackageSha256="64f9cef1aac1029a066a5ce022a1fd0d42317c2df0214ba979fabc47bd763813";
+    public const string ManifestSha256="5253ada8ebfd9bb0fd0175084dfc719a7ca5a06d15d9fb95204b0a43237bc5d7";
+    public const string PackageSha256="adee8af6a06023ccaca589c39ef68b7b356ab1f70c618e41757479f88f368b15";
     public const string PackageFile="Inhouse-Photos-Server-Runtime-3.1.97.zip";
-    public const string PackageUrl="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-runtime-v3.1.97/"+PackageFile;
+    public const string PackageUrl="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-runtime-v3.1.97-r2/"+PackageFile;
     const string PreviousImage="sha256:0781b4081482853b34963f4e8faefc4c92d4a25da87f45dd3cf9f93ce645062c";
+    const string PreviousManifestImage="sha256:29f28e05d28b2c84554dd67ccc2ae99d114c22bdbaf7410998e2f2281c19314a";
     const string PreviousVersion="3.1.96";
     const string PreviousSource="2c36a66f40347273f9f2f75242e42cda3091a1a3";
     const string PreviousSchema="ab48e687123b61185a4467ca2b70a3a66ebfdaa93f5a78b5d7ae9eed613c699f";
@@ -59,6 +61,7 @@ namespace InhousePhotos {
     const string OriginalConfig="sha256:ac66612c5815b715123e1946fb833cc3baa5adcb404f774ded31307d82c1e368";
     const string FastImage="sha256:0034cd9b0031574479c192ed8be48212f6e57012785d804beb171ed8a2d5a8ac";
     const string LegacyDurableImage="sha256:dd8c68b182ef2cade7002e7625c43e60ee89e27ee42eec0fb4b6e392d34a8a75";
+    const string LegacyDurableManifestImage="sha256:2d457c6ea49ae9ecd04c38b9636ffad0280f1148d73f237fc074f73fbda3e02e";
     const string LegacyDurableVersion="3.1.0-durable-upload-20261003";
     const string LegacyDurableSource="f661cdd96ebfb50349ca60a40a7cff3e4511f995";
     const string LegacyDurableSchema="ab48e687123b61185a4467ca2b70a3a66ebfdaa93f5a78b5d7ae9eed613c699f";
@@ -108,11 +111,12 @@ namespace InhousePhotos {
       if(image==null)return "";
       if(image.ImageId==OriginalImage||image.ImageId==OriginalConfig)return "3.1.0-pairing-20260929";
       if(image.ImageId==FastImage)return "3.1.0-storage-saver-20261002";
-      if(image.ImageId==LatestImageId&&image.Version==LatestVersion&&image.SourceCommit==SourceCommit&&image.SchemaSha256==SchemaSha256)return LatestVersion;
-      if(image.ImageId==PreviousImage&&image.Version==PreviousVersion&&image.SourceCommit==PreviousSource&&image.SchemaSha256==PreviousSchema)return PreviousVersion;
-      if(image.ImageId==LegacyDurableImage&&image.Version==LegacyDurableVersion&&image.SourceCommit==LegacyDurableSource&&image.SchemaSha256==LegacyDurableSchema)return LegacyDurableVersion;
+      if(IsLatestImageId(image.ImageId)&&image.Version==LatestVersion&&image.SourceCommit==SourceCommit&&image.SchemaSha256==SchemaSha256)return LatestVersion;
+      if((image.ImageId==PreviousImage||image.ImageId==PreviousManifestImage)&&image.Version==PreviousVersion&&image.SourceCommit==PreviousSource&&image.SchemaSha256==PreviousSchema)return PreviousVersion;
+      if((image.ImageId==LegacyDurableImage||image.ImageId==LegacyDurableManifestImage)&&image.Version==LegacyDurableVersion&&image.SourceCommit==LegacyDurableSource&&image.SchemaSha256==LegacyDurableSchema)return LegacyDurableVersion;
       return "";
     }
+    internal static bool IsLatestImageId(string id) {return id==LatestImageId||id==LatestConfigImageId;}
     static async Task<RuntimeImageIdentity> ReadImage(string image) {
       if(!Regex.IsMatch(image??"","^sha256:[a-f0-9]{64}$")&&image!=LatestImage)throw new IOException("Imagen del motor no válida.");
       var format="[{{json .Id}},{{json (index .Config.Labels \"org.opencontainers.image.version\")}},{{json (index .Config.Labels \"org.opencontainers.image.revision\")}},{{json (index .Config.Labels \"inhouse.runtime.database-schema-sha256\")}}]";
@@ -132,11 +136,11 @@ namespace InhousePhotos {
       try {
         if(FindPendingTransaction(prefs)!=null||KnownVersion(await ReadCurrent(prefs))!=LatestVersion)return false;
         var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));
-        if(receipt.Containers.Single(row=>row.Service=="immich-server").Image!=LatestImageId)return false;
+        if(!IsLatestImageId(receipt.Containers.Single(row=>row.Service=="immich-server").Image))return false;
         var rows=await Backend.InspectServer(prefs);
         Backend.AssertManagedIdentity(prefs,receipt.Containers,rows);
         var server=rows.Single(row=>row.Service=="immich-server");
-        if(server.Image!=LatestImageId||!Regex.IsMatch(server.Id??"","^[a-f0-9]{64}$"))return false;
+        if(!IsLatestImageId(server.Image)||!Regex.IsMatch(server.Id??"","^[a-f0-9]{64}$"))return false;
         var health=await Backend.Docker("inspect --format "+Backend.Argument("{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}")+" "+server.Id,20);
         return health.Trim()=="running|healthy"&&await Backend.Ping(prefs.LocalEndpoint)&&FindPendingTransaction(prefs)==null;
       }catch{return false;}
@@ -157,7 +161,9 @@ namespace InhousePhotos {
     }
     internal static bool MatchesRecovery(RuntimeTransaction record,Preferences prefs) {
       return record!=null&&prefs!=null&&record.format==1&&
-        ((record.sourceCommit==SourceCommit&&record.newImageId==LatestImageId)||(record.sourceCommit==PreviousSource&&record.newImageId==PreviousImage)||(record.sourceCommit==LegacyDurableSource&&record.newImageId==LegacyDurableImage))&&
+        ((record.sourceCommit==SourceCommit&&IsLatestImageId(record.newImageId))||
+         (record.sourceCommit==PreviousSource&&(record.newImageId==PreviousImage||record.newImageId==PreviousManifestImage))||
+         (record.sourceCommit==LegacyDurableSource&&(record.newImageId==LegacyDurableImage||record.newImageId==LegacyDurableManifestImage)))&&
         record.installation==prefs.Installation&&record.project==prefs.ProjectName&&record.receiptPath==prefs.ReceiptPath;
     }
     static string FindPendingTransaction(Preferences prefs) {
@@ -220,7 +226,7 @@ namespace InhousePhotos {
       try{return BoundedMessage(File.ReadAllText(ErrorPath));}catch{return "La actualización no se completó. Pulsa Actualizar para continuar.";}
     }
     static void ClearSavedError() {try{if(File.Exists(ErrorPath))File.Delete(ErrorPath);}catch{}}
-    internal static string HelperFailure(string stage,int exitCode) {
+    internal static string HelperFailure(string stage,int exitCode,string reason="") {
       var message="La actualización no se completó";
       switch(stage) {
         case "preflight":message="No se pudo comprobar la instalación y su copia de recuperación";break;
@@ -232,6 +238,14 @@ namespace InhousePhotos {
         case "receipt":message="No se pudo confirmar el registro de instalación";break;
         case "recovery":message="No se pudo completar la recuperación pendiente";break;
         case "rollback":message="La versión anterior no puede leer los trabajos nuevos; se conserva la versión nueva";break;
+      }
+      switch(reason) {
+        case "image_identity":message="El motor cargado no coincide con la identidad verificada. No se ha sustituido tu servidor";break;
+        case "image_platform":message="El motor no corresponde a la plataforma de este servidor";break;
+        case "image_metadata":message="El motor no confirmó su versión y configuración verificadas";break;
+        case "disk_space":message="El disco del sistema necesita más espacio para preparar el motor";break;
+        case "daemon_unavailable":message="El motor de Windows no responde. Abre Inhouse Photos en el PC y reintenta";break;
+        case "archive_invalid":message="El archivo del motor no pasa la comprobación. No se instalará";break;
       }
       return message+" (código "+exitCode+"). Pulsa Actualizar para continuar. Tus fotos se conservan.";
     }
@@ -283,6 +297,7 @@ namespace InhousePhotos {
       }
       return path;
     }
+    public static Task<string> CachePackage() {return PrepareFiles();}
     static async Task<string> PrepareFiles() {
       await DownloadGate.WaitAsync();
       try {
@@ -336,11 +351,16 @@ namespace InhousePhotos {
           UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,
           WorkingDirectory=directory,RedirectStandardOutput=true,RedirectStandardError=true
         }}) {
-          string failedStage="";
+          string failedStage="",failedReason="";
           var outputClosed=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
           process.OutputDataReceived+=(sender,e)=>{
             if(e.Data==null){outputClosed.TrySetResult(true);return;}
             HelperPhase(e.Data);
+            const string reasonPrefix="INHOUSE_RUNTIME_REASON:";
+            if(e.Data.StartsWith(reasonPrefix,StringComparison.Ordinal)) {
+              var reason=e.Data.Substring(reasonPrefix.Length);
+              if(new[]{"image_identity","image_platform","image_metadata","disk_space","daemon_unavailable","archive_invalid","native_failure"}.Contains(reason))failedReason=reason;
+            }
             const string failurePrefix="INHOUSE_RUNTIME_FAILURE:";
             if(e.Data!=null&&e.Data.StartsWith(failurePrefix,StringComparison.Ordinal)) {
               var value=e.Data.Substring(failurePrefix.Length);
@@ -363,7 +383,7 @@ namespace InhousePhotos {
             // PowerShell parent exits. Never use the unbounded WaitForExit()
             // overload or wait indefinitely for stderr EOF.
             await RuntimeProcessOutput.Drain(process,stderr,outputClosed.Task);
-            if(process.ExitCode!=0)throw new IOException(HelperFailure(failedStage,process.ExitCode));
+            if(process.ExitCode!=0)throw new IOException(HelperFailure(failedStage,process.ExitCode,failedReason));
           }finally{try{if(File.Exists(cancellationPath))File.Delete(cancellationPath);}catch{}}
         }
       }
@@ -382,7 +402,7 @@ namespace InhousePhotos {
               var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));
               Backend.AssertManagedIdentity(prefs,receipt.Containers,rows);
               var server=rows.Single(row=>row.Service=="immich-server");
-              if(server.Image!=LatestImageId||receipt.Containers.Single(row=>row.Service=="immich-server").Image!=LatestImageId||
+              if(!IsLatestImageId(server.Image)||receipt.Containers.Single(row=>row.Service=="immich-server").Image!=server.Image||
                 !Regex.IsMatch(server.Id??"","^[a-f0-9]{64}$"))throw new IOException("La instalación necesita comprobarse antes de reiniciar. Tus fotos se conservan.");
               State("restarting",95);
               await Backend.Docker("restart --time 30 "+server.Id,180);
@@ -468,10 +488,15 @@ namespace InhousePhotos {
       if(KnownVersion(new RuntimeImageIdentity{ImageId=FastImage})!="3.1.0-storage-saver-20261002")return 4;
       var image=new RuntimeImageIdentity{ImageId=LatestImageId,Version=LatestVersion,SourceCommit=SourceCommit,SchemaSha256=SchemaSha256};
       if(KnownVersion(image)!=LatestVersion)return 5;
+      image.ImageId=LatestConfigImageId;
+      if(KnownVersion(image)!=LatestVersion||!MatchesRecovery(new RuntimeTransaction{format=1,sourceCommit=SourceCommit,newImageId=LatestConfigImageId,
+        installation=prefs.Installation,project=prefs.ProjectName,receiptPath=prefs.ReceiptPath},prefs))return 19;
+      image.ImageId=LatestImageId;
       image.SourceCommit=new string('a',40);if(KnownVersion(image)!="")return 6;
       if(KnownVersion(new RuntimeImageIdentity{ImageId=LegacyDurableImage,Version=LegacyDurableVersion,SourceCommit=LegacyDurableSource,SchemaSha256=LegacyDurableSchema})!=LegacyDurableVersion)return 13;
       var previous=new RuntimeImageIdentity{ImageId=PreviousImage,Version=PreviousVersion,SourceCommit=PreviousSource,SchemaSha256=PreviousSchema};
       if(KnownVersion(previous)!=PreviousVersion)return 17;
+      previous.ImageId=PreviousManifestImage;if(KnownVersion(previous)!=PreviousVersion)return 20;
       previous.SchemaSha256=new string('a',64);if(KnownVersion(previous)!="")return 18;
       if(HelperFailure("restart",7).Contains("http")||!HelperFailure("queues",9).Contains("código 9")||HelperFailure("untrusted-secret",1).Contains("untrusted-secret"))return 14;
       if(!RemoteManagement.Allowed("GET",RemoteManagement.RuntimePath)||!RemoteManagement.Allowed("POST",RemoteManagement.RuntimePath)||

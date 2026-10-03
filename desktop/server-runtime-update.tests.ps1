@@ -18,6 +18,10 @@ Check ((Quote-RuntimeArgument 'simple') -ceq '"simple"') 'native argv quotes ord
 Check ((Quote-RuntimeArgument 'C:\folder name\') -ceq '"C:\folder name\\"') 'native argv doubles the trailing slash before its closing quote'
 Check ((Quote-RuntimeArgument 'a"b') -ceq '"a\"b"') 'native argv escapes embedded quotes'
 Check ((Quote-RuntimeArgument 'a\"b') -ceq '"a\\\"b"') 'native argv preserves the slash before an embedded quote'
+Check ((Get-RuntimeNativeReason 'private-user:private-token no space left on device') -ceq 'disk_space') 'native disk diagnosis never returns private stderr'
+Check ((Get-RuntimeNativeReason 'error during connect to private-server') -ceq 'daemon_unavailable') 'native daemon diagnosis uses an allowlisted code'
+Check ((Get-RuntimeNativeReason 'unexpected EOF secret-value') -ceq 'archive_invalid') 'native archive diagnosis hides raw archive error text'
+Check ((Get-RuntimeNativeReason 'unrecognized private-user:private-token') -ceq 'native_failure') 'unknown diagnostics fail closed without leaking private text'
 $savedCancellationPath = $script:CancellationPath
 try {
   $script:CancellationPath = Join-Path ([IO.Path]::GetTempPath()) ('cancel-' + [Guid]::NewGuid().ToString('N') + '.signal')
@@ -45,6 +49,11 @@ $manifest = [pscustomobject]@{format=1;version='3.1.0-storage-saver-20261002';so
 Assert-Manifest $manifest; Check $true 'valid immutable manifest'
 $publicVersion = Clone $manifest; $publicVersion.version='3.1.96'
 Assert-Manifest $publicVersion; Check $true 'accept verified numeric public server version'
+$dualIdentity = Clone $publicVersion
+$dualIdentity | Add-Member imageConfigId ('sha256:' + 'f' * 64)
+Assert-Manifest $dualIdentity; Check $true 'accept exactly published manifest and config identities across Docker stores'
+$bad = Clone $dualIdentity; $bad.imageConfigId='any-image'; Reject { Assert-Manifest $bad } 'alternate identity requires immutable SHA-256'
+$bad = Clone $dualIdentity; $bad.imageConfigId=$bad.imageId; Reject { Assert-Manifest $bad } 'alternate identity cannot be an ambiguous duplicate'
 $bad = Clone $publicVersion; $bad.version='03.1.96'; Reject { Assert-Manifest $bad } 'reject ambiguous numeric public version'
 $bad = Clone $publicVersion; $bad.version='3.1.96/other'; Reject { Assert-Manifest $bad } 'reject unsafe public version characters'
 $bad = Clone $manifest; $bad.databaseMigrations='changed'; Reject { Assert-Manifest $bad } 'schema-changing update'
@@ -186,6 +195,15 @@ try {
   Reset-ImageProbe
   Check (Test-RuntimeImage $publicVersion) 'exact published cached image can skip archive import'
   Check ($script:imageProbeCommands.Count -eq 1 -and $script:imageProbeCommands[0] -ceq 'image') 'cached image verification does not load or probe unrelated state'
+  Reset-ImageProbe; $script:imageProbeValues[0]=$dualIdentity.imageConfigId
+  Check ((Get-RuntimeImageId $dualIdentity) -ceq $dualIdentity.imageConfigId) 'classic Docker config digest is returned as the actual verified image identity'
+  Reset-ImageProbe
+  Check ((Get-RuntimeImageId $dualIdentity) -ceq $dualIdentity.imageId) 'containerd manifest digest is returned as the actual verified image identity'
+  Reset-ImageProbe; $script:imageProbeValues[0]='sha256:' + '1' * 64
+  Reject { Get-RuntimeImageId $dualIdentity } 'matching version labels never authorize an unpublished image digest'
+  Reset-ImageProbe; $script:imageProbeValues[0]=$dualIdentity.imageConfigId
+  $script:imageProbeValues[3].PSObject.Properties['org.opencontainers.image.revision'].Value='different'
+  Reject { Get-RuntimeImageId $dualIdentity } 'alternate config identity still requires exact published source revision'
   foreach ($index in @(0, 1, 2)) {
     Reset-ImageProbe; $script:imageProbeValues[$index] = 'different'
     Reject { Test-RuntimeImage $publicVersion } ('cached image refuses identity or platform mismatch ' + $index)
@@ -369,6 +387,12 @@ public static class InhouseDockerNativeFixture {
     } catch { $legacyBridgeFailed = $true }
     Check $legacyBridgeFailed 'legacy native stderr redirection fails or contaminates stdout with an exit-zero fixture'
     Check ((Invoke-Docker @('--native-success')) -ceq 'native stdout') 'native stderr progress with exit zero preserves only stdout'
+    try {
+      function Get-Command([string]$Name, $CommandType, $ErrorAction) {
+        return @([pscustomobject]@{Source=$script:DockerExe},[pscustomobject]@{Source=$script:DockerExe})
+      }
+      Check ((Invoke-Docker @('--native-success')) -ceq 'native stdout') 'duplicate executable PATH matches resolve one real native application'
+    } finally { Remove-Item -LiteralPath Function:Get-Command }
     Reject { Invoke-Docker @('--native-failure') } 'native nonzero exit rejects regardless of stderr or stdout'
     $expectedArguments = @('', 'plain', 'two words', 'C:\folder with spaces\', 'one"two', 'one\"two',
       '--format', '{{json .Config.Labels}}', '" --native-failure "', '$(fixture); & echo fixture', ('line1' + "`n" + 'line2'))

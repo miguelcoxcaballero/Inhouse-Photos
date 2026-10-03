@@ -35,6 +35,8 @@ namespace InhousePhotos {
         using(var running=System.Threading.Mutex.OpenExisting(@"Local\InhousePhotosServer"))
           throw new ManagerRunningException();
       }catch(System.Threading.WaitHandleCannotBeOpenedException){}
+      if(File.Exists(Pointer)&&ManagerUpdates.Compare(ReadInstalled().Version,Backend.Version)>0)
+        throw new IOException("Ya tienes una versión más reciente. Descarga el instalador actual desde tu web; no se instalará una versión anterior.");
       // The current and older managers use the same installer entry points.
       // Persist continuation before the active pointer can change, including
       // a manual upgrade used to recover an interrupted legacy operation.
@@ -54,7 +56,7 @@ namespace InhousePhotos {
       } else if(Backend.Hash(target)!=expected)throw new IOException("Hay un archivo inesperado en la carpeta de instalación. No se ha sobrescrito.");
       // The stable launcher is deliberately immutable while it supervises an
       // older version. It resolves the validated pointer on the next launch.
-      if(!File.Exists(Backend.Launcher))File.Copy(assembly.Location,Backend.Launcher,false);
+      if(!File.Exists(Backend.Launcher))FullInstallerPackage.CopyLauncher(assembly.Location,Backend.Launcher);
       var temporary=Pointer+"."+Guid.NewGuid().ToString("N")+".new";File.WriteAllText(temporary,Backend.Json.Serialize(app));
       if(File.Exists(Pointer))File.Replace(temporary,Pointer,Path.Combine(Backend.InstallDir,"previous.json"));else File.Move(temporary,Pointer);
       var shortcut=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs),"Inhouse Photos Server.lnk");
@@ -63,6 +65,54 @@ namespace InhousePhotos {
       using(var key=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\App Paths\Inhouse Photos.exe"))key.SetValue("",Backend.Launcher);
       ReadInstalled();
       SystemUpdates.ManagerInstalled(updatePreferences);
+    }
+    public static async Task InstallProduct(Action<string> notify) {
+      Backend.PrivateDirectory(Backend.SettingsDir);
+      var leasePath=Path.Combine(Backend.SettingsDir,"product-install.lock");
+      if(File.Exists(leasePath)&&(File.GetAttributes(leasePath)&FileAttributes.ReparsePoint)!=0)
+        throw new IOException("El bloqueo de instalación no puede ser un enlace.");
+      // Unlike a Mutex, the file lease is not bound to an await continuation's
+      // thread. CLI hand-off and WPF use exactly the same cross-process guard.
+      using(var lease=new FileStream(leasePath,FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None)) {
+          notify("Comprobando el programa y los componentes incluidos…");
+          VerifyPayload();
+          await FullInstallerPackage.Import(Assembly.GetExecutingAssembly().Location,notify);
+          notify("Instalando Inhouse Photos…");
+          Install();
+          var installed=ReadInstalled();
+          if(installed.Version!=Backend.Version)throw new IOException("El programa instalado no es la versión de este instalador.");
+          var prefs=Backend.Load();
+          if(!prefs.Managed) {
+            notify("Preparando los componentes para tu biblioteca nueva…");
+            await RuntimeUpdates.CachePackage();
+            return; // Disk selection and third-party license consent stay explicit.
+          }
+          notify("Preparando el servidor y verificando tu biblioteca…");
+          var executable=Path.Combine(Backend.InstallDir,installed.RelativePath);
+          using(var child=new Process{StartInfo=new ProcessStartInfo(executable,"--complete-product-install") {
+            UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,
+            WorkingDirectory=Backend.InstallDir,RedirectStandardOutput=true,RedirectStandardError=true
+          }}) {
+            var stdoutClosed=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            child.OutputDataReceived+=(sender,line)=>{
+              if(line.Data==null){stdoutClosed.TrySetResult(true);return;}
+              const string prefix="INHOUSE_INSTALL_STAGE:";
+              if(line.Data!=null&&line.Data.StartsWith(prefix,StringComparison.Ordinal)) {
+                var stage=line.Data.Substring(prefix.Length);
+                var message=ProductInstallation.StageMessage(stage);
+                if(message!=null)notify(message);
+              }
+            };
+            child.Start();child.BeginOutputReadLine();
+            var errors=child.StandardError.ReadToEndAsync();
+            while(!await Task.Run(()=>child.WaitForExit(1000)))await Task.Delay(100);
+            await RuntimeProcessOutput.Drain(child,errors,stdoutClosed.Task);
+            if(child.ExitCode!=0)throw new IOException(SystemUpdates.InstallationError(prefs)+" Pulsa Reintentar; tus fotos y la preparación verificada se conservan.");
+          }
+          if(ReadInstalled().Sha256!=installed.Sha256||!await RuntimeUpdates.ConfirmInstalled(prefs))
+            throw new IOException("Falta confirmar el servidor. La instalación no se da por terminada; pulsa Reintentar.");
+          notify("Instalación completa y biblioteca verificadas.");
+      }
     }
     public static void VerifyPayload() {
       var assembly=Assembly.GetExecutingAssembly();
@@ -92,7 +142,7 @@ namespace InhousePhotos {
         try {using(var old=Process.GetProcessById(managerPid)) {
           if(!old.WaitForExit(120000))throw new TimeoutException("El gestor anterior no se cerró. La actualización queda pendiente para reintentar; tus fotos se conservan.");
         }}catch(ArgumentException){/* It exited before the helper started. */}
-        Install();
+        InstallProduct(message=>{}).GetAwaiter().GetResult();
         StartInstalled(hidden);
         var previousError=Path.Combine(Backend.SettingsDir,"last-manager-update-error.txt");
         if(File.Exists(previousError))File.Delete(previousError);
@@ -117,7 +167,10 @@ namespace InhousePhotos {
         if(args.Length>0&&args[0]=="--wait-and-install")return WaitAndInstall(args);
         if(args.Contains("--launch")||args.Contains("--startup"))return Launch(args.Contains("--startup"));
         if(args.Contains("--verify-payload")){VerifyPayload();Console.WriteLine("Contenido verificado.");return 0;}
-        if(args.Contains("--install-current")){Install();Console.WriteLine("Instalación verificada en "+Backend.InstallDir);return 0;}
+        if(args.Contains("--verify-full-package")){VerifyPayload();FullInstallerPackage.Verify(Assembly.GetExecutingAssembly().Location);Console.WriteLine("Instalador completo verificado.");return 0;}
+        if(args.Contains("--install-product")){InstallProduct(Console.WriteLine).GetAwaiter().GetResult();return 0;}
+        if(args.Contains("--install-current")){InstallProduct(Console.WriteLine).GetAwaiter().GetResult();Console.WriteLine("Instalación completa verificada.");return 0;}
+        if(args.Contains("--install-manager-only-fixture")){if(Backend.Load().Managed)throw new IOException("Esta prueba requiere un perfil Windows sin biblioteca vinculada.");Install();return 0;}
         if(args.Contains("--verify-installed")){var app=ReadInstalled();Console.WriteLine(app.Version+" "+app.Sha256);return 0;}
         var application=new Application();return application.Run(new SetupWindow());
       }catch(Exception ex){if(args.Length==0)MessageBox.Show(ex.Message,"Inhouse Photos",MessageBoxButton.OK,MessageBoxImage.Error);else Console.Error.WriteLine(ex.Message);return 1;}
@@ -134,7 +187,7 @@ namespace InhousePhotos {
       readonly Border statusPanel;
       readonly ProgressBar progress;
       readonly Button button;
-      bool installed;
+      bool installed,installing;
 
       static TextBlock Copy(string value,double size,Brush color,bool bold=false) {
         return new TextBlock {Text=value,FontSize=size,Foreground=color,FontWeight=bold?FontWeights.SemiBold:FontWeights.Normal,
@@ -154,9 +207,9 @@ namespace InhousePhotos {
       static Border Divider() {return new Border {Height=1,Background=Rule};}
 
       public SetupWindow() {
-        Title="Instalar Inhouse Photos Server";
+        Title="Instalar Inhouse Photos";
         Width=Math.Min(610,Math.Max(480,SystemParameters.WorkArea.Width-48));
-        Height=Math.Min(620,Math.Max(500,SystemParameters.WorkArea.Height-48));
+        Height=Math.Min(730,Math.Max(500,SystemParameters.WorkArea.Height-48));
         MinWidth=450;MinHeight=480;ResizeMode=ResizeMode.CanResize;WindowStartupLocation=WindowStartupLocation.CenterScreen;
         Background=Page;Foreground=Text;FontFamily=new FontFamily("Segoe UI");
         using(var brand=Assembly.GetExecutingAssembly().GetManifestResourceStream("InhousePhotos.brand.xaml"))Icon=(ImageSource)XamlReader.Load(brand);
@@ -174,21 +227,23 @@ namespace InhousePhotos {
 
         var scroll=new ScrollViewer {VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
         var body=new StackPanel {Margin=new Thickness(34,0,34,12)};scroll.Content=body;
-        var title=Copy("Instala el gestor.\nTus fotos se quedan.",30,Text,true);title.LineHeight=36;
+        var title=Copy("Inhouse Photos,\nlisto en tu PC.",30,Text,true);title.LineHeight=36;
         body.Children.Add(title);
-        var introduction=Copy("Una forma sencilla de conectar, revisar y proteger tu biblioteca desde este ordenador.",15,Muted);
+        var introduction=Copy("Una sola instalación para el programa y el sistema que guarda tus fotos. Si ya tienes una biblioteca vinculada, también se actualiza y se comprueba aquí.",15,Muted);
         introduction.Margin=new Thickness(0,13,0,20);body.Children.Add(introduction);
         body.Children.Add(Divider());
-        body.Children.Add(Step("01","Instalar el gestor","Se añadirá al menú Inicio. Solo se instala el programa de Windows."));
+        body.Children.Add(Step("01","Instalar Inhouse Photos","El programa queda actualizado, con su versión comprobada y un acceso en el menú Inicio."));
         body.Children.Add(Divider());
-        body.Children.Add(Step("02","Conectar tu biblioteca","Al abrirlo, podrás vincular el servidor que ya tienes y ver su estado."));
+        body.Children.Add(Step("02","Preparar el sistema","El motor de fotos viene en este instalador. En un PC nuevo, al abrirlo se preparan los componentes que falten y se solicitan los permisos necesarios."));
+        body.Children.Add(Divider());
+        body.Children.Add(Step("03","Comprobar tu biblioteca","Si ya está vinculada, la instalación termina después de verificar el servidor. Si es la primera vez, al abrirlo eliges dónde guardar tus fotos."));
         body.Children.Add(Divider());
 
         var reassurance=new Grid {Margin=new Thickness(0,16,0,16)};
         reassurance.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(30)});
         reassurance.ColumnDefinitions.Add(new ColumnDefinition());
         reassurance.Children.Add(Copy("✓",18,Accent,true));
-        var safe=Copy("No se mueven ni se borran fotos. Instalar el gestor no apaga el servidor.",14,Text);
+        var safe=Copy("Tus fotos, cuentas, álbumes y discos se conservan. Al actualizar el motor puede haber una pausa breve en el acceso; no necesitas volver a subir tu biblioteca.",14,Text);
         Grid.SetColumn(safe,1);reassurance.Children.Add(safe);body.Children.Add(reassurance);
         Grid.SetRow(scroll,1);root.Children.Add(scroll);
 
@@ -196,38 +251,62 @@ namespace InhousePhotos {
         statusPanel=new Border {BorderBrush=Rule,BorderThickness=new Thickness(0,1,0,0),Padding=new Thickness(0,15,0,0),Margin=new Thickness(0,0,0,14)};
         var statusStack=new StackPanel();statusTitle=Copy("Listo para instalar",15,Text,true);
         statusDetail=Copy("Versión "+Backend.Version+"  ·  Windows 10 / 11",13,Muted);statusDetail.Margin=new Thickness(0,2,0,0);
-        statusStack.Children.Add(statusTitle);statusStack.Children.Add(statusDetail);
+        statusStack.Children.Add(statusTitle);
+        statusStack.Children.Add(new ScrollViewer{Content=statusDetail,MaxHeight=108,
+          VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
         progress=new ProgressBar {Height=4,Margin=new Thickness(0,10,0,0),Foreground=Accent,Background=Rule,
           BorderThickness=new Thickness(0),IsIndeterminate=true,Visibility=Visibility.Collapsed};statusStack.Children.Add(progress);
         statusPanel.Child=statusStack;footer.Children.Add(statusPanel);
-        button=new Button {Content="Instalar y abrir",Padding=new Thickness(20,12,20,12),MinHeight=48,FontSize=16,
+        button=new Button {Content="Instalar Inhouse Photos",Padding=new Thickness(20,12,20,12),MinHeight=48,FontSize=16,
           FontWeight=FontWeights.SemiBold,BorderThickness=new Thickness(0),Background=Accent,Foreground=Brushes.White,
           HorizontalContentAlignment=HorizontalAlignment.Center};footer.Children.Add(button);
         Grid.SetRow(footer,2);root.Children.Add(footer);
         button.Click+=InstallClicked;
+        Closing+=(sender,args)=>{
+          if(!installing)return;
+          args.Cancel=true;
+          statusDetail.Text="La instalación sigue en curso. Espera a que termine la comprobación antes de cerrar. Tus fotos y el trabajo pendiente se conservan.";
+        };
       }
 
       async void InstallClicked(object sender,RoutedEventArgs e) {
+        if(installing)return;
         button.IsEnabled=false;
-        progress.Visibility=Visibility.Visible;
         statusTitle.Foreground=Text;
-        statusTitle.Text=installed?"Abriendo el gestor…":"Instalando el gestor…";
-        statusDetail.Text=installed?"Tus fotos y el servidor no se han modificado.":"Copiando el programa y comprobando su integridad.";
         try {
-          if(!installed){await Task.Run((Action)Install);installed=true;}
-          statusTitle.Text="Instalación completa";
-          statusDetail.Text="Abriendo el gestor de tu biblioteca…";
-          Launch(false);Close();
+          if(installed) {
+            statusTitle.Text="Abriendo Inhouse Photos…";
+            Launch(false);Close();return;
+          }
+          installing=true;progress.Visibility=Visibility.Visible;
+          button.Content="Instalando…";
+          statusTitle.Text="Preparando Inhouse Photos…";
+          statusDetail.Text="Comprobando el programa, el motor de fotos y tu instalación actual.";
+          await InstallProduct(message=>{
+            if(String.IsNullOrWhiteSpace(message)||Dispatcher.HasShutdownStarted)return;
+            try{Dispatcher.BeginInvoke(new Action(()=>{if(installing)statusDetail.Text=message;}));}
+            catch(InvalidOperationException){ /* The window may be closing. */ }
+          });
+          var managed=Backend.Load().Managed;
+          // InstallProduct does not complete until the existing server and its
+          // persisted installation receipt are verified. A copied executable
+          // alone must not expose a success state or open the manager early.
+          installed=true;
+          statusTitle.Text=managed?"Instalación completa y verificada":"Programa actualizado y preparado";
+          statusDetail.Text=managed?"El programa y tu servidor están comprobados. Puedes abrir Inhouse Photos; tus fotos y cuentas se conservan.":
+            "Al abrir Inhouse Photos, elige dónde guardar tus fotos o conecta tu biblioteca existente. Se solicitarán las condiciones y permisos que necesite este PC.";
+          button.Content="Abrir Inhouse Photos";
         }catch(ManagerRunningException) {
-          progress.Visibility=Visibility.Collapsed;
-          statusTitle.Foreground=Warning;statusTitle.Text="Cierra el gestor anterior";
-          statusDetail.Text="En la barra de tareas, abre los iconos junto al reloj. Haz clic derecho en Inhouse Photos, elige «Salir del gestor» y vuelve aquí. Tus fotos y subidas seguirán funcionando.";
-          button.Content="Reintentar instalación";button.IsEnabled=true;
+          statusTitle.Foreground=Warning;statusTitle.Text="Cierra el programa anterior";
+          statusDetail.Text="En los iconos junto al reloj de Windows, haz clic derecho en Inhouse Photos y elige «Salir del gestor». Después pulsa Reintentar. No cierres el servidor de fotos; tu biblioteca se conserva.";
+          button.Content="Reintentar instalación";
         }catch(Exception ex) {
-          progress.Visibility=Visibility.Collapsed;
           statusTitle.Foreground=Warning;statusTitle.Text=installed?"Instalado, pero no se pudo abrir":"No se pudo completar la instalación";
-          statusDetail.Text=(installed?"Puedes abrirlo desde el menú Inicio. ":"")+ex.Message;
-          button.Content=installed?"Abrir el gestor":"Reintentar instalación";button.IsEnabled=true;
+          statusDetail.Text=ex.Message+(installed?" Puedes volver a abrirlo o usar el menú Inicio.":
+            " Tus fotos y el trabajo pendiente se conservan. Pulsa Reintentar para continuar; no necesitas desinstalar ni volver a subir nada.");
+          button.Content=installed?"Abrir Inhouse Photos":"Reintentar instalación";
+        }finally {
+          installing=false;progress.Visibility=Visibility.Collapsed;button.IsEnabled=true;
         }
       }
     }

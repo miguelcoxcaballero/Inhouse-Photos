@@ -114,6 +114,8 @@ namespace InhousePhotos {
       if(prefs==null||!prefs.Managed)return;
       lock(Gate) {
         var old=Read(prefs);
+        if(old!=null&&old.State!="completed"&&ManagerUpdates.Compare(old.TargetVersion,Backend.Version)>0)
+          throw new IOException("Hay una versión más reciente pendiente. Usa el instalador actual; no se reducirá la versión solicitada.");
         if(old!=null&&old.TargetVersion==Backend.Version&&(old.State=="pending"||old.State=="running")&&!old.RequiresLocalRecovery) {
           old.State="pending";old.NextAttemptUtc="";Write(old);return;
         }
@@ -239,6 +241,34 @@ namespace InhousePhotos {
           // The installer persists the continuation again before pointer swap.
           await installManager();return;
         }
+        await CompletePinnedCore(prefs);
+      }catch(Exception ex) {
+        if(managerStarted)ManagerUpdates.Fail(ex);
+        RecordFailure(prefs,ex);
+        throw;
+      }finally{lock(Gate)applying=false;}
+    }
+    public static async Task CompletePinnedInstallation(Preferences prefs) {
+      if(!TryBegin(prefs,true))throw new IOException("La instalación está ocupada o no corresponde a esta versión. Compruébala antes de reintentar.");
+      try{await CompletePinnedCore(prefs);}
+      catch(Exception ex){RecordFailure(prefs,ex);throw;}
+      finally{lock(Gate)applying=false;}
+    }
+    public static string InstallationError(Preferences prefs) {
+      try {
+        var intent=Read(prefs);var detail=intent==null?"":intent.Error??"";
+        if(detail.Length==0)return "No se completó la instalación del servidor.";
+        return detail.Substring(0,Math.Min(400,detail.Length)).Replace('\r',' ').Replace('\n',' ');
+      }catch{return "No se pudo confirmar la instalación del servidor.";}
+    }
+    static void RecordFailure(Preferences prefs,Exception ex) {
+      lock(Gate) {
+        phase="error";error=ex.Message;
+        try{var intent=Read(prefs);if(intent!=null){intent.State="error";intent.Error=error;intent.RequiresLocalRecovery=requiresLocal;Write(intent);}}
+        catch{requiresLocal=true;}
+      }
+    }
+    static async Task CompletePinnedCore(Preferences prefs) {
         var intent=Read(prefs);
         if(intent!=null&&ManagerUpdates.Compare(intent.TargetVersion,Backend.Version)>0)
           throw new IOException("No se pudo comprobar la versión solicitada. La actualización queda guardada para reintentar.");
@@ -258,15 +288,6 @@ namespace InhousePhotos {
           intent.State="completed";intent.Error="";intent.NextAttemptUtc="";intent.RequiresLocalRecovery=false;Write(intent);
           confirmed=true;phase="completed";progress=100;error="";requiresLocal=false;
         }
-      }catch(Exception ex) {
-        if(managerStarted)ManagerUpdates.Fail(ex);
-        lock(Gate) {
-          phase="error";error=ex.Message;
-          try{var intent=Read(prefs);if(intent!=null){intent.State="error";intent.Error=error;intent.RequiresLocalRecovery=requiresLocal;Write(intent);}}
-          catch{requiresLocal=true;}
-        }
-        throw;
-      }finally{lock(Gate)applying=false;}
     }
     public static int SelfTest() {
       var prefs=new Preferences{Managed=true,Installation=@"D:\photos",ProjectName="inhouse",ReceiptPath=@"C:\receipt.json"};

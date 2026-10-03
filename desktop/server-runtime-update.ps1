@@ -25,6 +25,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $script:RuntimeFailureStage = 'preflight'
+$script:RuntimeFailureReason = ''
 $script:RuntimePhase = 'verifying'
 $script:RuntimeJournal = $null
 $script:RuntimeJournalPath = ''
@@ -59,6 +60,9 @@ function Set-RuntimeStage([string]$Stage) {
 
 function Write-RuntimeFailure {
   if ($ManagerProcessId -gt 0) { Write-Output ('INHOUSE_RUNTIME_FAILURE:' + $script:RuntimeFailureStage) }
+  if ($ManagerProcessId -gt 0 -and @('image_identity', 'image_platform', 'image_metadata', 'disk_space', 'daemon_unavailable', 'archive_invalid', 'native_failure') -ccontains $script:RuntimeFailureReason) {
+    Write-Output ('INHOUSE_RUNTIME_REASON:' + $script:RuntimeFailureReason)
+  }
 }
 
 function Write-RuntimePhase([string]$Phase) {
@@ -319,7 +323,10 @@ function Invoke-RuntimeNative([string[]]$Arguments, [string]$InputText, [int]$Ti
   try {
     if ($env:OS -ceq 'Windows_NT') {
       $job = New-RuntimeClientJob
-      $application = (Get-Command -Name $DockerExe -CommandType Application -ErrorAction Stop).Source
+      # A duplicated PATH can make Get-Command return the same executable more
+      # than once. Passing that array to CreateProcess turns it into an invalid
+      # space-joined filename; resolve one executable, as normal invocation does.
+      $application = @(Get-Command -Name $DockerExe -CommandType Application -ErrorAction Stop)[0].Source
       $job.Start($application, $info.Arguments)
       $process = $job.Process
       $output = $job.Output.ReadToEndAsync(); $errors = $job.Error.ReadToEndAsync()
@@ -357,7 +364,10 @@ function Invoke-RuntimeNative([string[]]$Arguments, [string]$InputText, [int]$Ti
       $timeout.Data['RuntimeNativeTimeout'] = $true
       throw $timeout
     }
-    return [pscustomobject]@{ExitCode=$process.ExitCode;Output=$output.GetAwaiter().GetResult().Trim()}
+    # Stderr can contain credentials or environment values. Classify it only
+    # in memory and expose a fixed reason code, never its original text.
+    $reason = if ($process.ExitCode -ne 0) { Get-RuntimeNativeReason ($errors.GetAwaiter().GetResult()) } else { '' }
+    return [pscustomobject]@{ExitCode=$process.ExitCode;Output=$output.GetAwaiter().GetResult().Trim();Reason=$reason}
   } finally {
     try { if ($started -and -not $process.HasExited) { Stop-RuntimeClient $process $job } }
     finally {
@@ -372,6 +382,13 @@ function Invoke-RuntimeNative([string[]]$Arguments, [string]$InputText, [int]$Ti
   }
 }
 
+function Get-RuntimeNativeReason([string]$Diagnostic) {
+  if ($Diagnostic -match '(?i)no space left on device|not enough (?:disk )?space|insufficient disk space') { return 'disk_space' }
+  if ($Diagnostic -match '(?i)cannot connect|failed to connect|error during connect|docker daemon is not running|connection refused') { return 'daemon_unavailable' }
+  if ($Diagnostic -match '(?i)invalid tar header|invalid checksum|unexpected EOF|invalid magic|invalid archive') { return 'archive_invalid' }
+  return 'native_failure'
+}
+
 function Invoke-Docker([string[]]$Arguments, [int]$TimeoutSeconds = 0) {
   if ($TimeoutSeconds -le 0) {
     $TimeoutSeconds = 30
@@ -383,6 +400,7 @@ function Invoke-Docker([string[]]$Arguments, [int]$TimeoutSeconds = 0) {
   if ($result.ExitCode -ne 0) {
     $failure = New-Object InvalidOperationException ('Docker no completó la operación: ' + $Arguments[0] + '.')
     $failure.Data['RuntimeNativeExit'] = $result.ExitCode
+    $script:RuntimeFailureReason = if ($result.PSObject.Properties['Reason']) { $result.Reason } else { 'native_failure' }
     throw $failure
   }
   return $result.Output
@@ -508,6 +526,14 @@ function Assert-Manifest($Manifest) {
     -not @($Manifest.compatibleServerImageIds).Count -or
     @($Manifest.compatibleServerImageIds | Where-Object { $_ -notmatch '^sha256:[a-f0-9]{64}$' }).Count) {
     throw 'El manifiesto no describe una actualización compatible y verificable.'
+  }
+  # Docker's classic store identifies the config; containerd identifies the
+  # canonical manifest built from that config and the exact uncompressed layer.
+  # Both are cryptographic identities from the verified public archive, not a
+  # same-name/same-label fallback. Older publications retain one exact ID.
+  if ($Manifest.PSObject.Properties['imageConfigId'] -and
+    ($Manifest.imageConfigId -cnotmatch '^sha256:[a-f0-9]{64}$' -or $Manifest.imageConfigId -ceq $Manifest.imageId)) {
+    throw 'La identidad publicada del motor Docker no es válida.'
   }
   if ($Manifest.databaseMigrations -ceq 'additive-upload-outbox') {
     if (-not $Manifest.PSObject.Properties['baselineDatabaseSchemaSha256'] -or
@@ -745,7 +771,13 @@ function Wait-CompressionIdle([string]$Image, $Context) {
   } finally { $script:RuntimeReadDeadline = $savedDeadline }
 }
 
-function Test-RuntimeImage($Manifest) {
+function Get-RuntimeAcceptedImageIds($Manifest) {
+  $ids = @($Manifest.imageId)
+  if ($Manifest.PSObject.Properties['imageConfigId']) { $ids += $Manifest.imageConfigId }
+  return $ids
+}
+
+function Get-RuntimeImageId($Manifest) {
   $format = '[{{json .Id}},{{json .Os}},{{json .Architecture}},{{json .Config.Labels}}]'
   try { $json = Invoke-Docker @('image', 'inspect', '--format', $format, $Manifest.image) }
   catch {
@@ -753,7 +785,7 @@ function Test-RuntimeImage($Manifest) {
     # A timeout must never be interpreted as a missing image and trigger load.
     if ($_.Exception.Data.Contains('RuntimeNativeExit') -and $_.Exception.Data['RuntimeNativeExit'] -eq 1) {
       Invoke-Docker @('version', '--format', '{{.Server.Version}}') | Out-Null
-      return $false
+      return $null
     }
     throw
   }
@@ -761,13 +793,20 @@ function Test-RuntimeImage($Manifest) {
   $revision = $image[3].PSObject.Properties['org.opencontainers.image.revision']
   $version = $image[3].PSObject.Properties['org.opencontainers.image.version']
   $schema = $image[3].PSObject.Properties['inhouse.runtime.database-schema-sha256']
-  if ($image[0] -cne $Manifest.imageId -or $image[1] -cne 'linux' -or $image[2] -cne 'amd64' -or
+  if (@(Get-RuntimeAcceptedImageIds $Manifest) -cnotcontains $image[0] -or $image[1] -cne 'linux' -or $image[2] -cne 'amd64' -or
     -not $revision -or $revision.Value -cne $Manifest.sourceCommit -or
     -not $version -or $version.Value -cne $Manifest.version -or
     -not $schema -or $schema.Value -cne $Manifest.databaseSchemaSha256) {
-    throw 'La imagen existente no coincide con la identidad, versión y plataforma publicadas.'
+    $script:RuntimeFailureReason = if (@(Get-RuntimeAcceptedImageIds $Manifest) -cnotcontains $image[0]) { 'image_identity' }
+      elseif ($image[1] -cne 'linux' -or $image[2] -cne 'amd64') { 'image_platform' } else { 'image_metadata' }
+    throw 'El motor cargado no coincide con su identidad, versión y plataforma verificadas. No se ha cambiado tu servidor.'
   }
-  return $true
+  $script:RuntimeFailureReason = ''
+  return [string]$image[0]
+}
+
+function Test-RuntimeImage($Manifest) {
+  return [bool](Get-RuntimeImageId $Manifest)
 }
 
 function Restore-Runtime($Record, $Preferences, [string]$ComposeFile, [string]$RecordPath) {
@@ -817,6 +856,7 @@ function Assert-NoIncompleteUpdate([string]$SettingsPath) {
 
 function Invoke-RuntimeUpdate {
   Set-RuntimeStage 'preflight'
+  $script:RuntimeFailureReason = ''
   Set-RuntimeJournal $null ''
   Assert-RuntimeCancellationPath
   Assert-RuntimeNotCancelled
@@ -960,13 +1000,16 @@ function Invoke-RuntimeUpdate {
   if ([IO.Path]::GetFileName($archiveFile) -cne $manifest.archiveFile -or (Get-Sha256 $archiveFile) -cne $manifest.archiveSha256) {
     throw 'El archivo de la imagen no coincide con la publicación.'
   }
-  if (@($manifest.compatibleServerImageIds) -cnotcontains $server.Image -and $server.Image -cne $manifest.imageId) {
+  if (@($manifest.compatibleServerImageIds) -cnotcontains $server.Image -and @(Get-RuntimeAcceptedImageIds $manifest) -cnotcontains $server.Image) {
     throw 'La versión instalada no figura como compatible en la publicación. No se sustituirá.'
   }
   $previousRef = Get-ComposeImage $prefs $composeFile
   if ((Invoke-Docker @('image', 'inspect', '--format', '{{.Id}}', $previousRef)) -cne $server.Image) { throw 'La imagen de Compose no coincide con el servidor en ejecución.' }
   $candidate = Set-ServerImage ([IO.File]::ReadAllText($composeFile)) $manifest.image
-  if ($server.Image -ceq $manifest.imageId) { Write-Output ('Ya está instalada la imagen ' + $manifest.version + '.'); return }
+  if (@(Get-RuntimeAcceptedImageIds $manifest) -ccontains $server.Image) {
+    if ((Get-RuntimeImageId $manifest) -cne $server.Image) { throw 'La imagen en ejecución no coincide con la publicación verificada.' }
+    Write-Output ('Ya está instalada la imagen ' + $manifest.version + '.'); return
+  }
   if (-not $Apply) { Write-Output ('Actualización compatible: ' + $manifest.version + '. Añade -Apply para instalarla. Solo se recreará immich-server.'); return }
 
   # A private transaction journal survives PowerShell termination and retains
@@ -993,10 +1036,17 @@ function Invoke-RuntimeUpdate {
     Write-RuntimePhase 'installing'
     Set-RuntimeStage 'image'
     Set-RuntimeJournal $record $recordPath
-    if (-not (Test-RuntimeImage $manifest)) {
+    $loadedImageId = Get-RuntimeImageId $manifest
+    if (-not $loadedImageId) {
       Invoke-Docker @('load', '--input', $archiveFile) | Out-Null
-      if (-not (Test-RuntimeImage $manifest)) { throw 'Docker no confirmó la imagen cargada.' }
+      $loadedImageId = Get-RuntimeImageId $manifest
+      if (-not $loadedImageId) { throw 'Docker no confirmó la imagen cargada.' }
     }
+    # Persist the actual verified identity before any queue/configuration
+    # change. Recovery must compare exact Docker IDs, never assume a backend.
+    $manifest.imageId = $loadedImageId
+    $record.newImageId = $loadedImageId
+    Write-PrivateJson $recordPath $record
     $script:QueueContext = New-QueueContext $server.Id $directory
     $record.queueState = (Invoke-QueueHelper $manifest.imageId $script:QueueContext 'inspect' $null).pausedStates
     Write-PrivateJson $recordPath $record
