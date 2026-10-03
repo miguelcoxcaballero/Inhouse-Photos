@@ -21,6 +21,8 @@ class WindowsPublicationTest(unittest.TestCase):
         self.run_git("config", "user.email", "verification@example.invalid")
         (self.root / "desktop").mkdir()
         (self.root / "desktop" / "ServerApp.cs").write_text("verified Windows source")
+        (self.root / "server").mkdir()
+        (self.root / "server/package.json").write_text('{"version":"3.1.96"}\n')
         (self.root / publication.MANIFEST).write_text("old update manifest")
         self.source = self.commit("base")
         self.staged = {
@@ -67,6 +69,18 @@ class WindowsPublicationTest(unittest.TestCase):
         self.write_manifest()
         with self.assertRaisesRegex(ValueError, "rebuild required"):
             publication.stage_publication(self.root, self.source, target, self.root.parent / "publication")
+
+    def test_refuses_a_changed_shared_server_version(self):
+        (self.root / "server/package.json").write_text('{"version":"3.1.97"}\n')
+        target = self.commit("change shared version")
+        with self.assertRaisesRegex(ValueError, "server/package.json"):
+            publication.require_same_windows_inputs(self.root, self.source, target)
+
+    def test_unified_version_preserves_the_legacy_installer_manifest_contract(self):
+        self.staged["Version"] = "3.1.96"
+        self.staged["InstallerUrl"] = self.staged["InstallerUrl"].replace("server-v1.2.17", "server-v3.1.96")
+        self.write_manifest()
+        self.assertEqual(publication.validate_manifest(self.root / publication.MANIFEST), self.staged)
 
     def test_rejects_an_untrusted_installer_url(self):
         self.staged["InstallerUrl"] = "https://example.invalid/installer.exe"

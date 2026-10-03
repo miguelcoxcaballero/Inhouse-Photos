@@ -25,8 +25,25 @@ BASE_INDEX = "283fb546c253d70c3e984062a2d2ebc08ce4547ef799e0ffba634222e4b5c16d"
 BASE_SOURCE = "67b8d77eb710211b13dc7a7ef469054b98962657"
 BASE_SCHEMA_SHA = "e4da4ec029df53f7657b2a81776bb48806c419ecfb509c95e5e84e128dbd4824"
 STORAGE_SAVER_IMAGE = "0034cd9b0031574479c192ed8be48212f6e57012785d804beb171ed8a2d5a8ac"
+DURABLE_UPLOAD_IMAGE = "dd8c68b182ef2cade7002e7625c43e60ee89e27ee42eec0fb4b6e392d34a8a75"
 UPLOAD_MIGRATION = "1790985600000-DurableUploadProcessing"
 PREFIX = "usr/src/app/server/dist/"
+PACKAGE_PATH = "usr/src/app/server/package.json"
+
+
+def same_dependency_input(path, baseline, published):
+    if path != "server/package.json":
+        return baseline == published
+    previous, current = json.loads(baseline), json.loads(published)
+    if not isinstance(previous, dict) or not isinstance(current, dict):
+        return False
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", str(current.get("version", ""))):
+        return False
+    previous.pop("version", None)
+    current.pop("version", None)
+    # Every other field remains pinned, including scripts, overrides and both
+    # dependency sets. A product version bump cannot introduce new packages.
+    return previous == current
 
 
 def verify_dependency_inputs(root, source_commit):
@@ -36,7 +53,7 @@ def verify_dependency_inputs(root, source_commit):
     for path in paths:
         baseline = subprocess.check_output(["git", "show", BASE_SOURCE + ":" + path], cwd=root)
         published = subprocess.check_output(["git", "show", source_commit + ":" + path], cwd=root)
-        if baseline != published or (root / path).read_bytes() != published:
+        if not same_dependency_input(path, baseline, published) or (root / path).read_bytes() != published:
             raise ValueError("Runtime dependencies differ from the verified base: " + path)
     if subprocess.check_output(["git", "diff", "--name-only", BASE_SOURCE, source_commit,
                                 "--", "packages/plugin-sdk", "packages/plugin-core"], cwd=root):
@@ -111,6 +128,9 @@ def build(args):
     if not re.fullmatch(r"[a-f0-9]{40}", args.source_commit):
         raise ValueError("Expected exact source commit")
     verify_dependency_inputs(args.dist.resolve().parents[1], args.source_commit)
+    package = args.dist.parent / "package.json"
+    if json.loads(package.read_bytes()).get("version") != args.version:
+        raise ValueError("Runtime version does not match the server API package version")
     compiled = compiled_files(args.dist)
     if digest(args.base_archive) != BASE_SHA:
         raise ValueError("Published base archive checksum mismatch")
@@ -184,6 +204,11 @@ def build(args):
                 entry = tarfile.TarInfo(path)
                 entry.size, entry.mode, entry.uid, entry.gid = source.stat().st_size, 0o644, 0, 0
                 entries[path] = (entry, source)
+            # ServerVersion reads this file at startup. Publish the verified
+            # source package so the API, image label and product agree.
+            package_entry = copy.copy(entries[PACKAGE_PATH][0])
+            package_entry.size = package.stat().st_size
+            entries[PACKAGE_PATH] = (package_entry, package)
             schema_sha = schema_digest(entries)
             startup = args.dist.parent / "bin/start.sh"
             path = "usr/src/app/server/bin/start.sh"
@@ -235,7 +260,8 @@ def build(args):
                    "image": args.image, "imageId": "sha256:" + image_id,
                    "archiveFile": filename, "archiveSha256": digest(output), "platform": "linux/amd64",
                    "compatibleServerImageIds": ["sha256:" + BASE_INDEX, "sha256:" + config_path.name,
-                                                "sha256:" + STORAGE_SAVER_IMAGE],
+                                                "sha256:" + STORAGE_SAVER_IMAGE,
+                                                "sha256:" + DURABLE_UPLOAD_IMAGE],
                    "databaseMigrations": "additive-upload-outbox", "databaseSchemaSha256": schema_sha,
                    "baselineDatabaseSchemaSha256": BASE_SCHEMA_SHA,
                    "addedDatabaseMigrations": [UPLOAD_MIGRATION]}
@@ -249,6 +275,6 @@ if __name__ == "__main__":
     parser.add_argument("dist", type=pathlib.Path)
     parser.add_argument("output_directory", type=pathlib.Path)
     parser.add_argument("--source-commit", required=True)
-    parser.add_argument("--version", default="3.1.0-durable-upload-20261003")
-    parser.add_argument("--image", default="inhouse-photos-server:v3.1.0-durable-upload-20261003")
+    parser.add_argument("--version", default="3.1.96")
+    parser.add_argument("--image", default="inhouse-photos-server:v3.1.96")
     build(parser.parse_args())

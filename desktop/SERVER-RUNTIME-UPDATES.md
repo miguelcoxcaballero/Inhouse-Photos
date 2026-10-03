@@ -1,37 +1,38 @@
-# Actualizar el motor del servidor Windows
+# Actualizar Inhouse Photos
 
-La versión del gestor Windows y la del motor de fotos se actualizan por separado.
-La recepción con cola persistente y las mejoras de compresión necesitan instalar
-el paquete del motor en el PC que ejecuta Docker Desktop. Este actualizador se aplica a una
-biblioteca previamente vinculada y verificada por Inhouse Photos Server.
-
-Con Android **3.1.95** y el gestor Windows **1.2.17**, la actualización se solicita
-desde **Ajustes > Gestión del servidor**, en la misma pantalla que muestra el
-estado del servidor, los discos y las copias. Si aparece la actualización del
-gestor Windows, instálala primero desde esa pantalla. Después pulsa
-**Actualizar servidor**. El PC descarga, verifica e instala el motor; el móvil
-muestra el progreso y confirma la versión instalada. La instalación continúa
-aunque salgas de la pantalla del móvil.
+Desde **Inhouse Photos 3.1.96**, Android y Windows comparten la versión pública
+del producto. En **Ajustes > Gestión del servidor**, pulsa **Actualizar** una
+sola vez. El PC instala los componentes necesarios, guarda la continuación
+antes de reiniciar el gestor y completa la actualización aunque cierres la app.
+La pantalla muestra un único progreso y confirma la versión cuando el motor
+real, su estado de salud y el registro de instalación están verificados.
 
 La actualización del gestor conserva el motor en ejecución. La actualización
 del motor reinicia brevemente la API de fotos y conserva la biblioteca y los
 trabajos pendientes. Durante la operación, el gestor bloquea las operaciones
 que podrían cambiar su configuración.
 
-La instalación manual sigue disponible para diagnóstico:
+## Reparar una actualización bloqueada en 1.2.17
 
-Descarga el ZIP del motor desde la publicación oficial, extráelo en una carpeta
-local, cierra el gestor desde su icono de la bandeja y ejecuta el lanzador
-`Actualizar-servidor.ps1` incluido en el paquete, con el mismo usuario de Windows
-que utiliza el gestor. El lanzador fija los SHA-256 reales del manifiesto y de
-los scripts; no requiere introducir credenciales.
+El gestor 1.2.17 puede confundir el progreso normal de Docker en Windows
+PowerShell 5.1 con un fallo y dejar la instalación pendiente. Además, esa versión
+bloquea su propia actualización remota mientras exista ese registro; una APK
+nueva no puede cambiar la regla del programa que ya está instalado.
+
+En este caso, cierra el gestor desde **Salir del gestor** en su icono de la
+bandeja e instala [Inhouse Photos 3.1.96 para Windows](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.96/Inhouse-Photos-Server-Setup.exe)
+con el mismo usuario de Windows. El instalador conserva la biblioteca y el
+registro pendiente, y el programa corregido continúa la actualización. No hace
+falta borrar las colas ni volver a subir los archivos. Esta reparación manual
+solo es necesaria para salir del bloqueo del programa antiguo.
 
 El paquete contiene una imagen completa del motor y puede rondar 1 GB
 comprimido. Reserva espacio para extraerla y para que Docker conserve ambas
 imágenes. La preparación espera hasta 15 minutos a que terminen las
 compresiones que ya están activas. Conserva los trabajos pendientes; no los
 borra. La API se reinicia brevemente durante la sustitución del motor. Una
-actualización correcta muestra la nueva versión y el commit instalado.
+actualización correcta muestra una sola versión de Inhouse Photos. Los hashes,
+commits y versiones internas de componentes se usan para verificar la instalación.
 
 ## Operación y verificación
 
@@ -75,10 +76,11 @@ usuario, no se registran ni se muestran, y se eliminan al finalizar.
 
 ## Recuperación
 
-Si el motor sigue respondiendo a la API, el móvil permite reanudar una
-actualización pendiente desde la misma pantalla. Si la API quedó totalmente
-detenida, el gestor no puede verificar una nueva sesión de administrador del
-móvil: abre **Ajustes > Actualizaciones del motor** en Windows para recuperarla.
+El PC guarda la solicitud y realiza reintentos automáticos acotados tras una
+interrupción. El mismo botón **Actualizar** permite continuar si esos intentos
+no bastan. Si la API está totalmente detenida y el PC no tiene una solicitud
+guardada, no puede verificar una nueva sesión de administrador del móvil:
+abre **Ajustes > Actualizaciones** en Windows para solicitar la recuperación.
 
 La actualización conserva los bytes originales de Compose y del recibo, el
 ID de la imagen anterior y un registro de transacción dentro de
@@ -138,4 +140,8 @@ recuperación de colas sin pérdida de trabajos. El empaquetado exige dependenci
 idénticas a las del motor base y un build completo limpio, incluida la migración.
 La publicación verifica subidas con el procesado detenido y recuperación tras
 reiniciar el servidor y perder las colas Redis. Una instalación real debe
-confirmar además la salud de la imagen publicada en Docker Desktop.
+confirmar además la salud de la imagen publicada en Docker Desktop. Las pruebas
+Windows ejecutan un programa nativo que escribe progreso en stderr y devuelve
+código cero, y también comprueban el rechazo de códigos de error. Las pruebas
+de transacción recorren instalación y recuperación, conservando el estado
+original de las colas, el recibo y los montajes.

@@ -23,6 +23,7 @@ class ConcurrentPublicationTests(unittest.TestCase):
         (self.root / "mobile/pubspec.yaml").write_text("version: 3.1.93+5151\n")
         (self.root / "server").mkdir()
         (self.root / "server/service.ts").write_text("const original = true;\n")
+        (self.root / "server/package.json").write_text('{"version": "3.1.96"}\n')
         (self.root / "i18n").mkdir()
         (self.root / "i18n/es.json").write_text('{}\n')
         (self.root / "AGENTS.md").write_text("Use the permanent Android key.\n")
@@ -64,6 +65,18 @@ class ConcurrentPublicationTests(unittest.TestCase):
         latest = self.commit("Newer mobile version")
         with self.assertRaisesRegex(ValueError, "new build is required"):
             publication.require_same_android_inputs(self.root, self.source, latest)
+
+    def test_public_server_version_cannot_change_during_a_unified_build(self):
+        (self.root / "server/package.json").write_text('{"version": "3.1.97"}\n')
+        latest = self.commit("Change shared public version")
+        with self.assertRaisesRegex(ValueError, "server/package.json"):
+            publication.require_same_android_inputs(self.root, self.source, latest)
+
+    def test_verified_windows_runtime_pins_can_advance_during_android_build(self):
+        (self.root / "desktop").mkdir()
+        (self.root / "desktop/RuntimeUpdates.cs").write_text('const string LatestVersion="3.1.96";\n')
+        latest = self.commit("Pin verified runtime image for Windows")
+        publication.require_same_android_inputs(self.root, self.source, latest)
 
     def test_translation_changes_require_a_new_build(self):
         (self.root / "i18n/es.json").write_text('{"backup": "Nueva traducción"}\n')

@@ -63,13 +63,18 @@ def updated_pubspec(contents: str, version: str, base_build: int) -> str:
 
 
 def release_feature(tag: str, version: str) -> str:
-    match = re.fullmatch(re.escape(f"v{version}") + r"-(durable-upload|server-update)", tag)
+    match = re.fullmatch(re.escape(f"v{version}") + r"-(durable-upload|server-update|unified)", tag)
     if not match:
         raise ValueError("Release tag must match the target Android version and a supported release feature")
     return match.group(1)
 
 
 def feature_description(feature: str) -> str:
+    if feature == "unified":
+        return (
+            "Actualiza Inhouse Photos desde Ajustes > Gestión del servidor. La aplicación "
+            "y el programa de Windows comparten una versión y una única acción de actualización.\n\n"
+        )
     if feature == "server-update":
         return (
             "En Ajustes > Gestión del servidor puedes consultar y solicitar la actualización "
@@ -80,6 +85,11 @@ def feature_description(feature: str) -> str:
         "La copia de seguridad continúa después de guardar cada archivo en el servidor; "
         "la optimización se completa allí por separado.\n\n"
     )
+
+
+def validate_shared_version(feature: str, version: str, server_version: str) -> None:
+    if feature == "unified" and server_version != version:
+        raise ValueError("Unified Android and server package versions must match")
 
 
 def verify_identity(badging: str, certificates: str, symbols: str, version: str, version_code: int) -> None:
@@ -107,6 +117,8 @@ def stage(args: argparse.Namespace) -> dict:
     old_manifest = json.loads((root / "android-update.json").read_text())
     validate_target(version, base_build, current_version, current_build, old_manifest)
     feature = release_feature(args.tag, version)
+    server_version = json.loads((root / "server/package.json").read_text())["version"]
+    validate_shared_version(feature, version, server_version)
 
     with zipfile.ZipFile(apk) as archive, tempfile.TemporaryDirectory(prefix="inhouse-android-verify-") as temporary:
         if archive.testzip() is not None:
@@ -151,6 +163,7 @@ def stage(args: argparse.Namespace) -> dict:
         "sourceCommit": args.source_commit,
         "version": version,
         "versionCode": version_code,
+        "serverPackageVersion": server_version,
         "package": PACKAGE,
         "certificateSha256": CERTIFICATE,
         "apkSha256": digest,

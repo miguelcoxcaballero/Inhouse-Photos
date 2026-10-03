@@ -16,9 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      RELEASE_TAG: v3.1.95-server-update
-      ANDROID_RELEASE_VERSION: '3.1.95'
-      ANDROID_RELEASE_BASE_BUILD: '5153'
+      RELEASE_TAG: v3.1.96-unified
+      ANDROID_RELEASE_VERSION: '3.1.96'
+      ANDROID_RELEASE_BASE_BUILD: '5154'
     steps:
       - name: Checkout the source to publish
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -90,6 +90,7 @@ jobs:
             test/unit/media_upload_gate_test.dart \
             test/unit/adaptive_upload_limiter_test.dart \
             test/services/manager_update.service_test.dart \
+            test/services/system_update.service_test.dart \
             test/services/runtime_update.service_test.dart \
             test/services/server_management.service_test.dart \
             test/widgets/settings/server_management_settings_test.dart
@@ -147,7 +148,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- mobile/pubspec.yaml Inhouse-Photos.apk Inhouse-Photos-Android.zip android-update.json
-          git commit -m "chore(android): publish verified $ANDROID_RELEASE_VERSION server-update APK"
+          git commit -m "chore(android): publish verified $ANDROID_RELEASE_VERSION unified APK"
           git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
@@ -163,7 +164,7 @@ jobs:
           version_code = int(os.environ['ANDROID_RELEASE_BASE_BUILD']) + 2000
           Path(sys.argv[1]).write_text(
               f'Inhouse Photos Android {version} (ARM64, versionCode {version_code}).\n\n'
-              'Actualiza el motor del servidor desde Ajustes > Gestión del servidor. En esa misma pantalla, actualiza primero el gestor Windows si se solicita y después pulsa Actualizar servidor. El PC descarga, verifica y aplica el motor; el móvil muestra el progreso.\n\n'
+              f'La aplicación y el programa de Windows comparten la versión {version}. En Ajustes > Gestión del servidor, una única acción consulta y aplica la actualización de Inhouse Photos. El trabajo pendiente continúa después de reiniciar el programa.\n\n'
               'Instala Inhouse-Photos.apk o extráelo de Inhouse-Photos-Android.zip sobre la aplicación existente. Se conserva el certificado permanente de Inhouse Photos. El informe adjunto verifica la versión, el paquete, la firma y los ocho símbolos JNI.\n'
           )
           PY
@@ -171,7 +172,7 @@ jobs:
             python -c 'import json,sys; assert json.load(open(sys.argv[1]))["isDraft"], "Refusing to overwrite an already published Android release"' "$RUNNER_TEMP/existing-android-release.json"
           else
             gh release create "$RELEASE_TAG" --draft --target "$RELEASE_COMMIT" \
-              --title "Inhouse Photos Android $ANDROID_RELEASE_VERSION — actualización del motor del servidor" \
+              --title "Inhouse Photos $ANDROID_RELEASE_VERSION — actualización unificada" \
               --notes-file "$RUNNER_TEMP/android-release-notes.md"
           fi
           gh release upload "$RELEASE_TAG" Inhouse-Photos.apk Inhouse-Photos-Android.zip \

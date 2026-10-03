@@ -16,6 +16,7 @@ import 'package:immich_mobile/providers/auth.provider.dart';
 import 'package:immich_mobile/services/manager_update.service.dart';
 import 'package:immich_mobile/services/runtime_update.service.dart';
 import 'package:immich_mobile/services/server_management.service.dart';
+import 'package:immich_mobile/services/system_update.service.dart';
 import 'package:immich_mobile/widgets/settings/server_management_settings.dart';
 
 class _AdminNotifier extends StateNotifier<AuthState> implements AuthNotifier {
@@ -37,6 +38,9 @@ class _AdminNotifier extends StateNotifier<AuthState> implements AuthNotifier {
 }
 
 void main() {
+  const latestVersion = '3.1.96';
+  const systemPath = '/inhouse-manager/v1/system-update';
+  const managerPath = '/inhouse-manager/v1/update';
   late Drift db;
   late StoreService store;
 
@@ -65,17 +69,19 @@ void main() {
             service: ServerManagementService(client),
             managerUpdateService: ManagerUpdateService(client),
             runtimeUpdateService: RuntimeUpdateService(client),
+            systemUpdateService: SystemUpdateService(client),
           ),
         ),
       ),
     ),
   );
 
-  http.Response online({String version = '1.2.16'}) => http.Response(
+  http.Response online({String version = '1.2.16', bool busy = false, bool backupRunning = false}) => http.Response(
     jsonEncode({
       'Version': version,
       'ServerOnline': true,
-      'Busy': false,
+      'Busy': busy,
+      'BackupRunning': backupRunning,
       'BackupConfigured': true,
       'StartupKnown': true,
       'Disks': [],
@@ -84,13 +90,15 @@ void main() {
   );
 
   http.Response updateStatus({
-    required String current,
-    required String latest,
+    String current = '3.1.95',
+    String latest = latestVersion,
     bool available = false,
     String phase = 'idle',
     int progress = 0,
     String error = '',
     bool recoveryRequired = false,
+    bool requiresLocalRecovery = false,
+    bool busy = false,
   }) => http.Response(
     jsonEncode({
       'CurrentVersion': current,
@@ -101,16 +109,23 @@ void main() {
       'Error': error,
       'Notes': '',
       'RecoveryRequired': recoveryRequired,
+      'RequiresLocalRecovery': requiresLocalRecovery,
+      'Busy': busy,
     }),
     200,
   );
 
-  http.Response noUpdate(http.Request request) => updateStatus(
-    current: request.url.path.endsWith('/runtime-update') ? '3.1.0' : '1.2.16',
-    latest: request.url.path.endsWith('/runtime-update') ? '3.1.0' : '1.2.16',
-  );
+  http.Response noUpdate(http.Request request) => updateStatus(current: latestVersion);
 
   Finder button(String label) => find.ancestor(of: find.text(label), matching: find.byType(FilledButton));
+
+  Future<void> confirmUpdate(WidgetTester tester) async {
+    await tester.tap(button('Update'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Update')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+  }
 
   testWidgets('failed connection stops checking and recovers automatically when the manager starts', (tester) async {
     var requests = 0;
@@ -125,14 +140,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Checking connection…'), findsNothing);
-    expect(find.text('Windows manager unavailable'), findsOneWidget);
+    expect(find.text('PC unavailable'), findsOneWidget);
     expect(find.textContaining('offline or restarting'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 15));
     await tester.pumpAndSettle();
     expect(requests, 2);
     expect(find.text('Server online'), findsOneWidget);
-    expect(find.text('Windows manager unavailable'), findsNothing);
+    expect(find.text('PC unavailable'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -179,117 +194,47 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('old manager can be updated from this screen before enabling an engine update', (tester) async {
-    var managerStarted = false;
-    var engineStarts = 0;
-    var reconnects = 0;
-    var engineChecks = 0;
-    final requests = <String>[];
+  testWidgets('one public update bootstraps an old manager and follows the PC through completion', (tester) async {
+    var started = false;
+    var completed = false;
+    var managerPosts = 0;
+    var systemPosts = 0;
+    var checksAfterPost = 0;
     final client = MockClient((request) async {
-      requests.add('${request.method} ${request.url.path}');
       expect(request.headers['authorization'], 'Bearer administrator-token');
       switch (request.url.path) {
         case '/inhouse-manager/v1/status':
-          if (managerStarted && reconnects++ == 0) {
-            return http.Response('', 502);
-          }
-          return online(version: managerStarted ? '1.2.17' : '1.2.16');
-        case '/inhouse-manager/v1/update':
+          return online();
+        case systemPath:
           if (request.method == 'POST') {
-            expect(request.body, isEmpty);
-            managerStarted = true;
-            return http.Response('', 202);
-          }
-          return updateStatus(
-            current: managerStarted ? '1.2.17' : '1.2.16',
-            latest: '1.2.17',
-            available: !managerStarted,
-            phase: managerStarted ? 'completed' : 'idle',
-            progress: managerStarted ? 100 : 0,
-          );
-        case '/inhouse-manager/v1/runtime-update':
-          if (request.method == 'POST') {
-            engineStarts++;
-            return http.Response('', 202);
-          }
-          engineChecks++;
-          if (!managerStarted || reconnects <= 1) {
-            return http.Response('', 404);
-          }
-          return updateStatus(current: '3.1.0', latest: '3.1.0-durable-upload', available: true);
-        default:
-          fail('Unexpected request ${request.method} ${request.url}');
-      }
-    });
-    addTearDown(client.close);
-    await open(tester, client);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Update Windows manager'), findsOneWidget);
-    expect(find.textContaining('Update Windows manager'), findsWidgets);
-    expect(find.text('Update server engine'), findsNothing);
-    expect(engineChecks, greaterThan(0));
-
-    await tester.tap(button('Update Windows manager'));
-    await tester.pumpAndSettle();
-    expect(managerStarted, isFalse);
-    expect(engineStarts, 0);
-    await tester.tap(find.text('Continue'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(managerStarted, isTrue);
-
-    // The Windows manager temporarily disappears while the installer restarts
-    // it. The engine button becomes usable only after a successful reconnect.
-    for (var attempt = 0; attempt < 8 && reconnects < 2; attempt++) {
-      await tester.pump(const Duration(seconds: 15));
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    await tester.pumpAndSettle();
-    expect(reconnects, greaterThanOrEqualTo(2));
-    expect(find.textContaining('1.2.17'), findsWidgets);
-    expect(tester.widget<FilledButton>(button('Update server engine')).onPressed, isNotNull);
-    expect(engineStarts, 0);
-    expect(requests.where((request) => request == 'POST /inhouse-manager/v1/update'), hasLength(1));
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
-
-  testWidgets('engine update continues through a restart and confirms the running version', (tester) async {
-    var started = false;
-    var posts = 0;
-    var checksAfterStart = 0;
-    final client = MockClient((request) async {
-      switch (request.url.path) {
-        case '/inhouse-manager/v1/status':
-          return online(version: '1.2.17');
-        case '/inhouse-manager/v1/update':
-          return updateStatus(current: '1.2.17', latest: '1.2.17');
-        case '/inhouse-manager/v1/runtime-update':
-          if (request.method == 'POST') {
-            expect(request.body, isEmpty);
-            expect(request.headers['authorization'], 'Bearer administrator-token');
-            started = true;
-            posts++;
+            systemPosts++;
             return http.Response('', 202);
           }
           if (!started) {
-            return updateStatus(current: '3.1.0', latest: '3.1.0-durable-upload', available: true);
+            return http.Response('', 404);
           }
-          switch (checksAfterStart++) {
-            case 0:
-              return updateStatus(current: '3.1.0', latest: '3.1.0-durable-upload', phase: 'downloading', progress: 25);
-            case 1:
-              return updateStatus(current: '3.1.0', latest: '3.1.0-durable-upload', phase: 'restarting', progress: 90);
-            case 2:
-              return http.Response('', 502);
-            default:
-              return updateStatus(
-                current: '3.1.0-durable-upload',
-                latest: '3.1.0-durable-upload',
-                phase: 'completed',
-                progress: 100,
-              );
+          checksAfterPost++;
+          if (checksAfterPost == 1) {
+            return http.Response('<html>503 Service Unavailable</html>', 503);
           }
+          return updateStatus(
+            current: completed ? latestVersion : '3.1.95',
+            phase: completed ? 'completed' : 'downloading',
+            progress: completed ? 100 : 60,
+          );
+        case managerPath:
+          if (request.method == 'POST') {
+            expect(request.body, isEmpty);
+            managerPosts++;
+            started = true;
+            return http.Response('', 202);
+          }
+          // An old manager can have cached an internal-version manifest. It
+          // must still present the app's single public update/version.
+          return updateStatus(current: '1.2.16', latest: '1.2.16');
+        case '/inhouse-manager/v1/runtime-update':
+          expect(request.method, 'GET');
+          return http.Response('', 404);
         default:
           fail('Unexpected request ${request.method} ${request.url}');
       }
@@ -298,47 +243,278 @@ void main() {
     await open(tester, client);
     await tester.pumpAndSettle();
 
-    await tester.tap(button('Update server engine'));
-    await tester.pumpAndSettle();
-    expect(posts, 0);
-    await tester.tap(find.text('Continue'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(posts, 1);
-    expect(find.textContaining('25%'), findsWidgets);
+    expect(find.text('Update'), findsOneWidget);
+    expect(find.textContaining(latestVersion), findsOneWidget);
+    expect(find.textContaining('1.2.16'), findsNothing);
+    expect(find.textContaining('1.2.17'), findsNothing);
+    expect(find.text('Update Windows manager'), findsNothing);
+    expect(find.text('Update server engine'), findsNothing);
 
-    for (var attempt = 0; attempt < 10 && checksAfterStart < 4; attempt++) {
-      await tester.pump(const Duration(seconds: 15));
+    await confirmUpdate(tester);
+    expect(managerPosts, 1);
+    expect(systemPosts, 0);
+    completed = true;
+    for (var attempt = 0; attempt < 5 && checksAfterPost < 2; attempt++) {
+      await tester.pump(const Duration(seconds: 3));
       await tester.pump(const Duration(milliseconds: 100));
     }
     await tester.pumpAndSettle();
-    expect(checksAfterStart, greaterThanOrEqualTo(4));
-    expect(find.textContaining('3.1.0-durable-upload'), findsWidgets);
-    expect(posts, 1);
-    expect(find.text('Update server engine'), findsNothing);
+
+    expect(checksAfterPost, greaterThanOrEqualTo(2));
+    expect(find.textContaining('Up to date'), findsOneWidget);
+    expect(find.textContaining(latestVersion), findsOneWidget);
+    expect(managerPosts, 1);
+    expect(systemPosts, 0);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('accepted engine update stays pending until the new version is running', (tester) async {
+  testWidgets('one system update survives API restart and confirms the public running version', (tester) async {
+    var started = false;
     var posts = 0;
-    var updated = false;
+    var checksAfterPost = 0;
     final client = MockClient((request) async {
+      if (request.url.path.endsWith('/status')) {
+        return online();
+      }
+      expect(request.url.path, systemPath);
+      if (request.method == 'POST') {
+        expect(request.body, isEmpty);
+        expect(request.headers['authorization'], 'Bearer administrator-token');
+        started = true;
+        posts++;
+        return http.Response('', 202);
+      }
+      if (!started) {
+        return updateStatus(available: true);
+      }
+      switch (checksAfterPost++) {
+        case 0:
+          return updateStatus(phase: 'downloading', progress: 25);
+        case 1:
+          return updateStatus(phase: 'restarting', progress: 90);
+        case 2:
+          return http.Response('<html>503 Service Unavailable</html>', 503);
+        default:
+          return updateStatus(current: latestVersion, phase: 'completed', progress: 100);
+      }
+    });
+    addTearDown(client.close);
+    await open(tester, client);
+    await tester.pumpAndSettle();
+
+    await confirmUpdate(tester);
+    expect(posts, 1);
+    expect(find.textContaining('25%'), findsOneWidget);
+    for (var attempt = 0; attempt < 8 && checksAfterPost < 4; attempt++) {
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.pumpAndSettle();
+
+    expect(checksAfterPost, greaterThanOrEqualTo(4));
+    expect(find.textContaining('Up to date'), findsOneWidget);
+    expect(find.textContaining(latestVersion), findsOneWidget);
+    expect(posts, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('accepted update stays pending while the old public version is running', (tester) async {
+    var posts = 0;
+    var completed = false;
+    final client = MockClient((request) async {
+      if (request.url.path.endsWith('/status')) {
+        return online();
+      }
+      expect(request.url.path, systemPath);
+      if (request.method == 'POST') {
+        posts++;
+        return http.Response('', 202);
+      }
+      return updateStatus(
+        current: completed ? latestVersion : '3.1.95',
+        available: posts == 0,
+        phase: posts == 0 ? 'idle' : 'completed',
+        progress: posts == 0 ? 0 : 100,
+      );
+    });
+    addTearDown(client.close);
+    await open(tester, client);
+    await tester.pumpAndSettle();
+    await confirmUpdate(tester);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(posts, 1);
+    expect(find.textContaining('Up to date'), findsNothing);
+    if (button('Update').evaluate().isNotEmpty) {
+      expect(tester.widget<FilledButton>(button('Update')).onPressed, isNull);
+    }
+
+    completed = true;
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Up to date'), findsOneWidget);
+    expect(posts, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('lost system POST is resolved with read-only polling and never retried', (tester) async {
+    var started = false;
+    var completed = false;
+    var posts = 0;
+    var checksAfterPost = 0;
+    final client = MockClient((request) async {
+      if (request.url.path.endsWith('/status')) {
+        return online();
+      }
+      expect(request.url.path, systemPath);
+      if (request.method == 'POST') {
+        started = true;
+        posts++;
+        throw http.ClientException('Response lost after PC accepted update', request.url);
+      }
+      if (started) {
+        checksAfterPost++;
+      }
+      return updateStatus(
+        current: completed ? latestVersion : '3.1.95',
+        available: !started,
+        phase: completed
+            ? 'completed'
+            : started
+            ? 'downloading'
+            : 'idle',
+        progress: completed
+            ? 100
+            : started
+            ? 25
+            : 0,
+      );
+    });
+    addTearDown(client.close);
+    await open(tester, client);
+    await tester.pumpAndSettle();
+    await confirmUpdate(tester);
+
+    expect(posts, 1);
+    expect(checksAfterPost, greaterThan(0));
+    expect(find.textContaining('25%'), findsOneWidget);
+    completed = true;
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Up to date'), findsOneWidget);
+    expect(checksAfterPost, greaterThanOrEqualTo(2));
+    expect(posts, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('interrupted system update allows recovery and blocks backups until completion', (tester) async {
+    var started = false;
+    var completed = false;
+    var posts = 0;
+    final client = MockClient((request) async {
+      if (request.url.path.endsWith('/status')) {
+        return online();
+      }
+      expect(request.url.path, systemPath);
+      if (request.method == 'POST') {
+        expect(request.body, isEmpty);
+        started = true;
+        posts++;
+        return http.Response('', 202);
+      }
+      return updateStatus(
+        current: completed ? latestVersion : '3.1.95',
+        available: !started,
+        phase: completed
+            ? 'completed'
+            : started
+            ? 'downloading'
+            : 'error',
+        progress: completed
+            ? 100
+            : started
+            ? 25
+            : 0,
+        error: started ? '' : 'The update was interrupted. Update to finish.',
+        recoveryRequired: !completed,
+      );
+    });
+    addTearDown(client.close);
+    await open(tester, client);
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<FilledButton>(button('Back up now')).onPressed, isNull);
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNotNull);
+    await confirmUpdate(tester);
+    expect(posts, 1);
+    expect(find.textContaining('25%'), findsOneWidget);
+    expect(tester.widget<FilledButton>(button('Back up now')).onPressed, isNull);
+
+    completed = true;
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Up to date'), findsOneWidget);
+    expect(tester.widget<FilledButton>(button('Back up now')).onPressed, isNotNull);
+    expect(posts, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('recovery requiring the PC opens instructions without a remote update request', (tester) async {
+    var posts = 0;
+    final client = MockClient((request) async {
+      if (request.url.path.endsWith('/status')) {
+        return online();
+      }
+      expect(request.url.path, systemPath);
+      if (request.method == 'POST') {
+        posts++;
+      }
+      return updateStatus(
+        available: true,
+        phase: 'error',
+        error: 'Open Inhouse Photos on your PC to finish recovery.',
+        recoveryRequired: true,
+        requiresLocalRecovery: true,
+      );
+    });
+    addTearDown(client.close);
+    await open(tester, client);
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNotNull);
+    await tester.tap(button('Update'));
+    await tester.pumpAndSettle();
+    expect(find.text('Finish the update on your PC'), findsOneWidget);
+    expect(posts, 0);
+    expect(tester.widget<FilledButton>(button('Back up now')).onPressed, isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('legacy interrupted update opens PC recovery without trying either updater again', (tester) async {
+    var posts = 0;
+    var runtimeReads = 0;
+    final client = MockClient((request) async {
+      if (request.method == 'POST') {
+        posts++;
+        return http.Response('', 202);
+      }
       switch (request.url.path) {
         case '/inhouse-manager/v1/status':
           return online(version: '1.2.17');
-        case '/inhouse-manager/v1/update':
+        case systemPath:
+          return http.Response('', 404);
+        case managerPath:
           return updateStatus(current: '1.2.17', latest: '1.2.17');
         case '/inhouse-manager/v1/runtime-update':
-          if (request.method == 'POST') {
-            posts++;
-            return http.Response('', 202);
-          }
+          runtimeReads++;
           return updateStatus(
-            current: updated ? '3.1.0-durable-upload' : '3.1.0',
+            current: '3.1.0-storage-saver',
             latest: '3.1.0-durable-upload',
-            available: posts == 0,
-            phase: posts > 0 ? 'completed' : 'idle',
-            progress: posts > 0 ? 100 : 0,
+            available: true,
+            phase: 'error',
+            error: 'An interrupted runtime transaction needs recovery.',
+            recoveryRequired: true,
           );
         default:
           fail('Unexpected request ${request.method} ${request.url}');
@@ -348,171 +524,119 @@ void main() {
     await open(tester, client);
     await tester.pumpAndSettle();
 
-    await tester.tap(button('Update server engine'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Continue'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.pump(const Duration(seconds: 15));
-    await tester.pump(const Duration(milliseconds: 100));
-
-    // POST 202 and even a "completed" phase are insufficient if the manager
-    // still reports the previous running image.
-    expect(posts, 1);
-    expect(find.text('Update server engine'), findsNothing);
-    expect(find.textContaining('Server engine updated'), findsNothing);
-
-    updated = true;
-    await tester.pump(const Duration(seconds: 15));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('3.1.0-durable-upload'), findsWidgets);
-    expect(posts, 1);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
-
-  testWidgets('lost manager update response is resolved by status checks without a second POST', (tester) async {
-    var started = false;
-    var completed = false;
-    var posts = 0;
-    var managerChecksAfterPost = 0;
-    final client = MockClient((request) async {
-      switch (request.url.path) {
-        case '/inhouse-manager/v1/status':
-          return online(version: completed ? '1.2.17' : '1.2.16');
-        case '/inhouse-manager/v1/update':
-          if (request.method == 'POST') {
-            expect(request.body, isEmpty);
-            started = true;
-            posts++;
-            throw http.ClientException('Connection closed after PC accepted update', request.url);
-          }
-          if (started) {
-            managerChecksAfterPost++;
-          }
-          return updateStatus(
-            current: completed ? '1.2.17' : '1.2.16',
-            latest: '1.2.17',
-            available: !started,
-            phase: completed
-                ? 'completed'
-                : started
-                ? 'downloading'
-                : 'idle',
-            progress: completed
-                ? 100
-                : started
-                ? 25
-                : 0,
-          );
-        case '/inhouse-manager/v1/runtime-update':
-          expect(request.method, 'GET');
-          return noUpdate(request);
-        default:
-          fail('Unexpected request ${request.method} ${request.url}');
-      }
-    });
-    addTearDown(client.close);
-    await open(tester, client);
-    await tester.pumpAndSettle();
-
-    await tester.tap(button('Update Windows manager'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Continue'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(posts, 1);
-    expect(managerChecksAfterPost, greaterThan(0));
-    expect(find.textContaining('Downloading Windows manager'), findsOneWidget);
-    expect(find.textContaining('25%'), findsOneWidget);
-    expect(find.text('Update Windows manager'), findsNothing);
-
-    completed = true;
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('1.2.17'), findsWidgets);
-    expect(managerChecksAfterPost, greaterThanOrEqualTo(2));
-    expect(posts, 1);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
-
-  testWidgets('interrupted engine update blocks PC changes until recovery completes', (tester) async {
-    // Keep the recovery actions and backup controls in the viewport together;
-    // this test checks their shared state rather than scrolling behavior.
-    tester.view.physicalSize = const Size(800, 1400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    var started = false;
-    var completed = false;
-    var posts = 0;
-    final client = MockClient((request) async {
-      switch (request.url.path) {
-        case '/inhouse-manager/v1/status':
-          // Recovery is not a running PC operation, so the engine resume
-          // action must remain available even while other changes are blocked.
-          return online(version: '1.2.17');
-        case '/inhouse-manager/v1/update':
-          return updateStatus(current: '1.2.17', latest: '1.2.18', available: true);
-        case '/inhouse-manager/v1/runtime-update':
-          if (request.method == 'POST') {
-            expect(request.body, isEmpty);
-            started = true;
-            posts++;
-            return http.Response('', 202);
-          }
-          return updateStatus(
-            current: completed ? '3.1.0-durable-upload' : '3.1.0',
-            latest: '3.1.0-durable-upload',
-            available: !started,
-            phase: completed
-                ? 'completed'
-                : started
-                ? 'downloading'
-                : 'error',
-            progress: completed
-                ? 100
-                : started
-                ? 25
-                : 0,
-            error: started ? '' : 'The update was interrupted. Resume it to finish.',
-            recoveryRequired: !completed,
-          );
-        default:
-          fail('Unexpected request ${request.method} ${request.url}');
-      }
-    });
-    addTearDown(client.close);
-    await open(tester, client);
-    await tester.pumpAndSettle();
-
+    expect(runtimeReads, greaterThan(0));
+    expect(find.text('Update'), findsOneWidget);
+    expect(find.textContaining('1.2.17'), findsNothing);
+    expect(find.textContaining('3.1.0-storage-saver'), findsNothing);
     expect(tester.widget<FilledButton>(button('Back up now')).onPressed, isNull);
-    expect(tester.widget<FilledButton>(button('Update Windows manager')).onPressed, isNull);
-    expect(tester.widget<FilledButton>(button('Resume server engine update')).onPressed, isNotNull);
-    expect(find.textContaining('interrupted'), findsOneWidget);
-
-    await tester.tap(button('Resume server engine update'));
+    await tester.tap(button('Update'));
     await tester.pumpAndSettle();
+    expect(find.text('Finish the update on your PC'), findsOneWidget);
     expect(posts, 0);
-    await tester.tap(find.text('Continue'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
-    expect(posts, 1);
-    expect(find.textContaining('25%'), findsOneWidget);
-    expect(tester.widget<FilledButton>(button('Back up now')).onPressed, isNull);
-    expect(tester.widget<FilledButton>(button('Update Windows manager')).onPressed, isNull);
-
-    completed = true;
-    await tester.pump(const Duration(seconds: 3));
+  testWidgets('busy PC blocks updates while keeping backup cancellation available', (tester) async {
+    var cancelled = false;
+    var cancels = 0;
+    final client = MockClient((request) async {
+      switch (request.url.path) {
+        case '/inhouse-manager/v1/status':
+          return online(busy: !cancelled, backupRunning: !cancelled);
+        case systemPath:
+          expect(request.method, 'GET');
+          return updateStatus(available: true, busy: !cancelled);
+        case '/inhouse-manager/v1/status/backup/cancel':
+          expect(request.method, 'POST');
+          cancelled = true;
+          cancels++;
+          return http.Response('', 202);
+        default:
+          fail('Unexpected request ${request.method} ${request.url}');
+      }
+    });
+    addTearDown(client.close);
+    await open(tester, client);
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('3.1.0-durable-upload'), findsWidgets);
-    expect(find.text('Resume server engine update'), findsNothing);
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNull);
+    expect(tester.widget<FilledButton>(button('Stop backup')).onPressed, isNotNull);
+    await tester.tap(button('Stop backup'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Continue')));
+    await tester.pumpAndSettle();
+
+    expect(cancels, 1);
     expect(tester.widget<FilledButton>(button('Back up now')).onPressed, isNotNull);
-    expect(tester.widget<FilledButton>(button('Update Windows manager')).onPressed, isNotNull);
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNotNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('definite update refusal permits a deliberate retry without staying pending', (tester) async {
+    var posts = 0;
+    var readsAfterPost = 0;
+    final client = MockClient((request) async {
+      if (request.url.path.endsWith('/status')) {
+        return online();
+      }
+      expect(request.url.path, systemPath);
+      if (request.method == 'POST') {
+        posts++;
+        return http.Response('{"message":"PC busy with backup"}', 409);
+      }
+      if (posts > 0) {
+        readsAfterPost++;
+      }
+      return updateStatus(available: true);
+    });
+    addTearDown(client.close);
+    await open(tester, client);
+    await tester.pumpAndSettle();
+    await confirmUpdate(tester);
+    await tester.pumpAndSettle();
+
+    expect(posts, 1);
+    expect(readsAfterPost, greaterThan(0));
+    expect(find.textContaining('Updating Inhouse Photos'), findsNothing);
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNotNull);
+    expect(tester.widget<FilledButton>(button('Back up now')).onPressed, isNotNull);
+    await tester.pump(const Duration(seconds: 15));
+    await tester.pumpAndSettle();
     expect(posts, 1);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final changedKey in [StoreKey.serverEndpoint, StoreKey.accessToken]) {
+    testWidgets('update confirmation is invalidated when $changedKey changes', (tester) async {
+      var posts = 0;
+      final client = MockClient((request) async {
+        if (request.url.path.endsWith('/status')) {
+          return online();
+        }
+        expect(request.url.path, systemPath);
+        if (request.method == 'POST') {
+          posts++;
+          return http.Response('', 202);
+        }
+        return updateStatus(available: true);
+      });
+      addTearDown(client.close);
+      await open(tester, client);
+      await tester.pumpAndSettle();
+      await tester.tap(button('Update'));
+      await tester.pumpAndSettle();
+
+      await tester.runAsync(
+        () => store.put(
+          changedKey,
+          changedKey == StoreKey.serverEndpoint ? 'https://another-server.example.com/api' : 'different-user-token',
+        ),
+      );
+      await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Update')));
+      await tester.pumpAndSettle();
+
+      expect(posts, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 }

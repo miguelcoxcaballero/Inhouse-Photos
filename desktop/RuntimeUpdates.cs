@@ -52,6 +52,10 @@ namespace InhousePhotos {
     const string OriginalImage="sha256:283fb546c253d70c3e984062a2d2ebc08ce4547ef799e0ffba634222e4b5c16d";
     const string OriginalConfig="sha256:ac66612c5815b715123e1946fb833cc3baa5adcb404f774ded31307d82c1e368";
     const string FastImage="sha256:0034cd9b0031574479c192ed8be48212f6e57012785d804beb171ed8a2d5a8ac";
+    const string LegacyDurableImage="sha256:dd8c68b182ef2cade7002e7625c43e60ee89e27ee42eec0fb4b6e392d34a8a75";
+    const string LegacyDurableVersion="3.1.0-durable-upload-20261003";
+    const string LegacyDurableSource="f661cdd96ebfb50349ca60a40a7cff3e4511f995";
+    const string LegacyDurableSchema="ab48e687123b61185a4467ca2b70a3a66ebfdaa93f5a78b5d7ae9eed613c699f";
     const string Notes="Guarda originales y trabajos pendientes en el servidor; el móvil puede seguir subiendo mientras se procesan. Durante la instalación se reinicia brevemente el motor de fotos.";
     static readonly object StateGate=new object();
     static readonly SemaphoreSlim CheckGate=new SemaphoreSlim(1,1),DownloadGate=new SemaphoreSlim(1,1);
@@ -93,6 +97,7 @@ namespace InhousePhotos {
       if(image.ImageId==OriginalImage||image.ImageId==OriginalConfig)return "3.1.0-pairing-20260929";
       if(image.ImageId==FastImage)return "3.1.0-storage-saver-20261002";
       if(image.ImageId==LatestImageId&&image.Version==LatestVersion&&image.SourceCommit==SourceCommit&&image.SchemaSha256==SchemaSha256)return LatestVersion;
+      if(image.ImageId==LegacyDurableImage&&image.Version==LegacyDurableVersion&&image.SourceCommit==LegacyDurableSource&&image.SchemaSha256==LegacyDurableSchema)return LegacyDurableVersion;
       return "";
     }
     static async Task<RuntimeImageIdentity> ReadImage(string image) {
@@ -110,6 +115,19 @@ namespace InhousePhotos {
       Backend.AssertManagedIdentity(prefs,receipt.Containers,rows);
       return await ReadImage(rows.Single(row=>row.Service=="immich-server").Image);
     }
+    public static async Task<bool> ConfirmInstalled(Preferences prefs) {
+      try {
+        if(FindPendingTransaction(prefs)!=null||KnownVersion(await ReadCurrent(prefs))!=LatestVersion)return false;
+        var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));
+        if(receipt.Containers.Single(row=>row.Service=="immich-server").Image!=LatestImageId)return false;
+        var rows=await Backend.InspectServer(prefs);
+        Backend.AssertManagedIdentity(prefs,receipt.Containers,rows);
+        var server=rows.Single(row=>row.Service=="immich-server");
+        if(server.Image!=LatestImageId||!Regex.IsMatch(server.Id??"","^[a-f0-9]{64}$"))return false;
+        var health=await Backend.Docker("inspect --format "+Backend.Argument("{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}")+" "+server.Id,20);
+        return health.Trim()=="running|healthy"&&await Backend.Ping(prefs.LocalEndpoint)&&FindPendingTransaction(prefs)==null;
+      }catch{return false;}
+    }
     static IEnumerable<string> TransactionFiles(string root) {
       if(!Directory.Exists(root))yield break;
       var pending=new Stack<string>();pending.Push(root);int count=0;
@@ -125,7 +143,8 @@ namespace InhousePhotos {
       }
     }
     internal static bool MatchesRecovery(RuntimeTransaction record,Preferences prefs) {
-      return record!=null&&prefs!=null&&record.format==1&&record.sourceCommit==SourceCommit&&record.newImageId==LatestImageId&&
+      return record!=null&&prefs!=null&&record.format==1&&
+        ((record.sourceCommit==SourceCommit&&record.newImageId==LatestImageId)||(record.sourceCommit==LegacyDurableSource&&record.newImageId==LegacyDurableImage))&&
         record.installation==prefs.Installation&&record.project==prefs.ProjectName&&record.receiptPath==prefs.ReceiptPath;
     }
     static string FindPendingTransaction(Preferences prefs) {
@@ -155,15 +174,18 @@ namespace InhousePhotos {
         try{image=await ReadCurrent(prefs,pending!=null);}
         catch{if(pending==null)throw;lock(StateGate){current="Motor pendiente de recuperación";checkedAt=DateTime.UtcNow;}return Status();}
         var version=KnownVersion(image);
+        var confirmed=pending==null&&version==LatestVersion&&await ConfirmInstalled(prefs);
         lock(StateGate) {
           current=version.Length>0?version:"Motor no reconocido";
-          compatible=version.Length>0&&version!=LatestVersion;
+          compatible=version.Length>0&&(version!=LatestVersion||!confirmed);
           recoveryRequired=pending!=null;
           checkedAt=DateTime.UtcNow;
           if(pending!=null){phase="error";error="La actualización necesita completarse. Reintenta desde esta pantalla.";}
           else if(version.Length==0){phase="error";error="La imagen instalada no figura como compatible; no se sustituirá automáticamente.";}
-          else if(phase=="idle"&&File.Exists(ErrorPath)){phase="error";error="La actualización anterior no se confirmó. Puedes reintentar.";}
+          else if(confirmed){phase="completed";progress=100;error="";}
+          else if(phase=="idle"&&File.Exists(ErrorPath)){phase="error";error=ReadSavedError();}
         }
+        if(confirmed)ClearSavedError();
         return Status();
       }finally{CheckGate.Release();}
     }
@@ -175,7 +197,30 @@ namespace InhousePhotos {
     }
     public static void Fail(Exception failure) {
       lock(StateGate){phase="error";error=failure.Message;applying=false;checkedAt=DateTime.MinValue;}
-      try{Backend.PrivateDirectory(Backend.SettingsDir);File.WriteAllText(ErrorPath,"La actualización del motor no se confirmó.");}catch{}
+      try{Backend.PrivateDirectory(Backend.SettingsDir);File.WriteAllText(ErrorPath,BoundedMessage(failure.Message));}catch{}
+    }
+    static string BoundedMessage(string value) {
+      value=(value??"").Replace('\r',' ').Replace('\n',' ').Trim();
+      return value.Length>400?value.Substring(0,400):value;
+    }
+    static string ReadSavedError() {
+      try{return BoundedMessage(File.ReadAllText(ErrorPath));}catch{return "La actualización no se completó. Pulsa Actualizar para continuar.";}
+    }
+    static void ClearSavedError() {try{if(File.Exists(ErrorPath))File.Delete(ErrorPath);}catch{}}
+    internal static string HelperFailure(string stage,int exitCode) {
+      var message="La actualización no se completó";
+      switch(stage) {
+        case "preflight":message="No se pudo comprobar la instalación y su copia de recuperación";break;
+        case "image":message="No se pudo preparar la descarga verificada";break;
+        case "queues":message="No se pudo comprobar o recuperar la cola de procesamiento";break;
+        case "quiesce":message="El procesamiento activo todavía no terminó";break;
+        case "config":message="La configuración cambió durante la actualización";break;
+        case "restart":message="El servidor todavía no confirmó que está listo";break;
+        case "receipt":message="No se pudo confirmar el registro de instalación";break;
+        case "recovery":message="No se pudo completar la recuperación pendiente";break;
+        case "rollback":message="La versión anterior no puede leer los trabajos nuevos; se conserva la versión nueva";break;
+      }
+      return message+" (código "+exitCode+"). Pulsa Actualizar para continuar. Tus fotos se conservan.";
     }
     static async Task DownloadPackage(string target) {
       var partial=target+"."+Guid.NewGuid().ToString("N")+".partial";
@@ -269,34 +314,69 @@ namespace InhousePhotos {
           UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,
           WorkingDirectory=directory,RedirectStandardOutput=true,RedirectStandardError=true
         }}) {
-          process.OutputDataReceived+=(sender,e)=>HelperPhase(e.Data);
+          string failedStage="";
+          process.OutputDataReceived+=(sender,e)=>{
+            HelperPhase(e.Data);
+            const string failurePrefix="INHOUSE_RUNTIME_FAILURE:";
+            if(e.Data!=null&&e.Data.StartsWith(failurePrefix,StringComparison.Ordinal)) {
+              var value=e.Data.Substring(failurePrefix.Length);
+              if(new[]{"preflight","image","queues","quiesce","config","restart","receipt","recovery","rollback"}.Contains(value))failedStage=value;
+            }
+          };
           process.Start();process.BeginOutputReadLine();var stderr=process.StandardError.ReadToEndAsync();
           if(!await Task.Run(()=>process.WaitForExit(45*60*1000))) {
             try{process.Kill();}catch{}
             throw new IOException("El motor no confirmó la actualización a tiempo. Conserva sus datos y reintenta para recuperar la operación.");
           }
           process.WaitForExit();await stderr;
-          if(process.ExitCode!=0)throw new IOException("El motor no confirmó la actualización. Reintenta para recuperar la operación; si la API no responde, comprueba el servidor en el PC.");
+          if(process.ExitCode!=0)throw new IOException(HelperFailure(failedStage,process.ExitCode));
         }
       }
     }
     public static async Task Apply(Preferences prefs) {
       try {
         await Backend.WithServerLock(async()=>{
-          var recovery=FindPendingTransaction(prefs);
-          var directory=recovery==null?await PrepareFiles():ComponentDir;
-          if(recovery!=null) {
-            Backend.PrivateDirectory(directory);
-            WriteResource(directory,"server-runtime-update.ps1");WriteResource(directory,"server-runtime-queue-handoff.cjs");
-            State("waiting",85);
+          for(int attempt=0;attempt<2;attempt++) {
+            var recovery=FindPendingTransaction(prefs);
+            if(recovery==null&&await ConfirmInstalled(prefs))break;
+            if(recovery==null&&KnownVersion(await ReadCurrent(prefs))==LatestVersion) {
+              // An interrupted final confirmation can leave the verified image
+              // installed but stopped/unhealthy. Restart that exact container;
+              // do not download again, rewrite Compose or create a new library.
+              var rows=await Backend.InspectServer(prefs);
+              var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));
+              Backend.AssertManagedIdentity(prefs,receipt.Containers,rows);
+              var server=rows.Single(row=>row.Service=="immich-server");
+              if(server.Image!=LatestImageId||receipt.Containers.Single(row=>row.Service=="immich-server").Image!=LatestImageId||
+                !Regex.IsMatch(server.Id??"","^[a-f0-9]{64}$"))throw new IOException("La instalación necesita comprobarse antes de reiniciar. Tus fotos se conservan.");
+              State("restarting",95);
+              await Backend.Docker("restart --time 30 "+server.Id,180);
+              var deadline=DateTime.UtcNow.AddMinutes(5);
+              while(DateTime.UtcNow<deadline) {
+                if(await Backend.Ping(prefs.LocalEndpoint)&&await ConfirmInstalled(prefs))break;
+                await Task.Delay(2000);
+              }
+              if(!await ConfirmInstalled(prefs))throw new IOException("El servidor actualizado todavía no responde. Comprueba Docker en el PC y pulsa Actualizar para continuar.");
+              break;
+            }
+            var directory=recovery==null?await PrepareFiles():ComponentDir;
+            if(recovery!=null) {
+              Backend.PrivateDirectory(directory);
+              WriteResource(directory,"server-runtime-update.ps1");WriteResource(directory,"server-runtime-queue-handoff.cjs");
+              State("waiting",85);
+            }
+            await RunHelper(directory,recovery);
+            State("restarting",95);
+            if(await ConfirmInstalled(prefs))break;
+            // A journal may safely restore/abort the previous image. Complete
+            // its recovery, then install the requested release in this same
+            // operation instead of asking the phone to press another button.
+            if(recovery==null||FindPendingTransaction(prefs)!=null||attempt!=0||KnownVersion(await ReadCurrent(prefs)).Length==0)
+              throw new IOException("La actualización todavía necesita comprobarse. Pulsa Actualizar para continuar; tus fotos se conservan.");
           }
-          await RunHelper(directory,recovery);
-          State("restarting",95);
-          var installed=await ReadCurrent(prefs);
-          if(KnownVersion(installed)!=LatestVersion||FindPendingTransaction(prefs)!=null||!await Backend.Ping(prefs.LocalEndpoint))
-            throw new IOException("El motor instalado todavía necesita comprobarse. Reintenta para recuperar la actualización.");
+          if(!await ConfirmInstalled(prefs))throw new IOException("El servidor todavía no confirmó la instalación completa. Pulsa Actualizar para continuar.");
           lock(StateGate){current=LatestVersion;compatible=false;recoveryRequired=false;phase="completed";progress=100;error="";checkedAt=DateTime.UtcNow;}
-          try{if(File.Exists(ErrorPath))File.Delete(ErrorPath);}catch{}
+          ClearSavedError();
         });
       }catch(Exception ex) {
         try{lock(StateGate)recoveryRequired=FindPendingTransaction(prefs)!=null;}catch{lock(StateGate)recoveryRequired=true;}
@@ -343,11 +423,16 @@ namespace InhousePhotos {
       var transaction=new RuntimeTransaction{format=1,sourceCommit=SourceCommit,newImageId=LatestImageId,installation=prefs.Installation,project=prefs.ProjectName,receiptPath=prefs.ReceiptPath};
       if(!MatchesRecovery(transaction,prefs))return 1;
       transaction.newImageId=OriginalImage;if(MatchesRecovery(transaction,prefs))return 2;
+      transaction.newImageId=LegacyDurableImage;transaction.sourceCommit=LegacyDurableSource;
+      if(!MatchesRecovery(transaction,prefs))return 11;
+      transaction.sourceCommit=new string('b',40);if(MatchesRecovery(transaction,prefs))return 12;
       if(KnownVersion(new RuntimeImageIdentity{ImageId=OriginalConfig})!="3.1.0-pairing-20260929")return 3;
       if(KnownVersion(new RuntimeImageIdentity{ImageId=FastImage})!="3.1.0-storage-saver-20261002")return 4;
       var image=new RuntimeImageIdentity{ImageId=LatestImageId,Version=LatestVersion,SourceCommit=SourceCommit,SchemaSha256=SchemaSha256};
       if(KnownVersion(image)!=LatestVersion)return 5;
       image.SourceCommit=new string('a',40);if(KnownVersion(image)!="")return 6;
+      if(KnownVersion(new RuntimeImageIdentity{ImageId=LegacyDurableImage,Version=LegacyDurableVersion,SourceCommit=LegacyDurableSource,SchemaSha256=LegacyDurableSchema})!=LegacyDurableVersion)return 13;
+      if(HelperFailure("restart",7).Contains("http")||!HelperFailure("queues",9).Contains("código 9")||HelperFailure("untrusted-secret",1).Contains("untrusted-secret"))return 14;
       if(!RemoteManagement.Allowed("GET",RemoteManagement.RuntimePath)||!RemoteManagement.Allowed("POST",RemoteManagement.RuntimePath)||
         RemoteManagement.Allowed("POST",RemoteManagement.RuntimePath+"/arbitrary")||
         RemoteManagement.Allowed("POST",RemoteManagement.RuntimePath+"?url=elsewhere")||

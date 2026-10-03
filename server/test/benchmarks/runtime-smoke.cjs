@@ -138,6 +138,12 @@ async function waitForProcessedAssets(
 
 async function main() {
   assert.ok(fixtureRoot, 'Set RUNTIME_TEST_FIXTURES to the generated benchmark fixtures directory');
+  const apiVersion = await api('GET', '/server/version');
+  const runtimeVersion = `${apiVersion.major}.${apiVersion.minor}.${apiVersion.patch}`;
+  assert.match(runtimeVersion, /^\d+\.\d+\.\d+$/);
+  if (process.env.RUNTIME_TEST_VERSION) {
+    assert.equal(runtimeVersion, process.env.RUNTIME_TEST_VERSION, 'Published server API must report the product version');
+  }
   const runtimeThreads = JSON.parse(
     nodeInServer(`
     const fs=require('node:fs');
@@ -288,6 +294,7 @@ async function main() {
   assert.equal(counts, '3|1');
   const result = {
     verifiedAt: new Date().toISOString(),
+    runtimeVersion,
     runtimeThreads,
     signupAndLogin: true,
     migrations,

@@ -27,9 +27,9 @@ namespace InhousePhotos {
     internal void InitializeLifecycle(bool hidden) {
       tray=new Forms.NotifyIcon{Text="Inhouse Photos Server",Icon=System.Drawing.Icon.ExtractAssociatedIcon(typeof(ServerWindow).Assembly.Location),Visible=true};
       var menu=new Forms.ContextMenuStrip();menu.Items.Add("Abrir Inhouse Photos",null,(s,e)=>Dispatcher.Invoke(BringToFront));
-      menu.Items.Add("Salir del gestor",null,(s,e)=>Dispatcher.Invoke(()=>{if(busy||RuntimeUpdates.IsBusy){notice.Text="Espera a que termine la operación antes de salir.";return;}exitRequested=true;Close();}));
+      menu.Items.Add("Salir del gestor",null,(s,e)=>Dispatcher.Invoke(()=>{if(busy||SystemUpdates.IsBusy){notice.Text="Espera a que termine la operación antes de salir.";return;}exitRequested=true;Close();}));
       tray.ContextMenuStrip=menu;tray.DoubleClick+=(s,e)=>Dispatcher.Invoke(BringToFront);
-      Closing+=(s,e)=>{if((busy||monitorBusy||RuntimeUpdates.IsBusy)&&!updateClose){e.Cancel=true;notice.Text="Espera a que termine la operación antes de salir.";return;}if(!exitRequested){e.Cancel=true;Hide();}};
+      Closing+=(s,e)=>{if((busy||monitorBusy||SystemUpdates.IsBusy)&&!updateClose){e.Cancel=true;notice.Text="Espera a que termine la operación antes de salir.";return;}if(!exitRequested){e.Cancel=true;Hide();}};
       Closed+=(s,e)=>{
         if(monitor!=null)monitor.Stop();lanMonitor?.Stop();lanDebounce?.Stop();
         if(networkAddressChanged!=null)NetworkChange.NetworkAddressChanged-=networkAddressChanged;
@@ -70,11 +70,11 @@ namespace InhousePhotos {
     void EnsureRemoteListener() {
       if(remoteManagement!=null||!prefs.Managed)return;
       remoteManagement=new RemoteManagement(prefs,
-        ()=>Dispatcher.Invoke(()=>!busy&&!monitorBusy&&!updatingManager&&!ManagerUpdates.IsApplying&&!RuntimeUpdates.BlocksOperations(prefs)&&backupCancellation==null),
-        ()=>Dispatcher.BeginInvoke(new Action(async()=>await ApplyManagerUpdate(true))),ReadRemoteStatus,PerformRemoteAction);
+        ReadRemoteStatus,PerformRemoteAction,
+        ()=>Dispatcher.Invoke(()=>busy||monitorBusy||updatingManager||backupCancellation!=null));
     }
     async Task RefreshLocalRoutes() {
-      if(lanPublishBusy||exitRequested||updatingManager||RuntimeUpdates.BlocksOperations(prefs)||!prefs.Managed)return;
+      if(lanPublishBusy||exitRequested||updatingManager||SystemUpdates.BlocksOperations(prefs)||RuntimeUpdates.BlocksOperations(prefs)||!prefs.Managed)return;
       lanPublishBusy=true;
       try{await Task.Run(()=>LanRoute.Publish(prefs));}
       catch{ /* Discovery outages never stop the existing HTTPS server. */ }
@@ -82,7 +82,13 @@ namespace InhousePhotos {
     }
     internal void BringToFront(){Show();WindowState=WindowState.Normal;Activate();}
     async Task Supervise() {
-      if(busy||monitorBusy||updatingManager||ManagerUpdates.IsApplying||RuntimeUpdates.BlocksOperations(prefs)||!prefs.Managed||DateTime.UtcNow<retryAfter)return;
+      // Resume first: a durable intent deliberately blocks ordinary automatic
+      // restarts and backups, but must never block its own continuation.
+      if(!busy&&!monitorBusy&&!updatingManager&&backupCancellation==null&&prefs.Managed) {
+        try{if(BeginSystemUpdate(true,true))return;}
+        catch(Exception ex){notice.Text=ex.Message;}
+      }
+      if(busy||monitorBusy||updatingManager||SystemUpdates.BlocksOperations(prefs)||RuntimeUpdates.BlocksOperations(prefs)||!prefs.Managed||DateTime.UtcNow<retryAfter)return;
       monitorBusy=true;
       try {
         bool autoStart=false;
@@ -99,8 +105,8 @@ namespace InhousePhotos {
           }catch(Exception ex){notice.Text="Actualizaciones remotas no disponibles: "+ex.Message;}
           try {await LanRoute.Publish(prefs);} catch { /* Public HTTPS remains available if LAN discovery cannot be published. */ }
           try {
-            var update=await ManagerUpdates.Check();
-            if(update.Available&&String.IsNullOrWhiteSpace(notice.Text))notice.Text="Nueva versión del gestor: "+update.LatestVersion+". Abre Ajustes para actualizar.";
+            var update=await SystemUpdates.Check(prefs);
+            if(update.Available&&String.IsNullOrWhiteSpace(notice.Text))notice.Text="Inhouse Photos "+update.LatestVersion+" disponible. Abre Ajustes para actualizar.";
           }catch{ /* A GitHub outage never affects photos or backups. */ }
         }
         if(Backend.IsBackupDue()) {
@@ -167,7 +173,7 @@ namespace InhousePhotos {
       bool startup=false,known=false;
       try{startup=await Startup.IsEnabled();known=true;}catch{}
       return new RemoteManagerStatus {
-        Version=Backend.Version,ServerOnline=await Backend.Ping(prefs.LocalEndpoint),Busy=ui.Busy||RuntimeUpdates.IsBusy||
+        Version=SystemUpdates.Status().CurrentVersion,ServerOnline=await Backend.Ping(prefs.LocalEndpoint),Busy=ui.Busy||SystemUpdates.IsBusy||
           (RuntimeUpdates.BlocksOperations(prefs)&&!RuntimeUpdates.Status().RecoveryRequired),
         Operation=ui.Operation,Progress=ui.Progress,Error=ui.Error,
         LibraryDrive=libraryRoot,BackupDestination=prefs.BackupDestination??"",
@@ -175,7 +181,7 @@ namespace InhousePhotos {
         BackupRunning=ui.BackupRunning,BackupPresent=backup.FilesPresent,
         BackupCompletedUtc=backup.CompletedUtc??"",WeeklyBackupEnabled=schedule.Enabled,
         NextBackupUtc=schedule.NextDueUtc??"",StartupEnabled=startup,StartupKnown=known,Disks=disks,
-        Usb=UsbDeviceMonitor.Current.Snapshot,RuntimeUpdate=RuntimeUpdates.Status()
+        Usb=UsbDeviceMonitor.Current.Snapshot,RuntimeUpdate=RuntimeUpdates.Status(),SystemUpdate=SystemUpdates.Status()
       };
       }catch(Exception ex) {
         // This method receives no credentials. Keep only the failure type and
@@ -195,12 +201,8 @@ namespace InhousePhotos {
         backupCancellation.Cancel();SetBackupProgress("Deteniendo la copia. Se conservarán los archivos ya copiados.");return true;
       }
       if(busy||monitorBusy||updatingManager||ManagerUpdates.IsApplying||backupCancellation!=null)return false;
-      if(action=="runtime-update") {
-        if(!RuntimeUpdates.TryBegin())return false;
-        busy=true;remoteError="";remoteOperation="runtime-update";
-        _=RunRuntimeUpdate();return true;
-      }
-      if(RuntimeUpdates.BlocksOperations(prefs))return false;
+      if(action=="system-update"||action=="runtime-update")return BeginSystemUpdate(false,true);
+      if(SystemUpdates.BlocksOperations(prefs)||RuntimeUpdates.BlocksOperations(prefs))return false;
       if(action.StartsWith("backup/destination/",StringComparison.Ordinal)) {
         var letter=action.Substring("backup/destination/".Length);
         if(letter.Length!=1||letter[0]<'A'||letter[0]>'Z')throw new ArgumentException("Invalid backup drive.");
@@ -258,117 +260,69 @@ namespace InhousePhotos {
       catch(Exception ex){remoteError=ex.Message;notice.Text=ex.Message;}
       finally{busy=false;remoteOperation="";if(IsVisible)await Render();}
     }
-    async Task RunRuntimeUpdate() {
-      try {
-        notice.Text="Actualizando el motor de fotos. La cola pendiente y los originales se conservan…";
-        await Task.Run(()=>RuntimeUpdates.Apply(prefs));
-        notice.Text="Motor actualizado: "+RuntimeUpdates.LatestVersion+". Las subidas ya usan la cola persistente.";
-      }catch(Exception ex){remoteError=ex.Message;notice.Text=ex.Message;}
-      finally{busy=false;remoteOperation="";if(IsVisible)await Render();}
+    bool BeginSystemUpdate(bool automatic,bool remote) {
+      if(busy||monitorBusy||updatingManager||backupCancellation!=null||SystemUpdates.IsBusy)return false;
+      if(!SystemUpdates.TryBegin(prefs,automatic))return false;
+      busy=true;remoteError="";remoteOperation="system-update";
+      _=RunSystemUpdate(remote);return true;
     }
-    void RenderRuntimeUpdate() {
-      Rule();content.Children.Add(Label("Motor de fotos",22));
-      var row=new StackPanel();var version=Label("Comprobando el motor instalado…",16);
-      var detail=Label("Los originales y la cola pendiente se conservan durante la actualización.",14,muted);
+    async Task RunSystemUpdate(bool remote) {
+      try {
+        notice.Text="Actualizando Inhouse Photos. La operación continúa aunque cierres la app del móvil…";
+        await Task.Run(()=>SystemUpdates.Apply(prefs,()=>Dispatcher.Invoke(()=>ApplyManagerHandoff(remote))));
+        if(SystemUpdates.Status().Phase=="completed")notice.Text="Inhouse Photos "+Backend.Version+" actualizado.";
+      }catch(Exception ex){remoteError=ex.Message;notice.Text=ex.Message;}
+      finally{busy=false;remoteOperation="";if(IsVisible&&!updateClose)await Render();}
+    }
+    async Task ApplyManagerHandoff(bool remote) {
+      if(RuntimeUpdates.IsBusy||backupCancellation!=null)throw new IOException("Espera a que termine la operación actual antes de actualizar.");
+      updatingManager=true;
+      try {
+        var installer=await ManagerUpdates.Prepare();
+        // Dispose the bridge before creating the installer so a dead listener
+        // cannot survive in an inherited Windows socket handle.
+        remoteManagement?.Dispose();remoteManagement=null;
+        ManagerUpdates.StartHelper(installer,System.Diagnostics.Process.GetCurrentProcess().Id,remote||!IsVisible);
+        updateClose=true;exitRequested=true;Close();
+      }catch(Exception ex){ManagerUpdates.Fail(ex);throw;}
+      finally{updatingManager=false;}
+    }
+    void RenderSystemUpdate() {
+      Rule();content.Children.Add(Label("Inhouse Photos",22));
+      var row=new StackPanel{Margin=new Thickness(0,2,0,8)};
+      var version=Label("Comprobando la versión instalada…",16);
+      var detail=Label("La actualización continúa en el ordenador aunque cierres el móvil.",14,muted);
       var bar=new ProgressBar{Minimum=0,Maximum=100,Height=4,Foreground=accent,Visibility=Visibility.Collapsed,Margin=new Thickness(0,0,0,9)};
-      var update=new Button{Content="Actualizar el motor",IsEnabled=false,HorizontalAlignment=HorizontalAlignment.Left};
+      var update=new Button{Content="Actualizar Inhouse Photos",IsEnabled=false,HorizontalAlignment=HorizontalAlignment.Left};
       row.Children.Add(version);row.Children.Add(detail);row.Children.Add(bar);row.Children.Add(update);content.Children.Add(row);
       void Refresh() {
-        var state=RuntimeUpdates.Status();
-        version.Text="Instalado: "+(String.IsNullOrEmpty(state.CurrentVersion)?"pendiente de comprobar":state.CurrentVersion);
-        var active=RuntimeUpdates.IsApplying;
-        bar.Visibility=active?Visibility.Visible:Visibility.Collapsed;bar.Value=state.Progress;
-        update.IsEnabled=state.Available&&!active&&!busy&&!updatingManager&&!ManagerUpdates.IsApplying;
-        update.Content=state.RecoveryRequired?"Completar actualización":"Actualizar el motor";
-        if(state.Phase=="downloading")detail.Text="Descargando el motor · "+state.Progress+" %";
-        else if(state.Phase=="waiting")detail.Text="Esperando las compresiones activas; los trabajos pendientes se conservan.";
-        else if(state.Phase=="installing")detail.Text="Preparando la imagen verificada del motor…";
-        else if(state.Phase=="restarting")detail.Text="Reiniciando y comprobando el motor de fotos…";
-        else if(state.Phase=="verifying")detail.Text="Verificando la imagen, la biblioteca y sus montajes…";
+        var state=SystemUpdates.Status();
+        version.Text=String.IsNullOrEmpty(state.CurrentVersion)?"Actualización pendiente":"Versión "+state.CurrentVersion;
+        bar.Visibility=state.Busy?Visibility.Visible:Visibility.Collapsed;bar.Value=state.Progress;
+        update.IsEnabled=state.Available&&!state.Busy&&!busy&&!monitorBusy&&!updatingManager&&backupCancellation==null;
+        update.Content=state.Phase=="error"?"Reintentar actualización":"Actualizar Inhouse Photos";
+        if(state.Phase=="downloading")detail.Text="Descargando Inhouse Photos · "+state.Progress+" %";
+        else if(state.Phase=="waiting")detail.Text="Continuando la actualización guardada. Los originales y trabajos pendientes se conservan.";
+        else if(state.Phase=="installing")detail.Text="Instalando la actualización verificada…";
+        else if(state.Phase=="restarting")detail.Text="Reiniciando y comprobando Inhouse Photos…";
+        else if(state.Phase=="verifying")detail.Text="Comprobando la actualización y la biblioteca…";
         else if(state.Phase=="error")detail.Text=state.Error;
-        else if(state.CurrentVersion==RuntimeUpdates.LatestVersion)detail.Text="Motor actualizado. Las subidas se guardan y se procesan en segundo plano.";
+        else if(state.CurrentVersion==state.LatestVersion)detail.Text="Inhouse Photos está actualizado.";
         else detail.Text=state.Notes;
       }
       update.Click+=async(sender,e)=>{
-        try{await RuntimeUpdates.Check(prefs,true);if(!BeginRemoteAction("runtime-update"))notice.Text="Espera a que termine la operación actual o vuelve a comprobar el motor.";}
+        update.IsEnabled=false;
+        try{await SystemUpdates.Check(prefs,true);if(!BeginSystemUpdate(false,false))notice.Text="Espera a que termine la operación actual o comprueba Inhouse Photos en el ordenador.";}
         catch(Exception ex){detail.Text=ex.Message;}
         Refresh();
       };
       var timer=new DispatcherTimer{Interval=TimeSpan.FromSeconds(1)};
       timer.Tick+=(sender,e)=>{if(!content.Children.Contains(row)){timer.Stop();return;}Refresh();};timer.Start();
       _=RefreshInitially();
-      async Task RefreshInitially(){try{await RuntimeUpdates.Check(prefs);if(content.Children.Contains(row))Refresh();}catch{if(content.Children.Contains(row))detail.Text="No se pudo comprobar el motor. Comprueba Docker en el PC.";}}
-    }
-    async Task ApplyManagerUpdate(bool remote) {
-      if(updatingManager||backupCancellation!=null||busy||monitorBusy||RuntimeUpdates.BlocksOperations(prefs)) {
-        if(remote)ManagerUpdates.Fail(new IOException("El PC está ocupado. Vuelve a intentarlo en unos segundos."));
-        else notice.Text="Espera a que termine la operación actual y vuelve a intentarlo.";
-        return;
-      }
-      if(!remote&&!ManagerUpdates.TryBegin())return;
-      updatingManager=true;
-      try {
-        notice.Text="Descargando y comprobando la actualización del gestor…";
-        var installer=await ManagerUpdates.Prepare();
-        // Release the listening socket before creating the helper. Otherwise
-        // Windows can inherit its handle into the new process, leaving a dead
-        // listener bound to the old PID after the hand-off.
-        remoteManagement?.Dispose();remoteManagement=null;
-        ManagerUpdates.StartHelper(installer,System.Diagnostics.Process.GetCurrentProcess().Id,remote||!IsVisible);
-        // The verified setup waits for this process to close. It changes only
-        // the per-user manager pointer; Docker and Caddy keep serving photos.
-        updateClose=true;exitRequested=true;Close();
-      }catch(Exception ex){ManagerUpdates.Fail(ex);notice.Text="No se instaló la actualización: "+ex.Message;}
-      finally{updatingManager=false;}
+      async Task RefreshInitially(){try{await SystemUpdates.Check(prefs);if(content.Children.Contains(row))Refresh();}catch{if(content.Children.Contains(row))detail.Text="No se pudo comprobar Inhouse Photos. Comprueba el ordenador.";}}
     }
     Task RenderManagement() {
-      Rule();content.Children.Add(Label("Actualizaciones del gestor",22));
-      var updateRow=new StackPanel{Margin=new Thickness(0,2,0,8)};
-      var updateVersion=Label("Versión instalada "+Backend.Version,16);updateVersion.FontWeight=FontWeights.SemiBold;
-      updateVersion.Margin=new Thickness(0,0,0,3);updateRow.Children.Add(updateVersion);
-      var updateDetail=Label("Buscando actualizaciones…",14,muted);updateDetail.Margin=new Thickness(0,0,0,8);updateRow.Children.Add(updateDetail);
-      var updateProgress=new ProgressBar{Minimum=0,Maximum=100,Height=4,Foreground=accent,Visibility=Visibility.Collapsed,Margin=new Thickness(0,0,0,9)};
-      updateRow.Children.Add(updateProgress);
-      var updateActions=new StackPanel{Orientation=Orientation.Horizontal};
-      var installUpdate=new Button{Content="Actualizar el gestor",IsEnabled=false,Visibility=Visibility.Collapsed};
-      var checkUpdate=new Button{Content="Buscar actualizaciones"};
-      updateActions.Children.Add(installUpdate);updateActions.Children.Add(checkUpdate);updateRow.Children.Add(updateActions);
-      content.Children.Add(updateRow);
-      async Task RefreshUpdate(bool force) {
-        checkUpdate.IsEnabled=false;
-        updateDetail.Text="Comprobando la última versión…";
-        try {
-          var state=await ManagerUpdates.Check(force);
-          if(!content.Children.Contains(updateRow))return;
-          updateDetail.Text=state.Available?"Versión "+state.LatestVersion+" disponible. "+state.Notes:
-            "Tu gestor está al día. Las fotos y el servidor se actualizan por separado.";
-          installUpdate.Visibility=state.Available?Visibility.Visible:Visibility.Collapsed;
-          installUpdate.IsEnabled=state.Available&&!updatingManager;
-        }catch(Exception ex){if(content.Children.Contains(updateRow))updateDetail.Text="No se pudo comprobar ahora: "+ex.Message;}
-        finally{if(content.Children.Contains(updateRow))checkUpdate.IsEnabled=true;}
-      }
-      checkUpdate.Click+=async(s,e)=>await RefreshUpdate(true);
-      installUpdate.Click+=async(s,e)=>{
-        if(updatingManager||busy||backupCancellation!=null)return;
-        if(!Confirm("Se instalará solo la nueva versión del gestor y se volverá a abrir. El servidor de fotos, las subidas y tus datos seguirán funcionando. ¿Actualizar ahora?"))return;
-        installUpdate.IsEnabled=false;checkUpdate.IsEnabled=false;
-        await ApplyManagerUpdate(false);
-        if(content.Children.Contains(updateRow)){checkUpdate.IsEnabled=true;await RefreshUpdate(false);}
-      };
-      var updateTimer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(400)};
-      updateTimer.Tick+=(s,e)=>{
-        if(!content.Children.Contains(updateRow)){updateTimer.Stop();return;}
-        var state=ManagerUpdates.Status();
-        if(state.Phase=="downloading"||state.Phase=="verifying"||state.Phase=="installing") {
-          updateProgress.Visibility=Visibility.Visible;updateProgress.Value=state.Progress;
-          updateDetail.Text=state.Phase=="downloading"?"Descargando · "+state.Progress+" %":
-            state.Phase=="verifying"?"Comprobando el instalador…":"Abriendo la nueva versión…";
-        }else if(state.Phase=="error"){
-          updateProgress.Visibility=Visibility.Collapsed;updateDetail.Text="No se instaló: "+state.Error;
-        }
-      };updateTimer.Start();
-      _=RefreshUpdate(false);
-      RenderRuntimeUpdate();
+      RenderSystemUpdate();
       Rule();content.Children.Add(Label("Inicio automático",22));
       var startupRow=new Grid{Margin=new Thickness(0,4,0,4)};
       startupRow.ColumnDefinitions.Add(new ColumnDefinition());
@@ -402,7 +356,7 @@ namespace InhousePhotos {
       }
       retry.Click+=async(s,e)=>await RefreshStartupState();
       auto.Click+=async(s,e)=>{
-        if(busy||ManagerUpdates.IsApplying||RuntimeUpdates.BlocksOperations(prefs)||!startupKnown){auto.IsChecked=startupEnabled;notice.Text="Espera a que termine o se recupere la operación actual antes de cambiar el inicio automático.";return;}
+        if(busy||SystemUpdates.BlocksOperations(prefs)||RuntimeUpdates.BlocksOperations(prefs)||!startupKnown){auto.IsChecked=startupEnabled;notice.Text="Espera a que termine o se recupere la operación actual antes de cambiar el inicio automático.";return;}
         try {
           var enabled=auto.IsChecked==true;
           if(!enabled&&Backend.ReadBackupSchedule().Enabled&&

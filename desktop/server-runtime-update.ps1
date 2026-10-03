@@ -23,6 +23,18 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$script:RuntimeFailureStage = 'preflight'
+
+function Set-RuntimeStage([string]$Stage) {
+  if (@('preflight', 'image', 'queues', 'quiesce', 'config', 'restart', 'receipt', 'recovery', 'rollback') -cnotcontains $Stage) {
+    throw 'Etapa de actualización no válida.'
+  }
+  $script:RuntimeFailureStage = $Stage
+}
+
+function Write-RuntimeFailure {
+  if ($ManagerProcessId -gt 0) { Write-Output ('INHOUSE_RUNTIME_FAILURE:' + $script:RuntimeFailureStage) }
+}
 
 function Write-RuntimePhase([string]$Phase) {
   if (@('verifying', 'waiting', 'installing', 'restarting', 'completed') -cnotcontains $Phase) {
@@ -82,9 +94,17 @@ function New-PrivateDirectory([string]$Path) {
 }
 
 function Invoke-Docker([string[]]$Arguments) {
-  # Never print command output: compose errors may quote environment values.
-  $output = & $DockerExe --context desktop-linux @Arguments 2>&1
-  if ($LASTEXITCODE -ne 0) { throw ('Docker no completó la operación: ' + $Arguments[0] + '.') }
+  # Windows PowerShell 5.1 turns native stderr into NativeCommandError. Docker
+  # writes ordinary progress/warnings there even on success. Keep stdout clean
+  # for JSON and use the native exit status; never expose environment values.
+  $savedPreference = $ErrorActionPreference
+  $global:LASTEXITCODE = $null
+  try {
+    $ErrorActionPreference = 'Continue'
+    $output = & $DockerExe --context desktop-linux @Arguments 2>$null
+    $exitCode = $global:LASTEXITCODE
+  } finally { $ErrorActionPreference = $savedPreference }
+  if ($null -eq $exitCode -or $exitCode -ne 0) { throw ('Docker no completó la operación: ' + $Arguments[0] + '.') }
   return ($output | Out-String).Trim()
 }
 
@@ -196,7 +216,7 @@ function Assert-Manifest($Manifest) {
   foreach ($name in @('format', 'version', 'sourceCommit', 'image', 'imageId', 'archiveFile', 'archiveSha256', 'platform', 'compatibleServerImageIds', 'databaseMigrations', 'databaseSchemaSha256')) {
     if (-not $Manifest.PSObject.Properties[$name]) { throw ('Falta un campo del manifiesto: ' + $name + '.') }
   }
-  if ($Manifest.format -ne 1 -or $Manifest.version -notmatch '^3\.1\.0-[a-z0-9][a-z0-9.-]*$' -or
+  if ($Manifest.format -ne 1 -or $Manifest.version -notmatch '^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[a-z0-9][a-z0-9.-]*)?$' -or
     $Manifest.sourceCommit -notmatch '^[a-f0-9]{40}$' -or
     $Manifest.image -notmatch '^inhouse-photos-server:[a-z0-9][a-z0-9_.-]{0,127}$' -or
     $Manifest.imageId -notmatch '^sha256:[a-f0-9]{64}$' -or
@@ -306,6 +326,7 @@ function Assert-NoManager {
 }
 
 function New-QueueContext([string]$ServerId, [string]$Directory) {
+  Set-RuntimeStage 'queues'
   $networks = (Invoke-Docker @('inspect', '--format', '{{json .NetworkSettings.Networks}}', $ServerId)) | ConvertFrom-Json
   $names = @($networks.PSObject.Properties.Name)
   if ($names.Count -ne 1) { throw 'La red del servidor necesita revisión manual antes de actualizar.' }
@@ -322,6 +343,8 @@ function New-QueueContext([string]$ServerId, [string]$Directory) {
 }
 
 function Invoke-QueueHelper([string]$Image, $Context, [string]$Action, $OriginalState) {
+  if ($Action -ceq 'assert-rollback-safe') { Set-RuntimeStage 'rollback' }
+  else { Set-RuntimeStage 'queues' }
   $helper = Assert-LocalFile (Join-Path $PSScriptRoot 'server-runtime-queue-handoff.cjs')
   $arguments = @('--context', 'desktop-linux', 'run', '--rm', '-i', '--no-healthcheck',
     '--network', $Context.Network, '--env-file', $Context.EnvironmentFile,
@@ -330,16 +353,25 @@ function Invoke-QueueHelper([string]$Image, $Context, [string]$Action, $Original
     $json = $OriginalState | ConvertTo-Json -Depth 15 -Compress
     $arguments += [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
   }
-  $output = [IO.File]::ReadAllText($helper) | & $DockerExe @arguments 2>&1
-  if ($LASTEXITCODE -ne 0) { throw ('No se pudo completar la operación de colas: ' + $Action + '.') }
+  $inputText = [IO.File]::ReadAllText($helper)
+  $savedPreference = $ErrorActionPreference
+  $global:LASTEXITCODE = $null
+  try {
+    $ErrorActionPreference = 'Continue'
+    $output = $inputText | & $DockerExe @arguments 2>$null
+    $exitCode = $global:LASTEXITCODE
+  } finally { $ErrorActionPreference = $savedPreference }
+  if ($null -eq $exitCode -or $exitCode -ne 0) { throw ('No se pudo completar la operación de colas: ' + $Action + '.') }
   return ($output | Out-String | ConvertFrom-Json)
 }
 
 function Wait-CompressionIdle([string]$Image, $Context) {
+  Set-RuntimeStage 'quiesce'
   Write-RuntimePhase 'waiting'
   $deadline = [DateTime]::UtcNow.AddMinutes(15)
   do {
     $state = Invoke-QueueHelper $Image $Context 'inspect' $null
+    Set-RuntimeStage 'quiesce'
     if ($state.activeJobs -eq 0) { return }
     Write-Progress -Activity 'Preparando actualización' -Status ('Esperando ' + $state.activeJobs + ' compresiones activas')
     Start-Sleep -Seconds 2
@@ -348,6 +380,7 @@ function Wait-CompressionIdle([string]$Image, $Context) {
 }
 
 function Restore-Runtime($Record, $Preferences, [string]$ComposeFile, [string]$RecordPath) {
+  Set-RuntimeStage 'rollback'
   # Pending jobs and durable outbox migrations have no consumer in the old
   # image. Never revert the database; retain the current image for recovery.
   Invoke-QueueHelper $Record.newImageId $script:QueueContext 'pause' $null | Out-Null
@@ -392,6 +425,7 @@ function Assert-NoIncompleteUpdate([string]$SettingsPath) {
 }
 
 function Invoke-RuntimeUpdate {
+  Set-RuntimeStage 'preflight'
   if ($env:OS -cne 'Windows_NT') { throw 'Este actualizador solo se ejecuta en el PC Windows del servidor.' }
   Assert-NoManager
   Write-RuntimePhase 'verifying'
@@ -413,6 +447,7 @@ function Invoke-RuntimeUpdate {
   $server = if ($servers.Count) { $servers[0] } else { $null }
 
   if ($ResumeRecord) {
+    Set-RuntimeStage 'recovery'
     $recordPath = Assert-LocalFile $ResumeRecord
     $record = Read-Json $recordPath
     if ($record.format -ne 1 -or $record.project -cne $prefs.ProjectName -or
@@ -466,11 +501,13 @@ function Invoke-RuntimeUpdate {
       if ((Invoke-Docker @('image', 'inspect', '--format', '{{.Id}}', $targetReference)) -cne $targetImage) {
         throw 'La etiqueta de imagen de la recuperación cambió. No se recreará el servidor con otra versión.'
       }
+      Set-RuntimeStage 'restart'
       Invoke-Docker ((Get-ComposeArguments $prefs $composeFile) + @('up', '-d', '--no-deps', '--pull', 'never', 'immich-server')) | Out-Null
       Write-RuntimePhase 'restarting'
       $after = @(Wait-ServerHealthy $prefs $composeFile $targetImage)
       Assert-Containers $record.previousContainers $after $prefs.ProjectName -ServerMayChange
       Assert-Configuration $savedReceipt.ConfigurationHashes (Get-ConfigurationHashes $prefs.Installation)
+      Set-RuntimeStage 'receipt'
       if ($targetImage -ceq $record.previousImageId) { [IO.File]::Copy($backup, $receiptFile, $true) }
       else { $savedReceipt.Containers = $after; Write-PrivateJson $receiptFile $savedReceipt }
       $record.status = 'resuming'
@@ -554,6 +591,7 @@ function Invoke-RuntimeUpdate {
     # A release archive is a docker save, with a unique release tag. The archive
     # hash is checked before load; inspect verifies its content after load.
     Write-RuntimePhase 'installing'
+    Set-RuntimeStage 'image'
     Invoke-Docker @('load', '--input', $archiveFile) | Out-Null
     $imageFormat = '[{{json .Id}},{{json .Os}},{{json .Architecture}},{{json .Config.Labels}}]'
     $image = (Invoke-Docker @('image', 'inspect', '--format', $imageFormat, $manifest.image)) | ConvertFrom-Json
@@ -573,6 +611,7 @@ function Invoke-RuntimeUpdate {
     Invoke-QueueHelper $manifest.imageId $script:QueueContext 'pause' $null | Out-Null
     Wait-CompressionIdle $manifest.imageId $script:QueueContext
     # Do not replace configuration changed by the manager or a concurrent admin.
+    Set-RuntimeStage 'config'
     Assert-NoManager
     Assert-Configuration $receipt.ConfigurationHashes (Get-ConfigurationHashes $prefs.Installation)
     Assert-Containers $before @(Get-Containers $prefs $composeFile) $prefs.ProjectName
@@ -589,6 +628,7 @@ function Invoke-RuntimeUpdate {
     $record.newComposeSha256 = Get-Sha256 $composeFile
     $record.status = 'starting'
     Write-PrivateJson $recordPath $record
+    Set-RuntimeStage 'restart'
     Invoke-Docker ((Get-ComposeArguments $prefs $composeFile) + @('up', '-d', '--no-deps', '--pull', 'never', 'immich-server')) | Out-Null
     Write-RuntimePhase 'restarting'
     $after = @(Wait-ServerHealthy $prefs $composeFile $manifest.imageId)
@@ -596,6 +636,7 @@ function Invoke-RuntimeUpdate {
     $expectedHashes = $receipt.ConfigurationHashes | ConvertTo-Json | ConvertFrom-Json
     $expectedHashes.'docker-compose.yml' = $record.newComposeSha256
     Assert-Configuration $expectedHashes (Get-ConfigurationHashes $prefs.Installation)
+    Set-RuntimeStage 'receipt'
     $receipt.ConfigurationHashes.'docker-compose.yml' = $record.newComposeSha256
     $receipt.Containers = $after
     Write-PrivateJson $receiptFile $receipt
@@ -640,6 +681,9 @@ if (-not $FunctionsOnly) {
     catch [Threading.AbandonedMutexException] { $ownsRuntimeMutex = $true }
     if (-not $ownsRuntimeMutex) { throw 'Ya hay una actualización del motor en curso.' }
     Invoke-RuntimeUpdate
+  } catch {
+    Write-RuntimeFailure
+    throw
   } finally {
     if ($ownsRuntimeMutex) { $runtimeMutex.ReleaseMutex() }
     $runtimeMutex.Dispose()

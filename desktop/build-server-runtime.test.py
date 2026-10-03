@@ -31,6 +31,9 @@ class RuntimeBuildTests(unittest.TestCase):
             target.write_text("// " + filename + "\n")
         (self.root / "server/bin").mkdir(parents=True)
         (self.root / "server/bin/start.sh").write_text("#!/bin/sh\nexec node dist/main.js\n")
+        (self.root / "server/package.json").write_text(json.dumps({
+            "name": "immich", "version": "3.1.96", "dependencies": {"retained": "1.0.0"},
+        }))
 
     def tearDown(self):
         self.temporary.cleanup()
@@ -62,12 +65,30 @@ class RuntimeBuildTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Runtime dependencies differ.*pnpm-lock.yaml"):
                 runtime.verify_dependency_inputs(self.root, "a" * 40)
 
+    def test_only_server_package_version_may_change(self):
+        baseline = {"name": "immich", "version": "3.1.0", "dependencies": {"retained": "1.0.0"},
+                    "devDependencies": {"compiler": "1.0.0"}, "scripts": {"start": "node dist/main.js"}}
+        current = dict(baseline, version="3.1.96")
+        self.assertTrue(runtime.same_dependency_input("server/package.json", json.dumps(baseline), json.dumps(current)))
+        for field in ["dependencies", "devDependencies", "scripts"]:
+            changed = dict(current, **{field: {"changed": "unverified"}})
+            self.assertFalse(runtime.same_dependency_input("server/package.json", json.dumps(baseline), json.dumps(changed)))
+        self.assertFalse(runtime.same_dependency_input("server/package.json", json.dumps(baseline), json.dumps(dict(current, version="unverified"))))
+        self.assertFalse(runtime.same_dependency_input("package.json", json.dumps(baseline), json.dumps(current)))
+
+    def test_runtime_api_version_must_match_release(self):
+        args = argparse.Namespace(dist=self.dist, source_commit="a" * 40, version="3.1.97")
+        with patch.object(runtime, "verify_dependency_inputs"):
+            with self.assertRaisesRegex(ValueError, "server API package version"):
+                runtime.build(args)
+
     def test_archive_replaces_complete_application_and_hashes_final_schema(self):
         old = {
             runtime.PREFIX + "schema/index.js": b"old schema",
             runtime.PREFIX + "obsolete-service.js": b"obsolete compiled application",
             "usr/src/app/server/node_modules/retained/dependency.js": b"verified published dependency",
             "usr/src/app/server/bin/start.sh": b"old startup",
+            runtime.PACKAGE_PATH: json.dumps({"name": "immich", "version": "3.1.0", "dependencies": {"retained": "1.0.0"}}).encode(),
         }
         layer = io.BytesIO()
         with tarfile.open(fileobj=layer, mode="w") as archive:
@@ -87,8 +108,8 @@ class RuntimeBuildTests(unittest.TestCase):
         baseline_schema.update((runtime.PREFIX + "schema/index.js").encode() + b"\0" + b"old schema")
         output = self.root / "release"
         args = argparse.Namespace(base_archive=base, dist=self.dist, output_directory=output,
-                                  source_commit="a" * 40, version="3.1.0-durable-upload-test",
-                                  image="inhouse-photos-server:durable-upload-test")
+                                  source_commit="a" * 40, version="3.1.96",
+                                  image="inhouse-photos-server:v3.1.96")
         with patch.object(runtime, "BASE_SHA", runtime.digest(base)), \
                 patch.object(runtime, "BASE_INDEX", image_index), \
                 patch.object(runtime, "BASE_SCHEMA_SHA", baseline_schema.hexdigest()), \
@@ -102,6 +123,8 @@ class RuntimeBuildTests(unittest.TestCase):
             files = {entry.name: archive.extractfile(entry).read() for entry in archive if entry.isfile()}
         self.assertNotIn(runtime.PREFIX + "obsolete-service.js", files)
         self.assertEqual(files["usr/src/app/server/node_modules/retained/dependency.js"], b"verified published dependency")
+        self.assertEqual(json.loads(files[runtime.PACKAGE_PATH])["version"], "3.1.96")
+        self.assertEqual(files[runtime.PACKAGE_PATH], (self.root / "server/package.json").read_bytes())
         for filename, source in runtime.compiled_files(self.dist).items():
             self.assertEqual(files[filename], source.read_bytes())
         final_schema = hashlib.sha256()
@@ -112,6 +135,7 @@ class RuntimeBuildTests(unittest.TestCase):
         self.assertEqual(manifest["databaseMigrations"], "additive-upload-outbox")
         self.assertEqual(manifest["addedDatabaseMigrations"], [runtime.UPLOAD_MIGRATION])
         self.assertIn("sha256:" + runtime.STORAGE_SAVER_IMAGE, manifest["compatibleServerImageIds"])
+        self.assertIn("sha256:" + runtime.DURABLE_UPLOAD_IMAGE, manifest["compatibleServerImageIds"])
 
 
 if __name__ == "__main__":

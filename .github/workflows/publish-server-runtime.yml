@@ -1,4 +1,4 @@
-name: Publish durable upload Inhouse server runtime
+name: Publish verified Inhouse Photos server runtime
 
 on:
   workflow_dispatch:
@@ -11,8 +11,8 @@ permissions:
   contents: write
 
 env:
-  RUNTIME_VERSION: 3.1.0-durable-upload-20261003
-  RUNTIME_TAG: server-runtime-v3.1.0-durable-upload-20261003
+  RUNTIME_VERSION: 3.1.96
+  RUNTIME_TAG: server-runtime-v3.1.96
 
 jobs:
   publish:
@@ -61,6 +61,7 @@ jobs:
           RUNTIME_TEST_FIXTURES: ${{ github.workspace }}/.runtime/performance
           RUNTIME_TEST_RESULTS: ${{ github.workspace }}/.runtime/release/runtime-smoke-results.json
           RUNTIME_TEST_IMAGE: inhouse-photos-server:v${{ env.RUNTIME_VERSION }}
+          RUNTIME_TEST_VERSION: ${{ env.RUNTIME_VERSION }}
         run: |
           trap 'docker compose -p inhouse-runtime-test -f "$RUNTIME_TEST_COMPOSE" logs --no-color --tail 120' ERR
           docker compose -p inhouse-runtime-test -f "$RUNTIME_TEST_COMPOSE" up -d --wait --wait-timeout 300
@@ -84,7 +85,7 @@ jobs:
           from pathlib import Path
           import json
           r=json.loads(Path('.runtime/performance/results.json').read_text())
-          notes=Path('desktop/RELEASE-runtime-3.1.0-durable-upload-20261003.md').read_text()
+          notes=Path('desktop/RELEASE-runtime-3.1.96.md').read_text()
           notes=notes.replace('{{ENCODED_SPEEDUP}}',f"{r['encodedBatchSpeedup']:.2f}".replace('.',','))
           notes=notes.replace('{{BATCH_SPEEDUP}}',f"{r['batchSpeedup']:.2f}".replace('.',','))
           notes=notes.replace('{{CPUS}}',str(r['cpus']))

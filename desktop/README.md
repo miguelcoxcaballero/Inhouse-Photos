@@ -75,13 +75,17 @@ failed route change restores the prior Caddyfile. If the manager installation
 fails, the previous verified executable is reopened. The photo API remains
 independent of the manager throughout the hand-off.
 
-Manager 1.2.17 adds server engine updates to the mobile app's existing
-**Settings > Server management** screen. Android 3.1.95 can first update an
-older Windows manager through the existing authenticated bridge, then request
-the verified durable-upload engine. The PC downloads and checks the runtime;
-closing the phone screen does not cancel installation. The screen displays
-the installed engine version, download progress and the final result. The
-engine restart briefly interrupts the photo API. See
+Inhouse Photos 3.1.96 uses one public version for Android and Windows and one
+**Update** button in **Settings > Server management**. The PC installs the
+required components and persists the continuation before its manager restarts;
+the phone can disconnect without cancelling it. Completion requires the real
+engine identity, health, installation receipt and recovery journal to agree.
+Interrupted operations have bounded automatic retries, with the same button
+available to continue. Windows PowerShell 5.1's normal native stderr progress
+is handled separately from JSON output and failure exit codes. An already
+blocked 1.2.17 installation needs a one-time Windows installer repair because
+that old executable rejects its own remote upgrade while a journal is pending.
+The engine restart briefly interrupts the photo API. See
 [SERVER-RUNTIME-UPDATES.md](SERVER-RUNTIME-UPDATES.md) for the identity checks
 and recovery rules.
 

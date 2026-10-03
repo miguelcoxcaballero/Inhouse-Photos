@@ -2,13 +2,6 @@ name: Publish verified Inhouse Windows manager
 
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/durable-upload-backlog]
-    paths:
-      - 'desktop/**'
-      - '.github/workflows/publish-inhouse-windows.yml'
-      - '.github/scripts/prepare_windows_publication.py'
-      - '.github/scripts/test_prepare_windows_publication.py'
 
 permissions:
   contents: write
@@ -18,8 +11,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  WINDOWS_VERSION: '1.2.17'
-  WINDOWS_TAG: server-v1.2.17
+  WINDOWS_VERSION: '3.1.96'
+  WINDOWS_TAG: server-v3.1.96
 
 jobs:
   publish:
@@ -74,22 +67,31 @@ jobs:
           # This PowerShell script throws on failed checks; it does not set a
           # native exit code. Clear it only after successful script completion.
           $global:LASTEXITCODE = 0
+          & .\desktop\server-runtime-update.transaction.tests.ps1
+          $global:LASTEXITCODE = 0
 
-      - name: Download the verified 1.2.16 bootstrap fixture
+      - name: Download the verified 1.2.17 upgrade and 1.2.16 bootstrap fixtures
         if: steps.existing.outputs.published != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          New-Item -ItemType Directory -Path "$env:RUNNER_TEMP\previous-manager" -Force | Out-Null
-          gh release download server-v1.2.16 --repo $env:GITHUB_REPOSITORY --pattern Inhouse-Photos-Server-Setup.exe --dir "$env:RUNNER_TEMP\previous-manager"
-          if ($LASTEXITCODE -ne 0) { throw 'Could not download the public bootstrap installer' }
-          $actual = (Get-FileHash "$env:RUNNER_TEMP\previous-manager\Inhouse-Photos-Server-Setup.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -ne '9378c9b3cc1366699011b29d5a06c32451a417b6fd0ba2574981c329844be65d') { throw 'Bootstrap installer checksum mismatch' }
+          $fixtures = @(
+            @{ version = '1.2.17'; sha256 = 'd6eb4b2ce1331f32688f48ab87f649285a84fbe6996b6e8e1c96cb3af12e5981' },
+            @{ version = '1.2.16'; sha256 = '9378c9b3cc1366699011b29d5a06c32451a417b6fd0ba2574981c329844be65d' }
+          )
+          foreach ($fixture in $fixtures) {
+            $directory = "$env:RUNNER_TEMP\previous-manager-$($fixture.version)"
+            New-Item -ItemType Directory -Path $directory -Force | Out-Null
+            gh release download "server-v$($fixture.version)" --repo $env:GITHUB_REPOSITORY --pattern Inhouse-Photos-Server-Setup.exe --dir $directory
+            if ($LASTEXITCODE -ne 0) { throw "Could not download the public $($fixture.version) installer" }
+            $actual = (Get-FileHash "$directory\Inhouse-Photos-Server-Setup.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $fixture.sha256) { throw "Installer $($fixture.version) checksum mismatch" }
+          }
 
-      - name: Verify x64 versions, runtime resources, self-tests and the 1.2.16 upgrade
+      - name: Verify the unified version, durable update intent and both installed upgrade paths
         if: steps.existing.outputs.published != 'true'
         run: |
-          & .\desktop\verify-windows-release.ps1 -Version $env:WINDOWS_VERSION -SourceCommit $env:GITHUB_SHA -PreviousInstallerPath "$env:RUNNER_TEMP\previous-manager\Inhouse-Photos-Server-Setup.exe"
+          & .\desktop\verify-windows-release.ps1 -Version $env:WINDOWS_VERSION -SourceCommit $env:GITHUB_SHA -PreviousInstallerPath "$env:RUNNER_TEMP\previous-manager-1.2.17\Inhouse-Photos-Server-Setup.exe" -BootstrapInstallerPath "$env:RUNNER_TEMP\previous-manager-1.2.16\Inhouse-Photos-Server-Setup.exe"
 
       - name: Save the verified Windows manifest and test report
         if: steps.existing.outputs.published != 'true'
@@ -116,7 +118,7 @@ jobs:
           if ($releaseExitCode -eq 0) {
             if (-not ($draft | ConvertFrom-Json).isDraft) { throw 'Refusing to overwrite a published Windows release' }
           } else {
-            gh release create $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Inhouse Photos Server $env:WINDOWS_VERSION" --draft --notes-file desktop/RELEASE-1.2.17.md
+            gh release create $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Inhouse Photos $env:WINDOWS_VERSION para Windows" --draft --notes-file desktop/RELEASE-3.1.96.md
             if ($LASTEXITCODE -ne 0) { throw 'Could not create the release draft' }
           }
           gh release upload $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --clobber desktop/dist/Inhouse-Photos-Server-Setup.exe desktop/dist/Inhouse-Photos-Server.exe desktop/dist/SHA256SUMS.txt desktop/dist/windows-release-verification.json windows-server-update.json

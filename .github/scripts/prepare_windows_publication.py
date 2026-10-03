@@ -13,6 +13,7 @@ from pathlib import Path
 MANIFEST = "windows-server-update.json"
 PUBLICATION_INPUTS = (
     "desktop",
+    "server/package.json",
     "AGENTS.md",
     MANIFEST,
     ".github/workflows/publish-inhouse-windows.yml",

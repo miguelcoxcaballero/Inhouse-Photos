@@ -12,6 +12,7 @@ ARTIFACTS = ("mobile/pubspec.yaml", "Inhouse-Photos.apk", "Inhouse-Photos-Androi
 PUBLICATION_INPUTS = (
     "mobile",
     "i18n",
+    "server/package.json",
     "AGENTS.md",
     ".github/workflows/publish-inhouse-android.yml",
     ".github/scripts/package_inhouse_android.py",

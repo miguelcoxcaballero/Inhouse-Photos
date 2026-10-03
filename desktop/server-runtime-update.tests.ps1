@@ -27,6 +27,10 @@ $manifest = [pscustomobject]@{format=1;version='3.1.0-storage-saver-20261002';so
   archiveSha256=('c' * 64);platform='linux/amd64';compatibleServerImageIds=@('sha256:' + 'd' * 64);
   databaseMigrations='unchanged';databaseSchemaSha256=('e' * 64)}
 Assert-Manifest $manifest; Check $true 'valid immutable manifest'
+$publicVersion = Clone $manifest; $publicVersion.version='3.1.96'
+Assert-Manifest $publicVersion; Check $true 'accept verified numeric public server version'
+$bad = Clone $publicVersion; $bad.version='03.1.96'; Reject { Assert-Manifest $bad } 'reject ambiguous numeric public version'
+$bad = Clone $publicVersion; $bad.version='3.1.96/other'; Reject { Assert-Manifest $bad } 'reject unsafe public version characters'
 $bad = Clone $manifest; $bad.databaseMigrations='changed'; Reject { Assert-Manifest $bad } 'schema-changing update'
 $bad = Clone $manifest; $bad.platform='linux/arm64'; Reject { Assert-Manifest $bad } 'incorrect platform'
 $bad = Clone $manifest; $bad.compatibleServerImageIds=@(); Reject { Assert-Manifest $bad } 'unknown baseline'
@@ -123,4 +127,57 @@ try {
     Check $true ('allow rerun after ' + $status)
   }
 } finally { if ([IO.Directory]::Exists($temporary)) { [IO.Directory]::Delete($temporary, $true) } }
+
+# Windows PowerShell 5.1 treats redirected native stderr differently from pwsh
+# on Linux. Exercise the real process boundary: successful Docker/Compose
+# progress must not become a terminating PowerShell error or pollute JSON.
+if ($env:OS -ceq 'Windows_NT') {
+  $nativeDirectory = Join-Path ([IO.Path]::GetTempPath()) ('inhouse native check ' + [Guid]::NewGuid().ToString('N'))
+  [void][IO.Directory]::CreateDirectory($nativeDirectory)
+  $savedDockerExe = $script:DockerExe
+  try {
+    $script:DockerExe = Join-Path $nativeDirectory 'docker fixture.exe'
+    Add-Type -Language CSharp -OutputType ConsoleApplication -OutputAssembly $script:DockerExe -TypeDefinition @'
+using System;
+public static class InhouseDockerNativeFixture {
+  public static int Main(string[] args) {
+    Console.Error.WriteLine("Native fixture progress on stderr.");
+    if (Array.IndexOf(args, "--native-failure") >= 0) {
+      Console.Out.WriteLine("This output must not be accepted.");
+      return 23;
+    }
+    if (Array.IndexOf(args, "--native-success") >= 0) {
+      Console.Out.WriteLine("native stdout");
+      return 0;
+    }
+    if (Array.IndexOf(args, "run") >= 0) {
+      Console.In.ReadToEnd();
+      if (Array.IndexOf(args, "resume") >= 0) return 24;
+      Console.Out.WriteLine("{\"schemaVersion\":1,\"activeJobs\":0,\"pausedStates\":{\"storageSaverCompression\":true,\"storageSaverVideoCompression\":true}}");
+      return 0;
+    }
+    return 25;
+  }
+}
+'@
+    $legacyBridgeFailed = $false
+    try {
+      $legacyOutput = & $script:DockerExe --native-success 2>&1
+      $legacyBridgeFailed = (($legacyOutput | Out-String).Trim() -cne 'native stdout')
+    } catch { $legacyBridgeFailed = $true }
+    Check $legacyBridgeFailed 'legacy native stderr redirection fails or contaminates stdout with an exit-zero fixture'
+    Check ((Invoke-Docker @('--native-success')) -ceq 'native stdout') 'native stderr progress with exit zero preserves only stdout'
+    Reject { Invoke-Docker @('--native-failure') } 'native nonzero exit rejects regardless of stderr or stdout'
+    $environmentFile = Join-Path $nativeDirectory 'queue fixture.env'
+    [IO.File]::WriteAllText($environmentFile, 'REDIS_HOSTNAME=fixture')
+    $context = [pscustomobject]@{Network='fixture-network';EnvironmentFile=$environmentFile}
+    $result = Invoke-QueueHelper ('sha256:' + 'a'*64) $context 'inspect' $null
+    Check ($result.schemaVersion -eq 1 -and $result.activeJobs -eq 0 -and $result.pausedStates.storageSaverCompression) 'queue JSON stdout parses despite native stderr progress'
+    $states = [pscustomobject]@{storageSaverCompression=$true;storageSaverVideoCompression=$true}
+    Reject { Invoke-QueueHelper ('sha256:' + 'a'*64) $context 'resume' $states } 'queue helper nonzero native exit rejects before JSON parsing'
+  } finally {
+    $script:DockerExe = $savedDockerExe
+    if ([IO.Directory]::Exists($nativeDirectory)) { [IO.Directory]::Delete($nativeDirectory, $true) }
+  }
+}
 Write-Output ($script:passed.ToString() + ' runtime updater checks passed.')

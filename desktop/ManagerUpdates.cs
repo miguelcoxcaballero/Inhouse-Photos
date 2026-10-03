@@ -54,7 +54,9 @@ namespace InhousePhotos {
     }
     public static int Compare(string a,string b) {return Version.Parse(a).CompareTo(Version.Parse(b));}
     static bool Valid(ManagerUpdateManifest value) {
+      Version parsed;
       if(value==null||!Regex.IsMatch(value.Version??"","^[0-9]+\\.[0-9]+\\.[0-9]+$")||
+         !Version.TryParse(value.Version,out parsed)||
          !Regex.IsMatch(value.Sha256??"","^[a-f0-9]{64}$"))return false;
       Uri uri;if(!Uri.TryCreate(value.InstallerUrl,UriKind.Absolute,out uri)||uri.Scheme!="https"||uri.Host!="github.com"||
         uri.AbsolutePath!="/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v"+value.Version+"/Inhouse-Photos-Server-Setup.exe"||
@@ -70,11 +72,12 @@ namespace InhousePhotos {
     public static async Task<ManagerUpdateStatus> Check(bool force=false) {
       await CheckGate.WaitAsync();
       try {
-        if(!force&&cached!=null&&DateTime.UtcNow-checkedAtUtc<TimeSpan.FromMinutes(15))return Status();
+        if(!force&&cached!=null&&DateTime.UtcNow-checkedAtUtc<TimeSpan.FromSeconds(15))return Status();
         ServicePointManager.SecurityProtocol|=SecurityProtocolType.Tls12;
         var request=(HttpWebRequest)WebRequest.Create(ManifestUrl);
         request.Method="GET";request.Timeout=8000;request.ReadWriteTimeout=8000;
         request.Headers[HttpRequestHeader.CacheControl]="no-cache";
+        using(var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(8)))using(deadline.Token.Register(()=>request.Abort()))
         using(var response=(HttpWebResponse)await request.GetResponseAsync()) {
           if(response.StatusCode!=HttpStatusCode.OK||response.ResponseUri.Scheme!="https"||
              response.ResponseUri.Host!="raw.githubusercontent.com"||response.ContentLength>4096)

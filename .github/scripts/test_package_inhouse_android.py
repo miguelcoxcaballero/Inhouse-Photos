@@ -61,6 +61,9 @@ class AtomicVersionPublicationTests(unittest.TestCase):
     def test_server_update_advances_from_the_published_durable_upload_release(self):
         release.validate_target("3.1.95", 5153, "3.1.94", 5152, {"version": "3.1.94", "versionCode": 7152})
 
+    def test_unified_release_advances_from_the_published_server_update_release(self):
+        release.validate_target("3.1.96", 5154, "3.1.95", 5153, {"version": "3.1.95", "versionCode": 7153})
+
     def test_source_version_cannot_advance_before_its_verified_artifacts(self):
         with self.assertRaisesRegex(ValueError, "currently published Android manifest must match"):
             release.validate_target("3.1.94", 5152, "3.1.94", 5152, self.manifest)
@@ -91,6 +94,17 @@ class AndroidReleaseTagTests(unittest.TestCase):
 
     def test_server_update_release_tag_matches_its_version(self):
         self.assertEqual(release.release_feature("v3.1.95-server-update", "3.1.95"), "server-update")
+
+    def test_unified_release_tag_matches_its_product_version(self):
+        self.assertEqual(release.release_feature("v3.1.96-unified", "3.1.96"), "unified")
+
+    def test_unified_release_requires_the_actual_server_package_version(self):
+        release.validate_shared_version("unified", "3.1.96", "3.1.96")
+        with self.assertRaisesRegex(ValueError, "server package versions must match"):
+            release.validate_shared_version("unified", "3.1.96", "3.1.0")
+
+    def test_previous_release_features_preserve_their_independent_version_policy(self):
+        release.validate_shared_version("server-update", "3.1.95", "3.1.0")
 
     def test_tag_cannot_advertise_a_different_version(self):
         with self.assertRaisesRegex(ValueError, "target Android version"):

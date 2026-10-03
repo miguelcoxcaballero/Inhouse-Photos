@@ -41,6 +41,7 @@ namespace InhousePhotos {
     public RemoteDiskStatus[] Disks {get;set;}
     public UsbDeviceStatus Usb {get;set;}
     public RuntimeUpdateStatus RuntimeUpdate {get;set;}
+    public SystemUpdateStatus SystemUpdate {get;set;}
   }
   /// A tiny, fixed-purpose bridge for an administrator's phone. Only the
   /// Windows manager restarts after an update; the photo API stays in Docker.
@@ -57,12 +58,12 @@ namespace InhousePhotos {
     public const string StatusPath="/inhouse-manager/v1/status";
     public const string UsbPath="/inhouse-manager/v1/usb";
     public const string RuntimePath="/inhouse-manager/v1/runtime-update";
+    public const string SystemPath="/inhouse-manager/v1/system-update";
     const string BeginMarker="# INHOUSE-MANAGER-ROUTE-BEGIN";
     const string EndMarker="# INHOUSE-MANAGER-ROUTE-END";
     readonly Preferences prefs;
-    readonly Func<bool> canUpdate;
-    readonly Action requestUpdate;
     readonly Func<Task<RemoteManagerStatus>> readStatus;
+    readonly Func<bool> pcBusy;
     readonly Func<string,Task<bool>> performAction;
     readonly string secret;
     readonly TcpListener listener;
@@ -73,10 +74,9 @@ namespace InhousePhotos {
     readonly Dictionary<string,DateTime> recentAdministrators=new Dictionary<string,DateTime>();
     static string SecretPath {get{return System.IO.Path.Combine(Backend.SettingsDir,"manager-bridge.dpapi");}}
 
-    public RemoteManagement(Preferences prefs,Func<bool> canUpdate,Action requestUpdate,
-      Func<Task<RemoteManagerStatus>> readStatus,Func<string,Task<bool>> performAction) {
-      this.prefs=prefs;this.canUpdate=canUpdate;this.requestUpdate=requestUpdate;
-      this.readStatus=readStatus;this.performAction=performAction;
+    public RemoteManagement(Preferences prefs,Func<Task<RemoteManagerStatus>> readStatus,Func<string,Task<bool>> performAction,Func<bool> pcBusy) {
+      this.prefs=prefs;
+      this.readStatus=readStatus;this.performAction=performAction;this.pcBusy=pcBusy;
       secret=LoadOrCreateSecret();
       listener=new TcpListener(IPAddress.Any,Port);listener.Start(8);
       try{NoInherit(listener.Server);}catch{listener.Stop();throw;}
@@ -177,14 +177,15 @@ namespace InhousePhotos {
       using(var sha=SHA256.Create())return Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(token)));
     }
     internal static bool MayReadProgress(string method,string path,bool applying,DateTime verifiedUtc,DateTime nowUtc) {
-      return method=="GET"&&(path==RuntimePath||path==StatusPath)&&applying&&nowUtc>=verifiedUtc&&
+      return method=="GET"&&(path==RuntimePath||path==SystemPath||path==StatusPath)&&applying&&nowUtc>=verifiedUtc&&
         nowUtc-verifiedUtc<=TimeSpan.FromMinutes(5);
     }
     async Task<AdministratorAuthorization> Authorize(string token,string method,string path) {
       var result=await IsAdmin(token);
       var hash=String.IsNullOrWhiteSpace(token)?null:TokenHash(token);
       lock(authorizationGate) {
-        if(!RuntimeUpdates.IsApplying)recentAdministrators.Clear();
+        var applying=RuntimeUpdates.IsApplying||SystemUpdates.IsApplying;
+        if(!applying)recentAdministrators.Clear();
         if(result==AdministratorAuthorization.Verified) {
           if(hash!=null) {
             foreach(var expired in recentAdministrators.Where(item=>DateTime.UtcNow-item.Value>TimeSpan.FromMinutes(5)).Select(item=>item.Key).ToArray())recentAdministrators.Remove(expired);
@@ -196,7 +197,7 @@ namespace InhousePhotos {
         if(result==AdministratorAuthorization.Denied){if(hash!=null)recentAdministrators.Remove(hash);return result;}
         DateTime verified;
         return hash!=null&&recentAdministrators.TryGetValue(hash,out verified)&&
-          MayReadProgress(method,path,RuntimeUpdates.IsApplying,verified,DateTime.UtcNow)?
+          MayReadProgress(method,path,applying,verified,DateTime.UtcNow)?
           AdministratorAuthorization.Verified:AdministratorAuthorization.Unavailable;
       }
     }
@@ -243,33 +244,19 @@ namespace InhousePhotos {
             catch{await Reply(stream,503,new{message="Could not read the Windows manager status."});}
             return;
           }
-          if(parts[1]==Path&&parts[0]=="GET") {
-            try{await ManagerUpdates.Check();await Reply(stream,200,ManagerUpdates.Status());}
-            catch(Exception ex){await Reply(stream,503,new{message="Update check unavailable: "+ex.Message,currentVersion=Backend.Version});}
+          if((parts[1]==SystemPath||parts[1]==Path||parts[1]==RuntimePath)&&parts[0]=="GET") {
+            try{var status=await SystemUpdates.CheckSoon(prefs);status.Busy=status.Busy||pcBusy();await Reply(stream,200,status);}
+            catch{await Reply(stream,503,new{message="No se pudo comprobar Inhouse Photos. Comprueba el ordenador."});}
             return;
           }
-          if(parts[1]==Path) {
-            if(!canUpdate()){await Reply(stream,409,new{message="The PC is busy with a backup or another operation. Try again shortly."});return;}
+          if(parts[1]==SystemPath||parts[1]==Path||parts[1]==RuntimePath) {
             try {
-              var status=await ManagerUpdates.Check(true);
-              if(!status.Available){await Reply(stream,409,new{message="The Windows manager is already up to date."});return;}
-              if(!ManagerUpdates.TryBegin()){await Reply(stream,409,new{message="The update is already in progress."});return;}
-              requestUpdate();await Reply(stream,202,ManagerUpdates.Status());
-            }catch(Exception ex){ManagerUpdates.Fail(ex);await Reply(stream,503,new{message=ex.Message});}
-            return;
-          }
-          if(parts[1]==RuntimePath&&parts[0]=="GET") {
-            try{await Reply(stream,200,await RuntimeUpdates.Check(prefs));}
-            catch{await Reply(stream,503,new{message="No se pudo comprobar el motor instalado. Comprueba Docker en el PC."});}
-            return;
-          }
-          if(parts[1]==RuntimePath) {
-            try {
-              if(!RuntimeUpdates.IsApplying)await RuntimeUpdates.Check(prefs,true);
-              var accepted=await performAction("runtime-update");
-              if(!accepted){await Reply(stream,409,new{message="El PC está ocupado o el motor ya está actualizado."});return;}
-              await Reply(stream,202,RuntimeUpdates.Status());
-            }catch{await Reply(stream,503,new{message="No se pudo iniciar la actualización del motor. Comprueba el gestor en el PC."});}
+              // Save and acknowledge the intent first. The server performs all
+              // catalogue, identity and health checks inside its own worker.
+              var accepted=await performAction("system-update");
+              if(!accepted){await Reply(stream,409,new{message="El ordenador está ocupado o la actualización necesita revisarse en el PC."});return;}
+              await Reply(stream,202,SystemUpdates.Status());
+            }catch{await Reply(stream,503,new{message="No se pudo guardar la actualización. Comprueba Inhouse Photos en el ordenador."});}
             return;
           }
           try {
@@ -282,9 +269,9 @@ namespace InhousePhotos {
       }catch{ /* An interrupted management request must not affect the photo server. */ }
     }
     public static bool Allowed(string method,string path) {
-      if(method=="GET")return path==Path||path==StatusPath||path==UsbPath||path==RuntimePath;
+      if(method=="GET")return path==Path||path==StatusPath||path==UsbPath||path==RuntimePath||path==SystemPath;
       if(method!="POST")return false;
-      if(path==Path||path==RuntimePath)return true;
+      if(path==Path||path==RuntimePath||path==SystemPath)return true;
       if(path==StatusPath+"/backup/start"||path==StatusPath+"/backup/cancel"||
          path==StatusPath+"/backup/schedule/enable"||path==StatusPath+"/backup/schedule/disable"||
          path==StatusPath+"/startup/enable"||path==StatusPath+"/startup/disable"||
