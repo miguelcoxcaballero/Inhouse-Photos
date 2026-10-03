@@ -71,7 +71,9 @@ jobs:
         if: steps.existing.outputs.published != 'true'
         run: |
           & .\desktop\server-runtime-update.tests.ps1
-          if ($LASTEXITCODE -ne 0) { throw 'Windows runtime updater checks failed' }
+          # This PowerShell script throws on failed checks; it does not set a
+          # native exit code. Clear it only after successful script completion.
+          $global:LASTEXITCODE = 0
 
       - name: Download the verified 1.2.16 bootstrap fixture
         if: steps.existing.outputs.published != 'true'
