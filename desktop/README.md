@@ -75,6 +75,16 @@ failed route change restores the prior Caddyfile. If the manager installation
 fails, the previous verified executable is reopened. The photo API remains
 independent of the manager throughout the hand-off.
 
+Manager 1.2.17 adds server engine updates to the mobile app's existing
+**Settings > Server management** screen. Android 3.1.95 can first update an
+older Windows manager through the existing authenticated bridge, then request
+the verified durable-upload engine. The PC downloads and checks the runtime;
+closing the phone screen does not cancel installation. The screen displays
+the installed engine version, download progress and the final result. The
+engine restart briefly interrupts the photo API. See
+[SERVER-RUNTIME-UPDATES.md](SERVER-RUNTIME-UPDATES.md) for the identity checks
+and recovery rules.
+
 Manager 1.2.5 uses five clear destinations: Overview, Connect mobile, Backups,
 Storage, and Settings. Its layout gives the server state one primary action,
 shows space and backup facts without nested cards, and moves technical controls

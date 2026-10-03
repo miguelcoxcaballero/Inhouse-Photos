@@ -5,6 +5,21 @@ La recepción con cola persistente y las mejoras de compresión necesitan instal
 el paquete del motor en el PC que ejecuta Docker Desktop. Este actualizador se aplica a una
 biblioteca previamente vinculada y verificada por Inhouse Photos Server.
 
+Con Android **3.1.95** y el gestor Windows **1.2.17**, la actualización se solicita
+desde **Ajustes > Gestión del servidor**, en la misma pantalla que muestra el
+estado del servidor, los discos y las copias. Si aparece la actualización del
+gestor Windows, instálala primero desde esa pantalla. Después pulsa
+**Actualizar servidor**. El PC descarga, verifica e instala el motor; el móvil
+muestra el progreso y confirma la versión instalada. La instalación continúa
+aunque salgas de la pantalla del móvil.
+
+La actualización del gestor conserva el motor en ejecución. La actualización
+del motor reinicia brevemente la API de fotos y conserva la biblioteca y los
+trabajos pendientes. Durante la operación, el gestor bloquea las operaciones
+que podrían cambiar su configuración.
+
+La instalación manual sigue disponible para diagnóstico:
+
 Descarga el ZIP del motor desde la publicación oficial, extráelo en una carpeta
 local, cierra el gestor desde su icono de la bandeja y ejecuta el lanzador
 `Actualizar-servidor.ps1` incluido en el paquete, con el mismo usuario de Windows
@@ -59,6 +74,11 @@ variables del servidor se copian de forma temporal a un archivo privado del
 usuario, no se registran ni se muestran, y se eliminan al finalizar.
 
 ## Recuperación
+
+Si el motor sigue respondiendo a la API, el móvil permite reanudar una
+actualización pendiente desde la misma pantalla. Si la API quedó totalmente
+detenida, el gestor no puede verificar una nueva sesión de administrador del
+móvil: abre **Ajustes > Actualizaciones del motor** en Windows para recuperarla.
 
 La actualización conserva los bytes originales de Compose y del recibo, el
 ID de la imagen anterior y un registro de transacción dentro de

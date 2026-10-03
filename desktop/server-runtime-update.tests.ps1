@@ -41,6 +41,23 @@ $bad = Clone $additive; $bad.baselineDatabaseSchemaSha256='f'*64; Reject { Asser
 $bad = Clone $additive; $bad.addedDatabaseMigrations=@('1790985600000-DurableUploadProcessing', 'OtherMigration'); Reject { Assert-Manifest $bad } 'unexpected additional migrations'
 $bad = Clone $additive; $bad.addedDatabaseMigrations=@('OtherMigration'); Reject { Assert-Manifest $bad } 'unverified migration'
 $bad = Clone $additive; $bad.PSObject.Properties.Remove('baselineDatabaseSchemaSha256'); Reject { Assert-Manifest $bad } 'missing migration baseline'
+Reject { Write-RuntimePhase 'arbitrary' } 'reject unknown remote progress phase'
+$script:ManagerProcessId=1
+try {
+  Check ((Write-RuntimePhase 'waiting') -ceq 'INHOUSE_RUNTIME_PHASE:waiting') 'remote progress reports waiting without paths or credentials'
+  $script:ManagerOperationKey=''
+  Reject { Assert-NoManager } 'running-manager bypass needs a verified operation event'
+} finally { $script:ManagerProcessId=0; $script:ManagerOperationKey='' }
+$manager = [pscustomobject]@{Id=100;ProcessName='Inhouse-Photos-Server';SessionId=2;Path='C:\manager\Inhouse-Photos-Server.exe'}
+$helper = [pscustomobject]@{ParentProcessId=100;SessionId=2}
+$managerInfo = [pscustomobject]@{ProcessId=100;ParentProcessId=99}
+$launcher = [pscustomobject]@{Id=99;ProcessName='Inhouse Photos';SessionId=2;Path='C:\launcher\Inhouse Photos.exe'}
+Assert-ManagerProcessChain $helper $manager $managerInfo @($manager) $launcher.Path; Check $true 'manager-owned helper accepted'
+Assert-ManagerProcessChain $helper $manager $managerInfo @($manager,$launcher) $launcher.Path; Check $true 'verified auto-start launcher parent accepted'
+$other = Clone $launcher; $other.Id=98; Reject { Assert-ManagerProcessChain $helper $manager $managerInfo @($manager,$other) $launcher.Path } 'unrelated manager refused'
+$other = Clone $launcher; $other.Path='C:\other\Inhouse Photos.exe'; Reject { Assert-ManagerProcessChain $helper $manager $managerInfo @($manager,$other) $launcher.Path } 'launcher path must match installed parent'
+$badHelper = Clone $helper; $badHelper.ParentProcessId=98; Reject { Assert-ManagerProcessChain $badHelper $manager $managerInfo @($manager) $launcher.Path } 'helper must be direct manager child'
+$badHelper = Clone $helper; $badHelper.SessionId=3; Reject { Assert-ManagerProcessChain $badHelper $manager $managerInfo @($manager) $launcher.Path } 'helper session must match manager'
 
 $mount = [pscustomobject]@{Type='bind';Source='/library';Destination='/data';Mode='rw';RW=$true;Propagation='rprivate'}
 $dbMount = [pscustomobject]@{Type='volume';Name='inhouse_pgdata';Source='/var/lib/docker/volumes/inhouse_pgdata/_data';Destination='/var/lib/postgresql/data';Driver='local';Mode='rw';RW=$true;Propagation=''}
@@ -49,6 +66,12 @@ $before = @(
   [pscustomobject]@{Id=('2'*64);Image=('sha256:'+'b'*64);Service='database';Project='inhouse';Mounts=@($dbMount)},
   [pscustomobject]@{Id=('3'*64);Image=('sha256:'+'c'*64);Service='redis';Project='inhouse';Mounts=@()})
 Assert-Containers $before $before 'inhouse'; Check $true 'unmodified production identity'
+Check (-not (Assert-RecoveryContainers $before $before 'inhouse')) 'existing server recovery preserves all identities'
+$withoutServer = @($before | Where-Object { $_.Service -cne 'immich-server' })
+Check (Assert-RecoveryContainers $before $withoutServer 'inhouse') 'interrupted recreation accepts only the missing photo server'
+$badRemaining = Clone $withoutServer; $badRemaining[0].Id='5'*64
+Reject { Assert-RecoveryContainers $before $badRemaining 'inhouse' } 'missing server cannot hide database recreation'
+Reject { Assert-RecoveryContainers $before @($withoutServer[0]) 'inhouse' } 'missing additional service requires manual review'
 $after = Clone $before; $after[0].Id='4'*64; $after[0].Image='sha256:'+'d'*64
 Assert-Containers $before $after 'inhouse' -ServerMayChange; Check $true 'only server recreation accepted'
 Reject { Assert-Containers $before $after 'inhouse' } 'unexpected server recreation before apply'

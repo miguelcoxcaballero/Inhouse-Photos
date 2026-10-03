@@ -27,9 +27,9 @@ namespace InhousePhotos {
     internal void InitializeLifecycle(bool hidden) {
       tray=new Forms.NotifyIcon{Text="Inhouse Photos Server",Icon=System.Drawing.Icon.ExtractAssociatedIcon(typeof(ServerWindow).Assembly.Location),Visible=true};
       var menu=new Forms.ContextMenuStrip();menu.Items.Add("Abrir Inhouse Photos",null,(s,e)=>Dispatcher.Invoke(BringToFront));
-      menu.Items.Add("Salir del gestor",null,(s,e)=>Dispatcher.Invoke(()=>{if(busy){notice.Text="Espera a que termine la operación antes de salir.";return;}exitRequested=true;Close();}));
+      menu.Items.Add("Salir del gestor",null,(s,e)=>Dispatcher.Invoke(()=>{if(busy||RuntimeUpdates.IsBusy){notice.Text="Espera a que termine la operación antes de salir.";return;}exitRequested=true;Close();}));
       tray.ContextMenuStrip=menu;tray.DoubleClick+=(s,e)=>Dispatcher.Invoke(BringToFront);
-      Closing+=(s,e)=>{if((busy||monitorBusy)&&!updateClose){e.Cancel=true;notice.Text="Espera a que termine la operación antes de salir.";return;}if(!exitRequested){e.Cancel=true;Hide();}};
+      Closing+=(s,e)=>{if((busy||monitorBusy||RuntimeUpdates.IsBusy)&&!updateClose){e.Cancel=true;notice.Text="Espera a que termine la operación antes de salir.";return;}if(!exitRequested){e.Cancel=true;Hide();}};
       Closed+=(s,e)=>{
         if(monitor!=null)monitor.Stop();lanMonitor?.Stop();lanDebounce?.Stop();
         if(networkAddressChanged!=null)NetworkChange.NetworkAddressChanged-=networkAddressChanged;
@@ -63,9 +63,18 @@ namespace InhousePhotos {
       };
       UsbDeviceMonitor.Current.Changed+=usbDevicesChanged;
       UsbDeviceMonitor.Current.Start();
+      // A recovery journal blocks supervision, but the phone must still reach
+      // the existing authenticated bridge to request ResumeRecord.
+      try{EnsureRemoteListener();}catch(Exception ex){notice.Text="Gestión remota no disponible: "+ex.Message;}
+    }
+    void EnsureRemoteListener() {
+      if(remoteManagement!=null||!prefs.Managed)return;
+      remoteManagement=new RemoteManagement(prefs,
+        ()=>Dispatcher.Invoke(()=>!busy&&!monitorBusy&&!updatingManager&&!ManagerUpdates.IsApplying&&!RuntimeUpdates.BlocksOperations(prefs)&&backupCancellation==null),
+        ()=>Dispatcher.BeginInvoke(new Action(async()=>await ApplyManagerUpdate(true))),ReadRemoteStatus,PerformRemoteAction);
     }
     async Task RefreshLocalRoutes() {
-      if(lanPublishBusy||exitRequested||updatingManager||!prefs.Managed)return;
+      if(lanPublishBusy||exitRequested||updatingManager||RuntimeUpdates.BlocksOperations(prefs)||!prefs.Managed)return;
       lanPublishBusy=true;
       try{await Task.Run(()=>LanRoute.Publish(prefs));}
       catch{ /* Discovery outages never stop the existing HTTPS server. */ }
@@ -73,7 +82,7 @@ namespace InhousePhotos {
     }
     internal void BringToFront(){Show();WindowState=WindowState.Normal;Activate();}
     async Task Supervise() {
-      if(busy||monitorBusy||!prefs.Managed||DateTime.UtcNow<retryAfter)return;
+      if(busy||monitorBusy||updatingManager||ManagerUpdates.IsApplying||RuntimeUpdates.BlocksOperations(prefs)||!prefs.Managed||DateTime.UtcNow<retryAfter)return;
       monitorBusy=true;
       try {
         bool autoStart=false;
@@ -85,10 +94,7 @@ namespace InhousePhotos {
         }
         if(online) {
           try {
-            if(remoteManagement==null)remoteManagement=new RemoteManagement(prefs,
-              ()=>Dispatcher.Invoke(()=>!busy&&!monitorBusy&&!updatingManager&&backupCancellation==null),
-              ()=>Dispatcher.BeginInvoke(new Action(async()=>await ApplyManagerUpdate(true))),
-              ReadRemoteStatus,PerformRemoteAction);
+            EnsureRemoteListener();
             await remoteManagement.EnsurePublished();
           }catch(Exception ex){notice.Text="Actualizaciones remotas no disponibles: "+ex.Message;}
           try {await LanRoute.Publish(prefs);} catch { /* Public HTTPS remains available if LAN discovery cannot be published. */ }
@@ -161,14 +167,15 @@ namespace InhousePhotos {
       bool startup=false,known=false;
       try{startup=await Startup.IsEnabled();known=true;}catch{}
       return new RemoteManagerStatus {
-        Version=Backend.Version,ServerOnline=await Backend.Ping(prefs.LocalEndpoint),Busy=ui.Busy,
+        Version=Backend.Version,ServerOnline=await Backend.Ping(prefs.LocalEndpoint),Busy=ui.Busy||RuntimeUpdates.IsBusy||
+          (RuntimeUpdates.BlocksOperations(prefs)&&!RuntimeUpdates.Status().RecoveryRequired),
         Operation=ui.Operation,Progress=ui.Progress,Error=ui.Error,
         LibraryDrive=libraryRoot,BackupDestination=prefs.BackupDestination??"",
         BackupConfigured=!String.IsNullOrWhiteSpace(prefs.BackupDestination),
         BackupRunning=ui.BackupRunning,BackupPresent=backup.FilesPresent,
         BackupCompletedUtc=backup.CompletedUtc??"",WeeklyBackupEnabled=schedule.Enabled,
         NextBackupUtc=schedule.NextDueUtc??"",StartupEnabled=startup,StartupKnown=known,Disks=disks,
-        Usb=UsbDeviceMonitor.Current.Snapshot
+        Usb=UsbDeviceMonitor.Current.Snapshot,RuntimeUpdate=RuntimeUpdates.Status()
       };
       }catch(Exception ex) {
         // This method receives no credentials. Keep only the failure type and
@@ -187,7 +194,13 @@ namespace InhousePhotos {
         if(backupCancellation==null)return false;
         backupCancellation.Cancel();SetBackupProgress("Deteniendo la copia. Se conservarán los archivos ya copiados.");return true;
       }
-      if(busy||monitorBusy||updatingManager||backupCancellation!=null)return false;
+      if(busy||monitorBusy||updatingManager||ManagerUpdates.IsApplying||backupCancellation!=null)return false;
+      if(action=="runtime-update") {
+        if(!RuntimeUpdates.TryBegin())return false;
+        busy=true;remoteError="";remoteOperation="runtime-update";
+        _=RunRuntimeUpdate();return true;
+      }
+      if(RuntimeUpdates.BlocksOperations(prefs))return false;
       if(action.StartsWith("backup/destination/",StringComparison.Ordinal)) {
         var letter=action.Substring("backup/destination/".Length);
         if(letter.Length!=1||letter[0]<'A'||letter[0]>'Z')throw new ArgumentException("Invalid backup drive.");
@@ -245,8 +258,49 @@ namespace InhousePhotos {
       catch(Exception ex){remoteError=ex.Message;notice.Text=ex.Message;}
       finally{busy=false;remoteOperation="";if(IsVisible)await Render();}
     }
+    async Task RunRuntimeUpdate() {
+      try {
+        notice.Text="Actualizando el motor de fotos. La cola pendiente y los originales se conservan…";
+        await Task.Run(()=>RuntimeUpdates.Apply(prefs));
+        notice.Text="Motor actualizado: "+RuntimeUpdates.LatestVersion+". Las subidas ya usan la cola persistente.";
+      }catch(Exception ex){remoteError=ex.Message;notice.Text=ex.Message;}
+      finally{busy=false;remoteOperation="";if(IsVisible)await Render();}
+    }
+    void RenderRuntimeUpdate() {
+      Rule();content.Children.Add(Label("Motor de fotos",22));
+      var row=new StackPanel();var version=Label("Comprobando el motor instalado…",16);
+      var detail=Label("Los originales y la cola pendiente se conservan durante la actualización.",14,muted);
+      var bar=new ProgressBar{Minimum=0,Maximum=100,Height=4,Foreground=accent,Visibility=Visibility.Collapsed,Margin=new Thickness(0,0,0,9)};
+      var update=new Button{Content="Actualizar el motor",IsEnabled=false,HorizontalAlignment=HorizontalAlignment.Left};
+      row.Children.Add(version);row.Children.Add(detail);row.Children.Add(bar);row.Children.Add(update);content.Children.Add(row);
+      void Refresh() {
+        var state=RuntimeUpdates.Status();
+        version.Text="Instalado: "+(String.IsNullOrEmpty(state.CurrentVersion)?"pendiente de comprobar":state.CurrentVersion);
+        var active=RuntimeUpdates.IsApplying;
+        bar.Visibility=active?Visibility.Visible:Visibility.Collapsed;bar.Value=state.Progress;
+        update.IsEnabled=state.Available&&!active&&!busy&&!updatingManager&&!ManagerUpdates.IsApplying;
+        update.Content=state.RecoveryRequired?"Completar actualización":"Actualizar el motor";
+        if(state.Phase=="downloading")detail.Text="Descargando el motor · "+state.Progress+" %";
+        else if(state.Phase=="waiting")detail.Text="Esperando las compresiones activas; los trabajos pendientes se conservan.";
+        else if(state.Phase=="installing")detail.Text="Preparando la imagen verificada del motor…";
+        else if(state.Phase=="restarting")detail.Text="Reiniciando y comprobando el motor de fotos…";
+        else if(state.Phase=="verifying")detail.Text="Verificando la imagen, la biblioteca y sus montajes…";
+        else if(state.Phase=="error")detail.Text=state.Error;
+        else if(state.CurrentVersion==RuntimeUpdates.LatestVersion)detail.Text="Motor actualizado. Las subidas se guardan y se procesan en segundo plano.";
+        else detail.Text=state.Notes;
+      }
+      update.Click+=async(sender,e)=>{
+        try{await RuntimeUpdates.Check(prefs,true);if(!BeginRemoteAction("runtime-update"))notice.Text="Espera a que termine la operación actual o vuelve a comprobar el motor.";}
+        catch(Exception ex){detail.Text=ex.Message;}
+        Refresh();
+      };
+      var timer=new DispatcherTimer{Interval=TimeSpan.FromSeconds(1)};
+      timer.Tick+=(sender,e)=>{if(!content.Children.Contains(row)){timer.Stop();return;}Refresh();};timer.Start();
+      _=RefreshInitially();
+      async Task RefreshInitially(){try{await RuntimeUpdates.Check(prefs);if(content.Children.Contains(row))Refresh();}catch{if(content.Children.Contains(row))detail.Text="No se pudo comprobar el motor. Comprueba Docker en el PC.";}}
+    }
     async Task ApplyManagerUpdate(bool remote) {
-      if(updatingManager||backupCancellation!=null||busy||monitorBusy) {
+      if(updatingManager||backupCancellation!=null||busy||monitorBusy||RuntimeUpdates.BlocksOperations(prefs)) {
         if(remote)ManagerUpdates.Fail(new IOException("El PC está ocupado. Vuelve a intentarlo en unos segundos."));
         else notice.Text="Espera a que termine la operación actual y vuelve a intentarlo.";
         return;
@@ -314,6 +368,7 @@ namespace InhousePhotos {
         }
       };updateTimer.Start();
       _=RefreshUpdate(false);
+      RenderRuntimeUpdate();
       Rule();content.Children.Add(Label("Inicio automático",22));
       var startupRow=new Grid{Margin=new Thickness(0,4,0,4)};
       startupRow.ColumnDefinitions.Add(new ColumnDefinition());
@@ -347,7 +402,7 @@ namespace InhousePhotos {
       }
       retry.Click+=async(s,e)=>await RefreshStartupState();
       auto.Click+=async(s,e)=>{
-        if(busy||!startupKnown){auto.IsChecked=startupEnabled;if(busy)notice.Text="Espera a que termine la operación antes de cambiar el inicio automático.";return;}
+        if(busy||ManagerUpdates.IsApplying||RuntimeUpdates.BlocksOperations(prefs)||!startupKnown){auto.IsChecked=startupEnabled;notice.Text="Espera a que termine o se recupere la operación actual antes de cambiar el inicio automático.";return;}
         try {
           var enabled=auto.IsChecked==true;
           if(!enabled&&Backend.ReadBackupSchedule().Enabled&&

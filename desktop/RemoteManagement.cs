@@ -40,6 +40,7 @@ namespace InhousePhotos {
     public bool StartupKnown {get;set;}
     public RemoteDiskStatus[] Disks {get;set;}
     public UsbDeviceStatus Usb {get;set;}
+    public RuntimeUpdateStatus RuntimeUpdate {get;set;}
   }
   /// A tiny, fixed-purpose bridge for an administrator's phone. Only the
   /// Windows manager restarts after an update; the photo API stays in Docker.
@@ -55,6 +56,7 @@ namespace InhousePhotos {
     public const string Path="/inhouse-manager/v1/update";
     public const string StatusPath="/inhouse-manager/v1/status";
     public const string UsbPath="/inhouse-manager/v1/usb";
+    public const string RuntimePath="/inhouse-manager/v1/runtime-update";
     const string BeginMarker="# INHOUSE-MANAGER-ROUTE-BEGIN";
     const string EndMarker="# INHOUSE-MANAGER-ROUTE-END";
     readonly Preferences prefs;
@@ -67,6 +69,8 @@ namespace InhousePhotos {
     readonly SemaphoreSlim capacity=new SemaphoreSlim(4,4);
     string publishedContainer,publishedConfigurationHash;
     bool disposed;
+    readonly object authorizationGate=new object();
+    readonly Dictionary<string,DateTime> recentAdministrators=new Dictionary<string,DateTime>();
     static string SecretPath {get{return System.IO.Path.Combine(Backend.SettingsDir,"manager-bridge.dpapi");}}
 
     public RemoteManagement(Preferences prefs,Func<bool> canUpdate,Action requestUpdate,
@@ -142,22 +146,59 @@ namespace InhousePhotos {
       }
       return found;
     }
-    async Task<bool> IsAdmin(string token) {
-      if(String.IsNullOrWhiteSpace(token)||token.Length>2048)return false;
-      Uri uri;if(!Uri.TryCreate(prefs.LocalEndpoint,UriKind.Absolute,out uri)||!uri.IsLoopback||uri.AbsolutePath!="/")return false;
+    enum AdministratorAuthorization {Denied,Verified,Unavailable}
+    async Task<AdministratorAuthorization> IsAdmin(string token) {
+      if(String.IsNullOrWhiteSpace(token)||token.Length>2048)return AdministratorAuthorization.Denied;
+      Uri uri;if(!Uri.TryCreate(prefs.LocalEndpoint,UriKind.Absolute,out uri)||!uri.IsLoopback||uri.AbsolutePath!="/")return AdministratorAuthorization.Denied;
       try {
         var request=(HttpWebRequest)WebRequest.Create(uri.GetLeftPart(UriPartial.Authority)+"/api/users/me");
         request.Method="GET";request.AllowAutoRedirect=false;request.Proxy=null;request.Timeout=7000;request.ReadWriteTimeout=7000;
         request.Headers[HttpRequestHeader.Authorization]="Bearer "+token;
+        using(var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(8)))using(deadline.Token.Register(()=>request.Abort()))
         using(var response=(HttpWebResponse)await request.GetResponseAsync()) {
-          if(response.StatusCode!=HttpStatusCode.OK||response.ContentLength>16384)return false;
+          if(response.StatusCode!=HttpStatusCode.OK||response.ContentLength>16384)return AdministratorAuthorization.Denied;
           using(var reader=new StreamReader(response.GetResponseStream())) {
-            var body=await reader.ReadToEndAsync();if(body.Length>16384)return false;
+            var body=await reader.ReadToEndAsync();if(body.Length>16384)return AdministratorAuthorization.Denied;
             var data=Backend.Json.Deserialize<Dictionary<string,object>>(body);
-            return data!=null&&data.ContainsKey("isAdmin")&&data["isAdmin"] is bool&&(bool)data["isAdmin"];
+            return data!=null&&data.ContainsKey("isAdmin")&&data["isAdmin"] is bool&&(bool)data["isAdmin"]?
+              AdministratorAuthorization.Verified:AdministratorAuthorization.Denied;
           }
         }
-      }catch{return false;}
+      }catch(WebException ex){
+        var response=ex.Response as HttpWebResponse;
+        if(response!=null)using(response) {
+          if((int)response.StatusCode>=400&&(int)response.StatusCode<500)return AdministratorAuthorization.Denied;
+        }
+        return AdministratorAuthorization.Unavailable;
+      }catch(IOException){return AdministratorAuthorization.Unavailable;}
+      catch{return AdministratorAuthorization.Denied;}
+    }
+    static string TokenHash(string token) {
+      using(var sha=SHA256.Create())return Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(token)));
+    }
+    internal static bool MayReadProgress(string method,string path,bool applying,DateTime verifiedUtc,DateTime nowUtc) {
+      return method=="GET"&&(path==RuntimePath||path==StatusPath)&&applying&&nowUtc>=verifiedUtc&&
+        nowUtc-verifiedUtc<=TimeSpan.FromMinutes(5);
+    }
+    async Task<AdministratorAuthorization> Authorize(string token,string method,string path) {
+      var result=await IsAdmin(token);
+      var hash=String.IsNullOrWhiteSpace(token)?null:TokenHash(token);
+      lock(authorizationGate) {
+        if(!RuntimeUpdates.IsApplying)recentAdministrators.Clear();
+        if(result==AdministratorAuthorization.Verified) {
+          if(hash!=null) {
+            foreach(var expired in recentAdministrators.Where(item=>DateTime.UtcNow-item.Value>TimeSpan.FromMinutes(5)).Select(item=>item.Key).ToArray())recentAdministrators.Remove(expired);
+            if(recentAdministrators.Count>=16)recentAdministrators.Clear();
+            recentAdministrators[hash]=DateTime.UtcNow;
+          }
+          return AdministratorAuthorization.Verified;
+        }
+        if(result==AdministratorAuthorization.Denied){if(hash!=null)recentAdministrators.Remove(hash);return result;}
+        DateTime verified;
+        return hash!=null&&recentAdministrators.TryGetValue(hash,out verified)&&
+          MayReadProgress(method,path,RuntimeUpdates.IsApplying,verified,DateTime.UtcNow)?
+          AdministratorAuthorization.Verified:AdministratorAuthorization.Unavailable;
+      }
     }
     async Task Serve(TcpClient client) {
       client.ReceiveTimeout=10000;client.SendTimeout=10000;client.NoDelay=true;
@@ -183,12 +224,16 @@ namespace InhousePhotos {
           headers.TryGetValue("X-Inhouse-Bridge",out key);
           if(!SameSecret(key,secret)){await Reply(stream,403,new{message="Forbidden"});return;}
           headers.TryGetValue("Content-Length",out length);
-          if(length!=null&&length!="0"){await Reply(stream,400,new{message="Body not allowed"});return;}
+          if((length!=null&&length!="0")||headers.ContainsKey("Transfer-Encoding")){await Reply(stream,400,new{message="Body not allowed"});return;}
           headers.TryGetValue("Authorization",out authorization);
           headers.TryGetValue("Cookie",out cookie);
           var token=authorization!=null&&authorization.StartsWith("Bearer ",StringComparison.Ordinal)?authorization.Substring(7):
             authorization==null?ReadOnlyBrowserToken(parts[0],parts[1],cookie):null;
-          if(!await IsAdmin(token)){await Reply(stream,401,new{message="Administrator sign-in required"});return;}
+          var admin=await Authorize(token,parts[0],parts[1]);
+          if(admin!=AdministratorAuthorization.Verified){
+            await Reply(stream,admin==AdministratorAuthorization.Unavailable?503:401,new{message=admin==AdministratorAuthorization.Unavailable?
+              "El motor de fotos no responde para verificar tu cuenta. Espera o comprueba el servidor en el PC.":"Administrator sign-in required"});return;
+          }
           if(parts[1]==UsbPath) {
             await Reply(stream,200,UsbDeviceMonitor.Current.Snapshot);
             return;
@@ -213,6 +258,20 @@ namespace InhousePhotos {
             }catch(Exception ex){ManagerUpdates.Fail(ex);await Reply(stream,503,new{message=ex.Message});}
             return;
           }
+          if(parts[1]==RuntimePath&&parts[0]=="GET") {
+            try{await Reply(stream,200,await RuntimeUpdates.Check(prefs));}
+            catch{await Reply(stream,503,new{message="No se pudo comprobar el motor instalado. Comprueba Docker en el PC."});}
+            return;
+          }
+          if(parts[1]==RuntimePath) {
+            try {
+              if(!RuntimeUpdates.IsApplying)await RuntimeUpdates.Check(prefs,true);
+              var accepted=await performAction("runtime-update");
+              if(!accepted){await Reply(stream,409,new{message="El PC está ocupado o el motor ya está actualizado."});return;}
+              await Reply(stream,202,RuntimeUpdates.Status());
+            }catch{await Reply(stream,503,new{message="No se pudo iniciar la actualización del motor. Comprueba el gestor en el PC."});}
+            return;
+          }
           try {
             var accepted=await performAction(parts[1].Substring(StatusPath.Length+1));
             await Reply(stream,accepted?202:409,new{message=accepted?"Action accepted":"The PC is busy or the action is not available."});
@@ -223,9 +282,9 @@ namespace InhousePhotos {
       }catch{ /* An interrupted management request must not affect the photo server. */ }
     }
     public static bool Allowed(string method,string path) {
-      if(method=="GET")return path==Path||path==StatusPath||path==UsbPath;
+      if(method=="GET")return path==Path||path==StatusPath||path==UsbPath||path==RuntimePath;
       if(method!="POST")return false;
-      if(path==Path)return true;
+      if(path==Path||path==RuntimePath)return true;
       if(path==StatusPath+"/backup/start"||path==StatusPath+"/backup/cancel"||
          path==StatusPath+"/backup/schedule/enable"||path==StatusPath+"/backup/schedule/disable"||
          path==StatusPath+"/startup/enable"||path==StatusPath+"/startup/disable"||

@@ -19,7 +19,7 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 
 [assembly: System.Reflection.AssemblyTitle("Inhouse Photos Server")]
-[assembly: System.Reflection.AssemblyVersion("1.2.16.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.17.0")]
 
 namespace InhousePhotos {
   public sealed class Preferences {
@@ -310,7 +310,7 @@ namespace InhousePhotos {
     void Rule(){content.Children.Add(new Border{Height=1,Background=line,Margin=new Thickness(0,18,0,20)});}
     Button Action(string title,Func<Task> task,bool primary=false) {
       var button=new Button{Content=title,HorizontalAlignment=HorizontalAlignment.Left};if(primary){button.Background=accent;button.BorderBrush=accent;button.Foreground=Brushes.White;}
-      button.Click+=async(s,e)=>{if(busy)return;busy=true;button.IsEnabled=false;notice.Text="Trabajando…";try{await task();if(notice.Text=="Trabajando…")notice.Text="";}catch(Exception ex){notice.Text=ex.Message;}finally{busy=false;button.IsEnabled=true;}};content.Children.Add(button);return button;
+      button.Click+=async(s,e)=>{if(busy||ManagerUpdates.IsApplying||RuntimeUpdates.BlocksOperations(prefs)){notice.Text="Espera a que termine o se recupere la actualización actual.";return;}busy=true;button.IsEnabled=false;notice.Text="Trabajando…";try{await task();if(notice.Text=="Trabajando…")notice.Text="";}catch(Exception ex){notice.Text=ex.Message;}finally{busy=false;button.IsEnabled=true;}};content.Children.Add(button);return button;
     }
     string PickFolder(){using(var dialog=new System.Windows.Forms.FolderBrowserDialog()){dialog.Description="Selecciona una carpeta";return dialog.ShowDialog()==System.Windows.Forms.DialogResult.OK?dialog.SelectedPath:null;}}
     bool Confirm(string message){return MessageBox.Show(this,message,"Inhouse Photos",MessageBoxButton.OKCancel,MessageBoxImage.Warning)==MessageBoxResult.OK;}
@@ -401,8 +401,10 @@ namespace InhousePhotos {
           Console.WriteLine("Verificado: "+prefs.ReceiptPath);return 0;
         }catch(Exception ex){Console.Error.WriteLine(ex.Message);return 20;}
       }
+      if(args.Contains("--verify-runtime-handoff"))return RuntimeUpdates.VerifyHandoff();
       if(args.Contains("--self-test")){
         try {
+          if(RuntimeUpdates.SelfTest()!=0)return 59;
           if(UsbNetworkSafety.SelfTest()!=0)return 29;
           if(UsbDeviceMonitor.SelfTest()!=0)return 56;
           var browserToken=new string('A',43);

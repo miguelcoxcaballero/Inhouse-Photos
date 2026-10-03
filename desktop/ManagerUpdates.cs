@@ -36,6 +36,7 @@ namespace InhousePhotos {
     static string phase="idle",error="";
     static int progress;
     static bool applying;
+    public static bool IsApplying {get{lock(StateGate)return applying;}}
     static string UpdatesDir {get{return Path.Combine(Backend.SettingsDir,"updates");}}
     static string ErrorPath {get{return Path.Combine(Backend.SettingsDir,"last-manager-update-error.txt");}}
 

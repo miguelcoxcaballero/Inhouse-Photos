@@ -153,7 +153,7 @@ namespace InhousePhotos {
       section.Unloaded+=(s,e)=>{if(listening){monitor.Changed-=changed;listening=false;}};
       check.Click+=(s,e)=>monitor.Refresh();
       prepare.Click+=async(s,e)=>{
-        if(busy||monitorBusy||updatingManager){activity.Text="Espera a que termine la operación actual antes de preparar la red USB.";activity.Foreground=accent;activity.Visibility=Visibility.Visible;return;}
+        if(busy||monitorBusy||updatingManager||ManagerUpdates.IsApplying||RuntimeUpdates.BlocksOperations(prefs)){activity.Text="Espera a que termine la operación actual antes de preparar la red USB.";activity.Foreground=accent;activity.Visibility=Visibility.Visible;return;}
         if(!monitor.Snapshot.CanPrepare){monitor.Refresh();Update();return;}
         if(!Confirm("El móvil ya está detectado. Se preparará únicamente su conexión de red USB para que el PC mantenga Internet por Ethernet o Wi-Fi. No se cambiarán DNS, fotos ni la red habitual. Windows pedirá permiso de administrador. ¿Preparar esta red USB?"))return;
         busy=true;preparing=true;prepare.IsEnabled=false;check.IsEnabled=false;

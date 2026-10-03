@@ -42,9 +42,13 @@ namespace InhousePhotos {
     public Dictionary<string,string> ConfigurationHashes {get;set;}
   }
   public static partial class Backend {
-    public const string Version="1.2.16";
+    public const string Version="1.2.17";
     public const string DockerContext="--context desktop-linux ";
     static readonly SemaphoreSlim ServerLock=new SemaphoreSlim(1,1);
+    public static async Task WithServerLock(Func<Task> action) {
+      await ServerLock.WaitAsync();
+      try {await action();} finally {ServerLock.Release();}
+    }
     public static readonly string InstallDir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),@"Programs\Inhouse Photos Server");
     public static string Launcher {get{return Path.Combine(InstallDir,"Inhouse Photos.exe");}}
     public static void PrivateDirectory(string path) {

@@ -1,0 +1,166 @@
+name: Publish verified Inhouse Windows manager
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/durable-upload-backlog]
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/publish-inhouse-windows.yml'
+      - '.github/scripts/prepare_windows_publication.py'
+      - '.github/scripts/test_prepare_windows_publication.py'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: inhouse-windows-publication
+  cancel-in-progress: false
+
+env:
+  WINDOWS_VERSION: '1.2.17'
+  WINDOWS_TAG: server-v1.2.17
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/feat/durable-upload-backlog'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Checkout the Windows source to publish
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 1
+
+      - name: Preserve an already published manager release
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $result = gh release view $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
+          if ($LASTEXITCODE -eq 0 -and -not ($result | ConvertFrom-Json).isDraft) {
+            'published=true' >> $env:GITHUB_OUTPUT
+            Write-Output 'This immutable manager release is already published; no assets will be replaced.'
+          } else { 'published=false' >> $env:GITHUB_OUTPUT }
+          $global:LASTEXITCODE = 0
+
+      - name: Verify publication staging preserves concurrent Android changes
+        if: steps.existing.outputs.published != 'true'
+        run: |
+          python -m unittest discover -s .github/scripts -p test_prepare_windows_publication.py
+          if ($LASTEXITCODE -ne 0) { throw 'Windows publication staging tests failed' }
+
+      - name: Build the manager and embedded installer payload
+        if: steps.existing.outputs.published != 'true'
+        run: |
+          git diff --exit-code
+          if ($LASTEXITCODE -ne 0) { throw 'Source checkout is not clean' }
+          & .\desktop\build.ps1
+
+      - name: Verify the embedded updater with Windows PowerShell 5.1
+        if: steps.existing.outputs.published != 'true'
+        run: |
+          & .\desktop\server-runtime-update.tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Windows runtime updater checks failed' }
+
+      - name: Download the verified 1.2.16 bootstrap fixture
+        if: steps.existing.outputs.published != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Path "$env:RUNNER_TEMP\previous-manager" -Force | Out-Null
+          gh release download server-v1.2.16 --repo $env:GITHUB_REPOSITORY --pattern Inhouse-Photos-Server-Setup.exe --dir "$env:RUNNER_TEMP\previous-manager"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download the public bootstrap installer' }
+          $actual = (Get-FileHash "$env:RUNNER_TEMP\previous-manager\Inhouse-Photos-Server-Setup.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne '9378c9b3cc1366699011b29d5a06c32451a417b6fd0ba2574981c329844be65d') { throw 'Bootstrap installer checksum mismatch' }
+
+      - name: Verify x64 versions, runtime resources, self-tests and the 1.2.16 upgrade
+        if: steps.existing.outputs.published != 'true'
+        run: |
+          & .\desktop\verify-windows-release.ps1 -Version $env:WINDOWS_VERSION -SourceCommit $env:GITHUB_SHA -PreviousInstallerPath "$env:RUNNER_TEMP\previous-manager\Inhouse-Photos-Server-Setup.exe"
+
+      - name: Save the verified Windows manifest and test report
+        if: steps.existing.outputs.published != 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: inhouse-windows-release-verification
+          path: |
+            windows-server-update.json
+            desktop/dist/windows-release-verification.json
+            desktop/dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Upload and verify the immutable public installer
+        if: steps.existing.outputs.published != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $draft = gh release view $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            if (-not ($draft | ConvertFrom-Json).isDraft) { throw 'Refusing to overwrite a published Windows release' }
+          } else {
+            gh release create $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Inhouse Photos Server $env:WINDOWS_VERSION" --draft --notes-file desktop/RELEASE-1.2.17.md
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create the release draft' }
+          }
+          gh release upload $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --clobber desktop/dist/Inhouse-Photos-Server-Setup.exe desktop/dist/Inhouse-Photos-Server.exe desktop/dist/SHA256SUMS.txt desktop/dist/windows-release-verification.json windows-server-update.json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not upload the verified Windows assets' }
+          $downloads = "$env:RUNNER_TEMP\downloaded-windows-release"
+          New-Item -ItemType Directory -Path $downloads -Force | Out-Null
+          gh release download $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --dir $downloads
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download the uploaded Windows assets' }
+          foreach ($name in @('Inhouse-Photos-Server-Setup.exe', 'Inhouse-Photos-Server.exe', 'SHA256SUMS.txt', 'windows-release-verification.json')) {
+            if ((Get-FileHash "desktop/dist/$name" -Algorithm SHA256).Hash -ne (Get-FileHash "$downloads/$name" -Algorithm SHA256).Hash) { throw "Published asset hash mismatch: $name" }
+          }
+          if ((Get-FileHash windows-server-update.json -Algorithm SHA256).Hash -ne (Get-FileHash "$downloads/windows-server-update.json" -Algorithm SHA256).Hash) { throw 'Published Windows manifest hash mismatch' }
+          $info = New-Object Diagnostics.ProcessStartInfo
+          $info.FileName = "$downloads\Inhouse-Photos-Server-Setup.exe"
+          $info.Arguments = '--verify-payload'
+          $info.UseShellExecute = $false
+          $info.CreateNoWindow = $true
+          $check = [Diagnostics.Process]::Start($info)
+          try {
+            if (-not $check.WaitForExit(15000)) { $check.Kill(); throw 'Downloaded installer verification timed out' }
+            if ($check.ExitCode -ne 0) { throw 'Downloaded installer payload verification failed' }
+          } finally { $check.Dispose() }
+          gh release edit $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft=false --latest=false
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish the verified Windows release' }
+
+      - name: Verify the public download URLs without authentication
+        if: steps.existing.outputs.published != 'true'
+        run: |
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $public = "$env:RUNNER_TEMP\public-windows-release"
+          New-Item -ItemType Directory -Path $public -Force | Out-Null
+          foreach ($name in @('Inhouse-Photos-Server-Setup.exe', 'Inhouse-Photos-Server.exe', 'SHA256SUMS.txt', 'windows-release-verification.json', 'windows-server-update.json')) {
+            $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:WINDOWS_TAG/$name"
+            $downloaded = Join-Path $public $name
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              try { Invoke-WebRequest -Uri $url -OutFile $downloaded -UseBasicParsing -TimeoutSec 60; break }
+              catch { if ($attempt -eq 3) { throw }; Start-Sleep -Seconds 3 }
+            }
+            $original = if ($name -eq 'windows-server-update.json') { $name } else { "desktop/dist/$name" }
+            if ((Get-FileHash $original -Algorithm SHA256).Hash -ne (Get-FileHash $downloaded -Algorithm SHA256).Hash) { throw "Public Windows download mismatch: $name" }
+          }
+
+      - name: Commit only the verified Windows manifest on the latest feature branch
+        if: steps.existing.outputs.published != 'true'
+        run: |
+          git fetch --depth=2 --no-tags origin $env:GITHUB_REF_NAME
+          if ($LASTEXITCODE -ne 0) { throw 'Could not fetch the latest source branch' }
+          $latest = (git rev-parse FETCH_HEAD).Trim()
+          $staging = "$env:RUNNER_TEMP\windows-publication"
+          python .github/scripts/prepare_windows_publication.py --source $env:GITHUB_SHA --target $latest --directory $staging
+          if ($LASTEXITCODE -ne 0) { throw 'Windows inputs changed; the published manifest was not committed' }
+          Push-Location $staging
+          try {
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add -- windows-server-update.json
+            git commit -m "chore(windows): publish verified manager $env:WINDOWS_VERSION manifest"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not commit the verified Windows manifest' }
+            git push origin "HEAD:refs/heads/$env:GITHUB_REF_NAME"
+            if ($LASTEXITCODE -ne 0) { throw 'The branch advanced concurrently; no source changes were overwritten' }
+          } finally { Pop-Location }

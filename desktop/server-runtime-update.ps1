@@ -15,12 +15,21 @@ param(
   [string]$SettingsDirectory = (Join-Path $env:LOCALAPPDATA 'Inhouse Photos Server'),
   [string]$DockerExe = 'docker',
   [ValidateRange(30, 1800)][int]$HealthTimeoutSeconds = 300,
+  [ValidateRange(0, 2147483647)][int]$ManagerProcessId = 0,
+  [string]$ManagerOperationKey = '',
   [switch]$Apply,
   [switch]$FunctionsOnly
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+function Write-RuntimePhase([string]$Phase) {
+  if (@('verifying', 'waiting', 'installing', 'restarting', 'completed') -cnotcontains $Phase) {
+    throw 'Fase de actualización no válida.'
+  }
+  if ($ManagerProcessId -gt 0) { Write-Output ('INHOUSE_RUNTIME_PHASE:' + $Phase) }
+}
 
 function Get-Sha256([string]$Path) {
   return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -146,6 +155,23 @@ function Assert-Containers($Expected, $Current, [string]$Project, [switch]$Serve
   }
 }
 
+function Assert-RecoveryContainers($Expected, $Current, [string]$Project) {
+  $server = @($Current | Where-Object { $_.Service -ceq 'immich-server' })
+  if ($server.Count) {
+    Assert-Containers $Expected $Current $Project -ServerMayChange
+    return $false
+  }
+  # Compose can disappear between removing and recreating this one service.
+  # Every remaining service must still have its exact original identity and
+  # mounts. The missing server is created stopped and checked again below.
+  $saved = @($Expected | Where-Object { $_.Service -ceq 'immich-server' })
+  if ($saved.Count -ne 1 -or $Current.Count -ne ($Expected.Count - 1)) {
+    throw 'La recuperación no encuentra únicamente el servidor de fotos.'
+  }
+  Assert-Containers $Expected (@($Current) + @($saved[0])) $Project -ServerMayChange
+  return $true
+}
+
 function Get-ConfigurationHashes([string]$Installation) {
   $result = @{}
   foreach ($name in @('docker-compose.yml', '.env', 'Caddyfile')) {
@@ -234,8 +260,47 @@ function Wait-ServerHealthy($Preferences, [string]$ComposeFile, [string]$Expecte
   throw 'El nuevo servidor no confirmó su estado saludable a tiempo.'
 }
 
+function Assert-ManagerProcessChain($Helper, $Manager, $ManagerInfo, $Running, [string]$LauncherPath) {
+  if ($Helper.ParentProcessId -ne $Manager.Id -or $Helper.SessionId -ne $Manager.SessionId -or
+    $ManagerInfo.ProcessId -ne $Manager.Id -or $Manager.ProcessName -cne 'Inhouse-Photos-Server') {
+    throw 'El proceso que inició la actualización no es el gestor esperado.'
+  }
+  foreach ($process in $Running) {
+    if ($process.Id -eq $Manager.Id) { continue }
+    # --startup keeps the immutable launcher waiting for its child manager.
+    # Permit this exact parent only; every unrelated manager remains blocked.
+    if ($process.Id -ne $ManagerInfo.ParentProcessId -or $process.ProcessName -cne 'Inhouse Photos' -or
+      $process.SessionId -ne $Manager.SessionId -or
+      -not [string]::Equals($process.Path, $LauncherPath, [StringComparison]::OrdinalIgnoreCase)) {
+      throw 'Hay otro gestor en ejecución; se conserva el motor actual.'
+    }
+  }
+}
+
 function Assert-NoManager {
-  if (@(Get-Process -Name 'Inhouse Photos', 'Inhouse-Photos-Server' -ErrorAction SilentlyContinue).Count) {
+  $running = @(Get-Process -Name 'Inhouse Photos', 'Inhouse-Photos-Server' -ErrorAction SilentlyContinue)
+  if ($ManagerProcessId -gt 0) {
+    # Only a direct child of the current manager may keep that manager open.
+    # Its operation event exists only while the UI holds its mutation lock.
+    if ($ManagerOperationKey -cnotmatch '^[a-f0-9]{32}$') { throw 'Falta la operación verificada del gestor.' }
+    $self = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $PID)
+    $manager = Get-Process -Id $ManagerProcessId -ErrorAction Stop
+    $managerInfo = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $ManagerProcessId)
+    $owner = Invoke-CimMethod -InputObject $managerInfo -MethodName GetOwnerSid
+    if ($owner.ReturnValue -ne 0 -or $owner.Sid -cne [Security.Principal.WindowsIdentity]::GetCurrent().User.Value) {
+      throw 'El gestor y el actualizador deben utilizar el mismo usuario de Windows.'
+    }
+    $launcherPath = Join-Path $env:LOCALAPPDATA 'Programs\Inhouse Photos Server\Inhouse Photos.exe'
+    Assert-ManagerProcessChain $self $manager $managerInfo $running $launcherPath
+    $operation = $null
+    try {
+      $operation = [Threading.EventWaitHandle]::OpenExisting(('Local\InhousePhotosRuntime-' + $ManagerProcessId + '-' + $ManagerOperationKey))
+      if (-not $operation.WaitOne(0)) { throw 'La operación del gestor ya no está activa.' }
+    } finally { if ($operation) { $operation.Dispose() } }
+    return
+  }
+  if ($ManagerOperationKey) { throw 'La operación del gestor necesita su proceso de origen.' }
+  if ($running.Count) {
     throw 'Cierra Inhouse Photos Server desde su icono de la bandeja antes de actualizar.'
   }
 }
@@ -271,6 +336,7 @@ function Invoke-QueueHelper([string]$Image, $Context, [string]$Action, $Original
 }
 
 function Wait-CompressionIdle([string]$Image, $Context) {
+  Write-RuntimePhase 'waiting'
   $deadline = [DateTime]::UtcNow.AddMinutes(15)
   do {
     $state = Invoke-QueueHelper $Image $Context 'inspect' $null
@@ -328,6 +394,7 @@ function Assert-NoIncompleteUpdate([string]$SettingsPath) {
 function Invoke-RuntimeUpdate {
   if ($env:OS -cne 'Windows_NT') { throw 'Este actualizador solo se ejecuta en el PC Windows del servidor.' }
   Assert-NoManager
+  Write-RuntimePhase 'verifying'
   $settingsFile = Assert-LocalFile (Join-Path $SettingsDirectory 'settings.json')
   $prefs = Read-Json $settingsFile
   if (-not $prefs.Managed -or $prefs.ProjectName -notmatch '^[a-z0-9][a-z0-9_-]*$') { throw 'Completa primero la vinculación segura con Inhouse Photos Server.' }
@@ -341,8 +408,9 @@ function Invoke-RuntimeUpdate {
   $hashes = Get-ConfigurationHashes $prefs.Installation
   if (-not $ResumeRecord) { Assert-Configuration $receipt.ConfigurationHashes $hashes }
   $before = @(Get-Containers $prefs $composeFile)
-  Assert-Containers $receipt.Containers $before $prefs.ProjectName -Adoption
-  $server = @($before | Where-Object { $_.Service -ceq 'immich-server' })[0]
+  if (-not $ResumeRecord) { Assert-Containers $receipt.Containers $before $prefs.ProjectName -Adoption }
+  $servers = @($before | Where-Object { $_.Service -ceq 'immich-server' })
+  $server = if ($servers.Count) { $servers[0] } else { $null }
 
   if ($ResumeRecord) {
     $recordPath = Assert-LocalFile $ResumeRecord
@@ -350,10 +418,10 @@ function Invoke-RuntimeUpdate {
     if ($record.format -ne 1 -or $record.project -cne $prefs.ProjectName -or
       $record.installation -cne $prefs.Installation -or $record.receiptPath -cne $prefs.ReceiptPath -or
       $record.settingsSha256 -cne (Get-Sha256 $settingsFile) -or
-      @($record.previousImageId, $record.newImageId) -cnotcontains $server.Image) {
+      ($null -ne $server -and @($record.previousImageId, $record.newImageId) -cnotcontains $server.Image)) {
       throw 'El registro pendiente no corresponde a esta instalación.'
     }
-    Assert-Containers $record.previousContainers $before $prefs.ProjectName -ServerMayChange
+    $missingServer = Assert-RecoveryContainers $record.previousContainers $before $prefs.ProjectName
     $backup = Assert-LocalFile (Join-Path ([IO.Path]::GetDirectoryName($recordPath)) 'adoption-receipt.before.json')
     if ((Get-Sha256 $backup) -cne $record.previousReceiptSha256) { throw 'La copia del recibo cambió.' }
     $savedReceipt = Read-Json $backup
@@ -362,13 +430,24 @@ function Invoke-RuntimeUpdate {
       else { throw 'Compose cambió fuera de la actualización. Se conservan las copias para revisión manual.' }
     $savedReceipt.ConfigurationHashes.'docker-compose.yml' = $hashes['docker-compose.yml']
     Assert-Configuration $savedReceipt.ConfigurationHashes $hashes
+    $targetReference = Get-ComposeImage $prefs $composeFile
+    if ((Invoke-Docker @('image', 'inspect', '--format', '{{.Id}}', $targetReference)) -cne $targetImage) {
+      throw 'La etiqueta de imagen de la recuperación cambió. No se recreará el servidor con otra versión.'
+    }
     if (-not $Apply) { Write-Output 'Transacción pendiente verificada. Añade -Apply para confirmar el motor y restaurar el estado original de las colas.'; return }
     if ($null -eq $record.queueState) {
-      if ($targetImage -cne $record.previousImageId -or $server.Image -cne $record.previousImageId) { throw 'El registro no contiene el estado original de las colas.' }
+      if ($missingServer -or $targetImage -cne $record.previousImageId -or $server.Image -cne $record.previousImageId) { throw 'El registro no contiene el estado original de las colas.' }
       $record.status = 'aborted'
       Write-PrivateJson $recordPath $record
       Write-Output 'Preparación cancelada; el servidor y las colas no se habían cambiado.'
       return
+    }
+    if ($missingServer) {
+      Invoke-Docker ((Get-ComposeArguments $prefs $composeFile) + @('up', '--no-start', '--no-deps', '--no-build', '--pull', 'never', 'immich-server')) | Out-Null
+      $before = @(Get-Containers $prefs $composeFile)
+      Assert-Containers $record.previousContainers $before $prefs.ProjectName -ServerMayChange
+      $server = @($before | Where-Object { $_.Service -ceq 'immich-server' })[0]
+      if ($server.Image -cne $targetImage) { throw 'El servidor creado no coincide con la imagen de recuperación.' }
     }
     $script:QueueContext = New-QueueContext $server.Id ([IO.Path]::GetDirectoryName($recordPath))
     try {
@@ -379,14 +458,16 @@ function Invoke-RuntimeUpdate {
       if ($targetImage -ceq $record.previousImageId) {
         $currentServer = @((Get-Containers $prefs $composeFile) | Where-Object { $_.Service -ceq 'immich-server' })[0]
         Invoke-Docker @('stop', $currentServer.Id) | Out-Null
-        try { Invoke-QueueHelper $targetImage $script:QueueContext 'assert-rollback-safe' $null | Out-Null }
-        catch { Invoke-Docker @('start', $currentServer.Id) | Out-Null; throw }
+        # If the old image cannot read the durable migration/outbox, leave it
+        # stopped. Starting it here would defeat the rollback safety guard.
+        Invoke-QueueHelper $targetImage $script:QueueContext 'assert-rollback-safe' $null | Out-Null
       }
       $targetReference = Get-ComposeImage $prefs $composeFile
       if ((Invoke-Docker @('image', 'inspect', '--format', '{{.Id}}', $targetReference)) -cne $targetImage) {
         throw 'La etiqueta de imagen de la recuperación cambió. No se recreará el servidor con otra versión.'
       }
       Invoke-Docker ((Get-ComposeArguments $prefs $composeFile) + @('up', '-d', '--no-deps', '--pull', 'never', 'immich-server')) | Out-Null
+      Write-RuntimePhase 'restarting'
       $after = @(Wait-ServerHealthy $prefs $composeFile $targetImage)
       Assert-Containers $record.previousContainers $after $prefs.ProjectName -ServerMayChange
       Assert-Configuration $savedReceipt.ConfigurationHashes (Get-ConfigurationHashes $prefs.Installation)
@@ -398,6 +479,7 @@ function Invoke-RuntimeUpdate {
       $record.status = if ($targetImage -ceq $record.previousImageId) { 'rolled-back' } else { 'completed' }
       Write-PrivateJson $recordPath $record
       Write-Output 'Transacción recuperada. Se confirmó el motor y se restauró el estado original de las colas.'
+      Write-RuntimePhase 'completed'
     } catch {
       $record.status = 'rollback-required'
       Write-PrivateJson $recordPath $record
@@ -471,6 +553,7 @@ function Invoke-RuntimeUpdate {
   try {
     # A release archive is a docker save, with a unique release tag. The archive
     # hash is checked before load; inspect verifies its content after load.
+    Write-RuntimePhase 'installing'
     Invoke-Docker @('load', '--input', $archiveFile) | Out-Null
     $imageFormat = '[{{json .Id}},{{json .Os}},{{json .Architecture}},{{json .Config.Labels}}]'
     $image = (Invoke-Docker @('image', 'inspect', '--format', $imageFormat, $manifest.image)) | ConvertFrom-Json
@@ -507,6 +590,7 @@ function Invoke-RuntimeUpdate {
     $record.status = 'starting'
     Write-PrivateJson $recordPath $record
     Invoke-Docker ((Get-ComposeArguments $prefs $composeFile) + @('up', '-d', '--no-deps', '--pull', 'never', 'immich-server')) | Out-Null
+    Write-RuntimePhase 'restarting'
     $after = @(Wait-ServerHealthy $prefs $composeFile $manifest.imageId)
     Assert-Containers $before $after $prefs.ProjectName -ServerMayChange
     $expectedHashes = $receipt.ConfigurationHashes | ConvertTo-Json | ConvertFrom-Json
@@ -523,6 +607,7 @@ function Invoke-RuntimeUpdate {
     Write-PrivateJson $recordPath $record
     Write-Output ('Instalada ' + $manifest.version + ', commit ' + $manifest.sourceCommit + '. Solo se recreó immich-server.')
     Write-Output ('Recuperación: ' + $recordPath)
+    Write-RuntimePhase 'completed'
   } catch {
     if ($changed) {
       try { Restore-Runtime $record $prefs $composeFile $recordPath }
@@ -547,4 +632,16 @@ function Invoke-RuntimeUpdate {
   }
 }
 
-if (-not $FunctionsOnly) { Invoke-RuntimeUpdate }
+if (-not $FunctionsOnly) {
+  $runtimeMutex = New-Object Threading.Mutex($false, 'Local\InhousePhotosRuntimeUpdate')
+  $ownsRuntimeMutex = $false
+  try {
+    try { $ownsRuntimeMutex = $runtimeMutex.WaitOne(0) }
+    catch [Threading.AbandonedMutexException] { $ownsRuntimeMutex = $true }
+    if (-not $ownsRuntimeMutex) { throw 'Ya hay una actualización del motor en curso.' }
+    Invoke-RuntimeUpdate
+  } finally {
+    if ($ownsRuntimeMutex) { $runtimeMutex.ReleaseMutex() }
+    $runtimeMutex.Dispose()
+  }
+}

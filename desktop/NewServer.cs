@@ -15,9 +15,9 @@ namespace InhousePhotos {
     public Dictionary<string,string> Hashes {get;set;}
   }
   public static class NewServer {
-    public const string ImageName="inhouse-photos-server:v3.1.0-pairing-20260929";
-    public const string ImageId="sha256:283fb546c253d70c3e984062a2d2ebc08ce4547ef799e0ffba634222e4b5c16d";
-    public const string BundleHash="3218c14df0af80c85c5b01d2631ae8341294393f50f9eae05b4505c34b735541";
+    public const string ImageName=RuntimeUpdates.LatestImage;
+    public const string ImageId=RuntimeUpdates.LatestImageId;
+    public const string BundleHash=RuntimeUpdates.ArchiveSha256;
     static readonly System.Threading.SemaphoreSlim Gate=new System.Threading.SemaphoreSlim(1,1);
     public static string PendingFile {get{return Path.Combine(Backend.SettingsDir,"setup-pending.json");}}
     public static void Validate(string folder,string email,string password,string name,string domain) {
@@ -43,17 +43,12 @@ namespace InhousePhotos {
       if(File.Exists(path))File.Replace(part,path,null);else File.Move(part,path);
     }
     static async Task EnsureImage(Action<string> progress) {
-      try{if((await Backend.Docker("image inspect "+ImageName+" --format {{.Id}}",15)).Trim()==ImageId)return;}catch{}
-      var archive=Path.Combine(Backend.SettingsDir,"components","inhouse-server-3.1.0-pairing-20260929.tar.gz");
-      await Download("https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.5/inhouse-server-3.1.0-pairing-20260929.tar.gz",archive,BundleHash,progress);
-      progress("Preparando los componentes descargados…");
-      await Backend.Docker("load --input "+Backend.Quote(archive),900);
-      if((await Backend.Docker("image inspect "+ImageName+" --format {{.Id}}",15)).Trim()!=ImageId)throw new IOException("El componente del servidor no pasa la verificación.");
+      await RuntimeUpdates.EnsureImage(progress);
     }
     public static string ComposeText(bool remote) {
       return @"services:
   immich-server:
-    image: inhouse-photos-server:v3.1.0-pairing-20260929
+    image: inhouse-photos-server:v3.1.0-durable-upload-20261003
     platform: linux/amd64
     env_file: .env
     volumes:
