@@ -184,7 +184,21 @@ jobs:
                   obj = api('git/tags/' + obj['sha'])['object']
               raise ValueError('Release tag is not a supported commit reference')
           def release_info():
-              return api('releases/tags/' + tag, missing_ok=True)
+              info = api('releases/tags/' + tag, missing_ok=True)
+              if info is not None:
+                  return info
+              # GitHub does not expose an unpublished draft through the tag
+              # endpoint. Resolve it from the authenticated release listing.
+              for page in range(1, 11):
+                  releases = api('releases?per_page=100&page=' + str(page))
+                  matches = [item for item in releases if item['tag_name'] == tag]
+                  if len(matches) > 1:
+                      raise ValueError('Multiple releases claim the corrected-script tag')
+                  if matches:
+                      return matches[0]
+                  if len(releases) < 100:
+                      return None
+              raise ValueError('Release listing exceeded the bounded lookup')
           def checksums(path):
               values = {}
               for line in path.read_text().splitlines():
