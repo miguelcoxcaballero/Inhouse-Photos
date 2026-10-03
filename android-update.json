@@ -1,8 +1,8 @@
 {
-  "version": "3.1.96",
-  "versionCode": 7154,
+  "version": "3.1.97",
+  "versionCode": 7155,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.96-unified/Inhouse-Photos.apk",
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.97-unified/Inhouse-Photos.apk",
   "sizeBytes": 75034321,
-  "sha256": "d0ad5a92e8864a181244215e08bce803d65c732360c67d181a5e9f0710c974ce"
+  "sha256": "e8ea00d3998a0c9adff647f6809e11e24388b9b88a9c5eb798de735b4fd8338f"
 }
