@@ -48,7 +48,7 @@ namespace InhousePhotos {
     public static string ComposeText(bool remote) {
       return @"services:
   immich-server:
-    image: inhouse-photos-server:v3.1.0-durable-upload-20261003
+    image: "+ImageName+@"
     platform: linux/amd64
     env_file: .env
     volumes:
