@@ -6,14 +6,17 @@ param(
   [string]$FullInstallerPath,
   [switch]$SkipInstallationVerification,
   [switch]$SkipHandoffVerification,
-  [string]$BuildDirectory = (Join-Path $PSScriptRoot 'dist'),
-  [string]$ReportPath = (Join-Path $PSScriptRoot 'dist\windows-release-verification.json'),
-  [string]$ManifestPath = (Join-Path $PSScriptRoot '..\windows-server-update.json'),
+  [string]$BuildDirectory,
+  [string]$ReportPath,
+  [string]$ManifestPath,
   [string]$PreviousInstallerPath,
   [string]$BootstrapInstallerPath,
   [string]$PreviousProductInstallerPath
 )
 $ErrorActionPreference = 'Stop'
+if(-not $BuildDirectory){$BuildDirectory=Join-Path $PSScriptRoot 'dist'}
+if(-not $ReportPath){$ReportPath=Join-Path $PSScriptRoot 'dist\windows-release-verification.json'}
+if(-not $ManifestPath){$ManifestPath=Join-Path $PSScriptRoot '..\windows-server-update.json'}
 if(-not $PinnedRuntimeVersion){$PinnedRuntimeVersion=$Version}
 
 function Get-LowerSha256([string]$Path) {
