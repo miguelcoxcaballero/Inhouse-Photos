@@ -1,6 +1,8 @@
 {
-    "Version":  "3.1.97",
-    "InstallerUrl":  "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.97/Inhouse-Photos-Server-Setup.exe",
-    "Sha256":  "be63a62d79a95c5a5e8bce977448f2f2503b66b4fbc71c2283871478f4c8f97d",
-    "Notes":  "Corrige bloqueos al instalar, muestra la etapa que ejecuta el PC y permite reintentar de forma segura. Actualiza también las descargas de tu web. Conserva tus fotos, la base de datos y el trabajo pendiente."
+    "Version":  "3.1.98",
+    "InstallerUrl":  "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.98/Inhouse-Photos-Server-Setup.exe",
+    "Sha256":  "d88d50dacf7ebbb4f8fb812e3e9676dab54f1352eb095e830d01cffaac119ed3",
+    "Notes":  "Corrige bloqueos al instalar, muestra la etapa que ejecuta el PC y permite reintentar de forma segura. Actualiza también las descargas de tu web. Conserva tus fotos, la base de datos y el trabajo pendiente.",
+    "FullInstallerUrl":  "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.98/Inhouse-Photos-Server-Full-Setup.exe",
+    "FullInstallerSha256":  "2c885c78f1a07c694a2700464b1a35f68ab2f5fa3d15e886938b1635b4310846"
 }
