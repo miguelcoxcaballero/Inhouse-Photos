@@ -12,6 +12,18 @@ del motor reinicia brevemente la API de fotos y conserva la biblioteca y los
 trabajos pendientes. Durante la operación, el gestor bloquea las operaciones
 que podrían cambiar su configuración.
 
+## Reparar una actualización bloqueada en 3.1.96
+
+La versión **3.1.97** limita los tiempos de los comandos Docker y sus procesos
+hijos, distingue las etapas de trabajo y recupera los registros de 3.1.96.
+Si el programa antiguo sigue en «Installing» y no permite salir, una APK nueva
+no puede detener de forma segura sus comandos antiguos. Sigue las
+[instrucciones de reparación de 3.1.97](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/tag/server-v3.1.97):
+deshabilita temporalmente únicamente su tarea de inicio, reinicia Windows e
+instala el gestor nuevo con el mismo usuario antes de abrir el antiguo. No
+borres las colas ni los registros. La nueva instalación conserva la solicitud
+y vuelve a intentar la recuperación.
+
 ## Reparar una actualización bloqueada en 1.2.17
 
 El gestor 1.2.17 puede confundir el progreso normal de Docker en Windows
@@ -20,7 +32,7 @@ bloquea su propia actualización remota mientras exista ese registro; una APK
 nueva no puede cambiar la regla del programa que ya está instalado.
 
 En este caso, cierra el gestor desde **Salir del gestor** en su icono de la
-bandeja e instala [Inhouse Photos 3.1.96 para Windows](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.96/Inhouse-Photos-Server-Setup.exe)
+bandeja e instala [Inhouse Photos 3.1.97 para Windows](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.97/Inhouse-Photos-Server-Setup.exe)
 con el mismo usuario de Windows. El instalador conserva la biblioteca y el
 registro pendiente, y el programa corregido continúa la actualización. No hace
 falta borrar las colas ni volver a subir los archivos. Esta reparación manual

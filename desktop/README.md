@@ -75,7 +75,7 @@ failed route change restores the prior Caddyfile. If the manager installation
 fails, the previous verified executable is reopened. The photo API remains
 independent of the manager throughout the hand-off.
 
-Inhouse Photos 3.1.96 uses one public version for Android and Windows and one
+Inhouse Photos 3.1.97 uses one public version for Android and Windows and one
 **Update** button in **Settings > Server management**. The PC installs the
 required components and persists the continuation before its manager restarts;
 the phone can disconnect without cancelling it. Completion requires the real
@@ -88,6 +88,13 @@ that old executable rejects its own remote upgrade while a journal is pending.
 The engine restart briefly interrupts the photo API. See
 [SERVER-RUNTIME-UPDATES.md](SERVER-RUNTIME-UPDATES.md) for the identity checks
 and recovery rules.
+
+Version 3.1.97 bounds Docker commands and inherited pipes, owns native client
+descendants through a Windows job, and preserves interrupted 3.1.96 operations
+for verified recovery. The mobile button can check stalled progress without
+starting another operation. The manager independently refreshes the existing
+public download portal from verified manifests, including during engine
+recovery; custom pages and Caddy configuration remain protected.
 
 Manager 1.2.5 uses five clear destinations: Overview, Connect mobile, Backups,
 Storage, and Settings. Its layout gives the server state one primary action,

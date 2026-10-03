@@ -229,6 +229,23 @@ try {
 # on Linux. Exercise the real process boundary: successful Docker/Compose
 # progress must not become a terminating PowerShell error or pollute JSON.
 if ($env:OS -ceq 'Windows_NT') {
+  function Check-NativeFixtureExited([int]$ProcessId, [string]$Role, [string]$Description) {
+    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    $exited = $null -eq $process
+    $name = 'absent'
+    if ($process) {
+      try {
+        $exited = $process.HasExited
+        try { $name = $process.ProcessName } catch { $name = 'unavailable' }
+      } catch { $exited = $null -eq (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue) }
+      finally { $process.Dispose() }
+    }
+    # A terminated Windows process can remain enumerable while another handle
+    # or an outer runner job retains it. Its exit state proves the client has
+    # stopped; a still-running or unverifiable descendant must fail this check.
+    if (-not $exited) { Write-Host ('Native fixture role={0} HasExited={1} ProcessName={2}' -f $Role,$exited,$name) }
+    Check $exited $Description
+  }
   $nativeDirectory = Join-Path ([IO.Path]::GetTempPath()) ('inhouse native check ' + [Guid]::NewGuid().ToString('N'))
   [void][IO.Directory]::CreateDirectory($nativeDirectory)
   $savedDockerExe = $script:DockerExe
@@ -387,8 +404,9 @@ public static class InhouseDockerNativeFixture {
     Check ([IO.File]::Exists($pidFile)) 'timeout fixture started a native child process'
     $fixturePids = @([IO.File]::ReadAllLines($pidFile) | ForEach-Object { [int]$_ })
     Check ($fixturePids.Count -eq 2) 'timeout fixture recorded its parent and child identities'
-    foreach ($fixturePid in $fixturePids) {
-      Check (-not (Get-Process -Id $fixturePid -ErrorAction SilentlyContinue)) 'native timeout stops its client process tree'
+    for ($fixtureIndex=0; $fixtureIndex -lt $fixturePids.Count; $fixtureIndex++) {
+      $role=if ($fixtureIndex -eq 0) { 'parent' } else { 'child' }
+      Check-NativeFixtureExited $fixturePids[$fixtureIndex] $role 'native timeout stops its client process tree'
     }
 
     $orphanPidFile = Join-Path $nativeDirectory 'fixture orphan process ids.txt'
@@ -400,8 +418,9 @@ public static class InhouseDockerNativeFixture {
     Check ([IO.File]::Exists($orphanPidFile)) 'orphan fixture started its recorded native child'
     $fixturePids = @([IO.File]::ReadAllLines($orphanPidFile) | ForEach-Object { [int]$_ })
     Check ($fixturePids.Count -eq 2) 'orphan fixture records the exited parent and remaining child'
-    foreach ($fixturePid in $fixturePids) {
-      Check (-not (Get-Process -Id $fixturePid -ErrorAction SilentlyContinue)) 'native supervisor closes its job and removes remaining descendants after parent exit'
+    for ($fixtureIndex=0; $fixtureIndex -lt $fixturePids.Count; $fixtureIndex++) {
+      $role=if ($fixtureIndex -eq 0) { 'exited-parent' } else { 'orphan-child' }
+      Check-NativeFixtureExited $fixturePids[$fixtureIndex] $role 'native supervisor closes its job and removes remaining descendants after parent exit'
     }
 
     $nativeCancellationPath = Join-Path $PSScriptRoot ('cancel-' + [Guid]::NewGuid().ToString('N') + '.signal')
@@ -425,8 +444,9 @@ public static class InhouseDockerNativeFixture {
     Check ([IO.File]::Exists($cancelledDuringPidFile)) 'cancellation fixture had a running native client and child'
     $fixturePids = @([IO.File]::ReadAllLines($cancelledDuringPidFile) | ForEach-Object { [int]$_ })
     Check ($fixturePids.Count -eq 2) 'cancellation fixture recorded both native process identities'
-    foreach ($fixturePid in $fixturePids) {
-      Check (-not (Get-Process -Id $fixturePid -ErrorAction SilentlyContinue)) 'manager cancellation stops the native client process tree'
+    for ($fixtureIndex=0; $fixtureIndex -lt $fixturePids.Count; $fixtureIndex++) {
+      $role=if ($fixtureIndex -eq 0) { 'cancelled-parent' } else { 'cancelled-child' }
+      Check-NativeFixtureExited $fixturePids[$fixtureIndex] $role 'manager cancellation stops the native client process tree'
     }
     [IO.File]::Delete($nativeCancellationPath)
     $script:CancellationPath = $savedCancellationPath
