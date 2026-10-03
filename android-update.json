@@ -1,8 +1,8 @@
 {
-  "version": "3.1.95",
-  "versionCode": 7153,
+  "version": "3.1.96",
+  "versionCode": 7154,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.95-server-update/Inhouse-Photos.apk",
-  "sizeBytes": 74968813,
-  "sha256": "1caaf5285646ceb5e362ed6c7d479779c3d72533ecb20edef0ea557b8b2a7093"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.96-unified/Inhouse-Photos.apk",
+  "sizeBytes": 75034321,
+  "sha256": "d0ad5a92e8864a181244215e08bce803d65c732360c67d181a5e9f0710c974ce"
 }
