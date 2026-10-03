@@ -38,7 +38,13 @@ namespace InhousePhotos {
    if(args.Length<6||args[0]!="exec"||args[2]!="sh"||args[3]!="-c")throw new IOException("unexpected Docker command");
    var executable=Path.DirectorySeparatorChar=='\\'?Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),"Git","bin","bash.exe"):"/bin/sh";
    var start=new ProcessStartInfo(executable){UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true};
-   start.ArgumentList.Add("-c");start.ArgumentList.Add(args[4]);start.ArgumentList.Add(args[5]);
+   // The production shell runs in a Linux container. Git Bash cannot apply
+   // Linux mode 0700 to the Windows runner's NTFS test directory. Preserve
+   // every existence/link guard and file transaction; only translate that
+   // private staging-directory mode in this host fixture. Linux runs the
+   // original command unchanged, and no real configuration enters the fixture.
+   var script=Path.DirectorySeparatorChar=='\\'?args[4].Replace("mkdir -m 700 ","mkdir "):args[4];
+   start.ArgumentList.Add("-c");start.ArgumentList.Add(script);start.ArgumentList.Add(args[5]);
    foreach(var argument in args.Skip(6))start.ArgumentList.Add(ShellPath(Translate(argument)));
    using(var process=Process.Start(start)){
     var output=process.StandardOutput.ReadToEndAsync();var error=process.StandardError.ReadToEndAsync();await process.WaitForExitAsync();
