@@ -1,6 +1,6 @@
 {
-  "Version": "1.2.16",
-  "InstallerUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.16/Inhouse-Photos-Server-Setup.exe",
-  "Sha256": "9378c9b3cc1366699011b29d5a06c32451a417b6fd0ba2574981c329844be65d",
-  "Notes": "Detecta móviles USB automáticamente y muestra conexión, permisos y preparación en Windows y la web. Verifica el panel web con su política de seguridad específica. Conserva biblioteca, cuentas y conexión habitual; no instala controladores ni modifica redes sin permiso."
+    "Version":  "1.2.17",
+    "InstallerUrl":  "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.17/Inhouse-Photos-Server-Setup.exe",
+    "Sha256":  "d6eb4b2ce1331f32688f48ab87f649285a84fbe6996b6e8e1c96cb3af12e5981",
+    "Notes":  "Permite actualizar desde el móvil el motor del servidor y muestra su versión y progreso. Descarga y verifica el paquete publicado y conserva la biblioteca y la base de datos."
 }
