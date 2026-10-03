@@ -1,6 +1,6 @@
 {
-    "Version":  "1.2.17",
-    "InstallerUrl":  "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.17/Inhouse-Photos-Server-Setup.exe",
-    "Sha256":  "d6eb4b2ce1331f32688f48ab87f649285a84fbe6996b6e8e1c96cb3af12e5981",
-    "Notes":  "Permite actualizar desde el móvil el motor del servidor y muestra su versión y progreso. Descarga y verifica el paquete publicado y conserva la biblioteca y la base de datos."
+    "Version":  "3.1.96",
+    "InstallerUrl":  "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.96/Inhouse-Photos-Server-Setup.exe",
+    "Sha256":  "1857acdac75128fc79ab0b2628b704700beaf8dd8117936ba04ace90d8e2b016",
+    "Notes":  "Inhouse Photos comparte una versión y una acción de actualización en el móvil y Windows. Guarda la intención antes de reiniciar y continúa al abrir el programa; conserva la biblioteca, la base de datos y el trabajo pendiente."
 }
