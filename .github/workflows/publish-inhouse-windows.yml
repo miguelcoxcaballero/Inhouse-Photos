@@ -40,8 +40,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $result = gh release view $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
-          if ($LASTEXITCODE -eq 0 -and -not ($result | ConvertFrom-Json).isDraft) {
+          $previousErrorPreference = $ErrorActionPreference
+          try {
+            # PowerShell 5.1 turns redirected native stderr into errors even for
+            # the expected "release not found" result on the first publication.
+            $ErrorActionPreference = 'Continue'
+            $result = gh release view $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
+            $releaseExitCode = $LASTEXITCODE
+          } finally { $ErrorActionPreference = $previousErrorPreference }
+          if ($releaseExitCode -eq 0 -and -not ($result | ConvertFrom-Json).isDraft) {
             'published=true' >> $env:GITHUB_OUTPUT
             Write-Output 'This immutable manager release is already published; no assets will be replaced.'
           } else { 'published=false' >> $env:GITHUB_OUTPUT }
@@ -98,8 +105,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $draft = gh release view $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
-          if ($LASTEXITCODE -eq 0) {
+          $previousErrorPreference = $ErrorActionPreference
+          try {
+            $ErrorActionPreference = 'Continue'
+            $draft = gh release view $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
+            $releaseExitCode = $LASTEXITCODE
+          } finally { $ErrorActionPreference = $previousErrorPreference }
+          if ($releaseExitCode -eq 0) {
             if (-not ($draft | ConvertFrom-Json).isDraft) { throw 'Refusing to overwrite a published Windows release' }
           } else {
             gh release create $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Inhouse Photos Server $env:WINDOWS_VERSION" --draft --notes-file desktop/RELEASE-1.2.17.md
