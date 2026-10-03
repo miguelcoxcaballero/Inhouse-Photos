@@ -51,6 +51,31 @@ void main() {
     expect(value.recoveryRequired, isFalse);
     expect(value.requiresLocalRecovery, isFalse);
     expect(value.busy, isFalse);
+    expect(value.stage, isEmpty);
+    expect(value.stageElapsedSeconds, 0);
+  });
+
+  test('stage diagnostics accept either JSON casing without changing update progress', () async {
+    for (final pascalFields in [true, false]) {
+      final client = MockClient(
+        (_) async => http.Response(
+          jsonEncode({
+            ...status(phase: 'installing'),
+            pascalFields ? 'Stage' : 'stage': 'image',
+            pascalFields ? 'StageElapsedSeconds' : 'stageElapsedSeconds': 45,
+          }),
+          200,
+        ),
+      );
+      addTearDown(client.close);
+
+      final value = await SystemUpdateService(client).check(url, 'admin-token');
+
+      expect(value.stage, 'image');
+      expect(value.stageElapsedSeconds, 45);
+      expect(value.phase, 'installing');
+      expect(value.progress, 42);
+    }
   });
 
   test('accepts camelCase status and both recovery flag casings', () async {

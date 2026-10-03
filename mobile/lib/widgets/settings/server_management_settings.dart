@@ -21,12 +21,14 @@ class ServerManagementSettings extends ConsumerStatefulWidget {
     this.managerUpdateService,
     this.runtimeUpdateService,
     this.systemUpdateService,
+    this.updateElapsed,
   });
 
   final ServerManagementService? service;
   final ManagerUpdateService? managerUpdateService;
   final RuntimeUpdateService? runtimeUpdateService;
   final SystemUpdateService? systemUpdateService;
+  final Duration Function()? updateElapsed;
 
   @override
   ConsumerState<ServerManagementSettings> createState() => _ServerManagementSettingsState();
@@ -319,6 +321,8 @@ class _ServerManagementSettingsState extends ConsumerState<ServerManagementSetti
             managerUpdateService: _managerUpdateService,
             runtimeUpdateService: _runtimeUpdateService,
             systemUpdateService: _systemUpdateService,
+            elapsed: widget.updateElapsed,
+            pcVersion: status?.version,
             busy: _acting || status?.busy == true,
             refreshGeneration: _refreshGeneration,
             onUpdatingChanged: (updating) {

@@ -14,6 +14,8 @@ class ServerUpdatesSettings extends StatefulWidget {
     required this.managerUpdateService,
     required this.runtimeUpdateService,
     required this.systemUpdateService,
+    this.elapsed,
+    this.pcVersion,
     required this.busy,
     required this.refreshGeneration,
     required this.onUpdatingChanged,
@@ -23,6 +25,8 @@ class ServerUpdatesSettings extends StatefulWidget {
   final ManagerUpdateService managerUpdateService;
   final RuntimeUpdateService runtimeUpdateService;
   final SystemUpdateService systemUpdateService;
+  final Duration Function()? elapsed;
+  final String? pcVersion;
   final bool busy;
   final int refreshGeneration;
   final ValueChanged<bool> onUpdatingChanged;
@@ -33,9 +37,9 @@ class ServerUpdatesSettings extends StatefulWidget {
 }
 
 class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with WidgetsBindingObserver {
-  static const _publicVersion = '3.1.96';
+  static const _publicVersion = '3.1.97';
   static const _repairInstaller =
-      'https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.96/Inhouse-Photos-Server-Setup.exe';
+      'https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.97/Inhouse-Photos-Server-Setup.exe';
   SystemUpdateStatus? _status;
   ManagerUpdateStatus? _legacyStatus;
   RuntimeUpdateStatus? _legacyRuntime;
@@ -48,8 +52,11 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
   bool _requestPending = false;
   bool _foreground = true;
   String? _target;
-  DateTime? _requestStartedAt;
-  DateTime? _lastSuccessfulCheck;
+  final Stopwatch _uptime = Stopwatch();
+  Duration? _requestStartedAt;
+  Duration? _lastSuccessfulCheck;
+  Duration? _lastProgressAt;
+  ({String source, String phase, String stage, int progress, String version})? _lastProgress;
   int _epoch = 0;
   Timer? _poll;
 
@@ -58,9 +65,30 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
   bool get _localRepair =>
       _status?.requiresLocalRecovery == true || (_legacy && _legacyRuntime?.recoveryRequired == true);
   bool get _recovering => _status?.recoveryRequired == true || (_legacy && _legacyRuntime?.recoveryRequired == true);
+  Duration get _elapsed => widget.elapsed?.call() ?? _uptime.elapsed;
   bool get _active =>
-      _requestPending || _activePhase(_status?.phase) || (_legacy && _activePhase(_legacyStatus?.phase));
-  bool get _blocking => _active || _recovering;
+      _requestPending ||
+      (_reachable && (_activePhase(_status?.phase) || (_legacy && _activePhase(_legacyStatus?.phase))));
+  bool get _disconnectedUpdate =>
+      _connectionError &&
+      _lastProgress != null &&
+      _lastSuccessfulCheck != null &&
+      _elapsed - _lastSuccessfulCheck! >= const Duration(minutes: 2);
+  bool get _stalledProgress {
+    if (_lastProgressAt == null || _lastProgress == null) {
+      return false;
+    }
+    final limit = switch (_lastProgress!.stage == 'quiesce' ? 'waiting' : _lastProgress!.phase) {
+      'waiting' => const Duration(minutes: 20),
+      'downloading' => const Duration(minutes: 10),
+      _ => const Duration(minutes: 5),
+    };
+    return _elapsed - _lastProgressAt! >= limit;
+  }
+
+  bool get _needsVerification => _stalledProgress || _disconnectedUpdate;
+  bool get _blocking => _active || _recovering || _needsVerification;
+  String? get _reportedPcVersion => _legacy ? _legacyStatus?.currentVersion : widget.pcVersion;
 
   String _text(String en, String es) => Localizations.localeOf(context).languageCode == 'es' ? es : en;
   static bool _activePhase(String? phase) =>
@@ -70,6 +98,7 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _uptime.start();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         widget.onUpdatingChanged(_blocking);
@@ -100,6 +129,7 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
   @override
   void dispose() {
     _poll?.cancel();
+    _uptime.stop();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -147,6 +177,8 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
         _target = null;
         _requestStartedAt = null;
         _lastSuccessfulCheck = null;
+        _lastProgressAt = null;
+        _lastProgress = null;
       });
       _notifyBlocking(wasBlocking);
     }
@@ -171,13 +203,14 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
         _reachable = true;
         _authenticationError = false;
         _connectionError = false;
-        _lastSuccessfulCheck = DateTime.now();
+        _lastSuccessfulCheck = _elapsed;
+        _trackProgress('system', status);
         if (status.phase == 'error') {
           _requestPending = false;
           _target = null;
         } else if (_activePhase(status.phase)) {
           _requestPending = true;
-          _requestStartedAt ??= DateTime.now();
+          _requestStartedAt ??= _elapsed;
           _target ??= status.latestVersion;
         } else if (_requestPending &&
             (status.phase == 'idle' || status.phase == 'completed') &&
@@ -187,7 +220,7 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
           completed = true;
         } else if (_requestPending &&
             _requestStartedAt != null &&
-            DateTime.now().difference(_requestStartedAt!) > const Duration(seconds: 30)) {
+            (_elapsed - _requestStartedAt!) > const Duration(seconds: 30)) {
           // A successful receipt alone is not an installed update. If the PC
           // keeps reporting no active work and the old version, offer another
           // deliberate attempt instead of displaying Pending indefinitely.
@@ -243,17 +276,18 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
         _reachable = true;
         _authenticationError = false;
         _connectionError = false;
-        _lastSuccessfulCheck = DateTime.now();
+        _lastSuccessfulCheck = _elapsed;
+        _trackProgress('legacy', manager);
         if (manager.phase == 'error' || runtime?.recoveryRequired == true) {
           _requestPending = false;
           _target = null;
         } else if (_activePhase(manager.phase)) {
           _requestPending = true;
-          _requestStartedAt ??= DateTime.now();
+          _requestStartedAt ??= _elapsed;
           _target ??= _publicVersion;
         } else if (_requestPending &&
             _requestStartedAt != null &&
-            DateTime.now().difference(_requestStartedAt!) > const Duration(minutes: 2)) {
+            (_elapsed - _requestStartedAt!) > const Duration(minutes: 2)) {
           _requestPending = false;
           _target = null;
         }
@@ -266,6 +300,25 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
     }
   }
 
+  void _trackProgress(String source, ManagerUpdateStatus status) {
+    if (!_activePhase(status.phase)) {
+      _lastProgress = null;
+      _lastProgressAt = null;
+      return;
+    }
+    final progress = (
+      source: source,
+      phase: status.phase,
+      stage: status is SystemUpdateStatus ? status.stage : '',
+      progress: status.progress,
+      version: status.currentVersion,
+    );
+    if (_lastProgress != progress) {
+      _lastProgress = progress;
+      _lastProgressAt = _elapsed;
+    }
+  }
+
   void _recordConnectionError(bool authentication) {
     final wasBlocking = _blocking;
     setState(() {
@@ -275,7 +328,7 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
       if (authentication ||
           (_requestPending &&
               _lastSuccessfulCheck != null &&
-              DateTime.now().difference(_lastSuccessfulCheck!) > const Duration(minutes: 2))) {
+              (_elapsed - _lastSuccessfulCheck!) >= const Duration(minutes: 2))) {
         _requestPending = false;
       }
     });
@@ -320,7 +373,43 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
     );
   }
 
+  Future<void> _verifyProgress() async {
+    final endpoint = _endpoint;
+    final token = _token;
+    final epoch = _epoch;
+    await _refresh();
+    if (endpoint == null || token == null || !_sameSession(endpoint, token, epoch) || _authenticationError) {
+      return;
+    }
+    if (_localRepair && !_active && _status?.busy != true && !widget.busy) {
+      return _showPcRepair();
+    }
+    if (!_needsVerification && _reachable) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_text('Update not confirmed', 'Actualización sin confirmar')),
+        content: Text(
+          _text(
+            'The PC has not confirmed progress. This check has not started another installation. '
+                'Check the installer on your PC and keep it open while it is working. '
+                'If it reports an error, follow its recovery instructions. Your photos and queued processing remain saved.',
+            'El PC no ha confirmado avances. Esta comprobación no ha iniciado otra instalación. '
+                'Comprueba el instalador en el PC y mantenlo abierto mientras esté trabajando. '
+                'Si muestra un error, sigue sus instrucciones de recuperación. Las fotos y el procesamiento pendiente siguen guardados.',
+          ),
+        ),
+        actions: [FilledButton(onPressed: () => Navigator.pop(context), child: Text(_text('Close', 'Cerrar')))],
+      ),
+    );
+  }
+
   Future<void> _update() async {
+    if (_needsVerification && !_checking && !_authenticationError) {
+      return _verifyProgress();
+    }
     if (_active || _checking || widget.busy || _status?.busy == true || _authenticationError) {
       return;
     }
@@ -372,7 +461,7 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
     final wasBlocking = _blocking;
     setState(() {
       _requestPending = true;
-      _requestStartedAt = DateTime.now();
+      _requestStartedAt = _elapsed;
       _target = _legacy ? _publicVersion : _status!.latestVersion;
       _connectionError = false;
     });
@@ -403,6 +492,16 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
   }
 
   String get _description {
+    if (_needsVerification && !_authenticationError) {
+      final version = _reportedPcVersion;
+      final detail = _text(
+        'Update progress could not be confirmed. Tap Update to check recovery.',
+        'No se han confirmado avances. Pulsa Actualizar para comprobar la recuperación.',
+      );
+      return version == null || version.isEmpty
+          ? detail
+          : '$detail ${_text('PC app version:', 'Versión del PC:')} $version';
+    }
     if (_authenticationError) {
       return _text(
         'Sign in again as an administrator to update.',
@@ -432,6 +531,11 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
     final phase = _legacy ? _legacyStatus?.phase : _status?.phase;
     final progress = _legacy ? _legacyStatus?.progress : _status?.progress;
     if (_active) {
+      final stage = _stageDescription;
+      if (!_legacy && stage != null) {
+        final seconds = _status?.stageElapsedSeconds ?? 0;
+        return seconds < 60 ? stage : '$stage · ${seconds ~/ 60} min';
+      }
       return switch (phase) {
         'downloading' => _text(
           'Downloading update on your PC · $progress%',
@@ -470,22 +574,41 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
     return _text('Version $version · Up to date', 'Versión $version · Actualizado');
   }
 
+  String? get _stageDescription => switch (_status?.stage) {
+    'preflight' => _text('Checking the update…', 'Comprobando la actualización…'),
+    'image' => _text('Preparing server components…', 'Preparando el servidor…'),
+    'queues' => _text('Checking pending processing…', 'Revisando el procesamiento pendiente…'),
+    'quiesce' => _text(
+      'Finishing active processing. Queued files stay saved.',
+      'Terminando el procesamiento activo. Los archivos pendientes siguen guardados.',
+    ),
+    'config' => _text('Applying the update…', 'Aplicando la actualización…'),
+    'restart' => _text('Restarting Inhouse Photos…', 'Reiniciando Inhouse Photos…'),
+    'receipt' => _text('Confirming the update…', 'Confirmando la actualización…'),
+    'recovery' => _text('Recovering the interrupted update…', 'Recuperando la actualización interrumpida…'),
+    'rollback' => _text('Restoring the previous installation…', 'Restaurando la instalación anterior…'),
+    'manager' => _text('Installing Inhouse Photos…', 'Instalando Inhouse Photos…'),
+    _ => null,
+  };
+
   @override
   Widget build(BuildContext context) {
     final phase = _legacy ? _legacyStatus?.phase : _status?.phase;
     final progress = _legacy ? _legacyStatus?.progress : _status?.progress;
+    final canVerify = _needsVerification && !_checking && !_authenticationError;
     final canUpdate =
-        !_checking &&
-        !_active &&
-        !widget.busy &&
-        _status?.busy != true &&
-        !_authenticationError &&
-        (_localRepair ||
-            _legacy ||
-            _status?.available == true ||
-            !_reachable ||
-            _status?.currentVersion != _status?.latestVersion ||
-            _status?.currentVersion == '');
+        canVerify ||
+        (!_checking &&
+            !_active &&
+            !widget.busy &&
+            _status?.busy != true &&
+            !_authenticationError &&
+            (_localRepair ||
+                _legacy ||
+                _status?.available == true ||
+                !_reachable ||
+                _status?.currentVersion != _status?.latestVersion ||
+                _status?.currentVersion == ''));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -497,7 +620,7 @@ class _ServerUpdatesSettingsState extends State<ServerUpdatesSettings> with Widg
               ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
               : null,
         ),
-        if (_active)
+        if (_active && !_needsVerification)
           Padding(
             padding: const EdgeInsets.fromLTRB(72, 0, 18, 8),
             child: LinearProgressIndicator(value: phase == 'downloading' ? (progress ?? 0) / 100 : null),

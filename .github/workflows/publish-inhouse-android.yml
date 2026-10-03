@@ -16,9 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      RELEASE_TAG: v3.1.96-unified
-      ANDROID_RELEASE_VERSION: '3.1.96'
-      ANDROID_RELEASE_BASE_BUILD: '5154'
+      RELEASE_TAG: v3.1.97-unified
+      ANDROID_RELEASE_VERSION: '3.1.97'
+      ANDROID_RELEASE_BASE_BUILD: '5155'
     steps:
       - name: Checkout the source to publish
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

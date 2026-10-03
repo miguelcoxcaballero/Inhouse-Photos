@@ -15,11 +15,15 @@ class SystemUpdateStatus extends ManagerUpdateStatus {
     this.recoveryRequired = false,
     this.requiresLocalRecovery = false,
     this.busy = false,
+    this.stage = '',
+    this.stageElapsedSeconds = 0,
   });
 
   final bool recoveryRequired;
   final bool requiresLocalRecovery;
   final bool busy;
+  final String stage;
+  final int stageElapsedSeconds;
 
   factory SystemUpdateStatus.fromJson(Object? value) {
     final status = ManagerUpdateStatus.fromJson(value);
@@ -35,6 +39,10 @@ class SystemUpdateStatus extends ManagerUpdateStatus {
       recoveryRequired: (json['RecoveryRequired'] ?? json['recoveryRequired']) == true,
       requiresLocalRecovery: (json['RequiresLocalRecovery'] ?? json['requiresLocalRecovery']) == true,
       busy: (json['Busy'] ?? json['busy']) == true,
+      stage: (json['Stage'] ?? json['stage']) is String ? (json['Stage'] ?? json['stage']) as String : '',
+      stageElapsedSeconds: (json['StageElapsedSeconds'] ?? json['stageElapsedSeconds']) is int
+          ? ((json['StageElapsedSeconds'] ?? json['stageElapsedSeconds']) as int).clamp(0, 31536000)
+          : 0,
     );
   }
 }

@@ -38,7 +38,7 @@ class _AdminNotifier extends StateNotifier<AuthState> implements AuthNotifier {
 }
 
 void main() {
-  const latestVersion = '3.1.96';
+  const latestVersion = '3.1.97';
   const systemPath = '/inhouse-manager/v1/system-update';
   const managerPath = '/inhouse-manager/v1/update';
   late Drift db;
@@ -60,21 +60,25 @@ void main() {
     await db.close();
   });
 
-  Future<void> open(WidgetTester tester, http.Client client) => tester.pumpWidget(
-    ProviderScope(
-      overrides: [authProvider.overrideWith((ref) => _AdminNotifier())],
-      child: MaterialApp(
-        home: Scaffold(
-          body: ServerManagementSettings(
-            service: ServerManagementService(client),
-            managerUpdateService: ManagerUpdateService(client),
-            runtimeUpdateService: RuntimeUpdateService(client),
-            systemUpdateService: SystemUpdateService(client),
+  Future<void> open(WidgetTester tester, http.Client client) {
+    final initialTime = tester.binding.clock.now();
+    return tester.pumpWidget(
+      ProviderScope(
+        overrides: [authProvider.overrideWith((ref) => _AdminNotifier())],
+        child: MaterialApp(
+          home: Scaffold(
+            body: ServerManagementSettings(
+              service: ServerManagementService(client),
+              managerUpdateService: ManagerUpdateService(client),
+              runtimeUpdateService: RuntimeUpdateService(client),
+              systemUpdateService: SystemUpdateService(client),
+              updateElapsed: () => tester.binding.clock.now().difference(initialTime),
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   http.Response online({String version = '1.2.16', bool busy = false, bool backupRunning = false}) => http.Response(
     jsonEncode({
@@ -99,6 +103,8 @@ void main() {
     bool recoveryRequired = false,
     bool requiresLocalRecovery = false,
     bool busy = false,
+    String stage = '',
+    int stageElapsedSeconds = 0,
   }) => http.Response(
     jsonEncode({
       'CurrentVersion': current,
@@ -111,6 +117,8 @@ void main() {
       'RecoveryRequired': recoveryRequired,
       'RequiresLocalRecovery': requiresLocalRecovery,
       'Busy': busy,
+      'Stage': stage,
+      'StageElapsedSeconds': stageElapsedSeconds,
     }),
     200,
   );
@@ -603,6 +611,198 @@ void main() {
     await tester.pump(const Duration(seconds: 15));
     await tester.pumpAndSettle();
     expect(posts, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('unchanged installing status exposes a read-only recovery check before a deliberate resume', (
+    tester,
+  ) async {
+    var phase = 'installing';
+    var posts = 0;
+    var reads = 0;
+    final client = MockClient((request) async {
+      if (request.url.path.endsWith('/status')) {
+        return online(busy: phase != 'error');
+      }
+      expect(request.url.path, systemPath);
+      if (request.method == 'POST') {
+        posts++;
+        phase = 'downloading';
+        return http.Response('', 202);
+      }
+      reads++;
+      return updateStatus(
+        available: phase == 'error',
+        phase: phase,
+        progress: phase == 'downloading' ? 25 : 80,
+        busy: phase != 'error',
+        recoveryRequired: phase == 'error',
+      );
+    });
+    addTearDown(client.close);
+    await open(tester, client);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNull);
+    await tester.pump(const Duration(minutes: 5, seconds: 1));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNotNull);
+    expect(find.textContaining('progress could not be confirmed'), findsOneWidget);
+    expect(find.textContaining('Up to date'), findsNothing);
+    expect(tester.widget<FilledButton>(button('Back up now')).onPressed, isNull);
+
+    final readsBeforeCheck = reads;
+    await tester.tap(button('Update'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(reads, greaterThan(readsBeforeCheck));
+    expect(posts, 0);
+    expect(find.text('Update not confirmed'), findsOneWidget);
+    Navigator.of(tester.element(find.byType(AlertDialog))).pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // The first tap checks recovery without repeating installation. A fresh
+    // backend error can allow a later, deliberate resume after confirmation.
+    phase = 'error';
+    await tester.tap(button('Update'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(posts, 0);
+    if (find.byType(AlertDialog).evaluate().isNotEmpty) {
+      Navigator.of(tester.element(find.byType(AlertDialog))).pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNotNull);
+    await confirmUpdate(tester);
+    expect(posts, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('lost connection after installing exposes a read-only check instead of staying pending forever', (
+    tester,
+  ) async {
+    var disconnected = false;
+    var posts = 0;
+    var reads = 0;
+    final client = MockClient((request) async {
+      if (request.url.path.endsWith('/status')) {
+        return online(busy: true);
+      }
+      expect(request.url.path, systemPath);
+      if (request.method == 'POST') {
+        posts++;
+        return http.Response('', 202);
+      }
+      reads++;
+      if (disconnected) {
+        return http.Response('<html>502 Bad Gateway</html>', 502);
+      }
+      return updateStatus(phase: 'installing', progress: 80, busy: true);
+    });
+    addTearDown(client.close);
+    await open(tester, client);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    disconnected = true;
+    await tester.pump(const Duration(minutes: 2, seconds: 4));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNotNull);
+    expect(find.textContaining('Up to date'), findsNothing);
+    expect(tester.widget<FilledButton>(button('Back up now')).onPressed, isNull);
+    final readsBeforeCheck = reads;
+    await tester.tap(button('Update'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(reads, greaterThan(readsBeforeCheck));
+    expect(posts, 0);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('advancing installation progress resets the stale update threshold', (tester) async {
+    var progress = 60;
+    var posts = 0;
+    final client = MockClient((request) async {
+      if (request.url.path.endsWith('/status')) {
+        return online(busy: true);
+      }
+      expect(request.url.path, systemPath);
+      if (request.method == 'POST') {
+        posts++;
+        return http.Response('', 202);
+      }
+      return updateStatus(phase: 'installing', progress: progress, busy: true);
+    });
+    addTearDown(client.close);
+    await open(tester, client);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(minutes: 4));
+
+    progress = 80;
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(minutes: 2));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNull);
+    expect(find.textContaining('progress could not be confirmed'), findsNothing);
+    await tester.pump(const Duration(minutes: 3, seconds: 5));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNotNull);
+    expect(find.textContaining('progress could not be confirmed'), findsOneWidget);
+    expect(posts, 0);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('a new installation stage resets the timeout while elapsed heartbeats do not', (tester) async {
+    var stage = 'image';
+    var stageStarted = tester.binding.clock.now();
+    var posts = 0;
+    final client = MockClient((request) async {
+      if (request.url.path.endsWith('/status')) {
+        return online(busy: true);
+      }
+      expect(request.url.path, systemPath);
+      if (request.method == 'POST') {
+        posts++;
+        return http.Response('', 202);
+      }
+      return updateStatus(
+        phase: 'installing',
+        progress: 80,
+        busy: true,
+        stage: stage,
+        stageElapsedSeconds: tester.binding.clock.now().difference(stageStarted).inSeconds,
+      );
+    });
+    addTearDown(client.close);
+    await open(tester, client);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining('Preparing server components'), findsOneWidget);
+    await tester.pump(const Duration(minutes: 4));
+
+    stage = 'queues';
+    stageStarted = tester.binding.clock.now();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(minutes: 2));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining('Checking pending processing'), findsOneWidget);
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNull);
+    expect(find.textContaining('progress could not be confirmed'), findsNothing);
+
+    // StageElapsedSeconds continues increasing on every successful status
+    // read. It is a heartbeat, so it cannot make unchanged progress look new.
+    await tester.pump(const Duration(minutes: 3, seconds: 5));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.widget<FilledButton>(button('Update')).onPressed, isNotNull);
+    expect(find.textContaining('progress could not be confirmed'), findsOneWidget);
+    expect(posts, 0);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
