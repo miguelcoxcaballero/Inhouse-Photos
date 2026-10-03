@@ -42,7 +42,7 @@ namespace InhousePhotos {
     public Dictionary<string,string> ConfigurationHashes {get;set;}
   }
   public static partial class Backend {
-    public const string Version="3.1.96";
+    public const string Version="3.1.97";
     public const string DockerContext="--context desktop-linux ";
     static readonly SemaphoreSlim ServerLock=new SemaphoreSlim(1,1);
     public static async Task WithServerLock(Func<Task> action) {

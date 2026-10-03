@@ -26,6 +26,7 @@ BASE_SOURCE = "67b8d77eb710211b13dc7a7ef469054b98962657"
 BASE_SCHEMA_SHA = "e4da4ec029df53f7657b2a81776bb48806c419ecfb509c95e5e84e128dbd4824"
 STORAGE_SAVER_IMAGE = "0034cd9b0031574479c192ed8be48212f6e57012785d804beb171ed8a2d5a8ac"
 DURABLE_UPLOAD_IMAGE = "dd8c68b182ef2cade7002e7625c43e60ee89e27ee42eec0fb4b6e392d34a8a75"
+UNIFIED_3196_IMAGE = "0781b4081482853b34963f4e8faefc4c92d4a25da87f45dd3cf9f93ce645062c"
 UPLOAD_MIGRATION = "1790985600000-DurableUploadProcessing"
 PREFIX = "usr/src/app/server/dist/"
 PACKAGE_PATH = "usr/src/app/server/package.json"
@@ -261,7 +262,8 @@ def build(args):
                    "archiveFile": filename, "archiveSha256": digest(output), "platform": "linux/amd64",
                    "compatibleServerImageIds": ["sha256:" + BASE_INDEX, "sha256:" + config_path.name,
                                                 "sha256:" + STORAGE_SAVER_IMAGE,
-                                                "sha256:" + DURABLE_UPLOAD_IMAGE],
+                                                "sha256:" + DURABLE_UPLOAD_IMAGE,
+                                                "sha256:" + UNIFIED_3196_IMAGE],
                    "databaseMigrations": "additive-upload-outbox", "databaseSchemaSha256": schema_sha,
                    "baselineDatabaseSchemaSha256": BASE_SCHEMA_SHA,
                    "addedDatabaseMigrations": [UPLOAD_MIGRATION]}
@@ -275,6 +277,6 @@ if __name__ == "__main__":
     parser.add_argument("dist", type=pathlib.Path)
     parser.add_argument("output_directory", type=pathlib.Path)
     parser.add_argument("--source-commit", required=True)
-    parser.add_argument("--version", default="3.1.96")
+    parser.add_argument("--version", default="3.1.97")
     parser.add_argument("--image", default="inhouse-photos-server:v3.1.96")
     build(parser.parse_args())

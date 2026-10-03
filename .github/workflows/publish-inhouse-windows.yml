@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  WINDOWS_VERSION: '3.1.96'
-  WINDOWS_TAG: server-v3.1.96
+  WINDOWS_VERSION: '3.1.97'
+  WINDOWS_TAG: server-v3.1.97
 
 jobs:
   publish:
@@ -70,21 +70,33 @@ jobs:
           & .\desktop\server-runtime-update.transaction.tests.ps1
           $global:LASTEXITCODE = 0
 
-      - name: Verify durable product updates and manager restart recovery
+      - name: Verify durable updates, exited installers, inherited pipes and public downloads
         if: steps.existing.outputs.published != 'true'
         shell: pwsh
         run: |
+          $global:LASTEXITCODE = 0
           & .\desktop\system-update.tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'System update coordinator verification failed' }
+          $global:LASTEXITCODE = 0
+          & .\desktop\manager-update.tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Manager handoff verification failed' }
+          $global:LASTEXITCODE = 0
+          & .\desktop\runtime-process-output.tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Runtime output deadline verification failed' }
+          $global:LASTEXITCODE = 0
+          & .\desktop\public-downloads.tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Public download publication verification failed' }
           $global:LASTEXITCODE = 0
 
-      - name: Download the verified 1.2.17 upgrade and 1.2.16 bootstrap fixtures
+      - name: Download verified 3.1.96, 1.2.17 and 1.2.16 upgrade fixtures
         if: steps.existing.outputs.published != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $fixtures = @(
             @{ version = '1.2.17'; sha256 = 'd6eb4b2ce1331f32688f48ab87f649285a84fbe6996b6e8e1c96cb3af12e5981' },
-            @{ version = '1.2.16'; sha256 = '9378c9b3cc1366699011b29d5a06c32451a417b6fd0ba2574981c329844be65d' }
+            @{ version = '1.2.16'; sha256 = '9378c9b3cc1366699011b29d5a06c32451a417b6fd0ba2574981c329844be65d' },
+            @{ version = '3.1.96'; sha256 = '1857acdac75128fc79ab0b2628b704700beaf8dd8117936ba04ace90d8e2b016' }
           )
           foreach ($fixture in $fixtures) {
             $directory = "$env:RUNNER_TEMP\previous-manager-$($fixture.version)"
@@ -95,10 +107,10 @@ jobs:
             if ($actual -ne $fixture.sha256) { throw "Installer $($fixture.version) checksum mismatch" }
           }
 
-      - name: Verify the unified version, durable update intent and both installed upgrade paths
+      - name: Verify the unified version, embedded downloads and all three installed upgrade paths
         if: steps.existing.outputs.published != 'true'
         run: |
-          & .\desktop\verify-windows-release.ps1 -Version $env:WINDOWS_VERSION -SourceCommit $env:GITHUB_SHA -PreviousInstallerPath "$env:RUNNER_TEMP\previous-manager-1.2.17\Inhouse-Photos-Server-Setup.exe" -BootstrapInstallerPath "$env:RUNNER_TEMP\previous-manager-1.2.16\Inhouse-Photos-Server-Setup.exe"
+          & .\desktop\verify-windows-release.ps1 -Version $env:WINDOWS_VERSION -SourceCommit $env:GITHUB_SHA -PreviousInstallerPath "$env:RUNNER_TEMP\previous-manager-1.2.17\Inhouse-Photos-Server-Setup.exe" -BootstrapInstallerPath "$env:RUNNER_TEMP\previous-manager-1.2.16\Inhouse-Photos-Server-Setup.exe" -PreviousProductInstallerPath "$env:RUNNER_TEMP\previous-manager-3.1.96\Inhouse-Photos-Server-Setup.exe"
 
       - name: Save the verified Windows manifest and test report
         if: steps.existing.outputs.published != 'true'
@@ -109,6 +121,7 @@ jobs:
             windows-server-update.json
             desktop/dist/windows-release-verification.json
             desktop/dist/SHA256SUMS.txt
+            desktop/dist/public-downloads.zip
           if-no-files-found: error
 
       - name: Upload and verify the immutable public installer
@@ -125,7 +138,7 @@ jobs:
           if ($releaseExitCode -eq 0) {
             if (-not ($draft | ConvertFrom-Json).isDraft) { throw 'Refusing to overwrite a published Windows release' }
           } else {
-            gh release create $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Inhouse Photos $env:WINDOWS_VERSION para Windows" --draft --notes-file desktop/RELEASE-3.1.96.md
+            gh release create $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Inhouse Photos $env:WINDOWS_VERSION para Windows" --draft --notes-file desktop/RELEASE-3.1.97.md
             if ($LASTEXITCODE -ne 0) { throw 'Could not create the release draft' }
           }
           gh release upload $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --clobber desktop/dist/Inhouse-Photos-Server-Setup.exe desktop/dist/Inhouse-Photos-Server.exe desktop/dist/SHA256SUMS.txt desktop/dist/windows-release-verification.json windows-server-update.json

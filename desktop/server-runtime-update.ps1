@@ -17,6 +17,7 @@ param(
   [ValidateRange(30, 1800)][int]$HealthTimeoutSeconds = 300,
   [ValidateRange(0, 2147483647)][int]$ManagerProcessId = 0,
   [string]$ManagerOperationKey = '',
+  [string]$CancellationPath = '',
   [switch]$Apply,
   [switch]$FunctionsOnly
 )
@@ -24,12 +25,36 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $script:RuntimeFailureStage = 'preflight'
+$script:RuntimePhase = 'verifying'
+$script:RuntimeJournal = $null
+$script:RuntimeJournalPath = ''
+$script:RuntimeReadDeadline = $null
+$script:RuntimeCancellationSuppressed = $false
+
+function Assert-RuntimeCancellationPath {
+  if (-not $CancellationPath) { return }
+  $full = [IO.Path]::GetFullPath($CancellationPath)
+  if ([IO.Path]::GetFileName($full) -cnotmatch '^cancel-[a-f0-9]{32}\.signal$' -or
+    -not [string]::Equals([IO.Path]::GetDirectoryName($full), [IO.Path]::GetFullPath($PSScriptRoot), [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'La señal de cancelación no corresponde al actualizador verificado.'
+  }
+  Assert-LocalFile (Join-Path $PSScriptRoot 'server-runtime-update.ps1') | Out-Null
+}
+
+function Assert-RuntimeNotCancelled {
+  if (-not $script:RuntimeCancellationSuppressed -and $CancellationPath -and [IO.File]::Exists($CancellationPath)) {
+    $failure = New-Object OperationCanceledException 'El gestor detuvo la espera de la actualización. Se conserva el estado necesario para reintentar.'
+    $failure.Data['RuntimeNativeTimeout'] = $true
+    throw $failure
+  }
+}
 
 function Set-RuntimeStage([string]$Stage) {
   if (@('preflight', 'image', 'queues', 'quiesce', 'config', 'restart', 'receipt', 'recovery', 'rollback') -cnotcontains $Stage) {
     throw 'Etapa de actualización no válida.'
   }
   $script:RuntimeFailureStage = $Stage
+  if ($ManagerProcessId -gt 0) { [Console]::Out.WriteLine('INHOUSE_RUNTIME_STAGE:' + $Stage) }
 }
 
 function Write-RuntimeFailure {
@@ -40,7 +65,18 @@ function Write-RuntimePhase([string]$Phase) {
   if (@('verifying', 'waiting', 'installing', 'restarting', 'completed') -cnotcontains $Phase) {
     throw 'Fase de actualización no válida.'
   }
+  $script:RuntimePhase = $Phase
   if ($ManagerProcessId -gt 0) { Write-Output ('INHOUSE_RUNTIME_PHASE:' + $Phase) }
+}
+
+function Write-RuntimeHeartbeat {
+  # Console output bypasses the PowerShell pipeline: heartbeat markers must
+  # never become part of Docker's JSON stdout or an environment-file value.
+  if ($ManagerProcessId -gt 0) {
+    [Console]::Out.WriteLine('INHOUSE_RUNTIME_STAGE:' + $script:RuntimeFailureStage)
+    [Console]::Out.WriteLine('INHOUSE_RUNTIME_PHASE:' + $script:RuntimePhase)
+    [Console]::Out.Flush()
+  }
 }
 
 function Get-Sha256([string]$Path) {
@@ -93,19 +129,263 @@ function New-PrivateDirectory([string]$Path) {
   Set-Acl -LiteralPath $Path -AclObject $acl
 }
 
-function Invoke-Docker([string[]]$Arguments) {
-  # Windows PowerShell 5.1 turns native stderr into NativeCommandError. Docker
-  # writes ordinary progress/warnings there even on success. Keep stdout clean
-  # for JSON and use the native exit status; never expose environment values.
-  $savedPreference = $ErrorActionPreference
-  $global:LASTEXITCODE = $null
+function Quote-RuntimeArgument([string]$Value) {
+  # ProcessStartInfo.Arguments uses CommandLineToArgvW rules on Windows. Quote
+  # every argument, doubling backslashes only before quotes and the final quote.
+  if ($null -eq $Value) { $Value = '' }
+  $quoted = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
+  $quoted = [regex]::Replace($quoted, '(\\+)$', '$1$1')
+  return '"' + $quoted + '"'
+}
+
+function New-RuntimeClientJob {
+  if (-not ('InhouseRuntimeClientJob' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Pipes;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+public sealed class InhouseRuntimeClientJob : IDisposable {
+  [StructLayout(LayoutKind.Sequential)] struct BasicLimits {
+    public long ProcessTime, JobTime;
+    public uint Flags;
+    public UIntPtr MinWorkingSet, MaxWorkingSet;
+    public uint ActiveProcesses;
+    public UIntPtr Affinity;
+    public uint Priority, Scheduling;
+  }
+  [StructLayout(LayoutKind.Sequential)] struct IoCounters {
+    public ulong ReadOperations, WriteOperations, OtherOperations, ReadBytes, WriteBytes, OtherBytes;
+  }
+  [StructLayout(LayoutKind.Sequential)] struct ExtendedLimits {
+    public BasicLimits Basic;
+    public IoCounters Io;
+    public UIntPtr ProcessMemory, JobMemory, PeakProcessMemory, PeakJobMemory;
+  }
+  [StructLayout(LayoutKind.Sequential)] struct Accounting {
+    public long UserTime, KernelTime, PeriodUserTime, PeriodKernelTime;
+    public uint PageFaults, TotalProcesses, ActiveProcesses, TerminatedProcesses;
+  }
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)] struct Startup {
+    public int Size;
+    public string Reserved, Desktop, Title;
+    public uint X, Y, XSize, YSize, XCount, YCount, Fill, Flags;
+    public ushort Show, ReservedSize;
+    public IntPtr ReservedBytes, Input, Output, Error;
+  }
+  [StructLayout(LayoutKind.Sequential)] struct CreatedProcess {
+    public IntPtr Process, Thread;
+    public uint ProcessId, ThreadId;
+  }
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr CreateJobObject(IntPtr security, string name);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool SetInformationJobObject(IntPtr job, int type, IntPtr information, uint size);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool TerminateJobObject(IntPtr job, uint code);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool QueryInformationJobObject(IntPtr job, int type, out Accounting information, uint size, IntPtr length);
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateProcess(string application, StringBuilder command, IntPtr processSecurity, IntPtr threadSecurity, bool inherit, uint flags, IntPtr environment, string directory, ref Startup startup, out CreatedProcess created);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern uint ResumeThread(IntPtr thread);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool TerminateProcess(IntPtr process, uint code);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern uint WaitForSingleObject(IntPtr handle,uint milliseconds);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool CloseHandle(IntPtr handle);
+  IntPtr handle;
+  AnonymousPipeServerStream input, output, error;
+  public Process Process {get;private set;}
+  public Stream Input {get{return input;}}
+  public StreamReader Output {get;private set;}
+  public StreamReader Error {get;private set;}
+  public InhouseRuntimeClientJob() {
+    handle=CreateJobObject(IntPtr.Zero,null);
+    if(handle==IntPtr.Zero)throw new Win32Exception(Marshal.GetLastWin32Error());
+    var limits=new ExtendedLimits();limits.Basic.Flags=0x2000; // KILL_ON_JOB_CLOSE
+    var size=Marshal.SizeOf(typeof(ExtendedLimits));var data=Marshal.AllocHGlobal(size);
+    try {
+      Marshal.StructureToPtr(limits,data,false);
+      if(!SetInformationJobObject(handle,9,data,(uint)size))throw new Win32Exception(Marshal.GetLastWin32Error());
+    } catch { Dispose();throw; }
+    finally { Marshal.FreeHGlobal(data); }
+  }
+  public void Start(string application,string arguments) {
+    var created=new CreatedProcess();
+    try {
+      input=new AnonymousPipeServerStream(PipeDirection.Out,HandleInheritability.Inheritable);
+      output=new AnonymousPipeServerStream(PipeDirection.In,HandleInheritability.Inheritable);
+      error=new AnonymousPipeServerStream(PipeDirection.In,HandleInheritability.Inheritable);
+      var startup=new Startup();startup.Size=Marshal.SizeOf(typeof(Startup));startup.Flags=0x100;
+      startup.Input=input.ClientSafePipeHandle.DangerousGetHandle();
+      startup.Output=output.ClientSafePipeHandle.DangerousGetHandle();
+      startup.Error=error.ClientSafePipeHandle.DangerousGetHandle();
+      var command=new StringBuilder("\""+application+"\" "+arguments);
+      // Start suspended so no child/plugin can escape before inheriting our
+      // job. Fail closed if containment cannot be established on this PC.
+      if(!CreateProcess(application,command,IntPtr.Zero,IntPtr.Zero,true,0x08000004,IntPtr.Zero,null,ref startup,out created))
+        throw new Win32Exception(Marshal.GetLastWin32Error());
+      if(!AssignProcessToJobObject(handle,created.Process))throw new Win32Exception(Marshal.GetLastWin32Error());
+      Process=System.Diagnostics.Process.GetProcessById((int)created.ProcessId);
+      // Retain a real handle before resuming: a very short command may exit
+      // before the first PowerShell WaitForExit opens a handle by PID.
+      var retainedProcessHandle=Process.Handle;
+      input.DisposeLocalCopyOfClientHandle();output.DisposeLocalCopyOfClientHandle();error.DisposeLocalCopyOfClientHandle();
+      Output=new StreamReader(output,new UTF8Encoding(false));Error=new StreamReader(error,new UTF8Encoding(false));
+      if(ResumeThread(created.Thread)==0xffffffff)throw new Win32Exception(Marshal.GetLastWin32Error());
+    } catch {
+      if(created.Process!=IntPtr.Zero) {
+        TerminateProcess(created.Process,1);
+        if(WaitForSingleObject(created.Process,5000)!=0)throw new TimeoutException("Suspended Docker client did not stop.");
+      }
+      throw;
+    } finally {
+      if(created.Thread!=IntPtr.Zero)CloseHandle(created.Thread);
+      if(created.Process!=IntPtr.Zero)CloseHandle(created.Process);
+    }
+  }
+  public void Stop() {
+    if(handle!=IntPtr.Zero&&!TerminateJobObject(handle,1))throw new Win32Exception(Marshal.GetLastWin32Error());
+    var deadline=DateTime.UtcNow.AddSeconds(5);
+    while(handle!=IntPtr.Zero) {
+      Accounting accounting;
+      if(!QueryInformationJobObject(handle,1,out accounting,(uint)Marshal.SizeOf(typeof(Accounting)),IntPtr.Zero))
+        throw new Win32Exception(Marshal.GetLastWin32Error());
+      if(accounting.ActiveProcesses==0)return;
+      if(DateTime.UtcNow>=deadline)throw new TimeoutException("Docker client tree did not stop.");
+      Thread.Sleep(20);
+    }
+  }
+  public void Dispose() {
+    try { Stop(); }
+    finally {
+      if(handle!=IntPtr.Zero){CloseHandle(handle);handle=IntPtr.Zero;}
+      if(input!=null)input.Dispose();if(Output!=null)Output.Dispose();else if(output!=null)output.Dispose();
+      if(Error!=null)Error.Dispose();else if(error!=null)error.Dispose();
+    }
+  }
+}
+'@
+  }
+  return New-Object InhouseRuntimeClientJob
+}
+
+function Stop-RuntimeClient($Process, $Job = $null) {
+  if ($Job) {
+    try { $Job.Stop() }
+    catch { $_.Exception.Data['RuntimeNativeTimeout'] = $true; throw }
+  }
+  elseif ($Process.HasExited) { return }
+  elseif ($env:OS -ceq 'Windows_NT') {
+    # docker.exe launches the Compose plugin as a child. Killing only the
+    # parent leaves that client issuing mutations after our lock is released.
+    $info = New-Object Diagnostics.ProcessStartInfo
+    $info.FileName = Join-Path $env:SystemRoot 'System32\taskkill.exe'
+    $info.Arguments = '/PID ' + $Process.Id + ' /T /F'
+    $info.UseShellExecute = $false; $info.CreateNoWindow = $true
+    $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+    $killer = New-Object Diagnostics.Process
+    $killer.StartInfo = $info
+    try {
+      [void]$killer.Start()
+      $discardOut = $killer.StandardOutput.ReadToEndAsync()
+      $discardError = $killer.StandardError.ReadToEndAsync()
+      if (-not $killer.WaitForExit(5000)) { $killer.Kill() }
+    } finally { $killer.Dispose() }
+  } else {
+    # This branch makes the same process-boundary checks runnable in Linux CI.
+    $treeKill = $Process.GetType().GetMethod('Kill', [type[]]@([bool]))
+    if ($treeKill) { [void]$treeKill.Invoke($Process, @($true)) }
+    else { $Process.Kill() }
+  }
+  if (-not $Process.WaitForExit(5000)) {
+    $timeout = New-Object TimeoutException 'No se pudo detener el cliente de actualización; se conserva la transacción pendiente.'
+    $timeout.Data['RuntimeNativeTimeout'] = $true
+    throw $timeout
+  }
+}
+
+function Invoke-RuntimeNative([string[]]$Arguments, [string]$InputText, [int]$TimeoutSeconds) {
+  Assert-RuntimeNotCancelled
+  if ($script:RuntimeReadDeadline) {
+    $TimeoutSeconds = [Math]::Min($TimeoutSeconds, [Math]::Max(1, [Math]::Ceiling(($script:RuntimeReadDeadline - [DateTime]::UtcNow).TotalSeconds)))
+  }
+  $info = New-Object Diagnostics.ProcessStartInfo
+  $info.FileName = $DockerExe
+  $info.Arguments = (($Arguments | ForEach-Object { Quote-RuntimeArgument $_ }) -join ' ')
+  $info.UseShellExecute = $false; $info.CreateNoWindow = $true
+  $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+  $info.RedirectStandardInput = $true
+  $process = $null
+  $started = $false; $job = $null
   try {
-    $ErrorActionPreference = 'Continue'
-    $output = & $DockerExe --context desktop-linux @Arguments 2>$null
-    $exitCode = $global:LASTEXITCODE
-  } finally { $ErrorActionPreference = $savedPreference }
-  if ($null -eq $exitCode -or $exitCode -ne 0) { throw ('Docker no completó la operación: ' + $Arguments[0] + '.') }
-  return ($output | Out-String).Trim()
+    if ($env:OS -ceq 'Windows_NT') {
+      $job = New-RuntimeClientJob
+      $application = (Get-Command -Name $DockerExe -CommandType Application -ErrorAction Stop).Source
+      $job.Start($application, $info.Arguments)
+      $process = $job.Process
+      $output = $job.Output.ReadToEndAsync(); $errors = $job.Error.ReadToEndAsync()
+      $stdin = $job.Input
+    } else {
+      $process = New-Object Diagnostics.Process; $process.StartInfo = $info
+      [void]$process.Start()
+      $output = $process.StandardOutput.ReadToEndAsync(); $errors = $process.StandardError.ReadToEndAsync()
+      $stdin = $process.StandardInput.BaseStream
+    }
+    $started = $true
+    $writing = $null; $closedInput = $false
+    if ($InputText) {
+      $bytes = (New-Object Text.UTF8Encoding $false).GetBytes($InputText)
+      $writing = $stdin.WriteAsync($bytes, 0, $bytes.Length)
+    } else { $stdin.Close(); $closedInput = $true }
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $heartbeat = [DateTime]::UtcNow
+    do {
+      Assert-RuntimeNotCancelled
+      if ($writing -and -not $closedInput -and $writing.IsCompleted) {
+        [void]$writing.GetAwaiter().GetResult(); $stdin.Close(); $closedInput = $true
+      }
+      if ([DateTime]::UtcNow -ge $heartbeat) { Write-RuntimeHeartbeat; $heartbeat = [DateTime]::UtcNow.AddSeconds(5) }
+      if ($process.WaitForExit(200)) { break }
+      if ([DateTime]::UtcNow -ge $deadline) {
+        Stop-RuntimeClient $process $job
+        $timeout = New-Object TimeoutException 'Docker no confirmó la operación dentro del tiempo permitido. Se conserva la transacción para recuperación.'
+        $timeout.Data['RuntimeNativeTimeout'] = $true
+        throw $timeout
+      }
+    } while ($true)
+    if (-not $output.Wait(5000) -or -not $errors.Wait(5000)) {
+      $timeout = New-Object TimeoutException 'No se confirmó el cierre del cliente Docker. Se conserva la transacción para recuperación.'
+      $timeout.Data['RuntimeNativeTimeout'] = $true
+      throw $timeout
+    }
+    return [pscustomobject]@{ExitCode=$process.ExitCode;Output=$output.GetAwaiter().GetResult().Trim()}
+  } finally {
+    try { if ($started -and -not $process.HasExited) { Stop-RuntimeClient $process $job } }
+    finally {
+      # Even if docker.exe already exited, an inherited Compose child can keep
+      # pipes open. Closing our job stops those clients before releasing locks.
+      if ($job) {
+        try { $job.Dispose() }
+        catch { $_.Exception.Data['RuntimeNativeTimeout'] = $true; throw }
+      }
+      if ($process) { $process.Dispose() }
+    }
+  }
+}
+
+function Invoke-Docker([string[]]$Arguments, [int]$TimeoutSeconds = 0) {
+  if ($TimeoutSeconds -le 0) {
+    $TimeoutSeconds = 30
+    if ($Arguments[0] -ceq 'load') { $TimeoutSeconds = 600 }
+    elseif (@('start', 'stop', 'restart', 'rm') -ccontains $Arguments[0] -or
+      ($Arguments[0] -ceq 'compose' -and $Arguments -contains 'up')) { $TimeoutSeconds = 180 }
+  }
+  $result = Invoke-RuntimeNative (@('--context', 'desktop-linux') + $Arguments) '' $TimeoutSeconds
+  if ($result.ExitCode -ne 0) {
+    $failure = New-Object InvalidOperationException ('Docker no completó la operación: ' + $Arguments[0] + '.')
+    $failure.Data['RuntimeNativeExit'] = $result.ExitCode
+    throw $failure
+  }
+  return $result.Output
 }
 
 function Get-ComposeArguments($Preferences, [string]$ComposeFile) {
@@ -268,7 +548,10 @@ function Get-ComposeImage($Preferences, [string]$ComposeFile) {
 
 function Wait-ServerHealthy($Preferences, [string]$ComposeFile, [string]$ExpectedImage) {
   $deadline = [DateTime]::UtcNow.AddSeconds($HealthTimeoutSeconds)
-  do {
+  $savedDeadline = $script:RuntimeReadDeadline
+  $script:RuntimeReadDeadline = $deadline
+  try { do {
+    Assert-RuntimeNotCancelled
     $rows = @(Get-Containers $Preferences $ComposeFile)
     $server = @($rows | Where-Object { $_.Service -ceq 'immich-server' })[0]
     if ($server.Image -cne $ExpectedImage) { throw 'El servidor arrancó con otra imagen.' }
@@ -278,6 +561,7 @@ function Wait-ServerHealthy($Preferences, [string]$ComposeFile, [string]$Expecte
     Start-Sleep -Seconds 2
   } while ([DateTime]::UtcNow -lt $deadline)
   throw 'El nuevo servidor no confirmó su estado saludable a tiempo.'
+  } finally { $script:RuntimeReadDeadline = $savedDeadline }
 }
 
 function Assert-ManagerProcessChain($Helper, $Manager, $ManagerInfo, $Running, [string]$LauncherPath) {
@@ -345,11 +629,66 @@ function New-QueueContext([string]$ServerId, [string]$Directory) {
   return [pscustomobject]@{Network=$names[0];EnvironmentFile=$path}
 }
 
+function Set-RuntimeJournal($Record, [string]$Path) {
+  $script:RuntimeJournal = $Record
+  $script:RuntimeJournalPath = $Path
+}
+
+function Save-RuntimeHelper([string]$Name) {
+  if ($script:RuntimeJournal -and $script:RuntimeJournalPath) {
+    $script:RuntimeJournal | Add-Member -NotePropertyName activeQueueHelper -NotePropertyValue $Name -Force
+    Write-PrivateJson $script:RuntimeJournalPath $script:RuntimeJournal
+  }
+}
+
+function Remove-RuntimeQueueHelper([string]$Name) {
+  if ($Name -cnotmatch '^inhouse-runtime-helper-[a-f0-9]{32}$') { throw 'La identidad del helper de recuperación no es válida.' }
+  $ids = Invoke-Docker @('ps', '-a', '--filter', ('name=^/' + $Name + '$'), '-q', '--no-trunc')
+  if ($ids) {
+    if ($ids -cnotmatch '^[a-f0-9]{64}$') { throw 'La identidad del helper no es única.' }
+    $identity = (Invoke-Docker @('inspect', '--format', '[{{json .Id}},{{json .Config.Labels}}]', $ids)) | ConvertFrom-Json
+    $label = $identity[1].PSObject.Properties['inhouse.runtime.helper']
+    if ($identity[0] -cne $ids -or -not $label -or $label.Value -cne $Name.Substring('inhouse-runtime-helper-'.Length)) {
+      throw 'No se detendrá un contenedor ajeno al helper de actualización.'
+    }
+    # This is the short-lived, uniquely labelled helper created by us. Never
+    # remove any Compose service, data volume or user container.
+    Invoke-Docker @('rm', '-f', $ids) 30 | Out-Null
+    if (Invoke-Docker @('ps', '-a', '--filter', ('name=^/' + $Name + '$'), '-q', '--no-trunc')) {
+      throw 'El helper no confirmó su cierre; se conserva la recuperación pendiente.'
+    }
+  }
+  Save-RuntimeHelper ''
+}
+
+function Remove-RuntimeDeferredHelpers($Preferences, [string]$SettingsHash) {
+  $root = Join-Path $SettingsDirectory 'runtime-updates'
+  if (-not (Test-Path -LiteralPath $root)) { return }
+  foreach ($file in @(Get-ChildItem -LiteralPath $root -Filter transaction.json -Recurse -File)) {
+    $saved = Read-Json $file.FullName
+    if (-not $saved.PSObject.Properties['deferredQueueHelpers'] -or -not @($saved.deferredQueueHelpers).Count) { continue }
+    if ($saved.project -cne $Preferences.ProjectName -or $saved.installation -cne $Preferences.Installation -or
+      $saved.receiptPath -cne $Preferences.ReceiptPath -or $saved.settingsSha256 -cne $SettingsHash) { continue }
+    foreach ($name in @($saved.deferredQueueHelpers)) {
+      # A timed-out create request may complete after its client is gone. The
+      # container is stopped, so it cannot change queues. Retain its name even
+      # after aborting the untouched preparation and check it on later retries.
+      # This receipt does not keep an otherwise finished update pending.
+      Remove-RuntimeQueueHelper ([string]$name)
+    }
+  }
+}
+
 function Invoke-QueueHelper([string]$Image, $Context, [string]$Action, $OriginalState) {
   if ($Action -ceq 'assert-rollback-safe') { Set-RuntimeStage 'rollback' }
   else { Set-RuntimeStage 'queues' }
   $helper = Assert-LocalFile (Join-Path $PSScriptRoot 'server-runtime-queue-handoff.cjs')
-  $arguments = @('--context', 'desktop-linux', 'run', '--rm', '-i', '--no-healthcheck',
+  if ($script:RuntimeJournal -and $script:RuntimeJournal.PSObject.Properties['activeQueueHelper'] -and $script:RuntimeJournal.activeQueueHelper) {
+    Remove-RuntimeQueueHelper $script:RuntimeJournal.activeQueueHelper
+  }
+  $key = [Guid]::NewGuid().ToString('N')
+  $name = 'inhouse-runtime-helper-' + $key
+  $arguments = @('create', '--interactive', '--name', $name, '--label', ('inhouse.runtime.helper=' + $key), '--pull', 'never', '--no-healthcheck',
     '--network', $Context.Network, '--env-file', $Context.EnvironmentFile,
     '--entrypoint', 'node', '--workdir', '/usr/src/app/server', $Image, '-', $Action)
   if ($null -ne $OriginalState) {
@@ -357,22 +696,45 @@ function Invoke-QueueHelper([string]$Image, $Context, [string]$Action, $Original
     $arguments += [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
   }
   $inputText = [IO.File]::ReadAllText($helper)
-  $savedPreference = $ErrorActionPreference
-  $global:LASTEXITCODE = $null
+  Save-RuntimeHelper $name
+  $failure = $null; $failureStage = $script:RuntimeFailureStage; $created = $false
   try {
-    $ErrorActionPreference = 'Continue'
-    $output = $inputText | & $DockerExe @arguments 2>$null
-    $exitCode = $global:LASTEXITCODE
-  } finally { $ErrorActionPreference = $savedPreference }
-  if ($null -eq $exitCode -or $exitCode -ne 0) { throw ('No se pudo completar la operación de colas: ' + $Action + '.') }
-  return ($output | Out-String | ConvertFrom-Json)
+    # Create stopped first. If Docker hangs while creating, no queued work can
+    # run later. Starting a known helper lets us remove that exact container
+    # after timeout instead of leaving a detached pause/resume process alive.
+    $id = Invoke-Docker $arguments 30
+    if ($id -cnotmatch '^[a-f0-9]{64}$') { throw 'No se confirmó la identidad del helper de colas.' }
+    $created = $true
+    $result = Invoke-RuntimeNative @('--context', 'desktop-linux', 'start', '--attach', '--interactive', $id) $inputText 60
+    if ($result.ExitCode -ne 0) { throw ('No se pudo completar la operación de colas: ' + $Action + '.') }
+    return ($result.Output | ConvertFrom-Json)
+  } catch { $failure = $_; $failureStage = $script:RuntimeFailureStage; throw }
+  finally {
+    # Cleanup needs its own bounded budget even after a health/quiesce deadline.
+    $savedDeadline = $script:RuntimeReadDeadline; $script:RuntimeReadDeadline = $null
+    $savedCancellation = $script:RuntimeCancellationSuppressed; $script:RuntimeCancellationSuppressed = $true
+    try { Remove-RuntimeQueueHelper $name }
+    catch { if (-not $failure) { throw } }
+    finally {
+      if ($failure -and -not $created -and $failure.Exception.Data.Contains('RuntimeNativeTimeout') -and $script:RuntimeJournal) {
+        $retained = @($name)
+        if ($script:RuntimeJournal.PSObject.Properties['deferredQueueHelpers']) { $retained += @($script:RuntimeJournal.deferredQueueHelpers) }
+        $script:RuntimeJournal | Add-Member -NotePropertyName deferredQueueHelpers -NotePropertyValue @($retained | Sort-Object -Unique) -Force
+        Write-PrivateJson $script:RuntimeJournalPath $script:RuntimeJournal
+      }
+      $script:RuntimeReadDeadline = $savedDeadline; $script:RuntimeFailureStage = $failureStage; $script:RuntimeCancellationSuppressed = $savedCancellation
+    }
+  }
 }
 
 function Wait-CompressionIdle([string]$Image, $Context) {
   Set-RuntimeStage 'quiesce'
   Write-RuntimePhase 'waiting'
   $deadline = [DateTime]::UtcNow.AddMinutes(15)
-  do {
+  $savedDeadline = $script:RuntimeReadDeadline
+  $script:RuntimeReadDeadline = $deadline
+  try { do {
+    Assert-RuntimeNotCancelled
     $state = Invoke-QueueHelper $Image $Context 'inspect' $null
     Set-RuntimeStage 'quiesce'
     if ($state.activeJobs -eq 0) { return }
@@ -380,6 +742,32 @@ function Wait-CompressionIdle([string]$Image, $Context) {
     Start-Sleep -Seconds 2
   } while ([DateTime]::UtcNow -lt $deadline)
   throw 'Las compresiones activas no terminaron a tiempo; se conserva el servidor anterior.'
+  } finally { $script:RuntimeReadDeadline = $savedDeadline }
+}
+
+function Test-RuntimeImage($Manifest) {
+  $format = '[{{json .Id}},{{json .Os}},{{json .Architecture}},{{json .Config.Labels}}]'
+  try { $json = Invoke-Docker @('image', 'inspect', '--format', $format, $Manifest.image) }
+  catch {
+    # Absence of a tag is acceptable only while the daemon itself responds.
+    # A timeout must never be interpreted as a missing image and trigger load.
+    if ($_.Exception.Data.Contains('RuntimeNativeExit') -and $_.Exception.Data['RuntimeNativeExit'] -eq 1) {
+      Invoke-Docker @('version', '--format', '{{.Server.Version}}') | Out-Null
+      return $false
+    }
+    throw
+  }
+  $image = $json | ConvertFrom-Json
+  $revision = $image[3].PSObject.Properties['org.opencontainers.image.revision']
+  $version = $image[3].PSObject.Properties['org.opencontainers.image.version']
+  $schema = $image[3].PSObject.Properties['inhouse.runtime.database-schema-sha256']
+  if ($image[0] -cne $Manifest.imageId -or $image[1] -cne 'linux' -or $image[2] -cne 'amd64' -or
+    -not $revision -or $revision.Value -cne $Manifest.sourceCommit -or
+    -not $version -or $version.Value -cne $Manifest.version -or
+    -not $schema -or $schema.Value -cne $Manifest.databaseSchemaSha256) {
+    throw 'La imagen existente no coincide con la identidad, versión y plataforma publicadas.'
+  }
+  return $true
 }
 
 function Restore-Runtime($Record, $Preferences, [string]$ComposeFile, [string]$RecordPath) {
@@ -429,6 +817,9 @@ function Assert-NoIncompleteUpdate([string]$SettingsPath) {
 
 function Invoke-RuntimeUpdate {
   Set-RuntimeStage 'preflight'
+  Set-RuntimeJournal $null ''
+  Assert-RuntimeCancellationPath
+  Assert-RuntimeNotCancelled
   if ($env:OS -cne 'Windows_NT') { throw 'Este actualizador solo se ejecuta en el PC Windows del servidor.' }
   Assert-NoManager
   Write-RuntimePhase 'verifying'
@@ -448,6 +839,7 @@ function Invoke-RuntimeUpdate {
   if (-not $ResumeRecord) { Assert-Containers $receipt.Containers $before $prefs.ProjectName -Adoption }
   $servers = @($before | Where-Object { $_.Service -ceq 'immich-server' })
   $server = if ($servers.Count) { $servers[0] } else { $null }
+  if ($Apply) { Remove-RuntimeDeferredHelpers $prefs (Get-Sha256 $settingsFile) }
 
   if ($ResumeRecord) {
     Set-RuntimeStage 'recovery'
@@ -473,6 +865,10 @@ function Invoke-RuntimeUpdate {
       throw 'La etiqueta de imagen de la recuperación cambió. No se recreará el servidor con otra versión.'
     }
     if (-not $Apply) { Write-Output 'Transacción pendiente verificada. Añade -Apply para confirmar el motor y restaurar el estado original de las colas.'; return }
+    Set-RuntimeJournal $record $recordPath
+    if ($record.PSObject.Properties['activeQueueHelper'] -and $record.activeQueueHelper) {
+      Remove-RuntimeQueueHelper $record.activeQueueHelper
+    }
     if ($null -eq $record.queueState) {
       if ($missingServer -or $targetImage -cne $record.previousImageId -or $server.Image -cne $record.previousImageId) { throw 'El registro no contiene el estado original de las colas.' }
       $record.status = 'aborted'
@@ -505,8 +901,8 @@ function Invoke-RuntimeUpdate {
         throw 'La etiqueta de imagen de la recuperación cambió. No se recreará el servidor con otra versión.'
       }
       Set-RuntimeStage 'restart'
-      Invoke-Docker ((Get-ComposeArguments $prefs $composeFile) + @('up', '-d', '--no-deps', '--pull', 'never', 'immich-server')) | Out-Null
       Write-RuntimePhase 'restarting'
+      Invoke-Docker ((Get-ComposeArguments $prefs $composeFile) + @('up', '-d', '--no-deps', '--pull', 'never', 'immich-server')) | Out-Null
       $after = @(Wait-ServerHealthy $prefs $composeFile $targetImage)
       Assert-Containers $record.previousContainers $after $prefs.ProjectName -ServerMayChange
       Assert-Configuration $savedReceipt.ConfigurationHashes (Get-ConfigurationHashes $prefs.Installation)
@@ -537,6 +933,7 @@ function Invoke-RuntimeUpdate {
       $record.settingsSha256 -cne (Get-Sha256 $settingsFile)) { throw 'El registro de recuperación no corresponde a la instalación actual.' }
     Assert-Containers $record.previousContainers $before $prefs.ProjectName -ServerMayChange
     if (-not $Apply) { Write-Output 'Identidad del rollback verificada. Al aplicar se comprobarán también las colas pendientes.'; return }
+    Set-RuntimeJournal $record $recordPath
     $script:QueueContext = New-QueueContext $server.Id ([IO.Path]::GetDirectoryName($recordPath))
     try {
       $record.queueState = (Invoke-QueueHelper $record.newImageId $script:QueueContext 'inspect' $null).pausedStates
@@ -591,19 +988,14 @@ function Invoke-RuntimeUpdate {
   $paused = $false
   $script:QueueContext = $null
   try {
-    # A release archive is a docker save, with a unique release tag. The archive
-    # hash is checked before load; inspect verifies its content after load.
+    # A verified existing image is enough: Docker Desktop can spend minutes
+    # importing this same archive again after a previous interrupted update.
     Write-RuntimePhase 'installing'
     Set-RuntimeStage 'image'
-    Invoke-Docker @('load', '--input', $archiveFile) | Out-Null
-    $imageFormat = '[{{json .Id}},{{json .Os}},{{json .Architecture}},{{json .Config.Labels}}]'
-    $image = (Invoke-Docker @('image', 'inspect', '--format', $imageFormat, $manifest.image)) | ConvertFrom-Json
-    $revision = $image[3].PSObject.Properties['org.opencontainers.image.revision']
-    $schema = $image[3].PSObject.Properties['inhouse.runtime.database-schema-sha256']
-    if ($image[0] -cne $manifest.imageId -or $image[1] -cne 'linux' -or $image[2] -cne 'amd64' -or
-      -not $revision -or $revision.Value -cne $manifest.sourceCommit -or
-      -not $schema -or $schema.Value -cne $manifest.databaseSchemaSha256) {
-      throw 'La imagen cargada no coincide con el commit y la plataforma publicados.'
+    Set-RuntimeJournal $record $recordPath
+    if (-not (Test-RuntimeImage $manifest)) {
+      Invoke-Docker @('load', '--input', $archiveFile) | Out-Null
+      if (-not (Test-RuntimeImage $manifest)) { throw 'Docker no confirmó la imagen cargada.' }
     }
     $script:QueueContext = New-QueueContext $server.Id $directory
     $record.queueState = (Invoke-QueueHelper $manifest.imageId $script:QueueContext 'inspect' $null).pausedStates
@@ -632,8 +1024,8 @@ function Invoke-RuntimeUpdate {
     $record.status = 'starting'
     Write-PrivateJson $recordPath $record
     Set-RuntimeStage 'restart'
-    Invoke-Docker ((Get-ComposeArguments $prefs $composeFile) + @('up', '-d', '--no-deps', '--pull', 'never', 'immich-server')) | Out-Null
     Write-RuntimePhase 'restarting'
+    Invoke-Docker ((Get-ComposeArguments $prefs $composeFile) + @('up', '-d', '--no-deps', '--pull', 'never', 'immich-server')) | Out-Null
     $after = @(Wait-ServerHealthy $prefs $composeFile $manifest.imageId)
     Assert-Containers $before $after $prefs.ProjectName -ServerMayChange
     $expectedHashes = $receipt.ConfigurationHashes | ConvertTo-Json | ConvertFrom-Json
@@ -653,9 +1045,19 @@ function Invoke-RuntimeUpdate {
     Write-Output ('Recuperación: ' + $recordPath)
     Write-RuntimePhase 'completed'
   } catch {
+    $originalFailureStage = $script:RuntimeFailureStage
     if ($changed) {
+      if ($_.Exception.Data.Contains('RuntimeNativeTimeout')) {
+        # Docker's daemon may still finish the last create/start request after
+        # the client was killed. Never race that request with an old-image
+        # rollback. Resume will inspect the actual service and retained journal.
+        $record.status = 'rollback-required'
+        Write-PrivateJson $recordPath $record
+        throw
+      }
       try { Restore-Runtime $record $prefs $composeFile $recordPath }
       catch { $record.status = 'rollback-required'; Write-PrivateJson $recordPath $record; throw ('No se confirmó la recuperación automática; la imagen anterior no puede leer trabajos o migraciones nuevos. Se conservan la imagen nueva, los archivos y las copias en ' + $directory + '. Usa -ResumeRecord para recuperar el motor nuevo.') }
+      finally { $script:RuntimeFailureStage = $originalFailureStage }
       $paused = $false
       throw 'La actualización no se confirmó. Se restauró el servidor anterior y su recibo.'
     }
@@ -663,7 +1065,9 @@ function Invoke-RuntimeUpdate {
     Write-PrivateJson $recordPath $record
     throw
   } finally {
-    if ($script:QueueContext) {
+    $savedCancellation = $script:RuntimeCancellationSuppressed
+    $script:RuntimeCancellationSuppressed = $true
+    try { if ($script:QueueContext) {
       # If an update failed before switching images, restore the original queue
       # state. After an unsafe rollback, leave both paused for operator recovery.
       if ($paused -and -not $changed) {
@@ -672,6 +1076,9 @@ function Invoke-RuntimeUpdate {
         Write-PrivateJson $recordPath $record
       }
       [IO.File]::Delete($script:QueueContext.EnvironmentFile)
+    } } finally {
+      $script:RuntimeCancellationSuppressed = $savedCancellation
+      if (Get-Variable originalFailureStage -Scope Local -ErrorAction SilentlyContinue) { $script:RuntimeFailureStage = $originalFailureStage }
     }
   }
 }

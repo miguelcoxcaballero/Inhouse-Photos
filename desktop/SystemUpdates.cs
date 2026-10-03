@@ -17,6 +17,8 @@ namespace InhousePhotos {
     public bool RecoveryRequired {get;set;}
     public bool Busy {get;set;}
     public bool RequiresLocalRecovery {get;set;}
+    public string Stage {get;set;}
+    public int StageElapsedSeconds {get;set;}
   }
   public sealed class SystemUpdateIntent {
     public int Format {get;set;}
@@ -135,24 +137,31 @@ namespace InhousePhotos {
     public static SystemUpdateStatus Status() {
       lock(Gate) {
         var engine=RuntimeUpdates.Status();var manager=ManagerUpdates.Status();
-        var visiblePhase=phase;var visibleProgress=progress;
-        if(applying&&ManagerUpdates.IsApplying) {
+        var managerApplying=ManagerUpdates.IsApplying;
+        var visiblePhase=phase;var visibleProgress=progress;var visibleError=error;
+        var stage="";var stageElapsed=0;
+        if(managerApplying) {
           visiblePhase=manager.Phase=="ready"?"installing":manager.Phase;
           visibleProgress=Math.Max(1,Math.Min(20,manager.Progress/5));
+          stage="manager";
         } else if(applying&&RuntimeUpdates.IsApplying) {
           visiblePhase=engine.Phase;visibleProgress=20+Math.Min(79,engine.Progress*79/100);
+          stage=engine.Stage??"";stageElapsed=engine.StageElapsedSeconds;
+        } else if(!applying&&manager.Phase=="error"&&(phase=="verifying"||phase=="waiting")) {
+          visiblePhase="error";visibleError=manager.Error;visibleProgress=0;
         }
         return new SystemUpdateStatus{CurrentVersion=confirmed?Backend.Version:"",LatestVersion=latest,
           Available=!requiresLocal&&(!confirmed||ManagerUpdates.Compare(latest,Backend.Version)>0),
-          Phase=visiblePhase,Progress=visibleProgress,Error=error,Notes=Notes,
-          RecoveryRequired=!confirmed&&(phase=="error"||phase=="waiting"),
-          Busy=applying||ManagerUpdates.IsApplying||RuntimeUpdates.IsBusy,RequiresLocalRecovery=requiresLocal};
+          Phase=visiblePhase,Progress=visibleProgress,Error=visibleError,Notes=Notes,
+          RecoveryRequired=!confirmed&&(visiblePhase=="error"||visiblePhase=="waiting"),
+          Busy=applying||managerApplying||RuntimeUpdates.IsBusy,RequiresLocalRecovery=requiresLocal,
+          Stage=stage,StageElapsedSeconds=stageElapsed};
       }
     }
     public static async Task<SystemUpdateStatus> Check(Preferences prefs,bool force=false) {
       await CheckGate.WaitAsync();
       try {
-        if(IsApplying)return Status();
+        if(IsApplying||ManagerUpdates.IsApplying)return Status();
         if(!force&&DateTime.UtcNow-checkedAt<TimeSpan.FromSeconds(15))return Status();
         SystemUpdateIntent intent;
         try{intent=Read(prefs);}catch(Exception ex){lock(Gate){confirmed=false;requiresLocal=true;phase="error";error=ex.Message;}return Status();}
@@ -163,9 +172,12 @@ namespace InhousePhotos {
         RuntimeUpdateStatus engine=null;
         if(!installed)try{engine=await RuntimeUpdates.Check(prefs,force);}catch{}
         lock(Gate) {
-          if(applying)return Status();
+          if(applying||ManagerUpdates.IsApplying)return Status();
           latest=manager.Available?manager.LatestVersion:Backend.Version;confirmed=installed;
           checkedAt=DateTime.UtcNow;
+          if(manager.Phase=="error"&&intent!=null&&intent.State=="running"&&!RuntimeUpdates.IsBusy) {
+            intent.State="error";intent.Error=manager.Error??"No se completó el cambio del gestor. Pulsa Actualizar para reintentar.";Write(intent);
+          }
           if(installed&&intent!=null&&intent.State!="completed"&&ManagerUpdates.Compare(intent.TargetVersion,Backend.Version)<=0) {
             intent.State="completed";intent.Error="";intent.NextAttemptUtc="";intent.RequiresLocalRecovery=false;Write(intent);
           }
@@ -217,11 +229,13 @@ namespace InhousePhotos {
       }
     }
     public static async Task Apply(Preferences prefs,Func<Task> installManager) {
+      bool managerStarted=false;
       try {
         var manager=ManagerUpdates.Status();
         try{manager=await ManagerUpdates.Check(true);}catch{ /* Resume the locally pinned product when GitHub is temporarily unavailable. */ }
         if(manager.Available) {
           if(!ManagerUpdates.TryBegin())throw new IOException("Ya hay otra actualización en curso.");
+          managerStarted=true;
           // The installer persists the continuation again before pointer swap.
           await installManager();return;
         }
@@ -245,6 +259,7 @@ namespace InhousePhotos {
           confirmed=true;phase="completed";progress=100;error="";requiresLocal=false;
         }
       }catch(Exception ex) {
+        if(managerStarted)ManagerUpdates.Fail(ex);
         lock(Gate) {
           phase="error";error=ex.Message;
           try{var intent=Read(prefs);if(intent!=null){intent.State="error";intent.Error=error;intent.RequiresLocalRecovery=requiresLocal;Write(intent);}}

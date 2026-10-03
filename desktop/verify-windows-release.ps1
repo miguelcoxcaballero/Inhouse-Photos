@@ -6,7 +6,8 @@ param(
   [string]$ReportPath = (Join-Path $PSScriptRoot 'dist\windows-release-verification.json'),
   [string]$ManifestPath = (Join-Path $PSScriptRoot '..\windows-server-update.json'),
   [string]$PreviousInstallerPath,
-  [string]$BootstrapInstallerPath
+  [string]$BootstrapInstallerPath,
+  [string]$PreviousProductInstallerPath
 )
 $ErrorActionPreference = 'Stop'
 
@@ -53,6 +54,9 @@ if ($env:OS -ne 'Windows_NT') { throw 'Windows release verification requires Win
 $BuildDirectory = [IO.Path]::GetFullPath($BuildDirectory)
 $manager = Join-Path $BuildDirectory 'Inhouse-Photos-Server.exe'
 $installer = Join-Path $BuildDirectory 'Inhouse-Photos-Server-Setup.exe'
+$publicDownloads = Join-Path $BuildDirectory 'public-downloads.zip'
+if (-not (Test-Path -LiteralPath $publicDownloads -PathType Leaf)) { throw 'Built public download archive is missing' }
+$publicDownloadsHash = Get-LowerSha256 $publicDownloads
 foreach ($binary in @($manager, $installer)) {
   if (-not (Test-Path -LiteralPath $binary -PathType Leaf)) { throw "Built executable is missing: $binary" }
   $info = [Reflection.AssemblyName]::GetAssemblyName($binary)
@@ -69,6 +73,9 @@ foreach ($binary in @($manager, $installer)) {
     if ((Get-EmbeddedResourceHash $assembly "InhousePhotos.$name") -ne (Get-LowerSha256 (Join-Path $PSScriptRoot $name))) {
       throw "Embedded $name does not match the verified source"
     }
+  }
+  if ((Get-EmbeddedResourceHash $assembly 'InhousePhotos.public-downloads.zip') -ne $publicDownloadsHash) {
+    throw 'Embedded public downloads do not match the verified build archive'
   }
 }
 $managerHash = Get-LowerSha256 $manager
@@ -99,8 +106,9 @@ Invoke-CheckedExecutable $manager @('--verify-system-update-intent') | Out-Null
 # only on a fresh Windows CI profile, never over an existing user's launcher.
 $launcher = $setupAssembly.GetType('InhousePhotos.Backend').GetProperty('Launcher').GetValue($null, $null)
 $fixtures = @()
-if ($BootstrapInstallerPath) { $fixtures += @{ path = $BootstrapInstallerPath; version = '1.2.16' } }
-if ($PreviousInstallerPath) { $fixtures += @{ path = $PreviousInstallerPath; version = '1.2.17' } }
+if ($BootstrapInstallerPath) { $fixtures += @{ path = $BootstrapInstallerPath; version = '1.2.16'; sha256 = '9378c9b3cc1366699011b29d5a06c32451a417b6fd0ba2574981c329844be65d' } }
+if ($PreviousInstallerPath) { $fixtures += @{ path = $PreviousInstallerPath; version = '1.2.17'; sha256 = 'd6eb4b2ce1331f32688f48ab87f649285a84fbe6996b6e8e1c96cb3af12e5981' } }
+if ($PreviousProductInstallerPath) { $fixtures += @{ path = $PreviousProductInstallerPath; version = '3.1.96'; sha256 = '1857acdac75128fc79ab0b2628b704700beaf8dd8117936ba04ace90d8e2b016' } }
 $verifiedPreviousVersions = @()
 if ($fixtures.Count -gt 0 -and (Test-Path -LiteralPath $launcher)) {
   throw 'Legacy upgrade verification requires a fresh isolated Windows profile'
@@ -112,6 +120,7 @@ for ($index = 0; $index -lt $fixtures.Count; $index++) {
     throw "Unexpected legacy fixture version: $($fixture.version)"
   }
   $fixtureHash = Get-LowerSha256 $fixturePath
+  if ($fixtureHash -ne $fixture.sha256) { throw "Fixture $($fixture.version) does not match the immutable public installer" }
   Invoke-CheckedExecutable $fixturePath @('--verify-payload') | Out-Null
   Invoke-CheckedExecutable $fixturePath @('--install-current') | Out-Null
   if (-not (Invoke-CheckedExecutable $fixturePath @('--verify-installed')).StartsWith("$($fixture.version) ")) {
@@ -140,7 +149,7 @@ if ($fixtures.Count -eq 0) {
   }
 }
 
-$notes = 'Inhouse Photos comparte una versi\u00f3n y una acci\u00f3n de actualizaci\u00f3n en el m\u00f3vil y Windows. Guarda la intenci\u00f3n antes de reiniciar y contin\u00faa al abrir el programa; conserva la biblioteca, la base de datos y el trabajo pendiente.'
+$notes = 'Corrige bloqueos al instalar, muestra la etapa que ejecuta el PC y permite reintentar de forma segura. Actualiza tambi\u00e9n las descargas de tu web. Conserva tus fotos, la base de datos y el trabajo pendiente.'
 $notes = [Regex]::Unescape($notes)
 $manifest = [ordered]@{
   Version = $Version
@@ -158,7 +167,7 @@ $hashLines = @(
 [IO.File]::WriteAllText((Join-Path $BuildDirectory 'SHA256SUMS.txt'), ($hashLines -join "`n") + "`n", $utf8)
 $sourceHashes = [ordered]@{}
 $sourceFiles = @((Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.cs' -File).FullName)
-$sourceFiles += @('build.ps1', 'brand.xaml', 'storage.ps1', 'server-runtime-update.ps1', 'server-runtime-queue-handoff.cjs') | ForEach-Object { Join-Path $PSScriptRoot $_ }
+$sourceFiles += @('build.ps1', 'brand.xaml', 'storage.ps1', 'server-runtime-update.ps1', 'server-runtime-queue-handoff.cjs', 'package-public-downloads.ps1') | ForEach-Object { Join-Path $PSScriptRoot $_ }
 foreach ($source in ($sourceFiles | Sort-Object)) { $sourceHashes[[IO.Path]::GetFileName($source)] = Get-LowerSha256 $source }
 $report = [ordered]@{
   version = $Version
@@ -172,6 +181,8 @@ $report = [ordered]@{
   runtimePins = $runtimePins
   sourceSha256 = $sourceHashes
   embeddedRuntimeHelpersMatchSource = $true
+  publicDownloadsZipSha256 = $publicDownloadsHash
+  embeddedPublicDownloadsMatchArchive = $true
   managerSelfTest = $true
   runtimeHelperProcessVerified = $true
   systemUpdateIntentVerified = $true
@@ -179,6 +190,7 @@ $report = [ordered]@{
   installationVerified = $true
   bootstrapFromManager1216Verified = $verifiedPreviousVersions -contains '1.2.16'
   upgradeFromManager1217Verified = $verifiedPreviousVersions -contains '1.2.17'
+  verifiedFromManager3196 = $verifiedPreviousVersions -contains '3.1.96'
   verifiedPreviousManagerVersions = @($verifiedPreviousVersions)
   authenticodeSigned = $false
 }

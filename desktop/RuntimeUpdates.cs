@@ -22,6 +22,8 @@ namespace InhousePhotos {
     public string Error {get;set;}
     public string Notes {get;set;}
     public bool RecoveryRequired {get;set;}
+    public string Stage {get;set;}
+    public int StageElapsedSeconds {get;set;}
   }
   public sealed class RuntimeImageIdentity {
     public string ImageId,Version,SourceCommit,SchemaSha256;
@@ -38,17 +40,21 @@ namespace InhousePhotos {
   /// The manager pins the already verified public engine. No phone input can
   /// select a release, URL, script, command, Docker context or recovery path.
   public static class RuntimeUpdates {
-    public const string LatestVersion="3.1.96";
-    public const string LatestImage="inhouse-photos-server:v3.1.96";
+    public const string LatestVersion="3.1.97";
+    public const string LatestImage="inhouse-photos-server:v3.1.97";
     public const string LatestImageId="sha256:0781b4081482853b34963f4e8faefc4c92d4a25da87f45dd3cf9f93ce645062c";
     public const string SourceCommit="2c36a66f40347273f9f2f75242e42cda3091a1a3";
     public const string SchemaSha256="ab48e687123b61185a4467ca2b70a3a66ebfdaa93f5a78b5d7ae9eed613c699f";
-    public const string ArchiveFile="inhouse-server-3.1.96.tar.gz";
+    public const string ArchiveFile="inhouse-server-3.1.97.tar.gz";
     public const string ArchiveSha256="bd3317ed4080c837ac10ee45d07bd03d390e83d7c14d74907ba55e16293d1d29";
     public const string ManifestSha256="2827fb5a1b630396f0f0b3a98a99b727d8671f900a09d774e71f008d278bbe6e";
     public const string PackageSha256="00014fccb90afd3738ec691dd6fb265e1ee71728c22a5fe1da98b5ddbed90b04";
-    public const string PackageFile="Inhouse-Photos-Server-Runtime-3.1.96.zip";
-    public const string PackageUrl="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-runtime-v3.1.96-r2/"+PackageFile;
+    public const string PackageFile="Inhouse-Photos-Server-Runtime-3.1.97.zip";
+    public const string PackageUrl="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-runtime-v3.1.97/"+PackageFile;
+    const string PreviousImage="sha256:0781b4081482853b34963f4e8faefc4c92d4a25da87f45dd3cf9f93ce645062c";
+    const string PreviousVersion="3.1.96";
+    const string PreviousSource="2c36a66f40347273f9f2f75242e42cda3091a1a3";
+    const string PreviousSchema="ab48e687123b61185a4467ca2b70a3a66ebfdaa93f5a78b5d7ae9eed613c699f";
     const string OriginalImage="sha256:283fb546c253d70c3e984062a2d2ebc08ce4547ef799e0ffba634222e4b5c16d";
     const string OriginalConfig="sha256:ac66612c5815b715123e1946fb833cc3baa5adcb404f774ded31307d82c1e368";
     const string FastImage="sha256:0034cd9b0031574479c192ed8be48212f6e57012785d804beb171ed8a2d5a8ac";
@@ -60,6 +66,8 @@ namespace InhousePhotos {
     static readonly object StateGate=new object();
     static readonly SemaphoreSlim CheckGate=new SemaphoreSlim(1,1),DownloadGate=new SemaphoreSlim(1,1);
     static string current="",phase="idle",error="";
+    static string stage="";
+    static DateTime stageStartedUtc=DateTime.UtcNow;
     static bool compatible,applying,recoveryRequired;
     static int progress;
     static DateTime checkedAt=DateTime.MinValue;
@@ -81,12 +89,16 @@ namespace InhousePhotos {
       if(IsApplying||OtherHelperRunning())return true;
       try{return FindPendingTransaction(prefs)!=null;}catch{return true;}
     }
+    internal static bool HasRecognizedPendingTransaction(Preferences prefs) {
+      return FindPendingTransaction(prefs)!=null;
+    }
     public static RuntimeUpdateStatus Status() {
       lock(StateGate)return new RuntimeUpdateStatus {
         CurrentVersion=current,LatestVersion=LatestVersion,Available=compatible||recoveryRequired,
         Phase=phase,Progress=progress,Error=error,Notes=recoveryRequired?
           "La actualización anterior quedó pendiente. Reintenta para verificar el motor y recuperar las colas.":Notes,
-        RecoveryRequired=recoveryRequired
+        RecoveryRequired=recoveryRequired,Stage=stage,
+        StageElapsedSeconds=(int)Math.Min(int.MaxValue,Math.Max(0,(DateTime.UtcNow-stageStartedUtc).TotalSeconds))
       };
     }
     static void State(string next,int percent,string message="") {
@@ -97,6 +109,7 @@ namespace InhousePhotos {
       if(image.ImageId==OriginalImage||image.ImageId==OriginalConfig)return "3.1.0-pairing-20260929";
       if(image.ImageId==FastImage)return "3.1.0-storage-saver-20261002";
       if(image.ImageId==LatestImageId&&image.Version==LatestVersion&&image.SourceCommit==SourceCommit&&image.SchemaSha256==SchemaSha256)return LatestVersion;
+      if(image.ImageId==PreviousImage&&image.Version==PreviousVersion&&image.SourceCommit==PreviousSource&&image.SchemaSha256==PreviousSchema)return PreviousVersion;
       if(image.ImageId==LegacyDurableImage&&image.Version==LegacyDurableVersion&&image.SourceCommit==LegacyDurableSource&&image.SchemaSha256==LegacyDurableSchema)return LegacyDurableVersion;
       return "";
     }
@@ -144,7 +157,7 @@ namespace InhousePhotos {
     }
     internal static bool MatchesRecovery(RuntimeTransaction record,Preferences prefs) {
       return record!=null&&prefs!=null&&record.format==1&&
-        ((record.sourceCommit==SourceCommit&&record.newImageId==LatestImageId)||(record.sourceCommit==LegacyDurableSource&&record.newImageId==LegacyDurableImage))&&
+        ((record.sourceCommit==SourceCommit&&record.newImageId==LatestImageId)||(record.sourceCommit==PreviousSource&&record.newImageId==PreviousImage)||(record.sourceCommit==LegacyDurableSource&&record.newImageId==LegacyDurableImage))&&
         record.installation==prefs.Installation&&record.project==prefs.ProjectName&&record.receiptPath==prefs.ReceiptPath;
     }
     static string FindPendingTransaction(Preferences prefs) {
@@ -192,7 +205,7 @@ namespace InhousePhotos {
     public static bool TryBegin() {
       lock(StateGate) {
         if(applying||(!compatible&&!recoveryRequired)||OtherHelperRunning())return false;
-        applying=true;phase="downloading";progress=0;error="";return true;
+        applying=true;phase="downloading";progress=0;error="";stage="preflight";stageStartedUtc=DateTime.UtcNow;return true;
       }
     }
     public static void Fail(Exception failure) {
@@ -288,6 +301,13 @@ namespace InhousePhotos {
       }finally{DownloadGate.Release();}
     }
     static void HelperPhase(string line) {
+      const string stagePrefix="INHOUSE_RUNTIME_STAGE:";
+      if(line!=null&&line.StartsWith(stagePrefix,StringComparison.Ordinal)) {
+        var next=line.Substring(stagePrefix.Length);
+        if(new[]{"preflight","image","queues","quiesce","config","restart","receipt","recovery","rollback"}.Contains(next))
+          lock(StateGate){if(stage!=next){stage=next;stageStartedUtc=DateTime.UtcNow;}}
+        return;
+      }
       const string prefix="INHOUSE_RUNTIME_PHASE:";
       if(line==null||!line.StartsWith(prefix,StringComparison.Ordinal))return;
       var value=line.Substring(prefix.Length);
@@ -301,11 +321,13 @@ namespace InhousePhotos {
     }
     static async Task RunHelper(string directory,string recovery) {
       var key=Guid.NewGuid().ToString("N");var managerPid=Process.GetCurrentProcess().Id;
+      var cancellationPath=Path.Combine(directory,"cancel-"+key+".signal");
       using(var operation=new EventWaitHandle(true,EventResetMode.ManualReset,@"Local\InhousePhotosRuntime-"+managerPid+"-"+key)) {
         var script=Path.Combine(directory,"server-runtime-update.ps1");
         var arguments="-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "+Backend.Quote(script)+
           " -SettingsDirectory "+Backend.Quote(Backend.SettingsDir)+" -DockerExe "+Backend.Quote(Backend.DockerExe())+
-          " -ManagerProcessId "+managerPid+" -ManagerOperationKey "+key+" -Apply";
+          " -ManagerProcessId "+managerPid+" -ManagerOperationKey "+key+
+          " -CancellationPath "+Backend.Quote(cancellationPath)+" -Apply";
         arguments+=recovery==null?
           " -ManifestPath "+Backend.Quote(Path.Combine(directory,"server-runtime-update.json"))+" -ManifestSha256 "+ManifestSha256+
           " -ArchivePath "+Backend.Quote(Path.Combine(directory,ArchiveFile)):
@@ -315,7 +337,9 @@ namespace InhousePhotos {
           WorkingDirectory=directory,RedirectStandardOutput=true,RedirectStandardError=true
         }}) {
           string failedStage="";
+          var outputClosed=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
           process.OutputDataReceived+=(sender,e)=>{
+            if(e.Data==null){outputClosed.TrySetResult(true);return;}
             HelperPhase(e.Data);
             const string failurePrefix="INHOUSE_RUNTIME_FAILURE:";
             if(e.Data!=null&&e.Data.StartsWith(failurePrefix,StringComparison.Ordinal)) {
@@ -324,12 +348,23 @@ namespace InhousePhotos {
             }
           };
           process.Start();process.BeginOutputReadLine();var stderr=process.StandardError.ReadToEndAsync();
-          if(!await Task.Run(()=>process.WaitForExit(45*60*1000))) {
-            try{process.Kill();}catch{}
-            throw new IOException("El motor no confirmó la actualización a tiempo. Conserva sus datos y reintenta para recuperar la operación.");
-          }
-          process.WaitForExit();await stderr;
-          if(process.ExitCode!=0)throw new IOException(HelperFailure(failedStage,process.ExitCode));
+          try {
+            var exited=Task.Run(()=>process.WaitForExit(45*60*1000));
+            if(!await exited) {
+              // Request cooperative cancellation. The verified helper stops its
+              // own Docker client, cleans its helper container and preserves the
+              // recovery journal before releasing its operation mutex.
+              try {using(var signal=new FileStream(cancellationPath,FileMode.CreateNew,FileAccess.Write,FileShare.Read))signal.Flush(true);}
+              catch(IOException){ /* Keep the operation locked until its bounded native commands finish. */ }
+              State("waiting",95);
+              while(!await Task.Run(()=>process.WaitForExit(1000)))await Task.Delay(250);
+            }
+            // A Docker descendant can retain redirected handles after the
+            // PowerShell parent exits. Never use the unbounded WaitForExit()
+            // overload or wait indefinitely for stderr EOF.
+            await RuntimeProcessOutput.Drain(process,stderr,outputClosed.Task);
+            if(process.ExitCode!=0)throw new IOException(HelperFailure(failedStage,process.ExitCode));
+          }finally{try{if(File.Exists(cancellationPath))File.Delete(cancellationPath);}catch{}}
         }
       }
     }
@@ -426,12 +461,18 @@ namespace InhousePhotos {
       transaction.newImageId=LegacyDurableImage;transaction.sourceCommit=LegacyDurableSource;
       if(!MatchesRecovery(transaction,prefs))return 11;
       transaction.sourceCommit=new string('b',40);if(MatchesRecovery(transaction,prefs))return 12;
+      transaction.sourceCommit=PreviousSource;transaction.newImageId=PreviousImage;
+      if(!MatchesRecovery(transaction,prefs))return 15;
+      transaction.sourceCommit=new string('b',40);if(MatchesRecovery(transaction,prefs))return 16;
       if(KnownVersion(new RuntimeImageIdentity{ImageId=OriginalConfig})!="3.1.0-pairing-20260929")return 3;
       if(KnownVersion(new RuntimeImageIdentity{ImageId=FastImage})!="3.1.0-storage-saver-20261002")return 4;
       var image=new RuntimeImageIdentity{ImageId=LatestImageId,Version=LatestVersion,SourceCommit=SourceCommit,SchemaSha256=SchemaSha256};
       if(KnownVersion(image)!=LatestVersion)return 5;
       image.SourceCommit=new string('a',40);if(KnownVersion(image)!="")return 6;
       if(KnownVersion(new RuntimeImageIdentity{ImageId=LegacyDurableImage,Version=LegacyDurableVersion,SourceCommit=LegacyDurableSource,SchemaSha256=LegacyDurableSchema})!=LegacyDurableVersion)return 13;
+      var previous=new RuntimeImageIdentity{ImageId=PreviousImage,Version=PreviousVersion,SourceCommit=PreviousSource,SchemaSha256=PreviousSchema};
+      if(KnownVersion(previous)!=PreviousVersion)return 17;
+      previous.SchemaSha256=new string('a',64);if(KnownVersion(previous)!="")return 18;
       if(HelperFailure("restart",7).Contains("http")||!HelperFailure("queues",9).Contains("código 9")||HelperFailure("untrusted-secret",1).Contains("untrusted-secret"))return 14;
       if(!RemoteManagement.Allowed("GET",RemoteManagement.RuntimePath)||!RemoteManagement.Allowed("POST",RemoteManagement.RuntimePath)||
         RemoteManagement.Allowed("POST",RemoteManagement.RuntimePath+"/arbitrary")||

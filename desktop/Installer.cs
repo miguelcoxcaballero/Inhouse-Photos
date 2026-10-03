@@ -87,11 +87,11 @@ namespace InhousePhotos {
     static int WaitAndInstall(string[] args) {
       int managerPid;
       if(args.Length<2||!int.TryParse(args[1],out managerPid)||managerPid<=0)throw new ArgumentException("La solicitud de actualización no es válida.");
-      try {using(var old=Process.GetProcessById(managerPid)) {
-        if(!old.WaitForExit(120000))throw new TimeoutException("El gestor anterior no se cerró. El servidor permanece disponible.");
-      }}catch(ArgumentException){/* It exited before the helper started. */}
       var hidden=args.Contains("--restart-hidden");
       try {
+        try {using(var old=Process.GetProcessById(managerPid)) {
+          if(!old.WaitForExit(120000))throw new TimeoutException("El gestor anterior no se cerró. La actualización queda pendiente para reintentar; tus fotos se conservan.");
+        }}catch(ArgumentException){/* It exited before the helper started. */}
         Install();
         StartInstalled(hidden);
         var previousError=Path.Combine(Backend.SettingsDir,"last-manager-update-error.txt");

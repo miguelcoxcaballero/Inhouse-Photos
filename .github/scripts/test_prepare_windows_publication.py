@@ -76,6 +76,13 @@ class WindowsPublicationTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "server/package.json"):
             publication.require_same_windows_inputs(self.root, self.source, target)
 
+    def test_refuses_changed_embedded_public_download_assets(self):
+        (self.root / "portal").mkdir()
+        (self.root / "portal/index.html").write_text("changed embedded download page")
+        target = self.commit("change public download asset")
+        with self.assertRaisesRegex(ValueError, "portal/index.html"):
+            publication.require_same_windows_inputs(self.root, self.source, target)
+
     def test_unified_version_preserves_the_legacy_installer_manifest_contract(self):
         self.staged["Version"] = "3.1.96"
         self.staged["InstallerUrl"] = self.staged["InstallerUrl"].replace("server-v1.2.17", "server-v3.1.96")

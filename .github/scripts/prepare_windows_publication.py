@@ -13,6 +13,7 @@ from pathlib import Path
 MANIFEST = "windows-server-update.json"
 PUBLICATION_INPUTS = (
     "desktop",
+    "portal",
     "server/package.json",
     "AGENTS.md",
     MANIFEST,

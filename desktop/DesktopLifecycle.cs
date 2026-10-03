@@ -18,7 +18,7 @@ namespace InhousePhotos {
     DispatcherTimer monitor;
     DispatcherTimer lanMonitor, lanDebounce;
     NetworkAddressChangedEventHandler networkAddressChanged;
-    bool lanPublishBusy;
+    bool lanPublishBusy,publicDownloadsBusy;
     EventHandler usbDevicesChanged;
     RemoteManagement remoteManagement;
     string remoteOperation="",remoteError="";
@@ -38,7 +38,10 @@ namespace InhousePhotos {
         remoteManagement?.Dispose();tray.Dispose();
       };
       monitor=new DispatcherTimer{Interval=TimeSpan.FromSeconds(45)};
-      monitor.Tick+=async(s,e)=>await Supervise();monitor.Start();
+      monitor.Tick+=async(s,e)=>{_=RefreshPublicDownloads();await Supervise();};monitor.Start();
+      // Repair stale public downloads independently of a pending engine update.
+      // The publisher validates the existing route and never changes its config.
+      _=RefreshPublicDownloads(true);
       Dispatcher.BeginInvoke(new Action(async()=>await Supervise()));
       // A USB tether can appear while backups are already running. Discovery
       // must not wait for the full supervisor, or be paused by a disk backup.
@@ -72,6 +75,13 @@ namespace InhousePhotos {
       remoteManagement=new RemoteManagement(prefs,
         ReadRemoteStatus,PerformRemoteAction,
         ()=>Dispatcher.Invoke(()=>busy||monitorBusy||updatingManager||backupCancellation!=null));
+    }
+    async Task RefreshPublicDownloads(bool force=false) {
+      if(publicDownloadsBusy||exitRequested||!prefs.Managed)return;
+      publicDownloadsBusy=true;
+      try{await Task.Run(()=>PublicDownloads.Publish(prefs,force));}
+      catch{ /* A pending engine operation must not keep the download page stale. */ }
+      finally{publicDownloadsBusy=false;}
     }
     async Task RefreshLocalRoutes() {
       if(lanPublishBusy||exitRequested||updatingManager||SystemUpdates.BlocksOperations(prefs)||RuntimeUpdates.BlocksOperations(prefs)||!prefs.Managed)return;

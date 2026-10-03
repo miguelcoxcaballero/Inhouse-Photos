@@ -62,7 +62,8 @@ function New-Fixture {
   $script:fixture = [pscustomobject]@{Root=$root;Settings=$settings;Installation=$install;Prefs=$prefs;
     Old=$old;New=$new;Manifest=$manifest;Rows=(Clone $rows);OriginalRows=(Clone $rows);
     QueueStates=[pscustomobject]@{storageSaverCompression=$false;storageSaverVideoCompression=$true};
-    FailLoad=$false;FailHealth=$false;MigrationInstalled=$false;Commands=(New-Object 'Collections.Generic.List[string]')}
+    FailLoad=$false;FailHealth=$false;TimeoutCompose=$false;ImageAvailable=$false;MigrationInstalled=$false;
+    HelperName='';HelperPresent=$false;HelperLabelMatches=$true;Commands=(New-Object 'Collections.Generic.List[string]')}
   $script:SettingsDirectory=$settings; $script:ManifestPath=$manifestPath
   $script:ManifestSha256=Get-Sha256 $manifestPath; $script:ArchivePath=$archive
   $script:ResumeRecord=''; $script:RollbackRecord=''; $script:Apply=$true
@@ -77,7 +78,7 @@ function Get-Containers($Preferences, [string]$ComposeFile) {
   $rows = Clone $script:fixture.Rows
   foreach ($row in $rows) { $row }
 }
-function Invoke-Docker([string[]]$Arguments) {
+function Invoke-Docker([string[]]$Arguments, [int]$TimeoutSeconds = 0) {
   $fixture.Commands.Add(($Arguments -join ' '))
   if ($Arguments[0] -ceq 'compose') {
     if ($Arguments -contains 'config') {
@@ -90,21 +91,43 @@ function Invoke-Docker([string[]]$Arguments) {
       $other=@($fixture.Rows | Where-Object { $_.Service -cne 'immich-server' })
       $server=Clone (@($fixture.OriginalRows | Where-Object { $_.Service -ceq 'immich-server' })[0])
       $server.Id='4'*64; $server.Image=$image; $fixture.Rows=@($server)+$other
+      if ($fixture.TimeoutCompose) {
+        $failure=New-Object TimeoutException 'Fixture Compose client timed out after the daemon created the new service.'
+        $failure.Data['RuntimeNativeTimeout']=$true
+        throw $failure
+      }
       return 'server created'
     }
   }
   if ($Arguments[0] -ceq 'load') {
     if ($fixture.FailLoad) { throw 'Fixture image load interrupted.' }
+    $fixture.ImageAvailable=$true
     return 'image loaded'
   }
   if ($Arguments[0] -ceq 'image') {
     if ($Arguments[-1] -ceq 'previous:tag') { return $fixture.Old }
     if ($Arguments[3] -ceq '{{.Id}}') { return $fixture.New }
+    if (-not $fixture.ImageAvailable) {
+      $failure=New-Object InvalidOperationException 'Fixture image absent.'
+      $failure.Data['RuntimeNativeExit']=1
+      throw $failure
+    }
     return ConvertTo-Json -InputObject @($fixture.New,'linux','amd64',
       [pscustomobject]@{'org.opencontainers.image.revision'=$fixture.Manifest.sourceCommit;
+        'org.opencontainers.image.version'=$fixture.Manifest.version;
         'inhouse.runtime.database-schema-sha256'=$fixture.Manifest.databaseSchemaSha256}) -Depth 10 -Compress
   }
+  if ($Arguments[0] -ceq 'version') { return 'fixture Docker daemon' }
+  if ($Arguments[0] -ceq 'ps') { if ($fixture.HelperPresent) { return '5'*64 }; return '' }
+  if ($Arguments[0] -ceq 'rm') {
+    if ($Arguments[-1] -cne ('5'*64)) { throw 'Fixture tried removing a Compose service.' }
+    $fixture.HelperPresent=$false; return 'helper removed'
+  }
   if ($Arguments[0] -ceq 'inspect') {
+    if ($Arguments[-1] -ceq ('5'*64)) {
+      $key=if ($fixture.HelperLabelMatches) { $fixture.HelperName.Substring('inhouse-runtime-helper-'.Length) } else { 'unexpected-owner' }
+      return ConvertTo-Json -InputObject @(('5'*64), [pscustomobject]@{'inhouse.runtime.helper'=$key}) -Compress
+    }
     if ($Arguments[2] -ceq '{{json .NetworkSettings.Networks}}') { return '{"inhouse_default":{}}' }
     if ($Arguments[2] -ceq '{{json .Config.Env}}') { return '["DB_HOSTNAME=database","REDIS_HOSTNAME=redis"]' }
     if ($fixture.FailHealth) { return 'exited|unhealthy' }
@@ -130,7 +153,8 @@ function Assert-Preserved {
     $actual=@($fixture.Rows | Where-Object { $_.Service -ceq $service })[0]
     Check ($actual.Id -ceq $original.Id -and $actual.Image -ceq $original.Image) ('preserve ' + $service + ' identity')
   }
-  Check (@($fixture.Commands | Where-Object { $_ -match '(^| )(down|rm|-V)( |$)' }).Count -eq 0) 'never remove library, database, volumes or jobs'
+  Check (@($fixture.Commands | Where-Object { $_ -match '(^| )(down|-V)( |$)' -or
+    ($_ -match '^rm ' -and $_ -cne ('rm -f ' + '5'*64)) }).Count -eq 0) 'never remove library, database, volumes or jobs'
 }
 
 $savedOs=$env:OS
@@ -145,6 +169,63 @@ try {
   Check ($receipt.ConfigurationHashes.'docker-compose.yml' -ceq (Get-Sha256 (Join-Path $fixture.Installation 'docker-compose.yml'))) 'receipt accepts the installed configuration'
   Check (@($receipt.Containers | Where-Object { $_.Service -ceq 'immich-server' })[0].Image -ceq $fixture.New) 'receipt records actual new image'
   Check (-not $fixture.QueueStates.storageSaverCompression -and $fixture.QueueStates.storageSaverVideoCompression) 'preserve original independent paused flags'
+  Assert-Preserved
+
+  $script:fixturePhase='skip-already-loaded-image'
+  New-Fixture; $fixture.ImageAvailable=$true
+  Invoke-RuntimeUpdate | Out-Null
+  Check ((Read-Json (Journal)).status -ceq 'completed') 'a fully verified preloaded image installs normally'
+  Check (@($fixture.Commands | Where-Object { $_ -like 'load *' }).Count -eq 0) 'do not reimport an already verified Docker image'
+  Assert-Preserved
+
+  $script:fixturePhase='compose-timeout-recovery'
+  New-Fixture; $fixture.TimeoutCompose=$true; $fixture.MigrationInstalled=$true
+  Reject { Invoke-RuntimeUpdate } 'Compose timeout ends the operation without racing a rollback'
+  $path=Journal
+  Check ((Read-Json $path).status -ceq 'rollback-required') 'uncertain daemon mutation retains recoverable journal'
+  Check (@($fixture.Commands | Where-Object { $_ -ceq 'queue assert-rollback-safe' -or $_ -like 'stop *' }).Count -eq 0) 'Compose timeout never starts an automatic downgrade or stops a possibly transitioning server'
+  $fixture.TimeoutCompose=$false; $script:ResumeRecord=$path
+  Invoke-RuntimeUpdate | Out-Null
+  Check ((Read-Json $path).status -ceq 'completed') 'retry reconciles actual new server after Compose timeout'
+  Check (-not $fixture.QueueStates.storageSaverCompression -and $fixture.QueueStates.storageSaverVideoCompression) 'timeout recovery restores independent original queue states'
+  Assert-Preserved
+
+  $script:fixturePhase='cleanup-interrupted-queue-helper'
+  New-Fixture; $fixture.FailLoad=$true
+  Reject { Invoke-RuntimeUpdate } 'prepare an interrupted journal for helper cleanup'
+  $path=Journal; $record=Read-Json $path
+  $fixture.HelperName='inhouse-runtime-helper-' + ('a'*32); $fixture.HelperPresent=$true
+  $record | Add-Member activeQueueHelper $fixture.HelperName
+  Write-PrivateJson $path $record
+  $script:ResumeRecord=$path; $fixture.FailLoad=$false; $fixture.Commands.Clear()
+  Invoke-RuntimeUpdate | Out-Null
+  Check (-not $fixture.HelperPresent) 'recovery removes only its exact labelled auxiliary container'
+  Check ((Read-Json $path).status -ceq 'aborted') 'untouched preparation becomes terminal after helper cleanup'
+  Check ((Read-Json $path).activeQueueHelper -ceq '') 'confirmed helper cleanup clears persisted helper receipt'
+  Assert-Preserved
+  $record=Read-Json $path
+  $record | Add-Member deferredQueueHelpers @($fixture.HelperName)
+  Write-PrivateJson $path $record
+  $fixture.HelperPresent=$true; $fixture.ImageAvailable=$true; $script:ResumeRecord=''; $fixture.Commands.Clear()
+  $script:Apply=$false
+  Invoke-RuntimeUpdate | Out-Null
+  Check ($fixture.HelperPresent -and @($fixture.Commands | Where-Object { $_ -like 'rm *' }).Count -eq 0) 'read-only preflight never removes even its deferred helper'
+  $script:Apply=$true
+  Invoke-RuntimeUpdate | Out-Null
+  Check (-not $fixture.HelperPresent) 'a stopped helper created late is cleaned on the next update using its retained receipt'
+  Check ((Read-Json $path).status -ceq 'aborted') 'deferred cleanup never makes a terminal preparation pending again'
+  Assert-Preserved
+
+  $script:fixturePhase='refuse-unowned-queue-helper'
+  New-Fixture; $fixture.FailLoad=$true
+  Reject { Invoke-RuntimeUpdate } 'prepare journal to reject another container ownership'
+  $path=Journal; $record=Read-Json $path
+  $fixture.HelperName='inhouse-runtime-helper-' + ('b'*32); $fixture.HelperPresent=$true; $fixture.HelperLabelMatches=$false
+  $record | Add-Member activeQueueHelper $fixture.HelperName
+  Write-PrivateJson $path $record
+  $script:ResumeRecord=$path; $fixture.FailLoad=$false; $fixture.Commands.Clear()
+  Reject { Invoke-RuntimeUpdate } 'never remove a helper name with a different ownership label'
+  Check ($fixture.HelperPresent -and @($fixture.Commands | Where-Object { $_ -like 'rm *' }).Count -eq 0) 'ownership mismatch leaves the container untouched'
   Assert-Preserved
 
   $script:fixturePhase='failed-before-change'

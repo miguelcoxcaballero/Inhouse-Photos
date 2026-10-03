@@ -36,14 +36,16 @@ namespace InhousePhotos {
     static string phase="idle",error="";
     static int progress;
     static bool applying;
-    public static bool IsApplying {get{lock(StateGate)return applying;}}
+    static Process helper;
+    public static bool IsApplying {get{lock(StateGate){RefreshHelper();return applying;}}}
     static string UpdatesDir {get{return Path.Combine(Backend.SettingsDir,"updates");}}
     static string ErrorPath {get{return Path.Combine(Backend.SettingsDir,"last-manager-update-error.txt");}}
 
     public static ManagerUpdateStatus Status() {
       lock(StateGate) {
+        RefreshHelper();
         if(phase=="idle"&&File.Exists(ErrorPath)) {
-          try{error=File.ReadAllText(ErrorPath).Trim();if(error.Length>300)error=error.Substring(0,300);phase="error";}catch{}
+          var recorded=RecordedError();if(recorded!=null){error=recorded;phase="error";}
         }
         return new ManagerUpdateStatus {
         CurrentVersion=Backend.Version,LatestVersion=cached==null?Backend.Version:cached.Version,
@@ -93,10 +95,33 @@ namespace InhousePhotos {
     static void State(string next,int percent=0,string message="") {
       lock(StateGate){phase=next;progress=percent;error=message;}
     }
-    public static bool TryBegin() {
-      lock(StateGate){if(applying)return false;applying=true;phase="downloading";progress=0;error="";try{if(File.Exists(ErrorPath))File.Delete(ErrorPath);}catch{}return true;}
+    static string RecordedError() {
+      try {
+        if(!File.Exists(ErrorPath)||(File.GetAttributes(ErrorPath)&FileAttributes.ReparsePoint)!=0||new FileInfo(ErrorPath).Length>4096)return null;
+        var recorded=File.ReadAllText(ErrorPath).Trim();
+        return String.IsNullOrEmpty(recorded)?null:recorded.Substring(0,Math.Min(300,recorded.Length));
+      }catch{return null;}
     }
-    public static void Fail(Exception ex) {lock(StateGate){phase="error";error=ex.Message;applying=false;}}
+    static void RefreshHelper() {
+      if(helper==null)return;
+      // A living installer can still be changing the validated active pointer.
+      // Only its confirmed exit makes retrying safe; elapsed time alone does not.
+      try{if(!helper.HasExited)return;}catch{return;}
+      helper.Dispose();helper=null;applying=false;progress=0;
+      error=RecordedError()??(phase=="error"&&!String.IsNullOrEmpty(error)?error:
+        "El instalador terminó sin cerrar este gestor. Pulsa Actualizar para reintentar; el servidor y tus fotos siguen disponibles.");
+      phase="error";
+    }
+    static void TrackHelper(Process process) {
+      if(process==null)throw new IOException("No se pudo iniciar el instalador de Windows.");
+      lock(StateGate){helper=process;applying=true;phase="installing";progress=100;error="";}
+    }
+    public static bool TryBegin() {
+      lock(StateGate){RefreshHelper();if(applying)return false;applying=true;phase="downloading";progress=0;error="";try{if(File.Exists(ErrorPath))File.Delete(ErrorPath);}catch{}return true;}
+    }
+    public static void Fail(Exception ex) {
+      lock(StateGate){RefreshHelper();phase="error";error=ex.Message;applying=helper!=null;}
+    }
     public static async Task<string> Prepare() {
       var status=await Check(true);
       if(!status.Available)throw new IOException("El gestor ya tiene la versión más reciente.");
@@ -146,12 +171,11 @@ namespace InhousePhotos {
       ManagerUpdateManifest release;lock(StateGate)release=cached;
       if(release==null||!File.Exists(installer)||Backend.Hash(installer)!=release.Sha256)
         throw new IOException("El instalador cambió después de comprobarlo. No se ejecutará.");
-      State("installing",100);
       var arguments="--wait-and-install "+managerPid+(hidden?" --restart-hidden":"");
-      Process.Start(new ProcessStartInfo(installer,arguments) {
+      TrackHelper(Process.Start(new ProcessStartInfo(installer,arguments) {
         UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,
         WorkingDirectory=Path.GetDirectoryName(installer)
-      });
+      }));
     }
   }
 }

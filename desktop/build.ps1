@@ -69,6 +69,8 @@ try {
   $writer.Write($png.ToArray())
 } finally { $writer.Dispose(); $png.Dispose() }
 $sources = (Get-ChildItem -LiteralPath $desktopRoot -Filter '*.cs' -File).FullName
+$publicDownloads = Join-Path $outDir 'public-downloads.zip'
+& (Join-Path $desktopRoot 'package-public-downloads.ps1') -OutFile $publicDownloads | Out-Null
 & $compilerExe /nologo /target:winexe /platform:x64 /optimize+ /utf8output /langversion:latest /deterministic /main:InhousePhotos.Program `
   "/out:$outDir\Inhouse-Photos-Server.exe" `
   "/win32icon:$iconPath" "/resource:$brandPath,InhousePhotos.brand.xaml" `
@@ -77,6 +79,7 @@ $sources = (Get-ChildItem -LiteralPath $desktopRoot -Filter '*.cs' -File).FullNa
   "/resource:$desktopRoot\storage.ps1,InhousePhotos.storage.ps1" `
   "/resource:$desktopRoot\server-runtime-update.ps1,InhousePhotos.server-runtime-update.ps1" `
   "/resource:$desktopRoot\server-runtime-queue-handoff.cjs,InhousePhotos.server-runtime-queue-handoff.cjs" `
+  "/resource:$publicDownloads,InhousePhotos.public-downloads.zip" `
   /reference:System.dll /reference:System.Core.dll /reference:System.Web.Extensions.dll `
   /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll `
   /reference:System.Management.dll /reference:System.Security.dll /reference:System.Xaml.dll `
@@ -94,6 +97,7 @@ $payloadHash = Join-Path $outDir 'payload.sha256'
   "/resource:$desktopRoot\storage.ps1,InhousePhotos.storage.ps1" `
   "/resource:$desktopRoot\server-runtime-update.ps1,InhousePhotos.server-runtime-update.ps1" `
   "/resource:$desktopRoot\server-runtime-queue-handoff.cjs,InhousePhotos.server-runtime-queue-handoff.cjs" `
+  "/resource:$publicDownloads,InhousePhotos.public-downloads.zip" `
   /reference:System.dll /reference:System.Core.dll /reference:System.Web.Extensions.dll /reference:System.Management.dll /reference:System.Security.dll /reference:System.Xaml.dll `
   /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll `
   /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:Microsoft.CSharp.dll `

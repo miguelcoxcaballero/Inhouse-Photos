@@ -136,6 +136,7 @@ class RuntimeBuildTests(unittest.TestCase):
         self.assertEqual(manifest["addedDatabaseMigrations"], [runtime.UPLOAD_MIGRATION])
         self.assertIn("sha256:" + runtime.STORAGE_SAVER_IMAGE, manifest["compatibleServerImageIds"])
         self.assertIn("sha256:" + runtime.DURABLE_UPLOAD_IMAGE, manifest["compatibleServerImageIds"])
+        self.assertIn("sha256:" + runtime.UNIFIED_3196_IMAGE, manifest["compatibleServerImageIds"])
 
 
 if __name__ == "__main__":
