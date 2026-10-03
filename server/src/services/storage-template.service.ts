@@ -134,19 +134,27 @@ export class StorageTemplateService extends BaseService {
   }
 
   @OnEvent({ name: 'AssetMetadataExtracted' })
-  async onAssetMetadataExtracted({ source, assetId }: ArgOf<'AssetMetadataExtracted'>) {
+  async onAssetMetadataExtracted({ source, assetId, durableUpload }: ArgOf<'AssetMetadataExtracted'>) {
+    if (durableUpload) {
+      return;
+    }
     await this.jobRepository.queue({ name: JobName.StorageTemplateMigrationSingle, data: { source, id: assetId } });
   }
 
   @OnJob({ name: JobName.StorageTemplateMigrationSingle, queue: QueueName.StorageTemplateMigration })
-  async handleMigrationSingle({ id }: JobOf<JobName.StorageTemplateMigrationSingle>): Promise<JobStatus> {
+  async handleMigrationSingle({
+    id,
+    durableUpload,
+  }: JobOf<JobName.StorageTemplateMigrationSingle>): Promise<JobStatus> {
     const config = await this.getConfig({ withCache: true });
     const isStorageTemplateEnabled = config.storageTemplate.enabled;
     if (!isStorageTemplateEnabled) {
       return JobStatus.Skipped;
     }
 
-    const asset = await this.assetJobRepository.getForStorageTemplateJob(id);
+    const asset = durableUpload
+      ? await this.assetJobRepository.getForStorageTemplateJob(id, { includeHidden: true })
+      : await this.assetJobRepository.getForStorageTemplateJob(id);
     if (!asset) {
       return JobStatus.Failed;
     }

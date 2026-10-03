@@ -256,6 +256,14 @@ export class JobRepository {
 
   private getJobOptions(item: JobItem): JobsOptions | null {
     switch (item.name) {
+      case JobName.AssetCompressStorageSaver:
+      case JobName.AssetCompressStorageSaverVideo: {
+        return { jobId: `upload-${item.data.id}`, removeOnFail: true };
+      }
+      case JobName.AssetExtractMetadata:
+      case JobName.AssetGenerateThumbnails: {
+        return item.data.source === 'upload' ? { jobId: `upload-${item.data.id}`, removeOnFail: true } : null;
+      }
       case JobName.NotifyAlbumUpdate: {
         return {
           jobId: `${item.data.id}/${item.data.recipientId}`,
@@ -263,7 +271,7 @@ export class JobRepository {
         };
       }
       case JobName.StorageTemplateMigrationSingle: {
-        return { jobId: item.data.id };
+        return { jobId: item.data.id, ...(item.data.durableUpload && { removeOnFail: true }) };
       }
       case JobName.PersonGenerateThumbnail: {
         return { priority: 1 };

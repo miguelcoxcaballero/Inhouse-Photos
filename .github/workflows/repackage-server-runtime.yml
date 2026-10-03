@@ -1,0 +1,298 @@
+name: Repackage verified server runtime with corrected Windows scripts
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/durable-upload-backlog]
+    paths: [.github/workflows/repackage-server-runtime.yml]
+
+concurrency:
+  group: inhouse-server-runtime-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  RUNTIME_VERSION: '3.1.96'
+  ORIGINAL_RUNTIME_TAG: server-runtime-v3.1.96
+  RUNTIME_TAG: server-runtime-v3.1.96-r2
+
+jobs:
+  windows-updater:
+    if: github.ref == 'refs/heads/feat/durable-upload-backlog'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Verify the corrected helper on Windows PowerShell 5.1
+        run: |
+          if ($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1) {
+            throw 'These native stderr regression checks must run on Windows PowerShell 5.1'
+          }
+          & .\desktop\server-runtime-update.tests.ps1
+          # These scripts throw on a failed assertion. Native fixture processes
+          # deliberately return errors, so reset only after successful completion.
+          $global:LASTEXITCODE = 0
+          & .\desktop\server-runtime-update.transaction.tests.ps1
+          $global:LASTEXITCODE = 0
+
+  publish:
+    needs: windows-updater
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Download the immutable original package and validation reports
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .runtime/original .runtime/release
+          for asset in Inhouse-Photos-Server-Runtime-3.1.96.zip storage-saver-performance.json runtime-smoke-results.json durable-backlog-results.json; do
+            gh release download "$ORIGINAL_RUNTIME_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --dir .runtime/original
+          done
+      - name: Verify and extract only the original manifest and image archive
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import shutil
+          import zipfile
+
+          original = Path('.runtime/original')
+          release = Path('.runtime/release')
+          pins = {
+              'Inhouse-Photos-Server-Runtime-3.1.96.zip': '991b0f1735adf03dedf5b69ce299a778397399e8dc5cdc2fc65ed116fc005e97',
+              'storage-saver-performance.json': '78ce954eb97a44defe4e6efe16e262a91cef578835c46c9ecbaab65efe193a96',
+              'runtime-smoke-results.json': '5a230d8f77abbdff67cdc64bc8b4af7a6d8483109457ecd4997f4993deaa06a3',
+              'durable-backlog-results.json': '701927fa9d5e1dac0dca3bd754b771b3e821afeb43c8293370a1478d64f921e4',
+          }
+          def sha(path):
+              with path.open('rb') as stream:
+                  return hashlib.file_digest(stream, 'sha256').hexdigest()
+          for name, expected in pins.items():
+              if sha(original / name) != expected:
+                  raise ValueError(f'Original release asset checksum mismatch: {name}')
+          entries = {
+              'server-runtime-update.json': '2827fb5a1b630396f0f0b3a98a99b727d8671f900a09d774e71f008d278bbe6e',
+              'inhouse-server-3.1.96.tar.gz': 'bd3317ed4080c837ac10ee45d07bd03d390e83d7c14d74907ba55e16293d1d29',
+          }
+          with zipfile.ZipFile(original / 'Inhouse-Photos-Server-Runtime-3.1.96.zip') as package:
+              for name, expected in entries.items():
+                  matches = [entry for entry in package.infolist() if entry.filename == name]
+                  if len(matches) != 1 or matches[0].is_dir():
+                      raise ValueError(f'Expected one exact original ZIP entry: {name}')
+                  # Do not extract or execute the original updater or launcher.
+                  with package.open(matches[0]) as source, (release / name).open('wb') as target:
+                      shutil.copyfileobj(source, target, 1024 * 1024)
+                  if sha(release / name) != expected:
+                      raise ValueError(f'Original ZIP entry checksum mismatch: {name}')
+          manifest = json.loads((release / 'server-runtime-update.json').read_bytes())
+          identity = {
+              'format': 1,
+              'version': '3.1.96',
+              'sourceCommit': '2c36a66f40347273f9f2f75242e42cda3091a1a3',
+              'image': 'inhouse-photos-server:v3.1.96',
+              'imageId': 'sha256:0781b4081482853b34963f4e8faefc4c92d4a25da87f45dd3cf9f93ce645062c',
+              'archiveFile': 'inhouse-server-3.1.96.tar.gz',
+              'archiveSha256': entries['inhouse-server-3.1.96.tar.gz'],
+              'platform': 'linux/amd64',
+          }
+          for field, expected in identity.items():
+              if manifest.get(field) != expected:
+                  raise ValueError(f'Original runtime identity mismatch: {field}')
+          for name in pins:
+              if name.endswith('.json'):
+                  shutil.copyfile(original / name, release / name)
+          print('Verified the unchanged 3.1.96 image, manifest and three original validation reports.')
+          PY
+      - name: Package the verified image with the corrected source scripts
+        run: |
+          python3 desktop/package-server-runtime.py .runtime/release .runtime/release/storage-saver-performance.json
+      - name: Publish or verify the immutable corrected-script release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import os
+          import re
+          import subprocess
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          import zipfile
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          source = os.environ['GITHUB_SHA']
+          tag = os.environ['RUNTIME_TAG']
+          if tag != 'server-runtime-v3.1.96-r2' or not re.fullmatch('[a-f0-9]{40}', source):
+              raise ValueError('Unexpected corrected-script release identity')
+          directory = Path('.runtime/release')
+          downloads = Path('.runtime/uploaded')
+          package_name = 'Inhouse-Photos-Server-Runtime-3.1.96.zip'
+          assets = {
+              package_name, 'server-runtime-update.json', 'storage-saver-performance.json',
+              'runtime-smoke-results.json', 'durable-backlog-results.json', 'SHA256SUMS.txt',
+          }
+          pinned = {
+              'server-runtime-update.json': '2827fb5a1b630396f0f0b3a98a99b727d8671f900a09d774e71f008d278bbe6e',
+              'storage-saver-performance.json': '78ce954eb97a44defe4e6efe16e262a91cef578835c46c9ecbaab65efe193a96',
+              'runtime-smoke-results.json': '5a230d8f77abbdff67cdc64bc8b4af7a6d8483109457ecd4997f4993deaa06a3',
+              'durable-backlog-results.json': '701927fa9d5e1dac0dca3bd754b771b3e821afeb43c8293370a1478d64f921e4',
+          }
+          def sha(path):
+              with path.open('rb') as stream:
+                  return hashlib.file_digest(stream, 'sha256').hexdigest()
+          def api(path, missing_ok=False):
+              request = urllib.request.Request(
+                  'https://api.github.com/repos/' + repo + '/' + path,
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                           'Accept': 'application/vnd.github+json',
+                           'X-GitHub-Api-Version': '2022-11-28',
+                           'User-Agent': 'inhouse-runtime-repackage'})
+              try:
+                  with urllib.request.urlopen(request, timeout=60) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as error:
+                  if missing_ok and error.code == 404:
+                      return None
+                  raise
+          def gh(*arguments):
+              subprocess.run(['gh', 'release', *arguments, '--repo', repo], check=True)
+          def verify_tag(required=False):
+              reference = api('git/ref/tags/' + tag, missing_ok=not required)
+              if reference is None:
+                  return
+              obj = reference['object']
+              for _ in range(4):
+                  if obj['type'] == 'commit':
+                      if obj['sha'] != source:
+                          raise ValueError('Release tag does not point at the verified helper source commit')
+                      return
+                  if obj['type'] != 'tag':
+                      break
+                  obj = api('git/tags/' + obj['sha'])['object']
+              raise ValueError('Release tag is not a supported commit reference')
+          def release_info():
+              info = api('releases/tags/' + tag, missing_ok=True)
+              if info is not None:
+                  return info
+              # GitHub does not expose an unpublished draft through the tag
+              # endpoint. Resolve it from the authenticated release listing.
+              for page in range(1, 11):
+                  releases = api('releases?per_page=100&page=' + str(page))
+                  matches = [item for item in releases if item['tag_name'] == tag]
+                  if len(matches) > 1:
+                      raise ValueError('Multiple releases claim the corrected-script tag')
+                  if matches:
+                      return matches[0]
+                  if len(releases) < 100:
+                      return None
+              raise ValueError('Release listing exceeded the bounded lookup')
+          def checksums(path):
+              values = {}
+              for line in path.read_text().splitlines():
+                  match = re.fullmatch(r'([a-f0-9]{64})  ([A-Za-z0-9.-]+)', line)
+                  if not match or match[2] in values:
+                      raise ValueError('Invalid or duplicate published checksum entry')
+                  values[match[2]] = match[1]
+              if set(values) != assets - {'SHA256SUMS.txt'}:
+                  raise ValueError('Published checksum list does not contain exactly the five payload assets')
+              return values
+          def verify_downloaded(info, exact_package):
+              if {asset['name'] for asset in info['assets']} != assets or len(info['assets']) != len(assets):
+                  raise ValueError('Release must contain exactly the six expected assets')
+              if info['target_commitish'] != source:
+                  raise ValueError('Release target differs from the verified helper source commit')
+              downloads.mkdir()
+              gh('download', tag, '--dir', str(downloads))
+              if {path.name for path in downloads.iterdir()} != assets:
+                  raise ValueError('Downloaded release assets do not match the expected set')
+              published = checksums(downloads / 'SHA256SUMS.txt')
+              for name, expected in published.items():
+                  if sha(downloads / name) != expected:
+                      raise ValueError(f'Uploaded release checksum mismatch: {name}')
+              for name, expected in pinned.items():
+                  if published[name] != expected:
+                      raise ValueError(f'Original verified payload changed: {name}')
+              if exact_package:
+                  for name in assets:
+                      if sha(downloads / name) != sha(directory / name):
+                          raise ValueError(f'Uploaded asset differs from the prepared file: {name}')
+              else:
+                  # ZIP timestamps can vary between runs. A published package is
+                  # immutable; verify every entry against today's same-source
+                  # package rather than replacing it with a byte-different ZIP.
+                  with zipfile.ZipFile(directory / package_name) as expected_zip, zipfile.ZipFile(downloads / package_name) as actual_zip:
+                      expected_entries = expected_zip.infolist()
+                      actual_entries = actual_zip.infolist()
+                      expected_names = {entry.filename for entry in expected_entries}
+                      if len(expected_entries) != len(expected_names) or len(actual_entries) != len(expected_names) or {entry.filename for entry in actual_entries} != expected_names:
+                          raise ValueError('Published package has missing, duplicate or unexpected entries')
+                      for name in sorted(expected_names):
+                          with expected_zip.open(name) as expected_stream, actual_zip.open(name) as actual_stream:
+                              if hashlib.file_digest(expected_stream, 'sha256').digest() != hashlib.file_digest(actual_stream, 'sha256').digest():
+                                  raise ValueError(f'Published package content differs from the verified source: {name}')
+              return {name: sha(downloads / name) for name in assets}
+
+          info = release_info()
+          already_published = info is not None and not info['draft']
+          verify_tag(required=already_published)
+          if already_published:
+              if not info['prerelease']:
+                  raise ValueError('Existing runtime r2 release is not marked as a prerelease')
+              uploaded = verify_downloaded(info, exact_package=False)
+              print('Verified all six assets of the existing immutable release; no files were replaced.')
+          else:
+              if info is not None and not {asset['name'] for asset in info['assets']} <= assets:
+                  raise ValueError('Existing draft contains unrelated assets; refusing to replace them')
+              notes = 'desktop/RELEASE-runtime-3.1.96-r2.md'
+              if info is None:
+                  gh('create', tag, '--target', source, '--title', 'Inhouse Photos - motor 3.1.96 (scripts r2)',
+                     '--draft', '--prerelease', '--notes-file', notes)
+              else:
+                  gh('edit', tag, '--target', source, '--notes-file', notes, '--prerelease')
+              gh('upload', tag, '--clobber', *[str(directory / name) for name in sorted(assets)])
+              info = release_info()
+              if info is None or not info['draft']:
+                  raise ValueError('Release stopped being a draft before upload verification')
+              uploaded = verify_downloaded(info, exact_package=True)
+              gh('edit', tag, '--target', source, '--notes-file', notes, '--draft=false', '--prerelease', '--latest=false')
+              info = release_info()
+              if info is None or info['draft'] or not info['prerelease'] or info['target_commitish'] != source:
+                  raise ValueError('Published release metadata differs from the verified draft')
+              verify_tag(required=True)
+
+          # Verify the public URLs without an Authorization header, including the
+          # complete ZIP, after publication or an immutable rerun.
+          for name in sorted(assets):
+              url = 'https://github.com/' + repo + '/releases/download/' + tag + '/' + urllib.parse.quote(name)
+              for attempt in range(3):
+                  try:
+                      with urllib.request.urlopen(url, timeout=60) as response:
+                          actual = hashlib.file_digest(response, 'sha256').hexdigest()
+                      if actual != uploaded[name]:
+                          raise ValueError(f'Public release download mismatch: {name}')
+                      break
+                  except (urllib.error.URLError, TimeoutError):
+                      if attempt == 2:
+                          raise
+                      time.sleep(3)
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as summary:
+              summary.write('Verified immutable runtime package: `' + tag + '`.\n\n')
+              summary.write('Helper source commit: `' + source + '`. Server image and API remain `3.1.96`.\n\n')
+              summary.write('Package SHA-256: `' + uploaded[package_name] + '`.\n')
+          print(json.dumps({'tag': tag, 'helperSourceCommit': source, 'packageSha256': uploaded[package_name],
+                            'manifestSha256': pinned['server-runtime-update.json'],
+                            'alreadyPublished': already_published}, indent=2))
+          PY

@@ -54,8 +54,9 @@ class ManagerUpdateStatus {
 }
 
 class ManagerUpdateException implements Exception {
-  const ManagerUpdateException(this.message);
+  const ManagerUpdateException(this.message, {this.uncertain = false});
   final String message;
+  final bool uncertain;
   @override
   String toString() => message;
 }
@@ -93,12 +94,18 @@ class ManagerUpdateService {
     try {
       final response = await client.post(url, headers: _headers(accessToken)).timeout(const Duration(seconds: 15));
       if (response.statusCode != 202) {
-        throw ManagerUpdateException(_message(response, 'The PC could not start the update.'));
+        throw ManagerUpdateException(
+          _message(response, 'The PC could not start the update.'),
+          uncertain: const {502, 503, 504}.contains(response.statusCode),
+        );
       }
     } on ManagerUpdateException {
       rethrow;
     } catch (_) {
-      throw const ManagerUpdateException('Could not reach the Windows manager. No update was started.');
+      throw const ManagerUpdateException(
+        'The update request could not be confirmed. Refresh to check its status.',
+        uncertain: true,
+      );
     }
   }
 

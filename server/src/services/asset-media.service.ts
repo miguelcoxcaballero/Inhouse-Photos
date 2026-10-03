@@ -119,7 +119,9 @@ export class AssetMediaService extends BaseService {
     const uploadFolder = this.getUploadFolder(asUploadRequest(request, file));
     const uploadPath = `${uploadFolder}/${uploadFilename}`;
 
-    await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [uploadPath] } });
+    if (await this.storageRepository.checkFileExists(uploadPath)) {
+      await this.storageRepository.unlink(uploadPath);
+    }
   }
 
   async uploadAsset(
@@ -128,6 +130,8 @@ export class AssetMediaService extends BaseService {
     file: UploadFile,
     sidecarFile?: UploadFile,
   ): Promise<AssetMediaResponseDto> {
+    let acceptedId: string | undefined;
+    let creationAttempted = false;
     try {
       await this.requireAccess({
         auth,
@@ -136,8 +140,6 @@ export class AssetMediaService extends BaseService {
         ids: [auth.user.id],
       });
 
-      this.requireQuota(auth, file.size);
-
       if (dto.livePhotoVideoId) {
         await onBeforeLink(
           { asset: this.assetRepository, event: this.eventRepository },
@@ -145,47 +147,46 @@ export class AssetMediaService extends BaseService {
         );
       }
 
-      const asset = await this.assetRepository.create({
-        ownerId: auth.user.id,
-        libraryId: null,
-
-        checksum: file.checksum,
-        checksumAlgorithm: ChecksumAlgorithm.sha1File,
-        originalPath: file.originalPath,
-
-        fileCreatedAt: dto.fileCreatedAt,
-        fileModifiedAt: dto.fileModifiedAt,
-        localDateTime: dto.fileCreatedAt,
-
-        type: mimeTypes.assetType(file.originalPath),
-        isFavorite: dto.isFavorite,
-        duration: dto.duration || null,
-        visibility: dto.visibility ?? AssetVisibility.Timeline,
-        livePhotoVideoId: dto.livePhotoVideoId,
-        originalFileName: dto.filename || file.originalName,
-      });
-
-      if (dto.metadata?.length) {
-        await this.assetRepository.upsertMetadata(asset.id, dto.metadata);
-      }
-
       if (sidecarFile) {
-        await this.assetRepository.upsertFile({
-          assetId: asset.id,
-          path: sidecarFile.originalPath,
-          type: AssetFileType.Sidecar,
-        });
         await this.storageRepository.utimes(sidecarFile.originalPath, new Date(), new Date(dto.fileModifiedAt));
       }
       await this.storageRepository.utimes(file.originalPath, new Date(), new Date(dto.fileModifiedAt));
-      await this.assetRepository.upsertExif({
-        exif: { assetId: asset.id, fileSizeInByte: file.size },
-        lockedPropertiesBehavior: 'override',
-      });
 
-      await this.jobRepository.queue({
-        name: JobName.AssetExtractMetadata,
-        data: { id: asset.id, source: dto.storageSaver ? 'storage-saver-upload' : 'upload' },
+      creationAttempted = true;
+      const asset = await this.assetRepository.createForUpload(
+        {
+          ownerId: auth.user.id,
+          libraryId: null,
+
+          checksum: file.checksum,
+          checksumAlgorithm: ChecksumAlgorithm.sha1File,
+          originalPath: file.originalPath,
+
+          fileCreatedAt: dto.fileCreatedAt,
+          fileModifiedAt: dto.fileModifiedAt,
+          localDateTime: dto.fileCreatedAt,
+
+          type: mimeTypes.assetType(file.originalPath),
+          isFavorite: dto.isFavorite,
+          duration: dto.duration || null,
+          visibility: dto.visibility ?? AssetVisibility.Timeline,
+          livePhotoVideoId: dto.livePhotoVideoId,
+          originalFileName: dto.filename || file.originalName,
+        },
+        {
+          storageSaver: dto.storageSaver ?? false,
+          fileSize: file.size,
+          sidecarPath: sidecarFile?.originalPath,
+          metadata: dto.metadata,
+          sharedLink: auth.sharedLink ? { id: auth.sharedLink.id, albumId: auth.sharedLink.albumId } : undefined,
+        },
+      );
+      acceptedId = asset.id;
+
+      // Quota usage and the processing outbox are already committed. Redis and
+      // optional workflow hooks must never hold up the receipt or delete this original.
+      void this.eventRepository.emit('AssetCreate', { asset }).catch((error) => {
+        this.logger.warn(`Asset ${asset.id} was saved, but an upload hook failed: ${error}`);
       });
       if (dto.storageSaver) {
         this.websocketRepository.clientSend('StorageSaverProgressV1', asset.ownerId, {
@@ -201,15 +202,40 @@ export class AssetMediaService extends BaseService {
         await this.addToSharedLink(auth.sharedLink, asset.id);
       }
 
-      await this.eventRepository.emit('AssetCreate', { asset, file });
-
       return { id: asset.id, status: AssetMediaStatus.CREATED };
     } catch (error: any) {
-      // clean up files
-      await this.jobRepository.queue({
-        name: JobName.FileDelete,
-        data: { files: [file.originalPath, sidecarFile?.originalPath] },
-      });
+      if (acceptedId) {
+        this.logger.warn(`Asset ${acceptedId} was saved; post-upload notification failed: ${error}`);
+        return { id: acceptedId, status: AssetMediaStatus.CREATED };
+      }
+      // A connection can fail while acknowledging a committed transaction.
+      // Re-check ownership before treating the uploaded bytes as disposable.
+      if (creationAttempted && !isAssetChecksumConstraint(error)) {
+        try {
+          const receipt = await this.assetRepository.getUploadReceipt(auth.user.id, file.checksum);
+          if (receipt?.originalPath === file.originalPath) {
+            return { id: receipt.assetId, status: AssetMediaStatus.CREATED };
+          }
+          const durable = await this.assetRepository.getByChecksum({ ownerId: auth.user.id, checksum: file.checksum });
+          if (durable?.originalPath === file.originalPath) {
+            return { id: durable.id, status: AssetMediaStatus.CREATED };
+          }
+        } catch (lookupError) {
+          this.logger.warn(
+            `Could not verify upload ownership; preserving original ${file.originalPath}: ${lookupError}`,
+          );
+          throw error;
+        }
+      }
+
+      // Only uncommitted temporary files are eligible for cleanup. An unavailable
+      // scheduler must not replace the real upload error or block a duplicate receipt.
+      void this.jobRepository
+        .queue({
+          name: JobName.FileDelete,
+          data: { files: [file.originalPath, sidecarFile?.originalPath] },
+        })
+        .catch((cleanupError) => this.logger.warn(`Upload cleanup scheduling failed: ${cleanupError}`));
 
       // handle duplicates with a success response
       if (isAssetChecksumConstraint(error)) {
@@ -369,11 +395,5 @@ export class AssetMediaService extends BaseService {
       userIds,
       recipientIds: userIds,
     });
-  }
-
-  private requireQuota(auth: AuthDto, size: number) {
-    if (auth.user.quotaSizeInBytes !== null && auth.user.quotaSizeInBytes < auth.user.quotaUsageInBytes + size) {
-      throw new BadRequestException('Quota has been exceeded!');
-    }
   }
 }

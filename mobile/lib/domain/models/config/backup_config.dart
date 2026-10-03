@@ -28,17 +28,6 @@ class BackupTransferPlan {
     required this.acknowledgementQueueCapacity,
   });
 
-  /// How many assets may be awaiting server-side compression at once.
-  ///
-  /// Storage saver has the server do the encoding, so the phone must not queue
-  /// work faster than the server can drain it. This used to be enforced by
-  /// making an upload worker wait for its own asset to finish compressing,
-  /// which tied upload concurrency to server latency and left the network idle.
-  /// The window allows uploads to run ahead briefly, but caps the amount of
-  /// unfinished server work so a fast phone cannot bury a slower compressor.
-  int compressionWindow({required bool isUnmetered}) =>
-      math.min(isUnmetered ? 32 : 12, math.max(isUnmetered ? 12 : 6, uploadWorkers * 2));
-
   static const empty = BackupTransferPlan(
     preparationWorkers: 0,
     uploadWorkers: 0,

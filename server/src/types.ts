@@ -219,6 +219,7 @@ export type ConcurrentQueueName = Exclude<
   | QueueName.DuplicateDetection
   | QueueName.BackupDatabase
   | QueueName.StorageSaverCompression
+  | QueueName.StorageSaverVideoCompression
 >;
 
 export type Jobs = { [K in JobItem['name']]: (JobItem & { name: K })['data'] };
@@ -235,6 +236,8 @@ export interface IDelayedJob extends IBaseJob {
 
 export type JobSource = 'upload' | 'storage-saver-upload' | 'sidecar-write' | 'copy' | 'edit';
 export interface IEntityJob extends IBaseJob {
+  /** Processing admitted through the durable upload outbox. Follow-ups are scheduled by its reconciler. */
+  durableUpload?: boolean;
   id: string;
   source?: JobSource;
   notify?: boolean;
@@ -391,6 +394,7 @@ export type JobItem =
   | { name: JobName.AssetExtractMetadataQueueAll; data: IBaseJob }
   | { name: JobName.AssetExtractMetadata; data: IEntityJob }
   | { name: JobName.AssetCompressStorageSaver; data: IEntityJob }
+  | { name: JobName.AssetCompressStorageSaverVideo; data: IEntityJob }
 
   // Notifications
   | { name: JobName.NotificationsCleanup; data?: IBaseJob }

@@ -810,6 +810,7 @@ export enum QueueName {
   IntegrityCheck = 'integrityCheck',
   Editor = 'editor',
   StorageSaverCompression = 'storageSaverCompression',
+  StorageSaverVideoCompression = 'storageSaverVideoCompression',
 }
 
 export const QueueNameSchema = z.enum(QueueName).describe('Queue name').meta({ id: 'QueueName' });
@@ -839,6 +840,7 @@ export enum JobName {
   AssetExtractMetadataQueueAll = 'AssetExtractMetadataQueueAll',
   AssetExtractMetadata = 'AssetExtractMetadata',
   AssetCompressStorageSaver = 'AssetCompressStorageSaver',
+  AssetCompressStorageSaverVideo = 'AssetCompressStorageSaverVideo',
   AssetFileMigration = 'AssetFileMigration',
   AssetGenerateThumbnailsQueueAll = 'AssetGenerateThumbnailsQueueAll',
   AssetGenerateThumbnails = 'AssetGenerateThumbnails',

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="same-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'">
+  <title>Conexión USB · Inhouse Photos</title>
+  <link rel="icon" href="../mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="usb.css">
+  <script src="../downloads.js" defer></script>
+  <script src="usb.js" defer></script>
+</head>
+<body>
+  <header><a class="brand" href="../"><img src="../mark.svg" width="29" height="29" alt="">inhouse photos</a><a class="back" href="/photos">Volver a las fotos <span aria-hidden="true">↗</span></a></header>
+  <main>
+    <p class="eyebrow">TU SERVIDOR</p>
+    <h1>Conecta. Comprueba.<br>Deja que se copie.</h1>
+    <p class="intro">Conecta el móvil al ordenador del servidor con un cable de datos. Aquí verás si Windows lo reconoce y qué falta para subir por cable.</p>
+    <section class="connection" aria-labelledby="usb-title" data-state="checking">
+      <div class="status-heading"><svg class="cable" width="36" height="42" viewBox="0 0 28 34" fill="none" aria-hidden="true"><path d="M14 29V5m-4 4 4-4 4 4M14 18l-7-5v-3m7 12 8-6v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="8" r="2" fill="currentColor"/><path d="M20 9h4v4h-4z" fill="currentColor"/><circle cx="14" cy="29" r="3" fill="currentColor"/></svg><div><div class="status-label"><span class="dot"></span><span id="usb-label">Comprobando USB</span></div><h2 id="usb-title">Buscando tu móvil…</h2></div></div>
+      <p id="usb-message">El estado se actualiza automáticamente. No hace falta pulsar «Preparar USB» para detectar el móvil.</p>
+      <p id="usb-action" class="next" hidden></p>
+      <p id="usb-network" class="network" hidden></p>
+      <div class="actions"><button id="retry" type="button">Volver a comprobar <span aria-hidden="true">↻</span></button><a id="signin" href="/auth/login?continue=%2Fdescargas%2Fservidor%2F" hidden>Iniciar sesión como administrador <span aria-hidden="true">↗</span></a><a id="upgrade" data-download="windows" data-version="3.1.96" href="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.96/Inhouse-Photos-Server-Setup.exe" hidden>Actualizar el gestor de Windows <span aria-hidden="true">↓</span></a></div>
+      <p id="freshness" class="freshness" role="status">Conectando con el gestor de Windows…</p>
+    </section>
+    <section class="guide" aria-labelledby="guide-title"><h2 id="guide-title">Un permiso en el móvil, no una configuración interminable.</h2><div class="steps"><article><span>01</span><h3>Conecta y desbloquea</h3><p>Usa un cable que permita datos. Si el móvil pregunta si confías en este ordenador, acepta solo si es tu PC.</p></article><article><span>02</span><h3>Permite la conexión USB</h3><p>En Android, activa «Compartir conexión por USB». En iPhone, «Punto de acceso personal» y «Confiar»; Windows necesita Apple Devices o iTunes.</p></article><article><span>03</span><h3>Abre Inhouse Photos</h3><p>La app detecta la red por cable y muestra su velocidad en los detalles de la copia. «Preparar red USB» en Windows protege la conexión habitual a Internet del PC.</p></article></div></section>
+    <details><summary>El móvil carga, pero no aparece</summary><p>Cargar no confirma que el cable permita datos. Desbloquea el móvil, prueba otro puerto o cable y comprueba si aparece en el Explorador de Windows. La web consulta el PC del servidor, no el ordenador desde el que la estás viendo.</p><p>El modo archivos (MTP) permite que Windows vea el móvil, pero no crea por sí solo la conexión que usa la app para subir. No se importan fotos ni se cambian cuentas automáticamente.</p></details>
+  </main>
+  <footer><span>Detección automática · Sin mover ni borrar fotos</span><a href="../">Descargas y ayuda ↗</a></footer>
+</body>
+</html>

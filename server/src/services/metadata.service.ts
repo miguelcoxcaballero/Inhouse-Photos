@@ -415,6 +415,7 @@ export class MetadataService extends BaseService {
       assetId: asset.id,
       userId: asset.ownerId,
       source: data.source,
+      ...(data.durableUpload && { durableUpload: true }),
     });
   }
 

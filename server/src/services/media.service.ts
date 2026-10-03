@@ -43,6 +43,7 @@ import {
   VideoStreamInfo,
 } from 'src/types';
 import { getAssetFile, getDimensions } from 'src/utils/asset.util';
+import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database';
 import { checkFaceVisibility, checkOcrVisibility } from 'src/utils/editor';
 import { BaseConfig, ThumbnailConfig } from 'src/utils/media';
 import { mimeTypes } from 'src/utils/mime-types';
@@ -75,10 +76,29 @@ export class MediaService extends BaseService {
   }
 
   @OnJob({ name: JobName.AssetCompressStorageSaver, queue: QueueName.StorageSaverCompression })
-  async handleStorageSaverCompression({ id }: JobOf<JobName.AssetCompressStorageSaver>): Promise<JobStatus> {
+  handleStorageSaverCompression(data: JobOf<JobName.AssetCompressStorageSaver>): Promise<JobStatus> {
+    return this.compressStorageSaverAsset(data, false);
+  }
+
+  @OnJob({ name: JobName.AssetCompressStorageSaverVideo, queue: QueueName.StorageSaverVideoCompression })
+  handleStorageSaverVideoCompression(data: JobOf<JobName.AssetCompressStorageSaverVideo>): Promise<JobStatus> {
+    return this.compressStorageSaverAsset(data, true);
+  }
+
+  private async compressStorageSaverAsset(
+    { id, durableUpload }: JobOf<JobName.AssetCompressStorageSaver>,
+    videoWorker: boolean,
+  ): Promise<JobStatus> {
     const asset = await this.assetRepository.getById(id);
     if (!asset?.originalPath) {
       return JobStatus.Failed;
+    }
+
+    // Drain videos already waiting in the old mixed queue without encoding
+    // them there. New uploads go directly to the appropriate queue.
+    if (asset.type === AssetType.Video && !videoWorker) {
+      await this.jobRepository.queue({ name: JobName.AssetCompressStorageSaverVideo, data: { id } });
+      return JobStatus.Success;
     }
 
     const sourcePath = asset.originalPath;
@@ -91,7 +111,9 @@ export class MediaService extends BaseService {
       if (await this.storageRepository.checkFileExists(previousPath)) {
         await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [previousPath] } });
       }
-      await this.jobRepository.queue({ name: JobName.AssetExtractMetadata, data: { id, source: 'upload' } });
+      if (!durableUpload) {
+        await this.jobRepository.queue({ name: JobName.AssetExtractMetadata, data: { id, source: 'upload' } });
+      }
       return JobStatus.Success;
     }
     const isGif = asset.originalFileName.toLowerCase().endsWith('.gif');
@@ -101,8 +123,12 @@ export class MediaService extends BaseService {
     let lastReportedProgress = -1;
     let pathCommitted = false;
     let committedBytes: number | undefined;
+    let processingComplete = false;
     let lastReportedState: ArgOf<'StorageSaverProgress'>['state'] | undefined;
     const report = (progress: number, state: ArgOf<'StorageSaverProgress'>['state'], outputBytes?: number) => {
+      if (state === 'completed' || state === 'skipped') {
+        processingComplete = true;
+      }
       const normalizedProgress = Math.min(1, Math.max(0, progress));
       if (
         state === 'compressing' &&
@@ -127,9 +153,13 @@ export class MediaService extends BaseService {
     try {
       report(0.01, 'compressing');
       if (asset.type === AssetType.Video) {
-        await this.mediaRepository.compressStorageSaverVideo(sourcePath, outputPath, (progress) =>
+        const encoded = await this.mediaRepository.compressStorageSaverVideo(sourcePath, outputPath, (progress) =>
           report(progress, 'compressing'),
         );
+        if (!encoded) {
+          report(1, 'skipped', sourceStats.size);
+          return JobStatus.Skipped;
+        }
       } else if (asset.type === AssetType.Image && !isGif) {
         const encoded = await this.mediaRepository.compressStorageSaverImage(
           sourcePath,
@@ -147,7 +177,7 @@ export class MediaService extends BaseService {
       }
 
       const outputStats = await this.storageRepository.stat(outputPath);
-      if (outputStats.size <= 0 || outputStats.size >= sourceStats.size) {
+      if (outputStats.size === 0 || outputStats.size >= sourceStats.size) {
         await this.storageRepository.unlink(outputPath);
         report(1, 'skipped', sourceStats.size);
         return JobStatus.Skipped;
@@ -160,15 +190,18 @@ export class MediaService extends BaseService {
 
       const originalFileName = `${path.parse(asset.originalFileName).name}${extension}`;
       await this.storageRepository.utimes(outputPath, new Date(), sourceStats.mtime);
+      await this.storageRepository.syncFile(outputPath);
       committedBytes = outputStats.size;
-      await this.assetRepository.update({
+      await this.assetRepository.commitStorageSaver({
         id,
-        originalPath: outputPath,
+        sourcePath,
+        outputPath,
         originalFileName,
         checksum: checksum.digest(),
+        outputBytes: outputStats.size,
+        sourceBytes: sourceStats.size,
       });
       pathCommitted = true;
-      await this.userRepository.updateUsage(asset.ownerId, outputStats.size - sourceStats.size);
       await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [sourcePath] } });
       this.logger.log(`Storage Saver reduced asset ${id} from ${sourceStats.size} to ${outputStats.size} bytes`);
       report(1, 'completed', outputStats.size);
@@ -177,16 +210,27 @@ export class MediaService extends BaseService {
       this.logger.error(`Storage Saver failed for asset ${id}: ${error}`, error?.stack);
       // An interrupted database acknowledgment can throw even after its
       // transaction committed. Re-read the durable reference before cleanup.
+      let sourceOwned = false;
       if (!pathCommitted) {
         try {
-          pathCommitted = (await this.assetRepository.getById(id))?.originalPath === outputPath;
+          const durableAsset = await this.assetRepository.getById(id);
+          pathCommitted = durableAsset?.originalPath === outputPath;
+          sourceOwned = durableAsset?.originalPath === sourcePath;
         } catch {
           // An unavailable database is not proof that the file is disposable.
-          pathCommitted = true;
+          // Keep both files and retry; it is not proof the source can be deleted either.
+          report(1, 'failed', sourceStats.size);
+          return JobStatus.Failed;
         }
       }
       if (!pathCommitted && (await this.storageRepository.checkFileExists(outputPath))) {
         await this.storageRepository.unlink(outputPath);
+      }
+      // Distinct originals can encode to the same canonical bytes. Keep the
+      // uploaded original rather than repeatedly re-encoding a uniqueness conflict.
+      if (!pathCommitted && sourceOwned && error?.constraint_name === ASSET_CHECKSUM_CONSTRAINT) {
+        report(1, 'skipped', sourceStats.size);
+        return JobStatus.Skipped;
       }
       // BullMQ does not retry a JobStatus.Failed result in this project. Repair
       // bookkeeping explicitly and consider the asset complete once its durable
@@ -198,6 +242,8 @@ export class MediaService extends BaseService {
           await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [sourcePath] } });
         } catch (repairError: any) {
           this.logger.warn(`Storage Saver repair scheduling failed for asset ${id}: ${repairError}`);
+          report(1, 'failed', committedBytes);
+          return JobStatus.Failed;
         }
         report(1, 'completed', committedBytes);
         return JobStatus.Success;
@@ -206,7 +252,9 @@ export class MediaService extends BaseService {
       return JobStatus.Failed;
     } finally {
       // Metadata and thumbnails are generated only after the final file exists.
-      await this.jobRepository.queue({ name: JobName.AssetExtractMetadata, data: { id, source: 'upload' } });
+      if (processingComplete && !durableUpload) {
+        await this.jobRepository.queue({ name: JobName.AssetExtractMetadata, data: { id, source: 'upload' } });
+      }
     }
   }
 

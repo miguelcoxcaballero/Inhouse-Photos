@@ -39,6 +39,7 @@ const QueuesResponseLegacySchema = z
     [QueueName.Editor]: QueueResponseLegacySchema,
     [QueueName.IntegrityCheck]: QueueResponseLegacySchema,
     [QueueName.StorageSaverCompression]: QueueResponseLegacySchema,
+    [QueueName.StorageSaverVideoCompression]: QueueResponseLegacySchema,
   })
   .meta({ id: 'QueuesResponseLegacyDto' });
 

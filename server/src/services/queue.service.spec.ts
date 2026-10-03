@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { defaults, SystemConfig } from 'src/config';
 import { ImmichWorker, JobName, QueueCommand, QueueName } from 'src/enum';
 import { QueueService } from 'src/services/queue.service';
+import { getStorageSaverResources } from 'src/utils/storage-saver';
 import { factory } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
@@ -23,12 +24,19 @@ describe(QueueService.name, () => {
     it('should update concurrency', () => {
       sut.onConfigUpdate({ newConfig: defaults, oldConfig: {} as SystemConfig });
 
-      expect(mocks.job.setConcurrency).toHaveBeenCalledTimes(20);
+      expect(mocks.job.setConcurrency).toHaveBeenCalledTimes(21);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(5, QueueName.FacialRecognition, 1);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(7, QueueName.DuplicateDetection, 1);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(8, QueueName.BackgroundTask, 5);
       expect(mocks.job.setConcurrency).toHaveBeenNthCalledWith(9, QueueName.StorageTemplateMigration, 1);
-      expect(mocks.job.setConcurrency).toHaveBeenCalledWith(QueueName.StorageSaverCompression, 4);
+      expect(mocks.job.setConcurrency).toHaveBeenCalledWith(
+        QueueName.StorageSaverCompression,
+        getStorageSaverResources().imageConcurrency,
+      );
+      expect(mocks.job.setConcurrency).toHaveBeenCalledWith(
+        QueueName.StorageSaverVideoCompression,
+        getStorageSaverResources().videoConcurrency,
+      );
     });
   });
 
@@ -81,6 +89,7 @@ describe(QueueService.name, () => {
         [QueueName.IntegrityCheck]: expected,
         [QueueName.Editor]: expected,
         [QueueName.StorageSaverCompression]: expected,
+        [QueueName.StorageSaverVideoCompression]: expected,
       });
     });
   });

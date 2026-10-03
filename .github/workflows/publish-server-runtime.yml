@@ -1,0 +1,121 @@
+name: Publish verified Inhouse Photos server runtime
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: inhouse-server-runtime-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  RUNTIME_VERSION: 3.1.97
+  RUNTIME_TAG: server-runtime-v3.1.97
+
+jobs:
+  windows-updater:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Verify bounded native commands and recovery under Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & ./desktop/server-runtime-update.tests.ps1
+          if (-not $?) { throw 'Windows native updater checks failed' }
+          $global:LASTEXITCODE = 0
+          & ./desktop/server-runtime-update.transaction.tests.ps1
+          if (-not $?) { throw 'Windows runtime recovery checks failed' }
+          $global:LASTEXITCODE = 0
+  publish:
+    needs: windows-updater
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.15.0
+      - name: Build the changed runtime modules
+        run: |
+          npm install --global pnpm@11.13.1
+          pnpm --filter immich... --filter @immich/sdk... install --frozen-lockfile
+          rm -rf server/dist
+          pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter immich build
+          node --test desktop/server-runtime-queue-handoff.test.cjs server/test/benchmarks/runtime-smoke.test.cjs
+          python3 desktop/build-server-runtime.test.py
+          pwsh -NoProfile -File desktop/server-runtime-update.tests.ps1
+          bash -n server/bin/start.sh
+      - name: Build and load the verified server image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .runtime/release .runtime/validation .runtime/performance
+          gh release download server-v1.2.5 --repo "$GITHUB_REPOSITORY" --pattern inhouse-server-3.1.0-pairing-20260929.tar.gz --dir .runtime
+          git fetch --depth=1 origin 67b8d77eb710211b13dc7a7ef469054b98962657
+          python3 desktop/build-server-runtime.py .runtime/inhouse-server-3.1.0-pairing-20260929.tar.gz server/dist .runtime/release --source-commit "$GITHUB_SHA" --version "$RUNTIME_VERSION" --image "inhouse-photos-server:v$RUNTIME_VERSION"
+          docker load --input ".runtime/release/inhouse-server-$RUNTIME_VERSION.tar.gz"
+          cp server/test/benchmarks/storage-saver.cjs .runtime/validation/benchmark.cjs
+          cd server
+          node <<'JS'
+          const {execFileSync}=require('node:child_process');
+          const fs=require('node:fs');
+          const swc=require('@swc/core');
+          const source=execFileSync('git',['show','67b8d77eb710211b13dc7a7ef469054b98962657:server/src/repositories/media.repository.ts'],{encoding:'utf8'}).replaceAll(/from 'src\/([^']+)'/g,(_,name)=>`from '/usr/src/app/server/dist/${name}'`);
+          const {code}=swc.transformSync(source,{jsc:{parser:{syntax:'typescript',decorators:true},transform:{legacyDecorator:true,decoratorMetadata:true},target:'es2022'},module:{type:'commonjs'}});
+          fs.writeFileSync('../.runtime/validation/baseline-media.repository.cjs',code);
+          JS
+      - name: Measure the published image
+        run: |
+          docker run --rm --network none --env NODE_PATH=/usr/src/app/server/node_modules --env BENCHMARK_SERVER_ROOT=/usr/src/app/server --env BENCHMARK_BASELINE_MODULE=/validation/baseline-media.repository.cjs --mount "type=bind,source=$PWD/.runtime/validation,target=/validation,readonly" --mount "type=bind,source=$PWD/.runtime/performance,target=/results" --entrypoint node "inhouse-photos-server:v$RUNTIME_VERSION" /validation/benchmark.cjs /results
+      - name: Verify startup, API uploads and existing queue backlog
+        env:
+          RUNTIME_TEST_COMPOSE: ${{ github.workspace }}/server/test/benchmarks/runtime-smoke.compose.yml
+          RUNTIME_TEST_FIXTURES: ${{ github.workspace }}/.runtime/performance
+          RUNTIME_TEST_RESULTS: ${{ github.workspace }}/.runtime/release/runtime-smoke-results.json
+          RUNTIME_TEST_IMAGE: inhouse-photos-server:v${{ env.RUNTIME_VERSION }}
+          RUNTIME_TEST_VERSION: ${{ env.RUNTIME_VERSION }}
+        run: |
+          trap 'docker compose -p inhouse-runtime-test -f "$RUNTIME_TEST_COMPOSE" logs --no-color --tail 120' ERR
+          docker compose -p inhouse-runtime-test -f "$RUNTIME_TEST_COMPOSE" up -d --wait --wait-timeout 300
+          node server/test/benchmarks/runtime-smoke.cjs
+          docker compose -p inhouse-runtime-test -f "$RUNTIME_TEST_COMPOSE" down --volumes
+      - name: Verify durable receipt, upload backlog and recovery after Redis loss
+        env:
+          RUNTIME_TEST_COMPOSE: ${{ github.workspace }}/server/test/benchmarks/runtime-smoke.compose.yml
+          RUNTIME_TEST_FIXTURES: ${{ github.workspace }}/.runtime/performance
+          RUNTIME_TEST_RESULTS: ${{ github.workspace }}/.runtime/release/durable-backlog-results.json
+          RUNTIME_TEST_IMAGE: inhouse-photos-server:v${{ env.RUNTIME_VERSION }}
+          RUNTIME_TEST_PROJECT: inhouse-runtime-test-backlog
+          RUNTIME_TEST_PORT: 19284
+        run: node server/test/benchmarks/durable-backlog-smoke.cjs
+      - name: Package and publish the installable update
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 desktop/package-server-runtime.py .runtime/release .runtime/performance/results.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          r=json.loads(Path('.runtime/performance/results.json').read_text())
+          notes=Path('desktop/RELEASE-runtime-3.1.97.md').read_text()
+          notes=notes.replace('{{ENCODED_SPEEDUP}}',f"{r['encodedBatchSpeedup']:.2f}".replace('.',','))
+          notes=notes.replace('{{BATCH_SPEEDUP}}',f"{r['batchSpeedup']:.2f}".replace('.',','))
+          notes=notes.replace('{{CPUS}}',str(r['cpus']))
+          Path('.runtime/release/RELEASE.md').write_text(notes)
+          PY
+          if gh release view "$RUNTIME_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft > .runtime/is-draft; then
+            test "$(cat .runtime/is-draft)" = true
+          else
+            gh release create "$RUNTIME_TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Inhouse Photos - motor $RUNTIME_VERSION" --draft --prerelease --notes-file .runtime/release/RELEASE.md
+          fi
+          gh release upload "$RUNTIME_TAG" --repo "$GITHUB_REPOSITORY" --clobber ".runtime/release/Inhouse-Photos-Server-Runtime-$RUNTIME_VERSION.zip" .runtime/release/server-runtime-update.json .runtime/release/storage-saver-performance.json .runtime/release/runtime-smoke-results.json .runtime/release/durable-backlog-results.json .runtime/release/SHA256SUMS.txt
+          gh release edit "$RUNTIME_TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --notes-file .runtime/release/RELEASE.md --draft=false --prerelease --latest=false
+      - name: Remove the isolated test containers and volumes
+        if: always()
+        run: |
+          docker compose -p inhouse-runtime-test -f server/test/benchmarks/runtime-smoke.compose.yml down --volumes
+          docker compose -p inhouse-runtime-test-backlog -f server/test/benchmarks/runtime-smoke.compose.yml down --volumes

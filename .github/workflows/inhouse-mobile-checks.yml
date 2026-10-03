@@ -43,6 +43,8 @@ jobs:
           test/widgets/backup/upload_connection_indicator_test.dart
           test/services/pairing.service_test.dart
           test/services/server_management.service_test.dart
+          test/services/manager_update.service_test.dart
+          test/services/runtime_update.service_test.dart
           test/widgets/settings/server_management_settings_test.dart
           test/widgets/forms/login/pairing_login_test.dart
           test/domain/services/timeline_norefresh_test.dart
