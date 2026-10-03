@@ -26,6 +26,8 @@ jobs:
     timeout-minutes: 90
     env:
       RELEASE_TAG: v3.1.94-durable-upload
+      ANDROID_RELEASE_VERSION: '3.1.94'
+      ANDROID_RELEASE_BASE_BUILD: '5152'
     steps:
       - name: Checkout the source to publish
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -110,7 +112,8 @@ jobs:
           umask 077
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/key.jks
           test -s android/key.jks
-          flutter build apk --release --split-per-abi --target-platform android-arm64
+          flutter build apk --release --split-per-abi --target-platform android-arm64 \
+            --build-name "$ANDROID_RELEASE_VERSION" --build-number "$ANDROID_RELEASE_BASE_BUILD"
           git diff --exit-code
 
       - name: Verify and stage the matching APK, ZIP and updater manifest
@@ -119,7 +122,12 @@ jobs:
             --apk mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
             --build-tools "$ANDROID_HOME/build-tools/36.0.0" \
             --tag "$RELEASE_TAG" --source-commit "$GITHUB_SHA" \
+            --version "$ANDROID_RELEASE_VERSION" --base-build "$ANDROID_RELEASE_BASE_BUILD" \
             --report "$RUNNER_TEMP/android-release-verification.json"
+
+      - name: Test the actual staged updater against the signed APK version
+        working-directory: mobile
+        run: flutter test test/unit/required_update_gate_test.dart
 
       - name: Save verified artifacts before publication
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -129,10 +137,11 @@ jobs:
             Inhouse-Photos.apk
             Inhouse-Photos-Android.zip
             android-update.json
+            mobile/pubspec.yaml
             ${{ runner.temp }}/android-release-verification.json
           if-no-files-found: error
 
-      - name: Commit the APK, ZIP and manifest atomically
+      - name: Commit the APK, ZIP, pubspec version and manifest atomically
         id: commit
         run: |
           git fetch --no-tags origin "refs/heads/$GITHUB_REF_NAME"
@@ -142,7 +151,7 @@ jobs:
           cd "$RUNNER_TEMP/android-publication"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- Inhouse-Photos.apk Inhouse-Photos-Android.zip android-update.json
+          git add -- mobile/pubspec.yaml Inhouse-Photos.apk Inhouse-Photos-Android.zip android-update.json
           git commit -m 'chore(android): publish verified 3.1.94 durable-upload APK'
           git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"

@@ -20,14 +20,15 @@ class ConcurrentPublicationTests(unittest.TestCase):
         publication.git(self.root, "config", "user.name", "Android release test")
         publication.git(self.root, "config", "user.email", "android-release@example.invalid")
         (self.root / "mobile").mkdir()
-        (self.root / "mobile/pubspec.yaml").write_text("version: 3.1.94+5152\n")
+        (self.root / "mobile/pubspec.yaml").write_text("version: 3.1.93+5151\n")
         (self.root / "server").mkdir()
         (self.root / "server/service.ts").write_text("const original = true;\n")
         (self.root / "i18n").mkdir()
         (self.root / "i18n/es.json").write_text('{}\n')
         (self.root / "AGENTS.md").write_text("Use the permanent Android key.\n")
         for artifact in publication.ARTIFACTS:
-            (self.root / artifact).write_bytes(b"previous published artifact")
+            if artifact != "mobile/pubspec.yaml":
+                (self.root / artifact).write_bytes(b"previous published artifact")
         self.source = self.commit("Source to build")
 
     def tearDown(self):

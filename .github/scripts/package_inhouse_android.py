@@ -38,10 +38,34 @@ def version_from_pubspec(path: Path) -> tuple[str, int]:
     return match.group(1), int(match.group(2))
 
 
+def validate_target(version: str, base_build: int, current_version: str, current_build: int, manifest: dict) -> None:
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise ValueError("Target version must be a semantic version")
+    if current_version != manifest["version"] or current_build + 2000 != manifest["versionCode"]:
+        raise ValueError("Source pubspec and the currently published Android manifest must match")
+    if tuple(map(int, version.split("."))) <= tuple(map(int, current_version.split("."))):
+        raise ValueError("Android publication must advance the updater semantic version")
+    if base_build <= current_build:
+        raise ValueError("Android publication must advance the updater ARM64 version code")
+
+
+def updated_pubspec(contents: str, version: str, base_build: int) -> str:
+    updated, replacements = re.subn(
+        r"^version:[ \t]*\d+\.\d+\.\d+\+\d+[ \t]*$",
+        f"version: {version}+{base_build}",
+        contents,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    if replacements != 1:
+        raise ValueError("pubspec.yaml must contain one version line to update atomically")
+    return updated
+
+
 def verify_identity(badging: str, certificates: str, symbols: str, version: str, version_code: int) -> None:
     package = re.search(r"^package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'", badging, re.MULTILINE)
     if not package or package.groups() != (PACKAGE, str(version_code), version):
-        raise ValueError("APK package/version does not match the updater and pubspec.yaml")
+        raise ValueError("APK package/version does not match the target release version")
     signers = re.findall(r"Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F:]+)", certificates)
     if len(signers) != 1 or signers[0].replace(":", "").lower() != CERTIFICATE:
         raise ValueError("APK must use the permanent Inhouse signing certificate")
@@ -56,15 +80,14 @@ def verify_identity(badging: str, certificates: str, symbols: str, version: str,
 def stage(args: argparse.Namespace) -> dict:
     root = args.root.resolve()
     apk = args.apk.resolve()
-    version, base_build = version_from_pubspec(root / "mobile/pubspec.yaml")
+    pubspec = root / "mobile/pubspec.yaml"
+    current_version, current_build = version_from_pubspec(pubspec)
+    version, base_build = args.version, args.base_build
     version_code = base_build + 2000
     if args.tag != f"v{version}-durable-upload":
-        raise ValueError("Release tag must match the pubspec version")
+        raise ValueError("Release tag must match the target Android version")
     old_manifest = json.loads((root / "android-update.json").read_text())
-    if tuple(map(int, version.split("."))) <= tuple(map(int, old_manifest["version"].split("."))):
-        raise ValueError("Android publication must advance the updater semantic version")
-    if version_code <= old_manifest["versionCode"]:
-        raise ValueError("Android publication must advance the updater ARM64 version code")
+    validate_target(version, base_build, current_version, current_build, old_manifest)
 
     with zipfile.ZipFile(apk) as archive, tempfile.TemporaryDirectory(prefix="inhouse-android-verify-") as temporary:
         if archive.testzip() is not None:
@@ -104,6 +127,7 @@ def stage(args: argparse.Namespace) -> dict:
     with zipfile.ZipFile(bundle) as archive:
         if archive.testzip() is not None or hashlib.sha256(archive.read("Inhouse-Photos.apk")).hexdigest() != digest:
             raise ValueError("The ZIP does not contain the verified APK")
+    pubspec.write_text(updated_pubspec(pubspec.read_text(), version, base_build))
     (root / "android-update.json").write_text(json.dumps(manifest, indent=2) + "\n")
     report = {
         "sourceCommit": args.source_commit,
@@ -126,6 +150,8 @@ def main() -> None:
     parser.add_argument("--build-tools", type=Path, required=True)
     parser.add_argument("--nm", default="nm")
     parser.add_argument("--tag", required=True)
+    parser.add_argument("--version", required=True)
+    parser.add_argument("--base-build", type=int, required=True)
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--report", type=Path, required=True)
     report = stage(parser.parse_args())

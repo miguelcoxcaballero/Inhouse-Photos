@@ -51,5 +51,36 @@ class AndroidIdentityTests(unittest.TestCase):
             self.check_identity(badging=self.badging.replace("arm64-v8a", "armeabi-v7a"))
 
 
+class AtomicVersionPublicationTests(unittest.TestCase):
+    def setUp(self):
+        self.manifest = {"version": "3.1.93", "versionCode": 7151}
+
+    def test_clean_published_source_can_build_next_version_with_explicit_flags(self):
+        release.validate_target("3.1.94", 5152, "3.1.93", 5151, self.manifest)
+
+    def test_source_version_cannot_advance_before_its_verified_artifacts(self):
+        with self.assertRaisesRegex(ValueError, "currently published Android manifest must match"):
+            release.validate_target("3.1.94", 5152, "3.1.94", 5152, self.manifest)
+
+    def test_release_must_advance_semantic_version(self):
+        with self.assertRaisesRegex(ValueError, "advance the updater semantic"):
+            release.validate_target("3.1.93", 5152, "3.1.93", 5151, self.manifest)
+
+    def test_release_must_advance_base_build_and_arm64_code(self):
+        with self.assertRaisesRegex(ValueError, "advance the updater ARM64"):
+            release.validate_target("3.1.94", 5151, "3.1.93", 5151, self.manifest)
+
+    def test_target_version_must_be_semantic(self):
+        with self.assertRaisesRegex(ValueError, "semantic version"):
+            release.validate_target("latest", 5152, "3.1.93", 5151, self.manifest)
+
+    def test_staged_version_preserves_newlines_and_all_other_pubspec_fields(self):
+        original = "name: immich_mobile\nversion: 3.1.93+5151\n\nenvironment:\n  flutter: 3.44.8\n"
+        self.assertEqual(
+            release.updated_pubspec(original, "3.1.94", 5152),
+            "name: immich_mobile\nversion: 3.1.94+5152\n\nenvironment:\n  flutter: 3.44.8\n",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

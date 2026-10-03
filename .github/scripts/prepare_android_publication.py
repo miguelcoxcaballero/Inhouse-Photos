@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 
-ARTIFACTS = ("Inhouse-Photos.apk", "Inhouse-Photos-Android.zip", "android-update.json")
+ARTIFACTS = ("mobile/pubspec.yaml", "Inhouse-Photos.apk", "Inhouse-Photos-Android.zip", "android-update.json")
 PUBLICATION_INPUTS = (
     "mobile",
     "i18n",
