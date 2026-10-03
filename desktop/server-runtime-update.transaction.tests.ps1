@@ -10,9 +10,26 @@ function Reject([scriptblock]$Action, [string]$Description) {
   try { & $Action | Out-Null; throw ('DID NOT REJECT: ' + $Description) }
   catch { if ($_.Exception.Message.StartsWith('DID NOT REJECT:')) { throw }; $script:checks++ }
 }
-function Clone($Value) { return ConvertFrom-Json -InputObject (ConvertTo-Json -InputObject $Value -Depth 30) }
+function Clone($Value) {
+  # An explicit variable return enumerates the top-level array consistently
+  # in Windows PowerShell 5.1, preserving arrays inside each row's mounts.
+  $parsed = ConvertFrom-Json -InputObject (ConvertTo-Json -InputObject $Value -Depth 30)
+  return $parsed
+}
 function Assert-NoManager {}
 function New-PrivateDirectory([string]$Path) { [void][IO.Directory]::CreateDirectory($Path) }
+$script:fixturePhase='initial'
+$script:productionAssertContainers=${function:Assert-Containers}
+function Assert-Containers($Expected, $Current, [string]$Project, [switch]$ServerMayChange, [switch]$Adoption) {
+  try { & $script:productionAssertContainers $Expected $Current $Project -ServerMayChange:$ServerMayChange -Adoption:$Adoption }
+  catch {
+    # Fake row counts and test names only; no environment, paths or identities.
+    Write-Host ('Transaction fixture phase={0} checks={1} expectedRows={2} currentRows={3} fixtureRows={4}' -f
+      $script:fixturePhase,$script:checks,$Expected.Count,$Current.Count,$script:fixture.Rows.Count)
+    Write-Host $_.ScriptStackTrace
+    throw
+  }
+}
 
 $script:roots = New-Object 'Collections.Generic.List[string]'
 function New-Fixture {
@@ -119,6 +136,7 @@ function Assert-Preserved {
 $savedOs=$env:OS
 try {
   $env:OS='Windows_NT'
+  $script:fixturePhase='normal-install'
   New-Fixture
   Invoke-RuntimeUpdate | Out-Null
   $record=Read-Json (Journal)
@@ -129,6 +147,7 @@ try {
   Check (-not $fixture.QueueStates.storageSaverCompression -and $fixture.QueueStates.storageSaverVideoCompression) 'preserve original independent paused flags'
   Assert-Preserved
 
+  $script:fixturePhase='failed-before-change'
   New-Fixture
   $fixture.FailLoad=$true
   Reject { Invoke-RuntimeUpdate } 'image load failure preserves recoverable journal'
@@ -144,6 +163,7 @@ try {
   Check (@($records | Where-Object { $_.status -ceq 'completed' }).Count -eq 1) 'a fresh installation succeeds immediately after aborted preparation'
   Assert-Preserved
 
+  $script:fixturePhase='recover-new-engine'
   New-Fixture
   $fixture.FailHealth=$true; $fixture.MigrationInstalled=$true
   Reject { Invoke-RuntimeUpdate } 'failed new health never downgrades a migrated database'
@@ -156,6 +176,7 @@ try {
   Check (-not $fixture.QueueStates.storageSaverCompression -and $fixture.QueueStates.storageSaverVideoCompression) 'retry restores original paused flags'
   Assert-Preserved
 
+  $script:fixturePhase='recover-missing-server'
   New-Fixture
   $fixture.FailHealth=$true; $fixture.MigrationInstalled=$true
   Reject { Invoke-RuntimeUpdate } 'create fixture for interrupted container recreation'
@@ -166,6 +187,7 @@ try {
   Check (@($fixture.Commands | Where-Object { $_ -match 'up --no-start --no-deps --no-build --pull never immich-server' }).Count -eq 1) 'recovery creates only photo server stopped before starting'
   Assert-Preserved
 
+  $script:fixturePhase='refuse-unsafe-old-engine'
   New-Fixture
   $fixture.FailHealth=$true; $fixture.MigrationInstalled=$true
   Reject { Invoke-RuntimeUpdate } 'create fixture for incompatible old engine recovery'
