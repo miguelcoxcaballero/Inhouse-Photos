@@ -1,8 +1,8 @@
 {
-  "version": "3.1.98",
-  "versionCode": 7156,
+  "version": "3.1.99",
+  "versionCode": 7157,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.98-sync-recovery/Inhouse-Photos.apk",
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.99-sync-recovery/Inhouse-Photos.apk",
   "sizeBytes": 75034385,
-  "sha256": "93845343cfd6209594eaf2e1ad53cfd8654a4f7df35180c605a40a14ba77c41f"
+  "sha256": "b91f60f01d3abca0713383b5a9de058701456b503018e8a13dfa2f419d3e0359"
 }
