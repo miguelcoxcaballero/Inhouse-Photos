@@ -2,6 +2,9 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
 
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
@@ -60,7 +63,7 @@ class SyncStreamService {
     final serverVersion = await _api.serverInfoApi.getServerVersion();
     if (serverVersion == null) {
       _logger.severe("Cannot perform sync: unable to determine server version");
-      return false;
+      throw StateError("Cannot synchronize: the server did not return its version.");
     }
 
     final serverSemVer = SemVer(major: serverVersion.major, minor: serverVersion.minor, patch: serverVersion.patch_);
@@ -77,19 +80,46 @@ class SyncStreamService {
 
     // Start the sync stream and handle events
     bool shouldReset = false;
-    await _syncApiRepository.streamChanges(
-      _handleEvents,
-      serverVersion: serverSemVer,
-      onReset: () => shouldReset = true,
-      abortSignal: _cancellation?.future,
-    );
-    if (shouldReset) {
-      _logger.info("Resetting sync state as requested by server");
-      await _syncApiRepository.streamChanges(
-        _handleEvents,
-        serverVersion: serverSemVer,
-        abortSignal: _cancellation?.future,
-      );
+    for (int attempt = 0; ; attempt++) {
+      if (isCancelled) {
+        return false;
+      }
+      try {
+        shouldReset = false;
+        await _syncApiRepository.streamChanges(
+          _handleEvents,
+          serverVersion: serverSemVer,
+          onReset: () => shouldReset = true,
+          abortSignal: _cancellation?.future,
+        );
+        if (shouldReset && !isCancelled) {
+          _logger.info("Resuming sync after the server reset its checkpoints");
+          shouldReset = false;
+          await _syncApiRepository.streamChanges(
+            _handleEvents,
+            serverVersion: serverSemVer,
+            onReset: () => shouldReset = true,
+            abortSignal: _cancellation?.future,
+          );
+          if (shouldReset) {
+            throw StateError("The server repeatedly reset synchronization. Retry after checking the server.");
+          }
+        }
+        break;
+      } catch (error) {
+        if (isCancelled) {
+          return false;
+        }
+        if (attempt >= 2 || !_isTransient(error)) {
+          rethrow;
+        }
+        _logger.warning("Connection interrupted; resuming from saved sync checkpoints (retry ${attempt + 1})", error);
+        final delay = Future<void>.delayed(Duration(seconds: attempt + 1));
+        await Future.any([delay, if (_cancellation != null) _cancellation.future]);
+      }
+    }
+    if (isCancelled) {
+      return false;
     }
 
     previousLength = migrations.length;
@@ -102,6 +132,12 @@ class SyncStreamService {
 
     return true;
   }
+
+  bool _isTransient(Object error) =>
+      error is SocketException ||
+      error is TimeoutException ||
+      (error is http.ClientException && error is! http.RequestAbortedException) ||
+      (error is ApiException && const [408, 429, 500, 502, 503, 504].contains(error.code));
 
   Future<void> _runPreSyncTasks(List<String> migrations, SemVer semVer) async {
     if (!migrations.contains(SyncMigrationTask.v20260701_ResetAlbumsV1.name)) {

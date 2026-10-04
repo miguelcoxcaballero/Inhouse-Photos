@@ -17,6 +17,8 @@ enum SyncStatus {
   }
 }
 
+const _unchangedError = Object();
+
 class SyncStatusState {
   final SyncStatus remoteSyncStatus;
   final SyncStatus localSyncStatus;
@@ -38,14 +40,14 @@ class SyncStatusState {
     SyncStatus? localSyncStatus,
     SyncStatus? hashJobStatus,
     SyncStatus? cloudIdSyncStatus,
-    String? errorMessage,
+    Object? errorMessage = _unchangedError,
   }) {
     return SyncStatusState(
       remoteSyncStatus: remoteSyncStatus ?? this.remoteSyncStatus,
       localSyncStatus: localSyncStatus ?? this.localSyncStatus,
       hashJobStatus: hashJobStatus ?? this.hashJobStatus,
       cloudIdSyncStatus: cloudIdSyncStatus ?? this.cloudIdSyncStatus,
-      errorMessage: errorMessage ?? this.errorMessage,
+      errorMessage: identical(errorMessage, _unchangedError) ? this.errorMessage : errorMessage as String?,
     );
   }
 

@@ -5,8 +5,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/album/local_album.model.dart';
-import 'package:immich_mobile/domain/models/store.model.dart';
-import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/platform_extensions.dart';
 import 'package:immich_mobile/extensions/theme_extensions.dart';
@@ -37,7 +35,9 @@ class DriftBackupPage extends ConsumerStatefulWidget {
 }
 
 class _DriftBackupPageState extends ConsumerState<DriftBackupPage> {
-  bool? syncSuccess;
+  Future<void>? _startingBackup;
+  int _backupGeneration = 0;
+  int _startingGeneration = 0;
 
   @override
   void initState() {
@@ -51,19 +51,77 @@ class _DriftBackupPageState extends ConsumerState<DriftBackupPage> {
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final backupNotifier = ref.read(driftBackupProvider.notifier);
-      final syncManager = ref.read(backgroundSyncProvider);
-
-      await backupNotifier.getBackupStatus(currentUser.id);
-
-      backupNotifier.updateSyncing(true);
-      syncSuccess = await syncManager.syncRemote();
-      backupNotifier.updateSyncing(false);
-
-      if (mounted) {
-        await backupNotifier.getBackupStatus(currentUser.id);
+      if (!mounted) {
+        return;
+      }
+      await ref.read(driftBackupProvider.notifier).getBackupStatus(currentUser.id);
+      if (!mounted) {
+        return;
+      }
+      if (ref.read(appConfigProvider).backup.enabled) {
+        unawaited(_startBackup());
+      } else {
+        await _synchronize();
+        if (mounted) {
+          await ref.read(driftBackupProvider.notifier).getBackupStatus(currentUser.id);
+        }
       }
     });
+  }
+
+  Future<bool> _synchronize() async {
+    final notifier = ref.read(driftBackupProvider.notifier);
+    notifier.updateSyncing(true);
+    try {
+      return await ref.read(backgroundSyncProvider).syncRemote();
+    } finally {
+      if (notifier.mounted) {
+        notifier.updateSyncing(false);
+      }
+    }
+  }
+
+  Future<void> _startBackup() {
+    final active = _startingBackup;
+    if (active != null) {
+      if (_startingGeneration == _backupGeneration) {
+        return active;
+      }
+      // If backup was disabled and enabled again while sync was still running,
+      // wait for the obsolete attempt before starting the new one.
+      return active.then((_) {
+        if (mounted && ref.read(appConfigProvider).backup.enabled) {
+          return _startBackup();
+        }
+      });
+    }
+    _startingGeneration = _backupGeneration;
+    return _startingBackup = _startBackupAfterSync().whenComplete(() => _startingBackup = null);
+  }
+
+  Future<void> _startBackupAfterSync() async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) {
+      return;
+    }
+    final generation = _backupGeneration;
+    final success = await _synchronize();
+    if (!mounted || generation != _backupGeneration || ref.read(currentUserProvider)?.id != currentUser.id) {
+      return;
+    }
+    final notifier = ref.read(driftBackupProvider.notifier);
+    await notifier.getBackupStatus(currentUser.id);
+    if (!mounted ||
+        generation != _backupGeneration ||
+        ref.read(currentUserProvider)?.id != currentUser.id ||
+        !ref.read(appConfigProvider).backup.enabled) {
+      return;
+    }
+    if (!success) {
+      Logger("DriftBackupPage").warning("Remote sync failed; backup can be retried without leaving this screen");
+      return;
+    }
+    await notifier.startForegroundBackup(currentUser.id);
   }
 
   @override
@@ -82,28 +140,6 @@ class _DriftBackupPageState extends ConsumerState<DriftBackupPage> {
     final error = ref.watch(driftBackupProvider.select((p) => p.error));
 
     final backupNotifier = ref.read(driftBackupProvider.notifier);
-    final backupSyncManager = ref.read(backgroundSyncProvider);
-
-    Future<void> startBackup() async {
-      final currentUser = Store.tryGet(StoreKey.currentUser);
-      if (currentUser == null) {
-        return;
-      }
-
-      if (syncSuccess == null) {
-        backupNotifier.updateSyncing(true);
-        syncSuccess = await backupSyncManager.syncRemote();
-        backupNotifier.updateSyncing(false);
-      }
-
-      await backupNotifier.getBackupStatus(currentUser.id);
-
-      if (syncSuccess == false) {
-        Logger("DriftBackupPage").warning("Remote sync did not complete successfully, skipping backup");
-        return;
-      }
-      await backupNotifier.startForegroundBackup(currentUser.id);
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -140,9 +176,9 @@ class _DriftBackupPageState extends ConsumerState<DriftBackupPage> {
                   const _RemainderCard(),
                   const Divider(),
                   BackupToggleButton(
-                    onStart: () async => await startBackup(),
+                    onStart: () => unawaited(_startBackup()),
                     onStop: () {
-                      syncSuccess = null;
+                      _backupGeneration++;
                       backupNotifier.stopForegroundBackup();
                     },
                   ),
@@ -150,19 +186,35 @@ class _DriftBackupPageState extends ConsumerState<DriftBackupPage> {
                     BackupError.none => const SizedBox.shrink(),
                     BackupError.syncFailed => Padding(
                       padding: const EdgeInsets.only(top: 10),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.max,
+                      child: Column(
                         children: [
-                          Icon(Icons.warning_rounded, color: context.colorScheme.error, fill: 1),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              context.t.backup_error_sync_failed,
-                              style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.error),
-                              textAlign: TextAlign.center,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.max,
+                            children: [
+                              Icon(Icons.warning_rounded, color: context.colorScheme.error, fill: 1),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  context.t.backup_error_sync_failed,
+                                  style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.error),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (ref.watch(syncStatusProvider).errorMessage case final String message)
+                            Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: SelectableText(message, style: context.textTheme.bodySmall),
                             ),
+                          TextButton.icon(
+                            onPressed: ref.watch(driftBackupProvider).isSyncing
+                                ? null
+                                : () => unawaited(_startBackup()),
+                            icon: const Icon(Icons.refresh),
+                            label: Text("backup_retry_sync".tr()),
                           ),
                         ],
                       ),

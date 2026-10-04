@@ -23,6 +23,7 @@ class InvalidIsolateUsageException implements Exception {
 Cancelable<T?> runInIsolateGentle<T>({
   required Future<T> Function(ProviderContainer ref) computation,
   String? debugLabel,
+  bool propagateErrors = false,
 }) {
   final token = RootIsolateToken.instance;
   if (token == null) {
@@ -43,6 +44,9 @@ Cancelable<T?> runInIsolateGentle<T>({
       return await computation(ref);
     } catch (error, stack) {
       log.severe("Error in runInIsolateGentle${debugLabel == null ? '' : ' for $debugLabel'}", error, stack);
+      if (propagateErrors) {
+        rethrow;
+      }
       return null;
     } finally {
       ref.dispose();

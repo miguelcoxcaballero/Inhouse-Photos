@@ -1,4 +1,5 @@
 {
+  "backup_retry_sync": "Retry backup",
   "about": "About",
   "account": "Account",
   "account_settings": "Account Settings",

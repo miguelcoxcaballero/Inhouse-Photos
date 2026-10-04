@@ -36,7 +36,6 @@ class _AbortCallbackWrapper {
 
 class _MockAbortCallbackWrapper extends Mock implements _AbortCallbackWrapper {}
 
-
 void main() {
   late SyncStreamService sut;
   late SyncStreamRepository mockSyncStreamRepo;
@@ -179,6 +178,69 @@ void main() {
     await sut.sync();
     await handleEventsCallback(events, mockAbortCallbackWrapper.call, mockResetCallbackWrapper.call);
   }
+
+  test('resumes a transient interruption without repeating completed writes or resetting the library', () async {
+    int attempts = 0;
+    when(
+      () => mockSyncApiRepo.streamChanges(
+        any(),
+        onReset: any(named: 'onReset'),
+        serverVersion: any(named: 'serverVersion'),
+        abortSignal: any(named: 'abortSignal'),
+      ),
+    ).thenAnswer((invocation) async {
+      final callback =
+          invocation.positionalArguments.first as Future<void> Function(List<SyncEvent>, Function(), Function());
+      if (++attempts == 1) {
+        await callback([SyncStreamStub.userDeleteV1], () {}, () {});
+        throw TimeoutException('Connection interrupted');
+      }
+      await callback([SyncStreamStub.userV1Admin], () {}, () {});
+    });
+    expect(await sut.sync(), isTrue);
+    expect(attempts, 2);
+    verify(() => mockSyncStreamRepo.deleteUsersV1(any())).called(1);
+    verify(() => mockSyncApiRepo.ack(['2'])).called(1);
+    verify(() => mockSyncStreamRepo.updateUsersV1(any())).called(1);
+    verify(() => mockSyncApiRepo.ack(['1'])).called(1);
+  });
+
+  test('authentication failures are preserved and never retried', () async {
+    when(
+      () => mockSyncApiRepo.streamChanges(
+        any(),
+        onReset: any(named: 'onReset'),
+        serverVersion: any(named: 'serverVersion'),
+        abortSignal: any(named: 'abortSignal'),
+      ),
+    ).thenThrow(ApiException(401, 'Unauthorized'));
+    await expectLater(sut.sync(), throwsA(isA<ApiException>().having((e) => e.code, 'code', 401)));
+    verify(
+      () => mockSyncApiRepo.streamChanges(
+        any(),
+        onReset: any(named: 'onReset'),
+        serverVersion: any(named: 'serverVersion'),
+        abortSignal: any(named: 'abortSignal'),
+      ),
+    ).called(1);
+  });
+
+  test('repeated server resets fail instead of enabling an unsynchronized backup', () async {
+    int attempts = 0;
+    when(
+      () => mockSyncApiRepo.streamChanges(
+        any(),
+        onReset: any(named: 'onReset'),
+        serverVersion: any(named: 'serverVersion'),
+        abortSignal: any(named: 'abortSignal'),
+      ),
+    ).thenAnswer((invocation) async {
+      attempts++;
+      (invocation.namedArguments[#onReset] as Function())();
+    });
+    await expectLater(sut.sync(), throwsA(isA<StateError>()));
+    expect(attempts, 2);
+  });
 
   group("SyncStreamService - _handleEvents", () {
     test("processes events and acks successfully when handlers succeed", () async {

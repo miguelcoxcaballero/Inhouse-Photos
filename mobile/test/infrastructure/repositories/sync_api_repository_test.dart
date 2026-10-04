@@ -290,4 +290,73 @@ void main() {
 
     expect(onDataCallCount, 0);
   });
+  test('a library-sized HTTP chunk stays within the database batch limit', () async {
+    const count = 87204;
+    int processed = 0;
+    final sizes = <int>[];
+    final payload =
+        List.generate(
+          count,
+          (i) => _createJsonLine(
+            SyncEntityType.userDeleteV1.toString(),
+            SyncUserDeleteV1(userId: 'user$i').toJson(),
+            'ack$i',
+          ),
+        ).join() +
+        _createJsonLine('SyncCompleteV1', {}, 'complete');
+    when(() => mockStreamedResponse.stream).thenAnswer((_) => http.ByteStream.fromBytes(utf8.encode(payload)));
+    await sut.streamChanges(
+      (events, _, _) async {
+        sizes.add(events.length);
+        processed += events.length;
+      },
+      httpClient: mockHttpClient,
+      serverVersion: const SemVer(major: 3, minor: 1, patch: 97),
+    );
+    expect(processed, count + 1);
+    expect(sizes.every((size) => size <= 5000), isTrue);
+    expect(sizes.length, 18);
+  });
+
+  test('handles fragmented UTF-8, CRLF and a final event without newline', () async {
+    final payload = utf8.encode(
+      _createJsonLine('UserDeleteV1', {'userId': 'café'}, 'ack').replaceAll('\n', '\r\n') +
+          jsonEncode({'type': 'SyncCompleteV1', 'data': {}, 'ack': 'done'}),
+    );
+    when(
+      () => mockStreamedResponse.stream,
+    ).thenAnswer((_) => http.ByteStream(Stream.fromIterable(payload.map((byte) => [byte]))));
+    final received = <SyncEvent>[];
+    await streamChanges((events, _, _) async => received.addAll(events), const SemVer(major: 3, minor: 1, patch: 97));
+    expect(received.length, 2);
+    expect((received.first.data as SyncUserDeleteV1).userId, 'café');
+    expect(received.last.type, SyncEntityType.syncCompleteV1);
+  });
+
+  test('an interrupted modern stream cannot be reported as successful', () async {
+    when(() => mockStreamedResponse.stream).thenAnswer(
+      (_) => http.ByteStream.fromBytes(utf8.encode(_createJsonLine('UserDeleteV1', {'userId': 'user'}, 'ack'))),
+    );
+    final received = <SyncEvent>[];
+    await expectLater(
+      streamChanges((events, _, _) async => received.addAll(events), const SemVer(major: 3, minor: 1, patch: 97)),
+      throwsA(isA<http.ClientException>()),
+    );
+    expect(received.single.ack, 'ack');
+  });
+
+  test('malformed final JSON fails rather than silently discarding records', () async {
+    when(() => mockStreamedResponse.stream).thenAnswer((_) => http.ByteStream.fromBytes(utf8.encode('{"type":')));
+    await expectLater(
+      streamChanges((_, _, _) async {}, const SemVer(major: 3, minor: 1, patch: 97)),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('server reset is a valid stream terminator', () async {
+    when(
+      () => mockStreamedResponse.stream,
+    ).thenAnswer((_) => http.ByteStream.fromBytes(utf8.encode(_createJsonLine('SyncResetV1', {}, 'reset'))));
+    await expectLater(streamChanges((_, _, _) async {}, const SemVer(major: 3, minor: 1, patch: 97)), completes);
+  });
 }

@@ -63,13 +63,15 @@ def updated_pubspec(contents: str, version: str, base_build: int) -> str:
 
 
 def release_feature(tag: str, version: str) -> str:
-    match = re.fullmatch(re.escape(f"v{version}") + r"-(durable-upload|server-update|unified)", tag)
+    match = re.fullmatch(re.escape(f"v{version}") + r"-(durable-upload|server-update|unified|sync-recovery)", tag)
     if not match:
         raise ValueError("Release tag must match the target Android version and a supported release feature")
     return match.group(1)
 
 
 def feature_description(feature: str) -> str:
+    if feature == "sync-recovery":
+        return "La copia reintenta interrupciones de conexión y procesa bibliotecas grandes en lotes limitados.\n\n"
     if feature == "unified":
         return (
             "Actualiza Inhouse Photos desde Ajustes > Gestión del servidor. La aplicación "

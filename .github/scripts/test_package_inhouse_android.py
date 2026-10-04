@@ -95,6 +95,11 @@ class AndroidReleaseTagTests(unittest.TestCase):
     def test_server_update_release_tag_matches_its_version(self):
         self.assertEqual(release.release_feature("v3.1.95-server-update", "3.1.95"), "server-update")
 
+    def test_sync_recovery_release_keeps_the_existing_server_runtime(self):
+        self.assertEqual(release.release_feature("v3.1.98-sync-recovery", "3.1.98"), "sync-recovery")
+        release.validate_shared_version("sync-recovery", "3.1.98", "3.1.97")
+        self.assertIn("bibliotecas grandes", release.feature_description("sync-recovery"))
+
     def test_unified_release_tag_matches_its_product_version(self):
         self.assertEqual(release.release_feature("v3.1.96-unified", "3.1.96"), "unified")
 

@@ -27,6 +27,8 @@ class BackgroundSyncManager {
   final SyncCallback? onCloudIdSyncComplete;
   final SyncErrorCallback? onCloudIdSyncError;
 
+  final Cancelable<bool?> Function() _remoteSyncRunner;
+  Future<bool>? _remoteSyncResult;
   Cancelable<bool?>? _syncTask;
   Cancelable<void>? _syncWebsocketTask;
   Cancelable<void>? _cloudIdSyncTask;
@@ -47,7 +49,8 @@ class BackgroundSyncManager {
     this.onCloudIdSyncStart,
     this.onCloudIdSyncComplete,
     this.onCloudIdSyncError,
-  });
+    Cancelable<bool?> Function()? remoteSyncRunner,
+  }) : _remoteSyncRunner = remoteSyncRunner ?? _runRemoteSync;
 
   Future<void> cancel() async {
     final tasks = [
@@ -134,30 +137,23 @@ class BackgroundSyncManager {
   }
 
   Future<bool> syncRemote() {
-    if (_syncTask != null) {
-      return _syncTask!.future.then((result) => result ?? false).catchError((_) => false);
-    }
+    return _remoteSyncResult ??= _syncRemote().whenComplete(() {
+      _remoteSyncResult = null;
+      _syncTask = null;
+    });
+  }
 
+  Future<bool> _syncRemote() async {
     onRemoteSyncStart?.call();
-
-    _syncTask = runInIsolateGentle(
-      computation: (ref) => ref.read(syncStreamServiceProvider).sync(),
-      debugLabel: 'remote-sync',
-    );
-    return _syncTask!
-        .then((result) {
-          final success = result ?? false;
-          onRemoteSyncComplete?.call(success);
-          return success;
-        })
-        .catchError((error) {
-          onRemoteSyncError?.call(error.toString());
-          _syncTask = null;
-          return false;
-        })
-        .whenComplete(() {
-          _syncTask = null;
-        });
+    try {
+      _syncTask = _remoteSyncRunner();
+      final success = await _syncTask!.future ?? false;
+      onRemoteSyncComplete?.call(success);
+      return success;
+    } catch (error) {
+      onRemoteSyncError?.call(error.toString());
+      return false;
+    }
   }
 
   Future<void> syncWebsocketBatchV1(List<dynamic> batchData) {
@@ -249,4 +245,10 @@ Cancelable<void> _handleWsAssetEditReadyV1(dynamic data) => runInIsolateGentle(
 Cancelable<void> _handleWsAssetEditReadyV2(dynamic data) => runInIsolateGentle(
   computation: (ref) => ref.read(syncStreamServiceProvider).handleWsAssetEditReadyV2(data),
   debugLabel: 'websocket-edit',
+);
+
+Cancelable<bool?> _runRemoteSync() => runInIsolateGentle(
+  computation: (ref) => ref.read(syncStreamServiceProvider).sync(),
+  debugLabel: 'remote-sync',
+  propagateErrors: true,
 );

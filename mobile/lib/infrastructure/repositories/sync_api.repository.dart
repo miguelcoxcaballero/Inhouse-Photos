@@ -79,8 +79,11 @@ class SyncApiRepository {
       ).toJson(),
     );
 
-    String previousChunk = '';
+    if (batchSize <= 0) {
+      throw ArgumentError.value(batchSize, 'batchSize', 'Must be positive');
+    }
     List<String> lines = [];
+    bool receivedTerminalEvent = false;
 
     bool shouldAbort = false;
 
@@ -99,26 +102,35 @@ class SyncApiRepository {
         throw ApiException(response.statusCode, 'Failed to get sync stream: $errorBody');
       }
 
-      await for (final chunk in response.stream.transform(utf8.decoder)) {
+      // TCP/HTTP chunks are not event batches. A single chunk can contain
+      // thousands of records; cap each database transaction independently.
+      await for (final line in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
         if (shouldAbort) {
           break;
         }
-
-        previousChunk += chunk;
-        final parts = previousChunk.toString().split('\n');
-        previousChunk = parts.removeLast();
-        lines.addAll(parts);
-
+        if (line.trim().isEmpty) {
+          continue;
+        }
+        lines.add(line);
         if (lines.length < batchSize) {
           continue;
         }
-
-        await onData(_parseLines(lines), abort, reset);
+        final events = _parseLines(lines);
+        receivedTerminalEvent |= events.any(_isTerminalEvent);
+        await onData(events, abort, reset);
         lines.clear();
       }
 
       if (lines.isNotEmpty && !shouldAbort) {
-        await onData(_parseLines(lines), abort, reset);
+        final events = _parseLines(lines);
+        receivedTerminalEvent |= events.any(_isTerminalEvent);
+        await onData(events, abort, reset);
+      }
+      if (!shouldAbort && serverVersion.major >= 3 && !receivedTerminalEvent) {
+        throw http.ClientException(
+          'The server closed synchronization before completion. Retry to resume.',
+          Uri.parse(endpoint),
+        );
       }
     } catch (error, stack) {
       return Future.error(error, stack);
@@ -126,6 +138,9 @@ class SyncApiRepository {
     stopwatch.stop();
     _logger.info("Remote Sync completed in ${stopwatch.elapsed.inMilliseconds}ms");
   }
+
+  bool _isTerminalEvent(SyncEvent event) =>
+      event.type == SyncEntityType.syncCompleteV1 || event.type == SyncEntityType.syncResetV1;
 
   List<SyncEvent> _parseLines(List<String> lines) {
     final List<SyncEvent> data = [];

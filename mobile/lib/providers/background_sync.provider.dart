@@ -5,9 +5,13 @@ import 'package:immich_mobile/providers/sync_status.provider.dart';
 
 final backgroundSyncProvider = Provider<BackgroundSyncManager>((ref) {
   final syncStatusNotifier = ref.read(syncStatusProvider.notifier);
+  bool disposed = false;
 
   final manager = BackgroundSyncManager(
     onRemoteSyncStart: () {
+      if (disposed) {
+        return;
+      }
       syncStatusNotifier.startRemoteSync();
       final backupProvider = ref.read(driftBackupProvider.notifier);
       if (backupProvider.mounted) {
@@ -15,13 +19,29 @@ final backgroundSyncProvider = Provider<BackgroundSyncManager>((ref) {
       }
     },
     onRemoteSyncComplete: (isSuccess) {
-      syncStatusNotifier.completeRemoteSync();
+      if (disposed) {
+        return;
+      }
+      if (isSuccess == true) {
+        syncStatusNotifier.completeRemoteSync();
+      } else {
+        syncStatusNotifier.errorRemoteSync("Remote synchronization did not complete. Retry to resume backup.");
+      }
       final backupProvider = ref.read(driftBackupProvider.notifier);
       if (backupProvider.mounted) {
         backupProvider.updateError(isSuccess == true ? BackupError.none : BackupError.syncFailed);
       }
     },
-    onRemoteSyncError: syncStatusNotifier.errorRemoteSync,
+    onRemoteSyncError: (error) {
+      if (disposed) {
+        return;
+      }
+      syncStatusNotifier.errorRemoteSync(error);
+      final backupProvider = ref.read(driftBackupProvider.notifier);
+      if (backupProvider.mounted) {
+        backupProvider.updateError(BackupError.syncFailed);
+      }
+    },
     onLocalSyncStart: syncStatusNotifier.startLocalSync,
     onLocalSyncComplete: syncStatusNotifier.completeLocalSync,
     onLocalSyncError: syncStatusNotifier.errorLocalSync,
@@ -32,6 +52,9 @@ final backgroundSyncProvider = Provider<BackgroundSyncManager>((ref) {
     onCloudIdSyncComplete: syncStatusNotifier.completeCloudIdSync,
     onCloudIdSyncError: syncStatusNotifier.errorCloudIdSync,
   );
-  ref.onDispose(manager.cancel);
+  ref.onDispose(() {
+    disposed = true;
+    manager.cancel();
+  });
   return manager;
 });
