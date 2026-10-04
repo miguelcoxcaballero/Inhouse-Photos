@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/asset_edit.model.dart';
 import 'package:immich_mobile/domain/models/exif.model.dart';
@@ -39,8 +40,14 @@ class RemoteAssetRepository extends DriftDatabaseRepository {
     final query =
         _db.remoteAssetEntity.select().addColumns([_db.localAssetEntity.id]).join([
             leftOuterJoin(
+              _db.remoteAssetCloudIdEntity,
+              _db.remoteAssetCloudIdEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
+              useColumns: false,
+            ),
+            leftOuterJoin(
               _db.localAssetEntity,
-              _db.remoteAssetEntity.checksum.equalsExp(_db.localAssetEntity.checksum),
+              _db.remoteAssetEntity.checksum.equalsExp(_db.localAssetEntity.checksum) |
+                  _db.remoteAssetCloudIdEntity.cloudId.equalsExp(_db.localAssetEntity.checksum),
               useColumns: false,
             ),
           ])
@@ -86,7 +93,10 @@ class RemoteAssetRepository extends DriftDatabaseRepository {
             RemoteAssetEntityCompanion(
               id: Value(remoteId),
               ownerId: Value(ownerId),
-              checksum: Value(source.checksum ?? remoteId),
+              // Original and compressed file checksums can differ. Keep the
+              // original in the cloud-id mapping below, never in the unique
+              // server-checksum index until an authoritative sync event arrives.
+              checksum: Value('$kPendingRemoteChecksumPrefix$remoteId'),
               name: Value(source.name),
               type: Value(source.type),
               createdAt: Value(source.createdAt),

@@ -202,11 +202,13 @@ void main() {
     final sql = File('lib/infrastructure/entities/merged_asset.drift.dart')
         .readAsStringSync()
         .split("'")
-        .firstWhere((piece) => piece.startsWith('SELECT rae.id AS remote_id'), orElse: () => '');
+        .firstWhere((piece) => piece.startsWith('SELECT 1 AS cursor_source'), orElse: () => '');
     expect(sql, isNotEmpty, reason: 'could not find the merged asset query in the generated source');
 
     final plan = await db
-        .customSelect('EXPLAIN QUERY PLAN ${sql.replaceAll(r'IN ($expandeduserIds)', "IN ('u')").replaceAll(r'${generatedlimit.sql}', '')} LIMIT 10')
+        .customSelect(
+          'EXPLAIN QUERY PLAN ${sql.replaceAll(r'IN ($expandeduserIds)', "IN ('u')").replaceAll(r'${generatedlimit.sql}', '')} LIMIT 10',
+        )
         .get();
     final details = plan.map((row) => row.data['detail'].toString()).toList();
     final sorts = details.where((d) => d.contains('USE TEMP B-TREE FOR')).toList();
@@ -215,7 +217,7 @@ void main() {
     for (final sort in sorts) {
       expect(
         sort,
-        contains('LAST TERM'),
+        matches(RegExp(r'LAST (?:\d+ )?TERMS?')),
         reason: 'the leading sort term must come from an index, not a full sort: ${details.join(' | ')}',
       );
     }
@@ -245,9 +247,7 @@ void main() {
     final abroadWallClock = DateTime.utc(2024, 5, 11, 1);
     final homeWallClock = DateTime.utc(2024, 5, 10, 20);
 
-    await db
-        .into(db.userEntity)
-        .insert(UserEntityCompanion.insert(id: userId, email: 'slice@test.dev', name: 'Slice'));
+    await db.into(db.userEntity).insert(UserEntityCompanion.insert(id: userId, email: 'slice@test.dev', name: 'Slice'));
     await db.batch((batch) {
       batch.insert(
         db.remoteAssetEntity,

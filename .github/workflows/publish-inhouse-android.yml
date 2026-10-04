@@ -12,13 +12,13 @@ concurrency:
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/feat/durable-upload-backlog'
+    if: github.ref == 'refs/heads/feat/durable-upload-backlog' || github.ref == 'refs/heads/fix/backup-checksum-collision'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      RELEASE_TAG: v3.1.98-sync-recovery
-      ANDROID_RELEASE_VERSION: '3.1.98'
-      ANDROID_RELEASE_BASE_BUILD: '5156'
+      RELEASE_TAG: v3.1.99-sync-recovery
+      ANDROID_RELEASE_VERSION: '3.1.99'
+      ANDROID_RELEASE_BASE_BUILD: '5157'
     steps:
       - name: Checkout the source to publish
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -78,6 +78,9 @@ jobs:
           cd mobile
           dart analyze --fatal-infos
           flutter test \
+            test/infrastructure/repositories/sync_checksum_collision_test.dart \
+            test/infrastructure/repositories/merged_asset_drift_test.dart \
+            test/domain/repositories/sync_stream_repository_test.dart \
             test/widgets/backup/drift_backup_sync_test.dart \
             test/domain/utils/background_sync_test.dart \
             test/providers/sync_status_test.dart \
@@ -169,7 +172,7 @@ jobs:
           version_code = int(os.environ['ANDROID_RELEASE_BASE_BUILD']) + 2000
           Path(sys.argv[1]).write_text(
               f'Inhouse Photos Android {version} (ARM64, versionCode {version_code}).\n\n'
-              f'Corrige el bloqueo de la copia después de fallar la sincronización. Reanuda las interrupciones de conexión desde los datos ya confirmados y limita los lotes de bibliotecas grandes. Añade un botón para reintentar sin salir de la pantalla.\n\n'
+              f'Corrige el fallo SQLite UNIQUE de propietario y checksum durante la copia. Los registros provisionales usan una identidad propia hasta recibir el checksum del servidor. Repara los conflictos existentes conservando las fotos, los álbumes y los datos de las copias anteriores.\n\n'
               'Instala Inhouse-Photos.apk o extráelo de Inhouse-Photos-Android.zip sobre la aplicación existente. Se conserva el certificado permanente de Inhouse Photos. El informe adjunto verifica la versión, el paquete, la firma y los ocho símbolos JNI.\n'
           )
           PY

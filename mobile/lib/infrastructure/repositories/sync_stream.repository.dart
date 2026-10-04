@@ -32,6 +32,7 @@ import 'package:immich_mobile/infrastructure/entities/user_metadata.entity.drift
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/utils/exif.converter.dart';
 import 'package:logging/logging.dart';
+import 'package:sqlite3/common.dart' show SqliteException;
 import 'package:openapi/api.dart' as api show AssetVisibility, AlbumUserRole, UserMetadataKey, AssetEditAction;
 import 'package:openapi/api.dart' hide UserMetadataKey, AssetEditAction, AssetVisibility, AlbumUserRole;
 
@@ -202,42 +203,36 @@ class SyncStreamRepository extends DriftDatabaseRepository {
 
   Future<void> updateAssetsV1(Iterable<SyncAssetV1> data, {String debugLabel = 'user'}) async {
     try {
-      await _db.batch((batch) {
-        for (final asset in data) {
-          final companion = RemoteAssetEntityCompanion(
-            name: Value(asset.originalFileName),
-            type: Value(asset.type.toAssetType()),
-            createdAt: Value.absentIfNull(asset.fileCreatedAt),
-            updatedAt: Value.absentIfNull(asset.fileModifiedAt),
-            uploadedAt: Value(asset.createdAt),
-            durationMs: Value(asset.duration?.toDuration()?.inMilliseconds ?? 0),
-            checksum: Value(asset.checksum),
-            isFavorite: Value(asset.isFavorite),
-            ownerId: Value(asset.ownerId),
-            // The timeline orders on this column directly, so a null would sink
-            // the asset to the end of the gallery. Servers normally supply it;
-            // derive it from the capture time when they do not.
-            localDateTime: Value(
-              asset.localDateTime ?? _wallClockOf(asset.fileCreatedAt ?? asset.createdAt),
-            ),
-            thumbHash: Value(asset.thumbhash),
-            deletedAt: Value(asset.deletedAt),
-            visibility: Value(asset.visibility.toAssetVisibility()),
-            livePhotoVideoId: Value(asset.livePhotoVideoId),
-            stackId: Value(asset.stackId),
-            libraryId: Value(asset.libraryId),
-            width: Value(asset.width),
-            height: Value(asset.height),
-            isEdited: Value(asset.isEdited),
-          );
+      final companions = <RemoteAssetEntityCompanion>[];
+      for (final asset in data) {
+        final companion = RemoteAssetEntityCompanion(
+          name: Value(asset.originalFileName),
+          type: Value(asset.type.toAssetType()),
+          createdAt: Value.absentIfNull(asset.fileCreatedAt),
+          updatedAt: Value.absentIfNull(asset.fileModifiedAt),
+          uploadedAt: Value(asset.createdAt),
+          durationMs: Value(asset.duration?.toDuration()?.inMilliseconds ?? 0),
+          checksum: Value(asset.checksum),
+          isFavorite: Value(asset.isFavorite),
+          ownerId: Value(asset.ownerId),
+          // The timeline orders on this column directly, so a null would sink
+          // the asset to the end of the gallery. Servers normally supply it;
+          // derive it from the capture time when they do not.
+          localDateTime: Value(asset.localDateTime ?? _wallClockOf(asset.fileCreatedAt ?? asset.createdAt)),
+          thumbHash: Value(asset.thumbhash),
+          deletedAt: Value(asset.deletedAt),
+          visibility: Value(asset.visibility.toAssetVisibility()),
+          livePhotoVideoId: Value(asset.livePhotoVideoId),
+          stackId: Value(asset.stackId),
+          libraryId: Value(asset.libraryId),
+          width: Value(asset.width),
+          height: Value(asset.height),
+          isEdited: Value(asset.isEdited),
+        );
 
-          batch.insert(
-            _db.remoteAssetEntity,
-            companion.copyWith(id: Value(asset.id)),
-            onConflict: DoUpdate((_) => companion),
-          );
-        }
-      });
+        companions.add(companion.copyWith(id: Value(asset.id)));
+      }
+      await _upsertRemoteAssets(companions);
     } catch (error, stack) {
       _logger.severe('Error: updateAssetsV1 - $debugLabel', error, stack);
       rethrow;
@@ -246,45 +241,97 @@ class SyncStreamRepository extends DriftDatabaseRepository {
 
   Future<void> updateAssetsV2(Iterable<SyncAssetV2> data, {String debugLabel = 'user'}) async {
     try {
-      await _db.batch((batch) {
-        for (final asset in data) {
-          final companion = RemoteAssetEntityCompanion(
-            name: Value(asset.originalFileName),
-            type: Value(asset.type.toAssetType()),
-            createdAt: Value.absentIfNull(asset.fileCreatedAt),
-            updatedAt: Value.absentIfNull(asset.fileModifiedAt),
-            uploadedAt: Value(asset.createdAt),
-            durationMs: Value(asset.duration),
-            checksum: Value(asset.checksum),
-            isFavorite: Value(asset.isFavorite),
-            ownerId: Value(asset.ownerId),
-            // The timeline orders on this column directly, so a null would sink
-            // the asset to the end of the gallery. Servers normally supply it;
-            // derive it from the capture time when they do not.
-            localDateTime: Value(
-              asset.localDateTime ?? _wallClockOf(asset.fileCreatedAt ?? asset.createdAt),
-            ),
-            thumbHash: Value(asset.thumbhash),
-            deletedAt: Value(asset.deletedAt),
-            visibility: Value(asset.visibility.toAssetVisibility()),
-            livePhotoVideoId: Value(asset.livePhotoVideoId),
-            stackId: Value(asset.stackId),
-            libraryId: Value(asset.libraryId),
-            width: Value(asset.width),
-            height: Value(asset.height),
-            isEdited: Value(asset.isEdited),
-          );
+      final companions = <RemoteAssetEntityCompanion>[];
+      for (final asset in data) {
+        final companion = RemoteAssetEntityCompanion(
+          name: Value(asset.originalFileName),
+          type: Value(asset.type.toAssetType()),
+          createdAt: Value.absentIfNull(asset.fileCreatedAt),
+          updatedAt: Value.absentIfNull(asset.fileModifiedAt),
+          uploadedAt: Value(asset.createdAt),
+          durationMs: Value(asset.duration),
+          checksum: Value(asset.checksum),
+          isFavorite: Value(asset.isFavorite),
+          ownerId: Value(asset.ownerId),
+          // The timeline orders on this column directly, so a null would sink
+          // the asset to the end of the gallery. Servers normally supply it;
+          // derive it from the capture time when they do not.
+          localDateTime: Value(asset.localDateTime ?? _wallClockOf(asset.fileCreatedAt ?? asset.createdAt)),
+          thumbHash: Value(asset.thumbhash),
+          deletedAt: Value(asset.deletedAt),
+          visibility: Value(asset.visibility.toAssetVisibility()),
+          livePhotoVideoId: Value(asset.livePhotoVideoId),
+          stackId: Value(asset.stackId),
+          libraryId: Value(asset.libraryId),
+          width: Value(asset.width),
+          height: Value(asset.height),
+          isEdited: Value(asset.isEdited),
+        );
 
-          batch.insert(
-            _db.remoteAssetEntity,
-            companion.copyWith(id: Value(asset.id)),
-            onConflict: DoUpdate((_) => companion),
-          );
-        }
-      });
+        companions.add(companion.copyWith(id: Value(asset.id)));
+      }
+      await _upsertRemoteAssets(companions);
     } catch (error, stack) {
       _logger.severe('Error: updateAssetsV2 - $debugLabel', error, stack);
       rethrow;
+    }
+  }
+
+  Future<void> _upsertRemoteAssets(List<RemoteAssetEntityCompanion> assets) async {
+    if (assets.isEmpty) {
+      return;
+    }
+    void insert(Batch batch, RemoteAssetEntityCompanion asset) => batch.insert(
+      _db.remoteAssetEntity,
+      asset,
+      onConflict: DoUpdate((_) => asset.copyWith(id: const Value.absent())),
+    );
+
+    try {
+      // The ordinary path remains one atomic batch with no extra queries.
+      await _db.batch((batch) {
+        for (final asset in assets) {
+          insert(batch, asset);
+        }
+      });
+    } on SqliteException catch (error) {
+      if (error.extendedResultCode != 2067 ||
+          !error.message.contains('remote_asset_entity.owner_id') ||
+          !error.message.contains('remote_asset_entity.checksum')) {
+        rethrow;
+      }
+      _logger.warning('Reconciling cached checksums with authoritative server asset IDs');
+      // A previous upload or an older server snapshot can claim this checksum
+      // under another ID. Preserve that row and every FK; only its stale
+      // checksum becomes provisional until its own server event arrives.
+      // All repairs and upserts commit together, before acknowledging the batch.
+      await _db.batch((batch) {
+        for (final asset in assets) {
+          final libraryId = asset.libraryId.value;
+          final where =
+              'owner_id = ? AND checksum = ? AND id <> ? AND ${libraryId == null ? 'library_id IS NULL' : 'library_id = ?'}';
+          final arguments = <Object?>[
+            asset.ownerId.value,
+            asset.checksum.value,
+            asset.id.value,
+            if (libraryId != null) libraryId,
+          ];
+          batch.customStatement(
+            'INSERT INTO remote_asset_cloud_id_entity (asset_id, cloud_id) '
+            'SELECT id, checksum FROM remote_asset_entity WHERE $where '
+            'ON CONFLICT(asset_id) DO UPDATE SET '
+            'cloud_id = COALESCE(remote_asset_cloud_id_entity.cloud_id, excluded.cloud_id)',
+            arguments,
+            [TableUpdate.onTable(_db.remoteAssetCloudIdEntity)],
+          );
+          batch.customStatement(
+            'UPDATE remote_asset_entity SET checksum = ? || id WHERE $where',
+            [kPendingRemoteChecksumPrefix, ...arguments],
+            [TableUpdate.onTable(_db.remoteAssetEntity)],
+          );
+          insert(batch, asset);
+        }
+      });
     }
   }
 
