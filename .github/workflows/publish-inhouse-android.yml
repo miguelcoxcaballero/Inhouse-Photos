@@ -12,13 +12,13 @@ concurrency:
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/feat/durable-upload-backlog' || github.ref == 'refs/heads/fix/backup-checksum-collision'
+    if: github.ref == 'refs/heads/feat/durable-upload-backlog' || github.ref == 'refs/heads/fix/backup-checksum-collision' || github.ref == 'refs/heads/feat/backup-cloud-menu'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      RELEASE_TAG: v3.1.99-sync-recovery
-      ANDROID_RELEASE_VERSION: '3.1.99'
-      ANDROID_RELEASE_BASE_BUILD: '5157'
+      RELEASE_TAG: v3.1.100-backup-menu
+      ANDROID_RELEASE_VERSION: '3.1.100'
+      ANDROID_RELEASE_BASE_BUILD: '5158'
     steps:
       - name: Checkout the source to publish
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -82,6 +82,7 @@ jobs:
             test/infrastructure/repositories/merged_asset_drift_test.dart \
             test/domain/repositories/sync_stream_repository_test.dart \
             test/widgets/backup/drift_backup_sync_test.dart \
+            test/widgets/backup/backup_cloud_menu_test.dart \
             test/domain/utils/background_sync_test.dart \
             test/providers/sync_status_test.dart \
             test/infrastructure/repositories/sync_api_repository_test.dart \
@@ -156,7 +157,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- mobile/pubspec.yaml Inhouse-Photos.apk Inhouse-Photos-Android.zip android-update.json
-          git commit -m "chore(android): publish verified $ANDROID_RELEASE_VERSION sync-recovery APK"
+          git commit -m "chore(android): publish verified $ANDROID_RELEASE_VERSION backup-menu APK"
           git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
@@ -172,7 +173,7 @@ jobs:
           version_code = int(os.environ['ANDROID_RELEASE_BASE_BUILD']) + 2000
           Path(sys.argv[1]).write_text(
               f'Inhouse Photos Android {version} (ARM64, versionCode {version_code}).\n\n'
-              f'Corrige el fallo SQLite UNIQUE de propietario y checksum durante la copia. Los registros provisionales usan una identidad propia hasta recibir el checksum del servidor. Repara los conflictos existentes conservando las fotos, los álbumes y los datos de las copias anteriores.\n\n'
+              f'Nuevo menú de copia de seguridad, con el estilo del resto de ajustes. Una nube muestra las fotos subiendo mientras se copian y una barra separa lo respaldado, lo listo para subir y lo que se está preparando. Si la sincronización falla, el aviso y el botón Reintentar aparecen en la misma nube. Todo cabe en una pantalla.\n\n'
               'Instala Inhouse-Photos.apk o extráelo de Inhouse-Photos-Android.zip sobre la aplicación existente. Se conserva el certificado permanente de Inhouse Photos. El informe adjunto verifica la versión, el paquete, la firma y los ocho símbolos JNI.\n'
           )
           PY
@@ -180,7 +181,7 @@ jobs:
             python -c 'import json,sys; assert json.load(open(sys.argv[1]))["isDraft"], "Refusing to overwrite an already published Android release"' "$RUNNER_TEMP/existing-android-release.json"
           else
             gh release create "$RELEASE_TAG" --draft --target "$RELEASE_COMMIT" \
-              --title "Inhouse Photos $ANDROID_RELEASE_VERSION — recuperación de copias" \
+              --title "Inhouse Photos $ANDROID_RELEASE_VERSION — nuevo menú de copia de seguridad" \
               --notes-file "$RUNNER_TEMP/android-release-notes.md"
           fi
           gh release upload "$RELEASE_TAG" Inhouse-Photos.apk Inhouse-Photos-Android.zip \

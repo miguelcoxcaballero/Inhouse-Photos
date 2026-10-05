@@ -100,6 +100,11 @@ class AndroidReleaseTagTests(unittest.TestCase):
         release.validate_shared_version("sync-recovery", "3.1.98", "3.1.97")
         self.assertIn("bibliotecas grandes", release.feature_description("sync-recovery"))
 
+    def test_backup_menu_release_keeps_the_existing_server_runtime(self):
+        self.assertEqual(release.release_feature("v3.1.100-backup-menu", "3.1.100"), "backup-menu")
+        release.validate_shared_version("backup-menu", "3.1.100", "3.1.97")
+        self.assertIn("menú de copia de seguridad", release.feature_description("backup-menu"))
+
     def test_unified_release_tag_matches_its_product_version(self):
         self.assertEqual(release.release_feature("v3.1.96-unified", "3.1.96"), "unified")
 

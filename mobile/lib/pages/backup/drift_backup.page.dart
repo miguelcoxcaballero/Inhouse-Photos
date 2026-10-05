@@ -10,7 +10,6 @@ import 'package:immich_mobile/extensions/platform_extensions.dart';
 import 'package:immich_mobile/extensions/theme_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
-import 'package:immich_mobile/presentation/widgets/backup/backup_toggle_button.widget.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/backup/backup_album.provider.dart';
 import 'package:immich_mobile/providers/backup/drift_backup.provider.dart';
@@ -19,7 +18,10 @@ import 'package:immich_mobile/providers/permission.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
-import 'package:immich_mobile/widgets/backup/backup_info_card.dart';
+import 'package:immich_mobile/utils/upload_speed_calculator.dart';
+import 'package:immich_mobile/widgets/backup/backup_cloud_hero.dart';
+import 'package:immich_mobile/widgets/backup/backup_stage_bar.dart';
+import 'package:immich_mobile/widgets/settings/setting_group_title.dart';
 import 'package:immich_ui/immich_ui.dart';
 import 'package:logging/logging.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -132,12 +134,9 @@ class _DriftBackupPageState extends ConsumerState<DriftBackupPage> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedAlbum = ref
+    final hasSelectedAlbums = ref
         .watch(backupAlbumProvider)
-        .where((album) => album.backupSelection == BackupSelection.selected)
-        .toList();
-
-    final error = ref.watch(driftBackupProvider.select((p) => p.error));
+        .any((album) => album.backupSelection == BackupSelection.selected);
 
     final backupNotifier = ref.read(driftBackupProvider.notifier);
 
@@ -162,83 +161,326 @@ class _DriftBackupPageState extends ConsumerState<DriftBackupPage> {
           ),
         ],
       ),
-      body: Stack(
+      body: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 32),
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 16.0, right: 16, bottom: 32),
-            child: ListView(
-              children: [
-                const SizedBox(height: 8),
-                const _BackupAlbumSelectionCard(),
-                if (selectedAlbum.isNotEmpty) ...[
-                  const _TotalCard(),
-                  const _BackupCard(),
-                  const _RemainderCard(),
-                  const Divider(),
-                  BackupToggleButton(
-                    onStart: () => unawaited(_startBackup()),
-                    onStop: () {
-                      _backupGeneration++;
-                      backupNotifier.stopForegroundBackup();
-                    },
-                  ),
-                  switch (error) {
-                    BackupError.none => const SizedBox.shrink(),
-                    BackupError.syncFailed => Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.max,
-                            children: [
-                              Icon(Icons.warning_rounded, color: context.colorScheme.error, fill: 1),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  context.t.backup_error_sync_failed,
-                                  style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.error),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (ref.watch(syncStatusProvider).errorMessage case final String message)
-                            Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: SelectableText(message, style: context.textTheme.bodySmall),
-                            ),
-                          TextButton.icon(
-                            onPressed: ref.watch(driftBackupProvider).isSyncing
-                                ? null
-                                : () => unawaited(_startBackup()),
-                            icon: const Icon(Icons.refresh),
-                            label: Text("backup_retry_sync".tr()),
-                          ),
-                        ],
-                      ),
-                    ),
-                  },
-                  const _BackupFooter(),
-                ],
-              ],
+          if (hasSelectedAlbums) ...[
+            _BackupSwitchCard(
+              onStart: () => unawaited(_startBackup()),
+              onStop: () {
+                _backupGeneration++;
+                backupNotifier.stopForegroundBackup();
+              },
             ),
-          ),
+            _BackupStatus(onRetry: () => unawaited(_startBackup())),
+            const Divider(height: 24),
+          ],
+          const _AlbumsTile(),
+          if (hasSelectedAlbums) ...[const _PendingTile(), const _UploadsTile(), const _BackgroundReliability()],
         ],
       ),
     );
   }
 }
 
-class _BackupFooter extends ConsumerStatefulWidget {
-  const _BackupFooter();
-
-  @override
-  ConsumerState<_BackupFooter> createState() => _BackupFooterState();
+NumberFormat _countFormat(BuildContext context) {
+  try {
+    return NumberFormat.decimalPattern(Localizations.localeOf(context).toString());
+  } catch (_) {
+    return NumberFormat.decimalPattern('en');
+  }
 }
 
-class _BackupFooterState extends ConsumerState<_BackupFooter> with WidgetsBindingObserver {
+TextStyle? _tileTitleStyle(BuildContext context) =>
+    context.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500, height: 1.5);
+
+TextStyle? _tileSubtitleStyle(BuildContext context) =>
+    context.textTheme.bodyMedium?.copyWith(color: context.textTheme.bodyMedium?.color?.withAlpha(215));
+
+const _tilePadding = EdgeInsets.only(left: 20, right: 24);
+
+/// The settings-card style switch that enables or disables backup.
+class _BackupSwitchCard extends ConsumerStatefulWidget {
+  const _BackupSwitchCard({required this.onStart, required this.onStop});
+
+  final VoidCallback onStart;
+  final VoidCallback onStop;
+
+  @override
+  ConsumerState<_BackupSwitchCard> createState() => _BackupSwitchCardState();
+}
+
+class _BackupSwitchCardState extends ConsumerState<_BackupSwitchCard> {
+  late bool _isEnabled = ref.read(appConfigProvider).backup.enabled;
+
+  Future<void> _onToggle(bool value) async {
+    await ref.read(settingsProvider).write(.backupEnabled, value);
+
+    setState(() {
+      _isEnabled = value;
+    });
+
+    if (value) {
+      widget.onStart.call();
+    } else {
+      widget.onStop.call();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final error = ref.watch(driftBackupProvider.select((state) => state.error));
+    final errorCount = ref.watch(driftBackupProvider.select((state) => state.errorCount));
+    final isComplete = ref.watch(
+      driftBackupProvider.select((state) => state.totalCount > 0 && state.remainderCount == 0),
+    );
+
+    final (subtitle, isWarning) = switch ((_isEnabled, error, errorCount, isComplete)) {
+      (false, _, _, _) => ("backup_switch_off".t(context: context), false),
+      (true, BackupError.syncFailed, _, _) => ("backup_switch_sync_failed".t(context: context), true),
+      (true, _, > 0, _) => ("upload_error_with_count".t(context: context, args: {'count': errorCount}), true),
+      (true, _, _, true) => ("backup_switch_all_done".t(context: context), false),
+      _ => ("backup_switch_on".t(context: context), false),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Card(
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
+        color: context.colorScheme.surfaceContainer,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+        margin: const EdgeInsets.symmetric(vertical: 4.0),
+        child: ListTile(
+          contentPadding: const EdgeInsets.only(left: 16, right: 12),
+          onTap: () => _onToggle(!_isEnabled),
+          leading: Container(
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.all(Radius.circular(16)),
+              color: context.isDarkTheme ? Colors.black26 : Colors.white.withAlpha(100),
+            ),
+            padding: const EdgeInsets.all(16.0),
+            child: Icon(Icons.cloud_upload_outlined, color: context.primaryColor),
+          ),
+          title: Text(
+            "backup_controller_page_backup".t(context: context),
+            style: context.textTheme.titleMedium!.copyWith(color: context.primaryColor),
+          ),
+          subtitle: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            layoutBuilder: (current, previous) =>
+                Stack(alignment: AlignmentDirectional.centerStart, children: [...previous, ?current]),
+            child: Text(
+              subtitle,
+              key: ValueKey(subtitle),
+              style: context.textTheme.bodyMedium?.copyWith(color: isWarning ? context.colorScheme.error : null),
+            ),
+          ),
+          trailing: Switch.adaptive(value: _isEnabled, onChanged: _onToggle),
+        ),
+      ),
+    );
+  }
+}
+
+/// The cloud with its animation and the staged progress bar below it.
+class _BackupStatus extends ConsumerWidget {
+  const _BackupStatus({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isEnabled = ref.watch(appConfigProvider.select((config) => config.backup.enabled));
+    final backup = ref.watch(driftBackupProvider);
+    final syncStatus = ref.watch(syncStatusProvider);
+    final count = _countFormat(context);
+
+    final activeUploads = backup.uploadItems.values.where((item) => item.isFailed != true).length;
+    final isError = backup.error == BackupError.syncFailed;
+    final isComplete = backup.totalCount > 0 && backup.remainderCount == 0;
+    final pending = "backup_hero_pending".t(context: context, args: {'count': count.format(backup.remainderCount)});
+
+    final (state, title, subtitle) = switch (null) {
+      _ when isError => (BackupCloudState.error, "backup_hero_sync_failed".t(context: context), null),
+      _ when !isEnabled => (
+        BackupCloudState.off,
+        "backup_hero_off".t(context: context),
+        backup.remainderCount > 0 ? pending : null,
+      ),
+      _ when activeUploads > 0 => (
+        BackupCloudState.uploading,
+        "backup_hero_uploading".t(context: context, args: {'count': activeUploads}),
+        // Only read while uploading: the aggregate speed is meaningless otherwise.
+        formatAggregateUploadSpeed(ref.read(driftBackupProvider.notifier).currentUploadBytesPerSecond),
+      ),
+      _ when backup.isSyncing => (BackupCloudState.syncing, "backup_hero_syncing".t(context: context), null),
+      _ when isComplete => (BackupCloudState.done, "backup_hero_done".t(context: context), null),
+      _ when syncStatus.isHashing => (BackupCloudState.syncing, "backup_hero_preparing".t(context: context), pending),
+      _ => (BackupCloudState.idle, "backup_hero_waiting".t(context: context), pending),
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        BackupCloudHero(
+          state: state,
+          title: title,
+          subtitle: subtitle,
+          footer: isError
+              ? Column(
+                  children: [
+                    if (syncStatus.errorMessage case final String message)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+                        child: SelectableText(
+                          message,
+                          textAlign: TextAlign.center,
+                          style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceSecondary),
+                        ),
+                      ),
+                    TextButton.icon(
+                      onPressed: backup.isSyncing ? null : onRetry,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text("backup_retry_sync".tr()),
+                    ),
+                  ],
+                )
+              : null,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+          child: BackupStageBar(
+            total: backup.totalCount,
+            backedUp: backup.backupCount,
+            ready: (backup.remainderCount - backup.processingCount).clamp(0, backup.remainderCount),
+            preparing: backup.processingCount,
+            isPreparing: syncStatus.isHashing,
+            isUploading: activeUploads > 0,
+            isError: isError,
+            backedUpLabel: "backup_bar_backed_up".t(context: context),
+            backedUpLegend: "backup_bar_legend_backed_up".t(context: context),
+            readyLegend: "backup_bar_legend_ready".t(context: context),
+            preparingLegend: "preparing".t(context: context),
+            totalLabel: "total".t(context: context),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AlbumsTile extends ConsumerWidget {
+  const _AlbumsTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final albums = ref.watch(backupAlbumProvider);
+    final selected = albums
+        .where((album) => album.backupSelection == BackupSelection.selected)
+        .map(
+          (album) => album.name == "Recent" || album.name == "Recents" ? "${album.name} (${'all'.tr()})" : album.name,
+        )
+        .join(", ");
+    final excluded = albums
+        .where((album) => album.backupSelection == BackupSelection.excluded)
+        .map((album) => album.name)
+        .join(", ");
+
+    return ListTile(
+      contentPadding: _tilePadding,
+      leading: const Icon(Icons.photo_library_outlined),
+      title: Text("albums".tr(), style: _tileTitleStyle(context)),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            selected.isNotEmpty ? selected : "backup_controller_page_none_selected".tr(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _tileSubtitleStyle(context),
+          ),
+          if (excluded.isNotEmpty)
+            Text(
+              "${"backup_controller_page_excluded".tr()}$excluded",
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: _tileSubtitleStyle(context)?.copyWith(color: Colors.red[300]),
+            ),
+        ],
+      ),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () async {
+        await context.pushRoute(const DriftBackupAlbumSelectionRoute());
+        final currentUser = ref.read(currentUserProvider);
+        if (currentUser == null) {
+          return;
+        }
+        unawaited(ref.read(driftBackupProvider.notifier).getBackupStatus(currentUser.id));
+      },
+    );
+  }
+}
+
+class _PendingTile extends ConsumerWidget {
+  const _PendingTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final remainder = ref.watch(driftBackupProvider.select((state) => state.remainderCount));
+
+    return ListTile(
+      contentPadding: _tilePadding,
+      leading: const Icon(Icons.pending_outlined),
+      title: Text("backup_pending_title".t(context: context), style: _tileTitleStyle(context)),
+      subtitle: Text(
+        "backup_pending_subtitle".t(context: context, args: {'count': _countFormat(context).format(remainder)}),
+        style: _tileSubtitleStyle(context),
+      ),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () => context.pushRoute(const DriftBackupAssetDetailRoute()),
+    );
+  }
+}
+
+class _UploadsTile extends ConsumerWidget {
+  const _UploadsTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(
+      driftBackupProvider.select(
+        (state) => state.uploadItems.values.where((item) => item.isFailed != true).firstOrNull,
+      ),
+    );
+
+    return ListTile(
+      contentPadding: _tilePadding,
+      leading: const Icon(Icons.upload_outlined),
+      title: Text("backup_uploads_title".t(context: context), style: _tileTitleStyle(context)),
+      subtitle: Text(
+        current == null
+            ? "backup_uploads_none".t(context: context)
+            : "${current.filename} · ${(current.progress * 100).clamp(0, 100).round()} %",
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: _tileSubtitleStyle(context)?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+      ),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () => context.pushRoute(const DriftUploadDetailRoute()),
+    );
+  }
+}
+
+/// Android permissions that keep background backups alive, shown only while missing.
+class _BackgroundReliability extends ConsumerStatefulWidget {
+  const _BackgroundReliability();
+
+  @override
+  ConsumerState<_BackgroundReliability> createState() => _BackgroundReliabilityState();
+}
+
+class _BackgroundReliabilityState extends ConsumerState<_BackgroundReliability> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -318,397 +560,54 @@ class _BackupFooterState extends ConsumerState<_BackupFooter> with WidgetsBindin
     final notificationStatus = ref.watch(notificationPermissionProvider);
     final batteryOptimizationStatus = ref.watch(batteryOptimizationProvider).valueOrNull;
 
-    return Column(
-      children: [
-        if (CurrentPlatform.isAndroid && isBackupEnabled) ...[
-          if (notificationStatus != PermissionStatus.granted)
-            TextButton.icon(
-              iconAlignment: .end,
-              icon: Icon(Icons.open_in_new_outlined, color: context.colorScheme.onSurfaceSecondary),
-              label: Text(
-                context.t.notification_backup_reliability,
-                textAlign: TextAlign.left,
-                style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceSecondary),
-              ),
-              onPressed: () {
-                ref.read(notificationPermissionProvider.notifier).requestNotificationPermission().then((p) {
-                  if (p == PermissionStatus.permanentlyDenied) {
-                    showPermissionsDialog();
-                  }
-                });
-              },
-            ),
-          if (notificationStatus != PermissionStatus.granted && batteryOptimizationStatus != PermissionStatus.granted)
-            const Divider(indent: 32, endIndent: 32),
-          if (batteryOptimizationStatus != PermissionStatus.granted)
-            TextButton.icon(
-              iconAlignment: .end,
-              icon: Icon(Icons.open_in_new_outlined, color: context.colorScheme.onSurfaceSecondary),
-              label: Text(
-                context.t.battery_optimization_backup_reliability,
-                textAlign: TextAlign.left,
-                style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceSecondary),
-              ),
-              onPressed: showBatteryOptimizationInfo,
-            ),
-        ],
-        TextButton.icon(
-          icon: const Icon(Icons.info_outline_rounded),
-          onPressed: () => context.pushRoute(const DriftUploadDetailRoute()),
-          label: Text(context.t.view_details),
-        ),
-      ],
-    );
-  }
-}
+    final needsNotifications = notificationStatus != PermissionStatus.granted;
+    final needsBattery = batteryOptimizationStatus != PermissionStatus.granted;
+    final visible = CurrentPlatform.isAndroid && isBackupEnabled && (needsNotifications || needsBattery);
 
-class _BackupAlbumSelectionCard extends ConsumerWidget {
-  const _BackupAlbumSelectionCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    Widget buildSelectedAlbumName() {
-      String text = "backup_controller_page_backup_selected".tr();
-      final albums = ref
-          .watch(backupAlbumProvider)
-          .where((album) => album.backupSelection == BackupSelection.selected)
-          .toList();
-
-      if (albums.isNotEmpty) {
-        for (var album in albums) {
-          if (album.name == "Recent" || album.name == "Recents") {
-            text += "${album.name} (${'all'.tr()}), ";
-          } else {
-            text += "${album.name}, ";
-          }
-        }
-
-        return Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Text(
-            text.trim().substring(0, text.length - 2),
-            style: context.textTheme.labelLarge?.copyWith(color: context.primaryColor),
-          ),
-        );
-      } else {
-        return Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Text(
-            "backup_controller_page_none_selected".tr(),
-            style: context.textTheme.labelLarge?.copyWith(color: context.primaryColor),
-          ),
-        );
-      }
-    }
-
-    Widget buildExcludedAlbumName() {
-      String text = "backup_controller_page_excluded".tr();
-      final albums = ref
-          .watch(backupAlbumProvider)
-          .where((album) => album.backupSelection == BackupSelection.excluded)
-          .toList();
-
-      if (albums.isNotEmpty) {
-        for (var album in albums) {
-          text += "${album.name}, ";
-        }
-
-        return Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Text(
-            text.trim().substring(0, text.length - 2),
-            style: context.textTheme.labelLarge?.copyWith(color: Colors.red[300]),
-          ),
-        );
-      } else {
-        return const SizedBox();
-      }
-    }
-
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: const BorderRadius.all(Radius.circular(20)),
-        side: BorderSide(color: context.colorScheme.outlineVariant, width: 1),
-      ),
-      elevation: 0,
-      borderOnForeground: false,
-      child: ListTile(
-        minVerticalPadding: 18,
-        title: Text("backup_controller_page_albums", style: context.textTheme.titleMedium).tr(),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "backup_controller_page_to_backup",
-                style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.onSurfaceSecondary),
-              ).tr(),
-              buildSelectedAlbumName(),
-              buildExcludedAlbumName(),
-            ],
-          ),
-        ),
-        trailing: ElevatedButton(
-          onPressed: () async {
-            await context.pushRoute(const DriftBackupAlbumSelectionRoute());
-            final currentUser = ref.read(currentUserProvider);
-            if (currentUser == null) {
-              return;
-            }
-            unawaited(ref.read(driftBackupProvider.notifier).getBackupStatus(currentUser.id));
-          },
-          child: const Text("select", style: TextStyle(fontWeight: FontWeight.bold)).tr(),
-        ),
-      ),
-    );
-  }
-}
-
-class _TotalCard extends ConsumerWidget {
-  const _TotalCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final totalCount = ref.watch(driftBackupProvider.select((p) => p.totalCount));
-
-    return BackupInfoCard(
-      title: "total".tr(),
-      subtitle: "backup_controller_page_total_sub".tr(),
-      info: totalCount.toString(),
-    );
-  }
-}
-
-class _BackupCard extends ConsumerWidget {
-  const _BackupCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final backupCount = ref.watch(driftBackupProvider.select((p) => p.backupCount));
-    final syncStatus = ref.watch(syncStatusProvider);
-
-    return BackupInfoCard(
-      title: "backup_controller_page_backup".tr(),
-      subtitle: "backup_controller_page_backup_sub".tr(),
-      info: backupCount.toString(),
-      isLoading: syncStatus.isRemoteSyncing,
-    );
-  }
-}
-
-class _RemainderCard extends ConsumerWidget {
-  const _RemainderCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final remainderCount = ref.watch(driftBackupProvider.select((p) => p.remainderCount));
-    final syncStatus = ref.watch(syncStatusProvider);
-
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: const BorderRadius.all(Radius.circular(20)),
-        side: BorderSide(color: context.colorScheme.outlineVariant, width: 1),
-      ),
-      elevation: 0,
-      borderOnForeground: false,
-      child: Column(
-        children: [
-          ListTile(
-            minVerticalPadding: 18,
-            isThreeLine: true,
-            title: Text("backup_controller_page_remainder".t(context: context), style: context.textTheme.titleMedium),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 4.0, right: 18.0),
-              child: Text(
-                "backup_controller_page_remainder_sub".t(context: context),
-                style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.onSurfaceSecondary),
-              ),
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: !visible
+          ? const SizedBox(width: double.infinity)
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Stack(
-                  children: [
-                    Text(
-                      remainderCount.toString(),
-                      style: context.textTheme.titleLarge?.copyWith(
-                        color: context.colorScheme.onSurface.withAlpha(syncStatus.isRemoteSyncing ? 50 : 255),
-                        fontFeatures: [const FontFeature.tabularFigures()],
-                      ),
-                    ),
-                    if (syncStatus.isRemoteSyncing)
-                      Positioned.fill(
-                        child: Align(
-                          alignment: Alignment.center,
-                          child: SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: context.colorScheme.onSurface.withAlpha(150),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+                const Divider(height: 24),
+                SettingGroupTitle(
+                  title: "backup_background_group".t(context: context),
+                  icon: Icons.info_outline_rounded,
+                  contentPadding: const EdgeInsets.only(left: 20, right: 20, bottom: 4),
                 ),
-                Text(
-                  "backup_info_card_assets",
-                  style: context.textTheme.labelLarge?.copyWith(
-                    color: context.colorScheme.onSurface.withAlpha(syncStatus.isRemoteSyncing ? 50 : 255),
+                if (needsNotifications)
+                  ListTile(
+                    contentPadding: _tilePadding,
+                    leading: const Icon(Icons.notifications_outlined),
+                    title: Text("backup_notifications_title".t(context: context), style: _tileTitleStyle(context)),
+                    subtitle: Text(
+                      "backup_notifications_subtitle".t(context: context),
+                      style: _tileSubtitleStyle(context),
+                    ),
+                    trailing: const Icon(Icons.open_in_new_outlined),
+                    onTap: () {
+                      ref.read(notificationPermissionProvider.notifier).requestNotificationPermission().then((p) {
+                        if (p == PermissionStatus.permanentlyDenied) {
+                          showPermissionsDialog();
+                        }
+                      });
+                    },
                   ),
-                ).tr(),
+                if (needsBattery)
+                  ListTile(
+                    contentPadding: _tilePadding,
+                    leading: const Icon(Icons.battery_alert_outlined),
+                    title: Text("backup_battery_title".t(context: context), style: _tileTitleStyle(context)),
+                    subtitle: Text("backup_battery_subtitle".t(context: context), style: _tileSubtitleStyle(context)),
+                    trailing: const Icon(Icons.open_in_new_outlined),
+                    onTap: showBatteryOptimizationInfo,
+                  ),
               ],
             ),
-          ),
-          const Divider(height: 0),
-          const _PreparingStatus(),
-          const Divider(height: 0),
-
-          ListTile(
-            enableFeedback: true,
-            visualDensity: VisualDensity.compact,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(20), bottomRight: Radius.circular(20)),
-            ),
-            onTap: () => context.pushRoute(const DriftBackupAssetDetailRoute()),
-            title: Text(
-              "view_details".t(context: context),
-              style: context.textTheme.labelLarge?.copyWith(color: context.colorScheme.onSurface.withAlpha(200)),
-            ),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16, color: context.colorScheme.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PreparingStatus extends ConsumerStatefulWidget {
-  const _PreparingStatus();
-
-  @override
-  _PreparingStatusState createState() => _PreparingStatusState();
-}
-
-class _PreparingStatusState extends ConsumerState {
-  Timer? _pollingTimer;
-
-  @override
-  void dispose() {
-    _pollingTimer?.cancel();
-    super.dispose();
-  }
-
-  void _startPollingIfNeeded() {
-    if (_pollingTimer != null) {
-      return;
-    }
-
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
-      final currentUser = ref.read(currentUserProvider);
-      if (currentUser != null && mounted) {
-        await ref.read(driftBackupProvider.notifier).getBackupStatus(currentUser.id);
-
-        // Stop polling if processing count reaches 0
-        final updatedProcessingCount = ref.read(driftBackupProvider.select((p) => p.processingCount));
-        if (updatedProcessingCount == 0) {
-          timer.cancel();
-          _pollingTimer = null;
-        }
-      } else {
-        timer.cancel();
-        _pollingTimer = null;
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final syncStatus = ref.watch(syncStatusProvider);
-    final remainderCount = ref.watch(driftBackupProvider.select((p) => p.remainderCount));
-    final processingCount = ref.watch(driftBackupProvider.select((p) => p.processingCount));
-    final readyForUploadCount = remainderCount - processingCount;
-
-    ref.listen<int>(driftBackupProvider.select((p) => p.processingCount), (previous, next) {
-      if (next > 0 && _pollingTimer == null) {
-        _startPollingIfNeeded();
-      } else if (next == 0 && _pollingTimer != null) {
-        _pollingTimer?.cancel();
-        _pollingTimer = null;
-      }
-    });
-
-    if (!syncStatus.isHashing) {
-      return const SizedBox.shrink();
-    }
-
-    return Row(
-      children: [
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(left: 1.0),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-              decoration: BoxDecoration(
-                color: context.colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
-                shape: BoxShape.rectangle,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        "preparing".t(context: context),
-                        style: context.textTheme.labelLarge?.copyWith(
-                          color: context.colorScheme.onSurface.withAlpha(200),
-                        ),
-                      ),
-                      const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 1.5)),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    processingCount.toString(),
-                    style: context.textTheme.titleMedium?.copyWith(
-                      color: context.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                      fontFeatures: [const FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-            decoration: BoxDecoration(color: context.colorScheme.primary.withValues(alpha: 0.1)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  "ready_for_upload".t(context: context),
-                  style: context.textTheme.labelLarge?.copyWith(color: context.colorScheme.onSurface.withAlpha(200)),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  readyForUploadCount.toString(),
-                  style: context.textTheme.titleMedium?.copyWith(
-                    color: context.primaryColor,
-                    fontWeight: FontWeight.w600,
-                    fontFeatures: [const FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
