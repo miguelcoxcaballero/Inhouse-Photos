@@ -1,8 +1,8 @@
 {
-  "version": "3.1.100",
-  "versionCode": 7158,
+  "version": "3.1.101",
+  "versionCode": 7159,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.100-backup-menu/Inhouse-Photos.apk",
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.101-backup-menu/Inhouse-Photos.apk",
   "sizeBytes": 75034533,
-  "sha256": "7515007c82cfb8444c162405bced8dd47e90e03153f20e09b737910c69a074d2"
+  "sha256": "74f882e66efcb1fc5927a6dd7c5226949558049e3c004a219a87170d350f96e9"
 }
