@@ -5,37 +5,31 @@ import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/theme_extensions.dart';
 import 'package:intl/intl.dart';
 
-/// Backup progress split into stages: backed up | ready to upload | preparing.
+/// Backup progress split into what is already backed up and what remains.
 class BackupStageBar extends StatefulWidget {
   const BackupStageBar({
     super.key,
     required this.total,
     required this.backedUp,
-    required this.ready,
-    required this.preparing,
+    required this.remaining,
     required this.backedUpLabel,
     required this.backedUpLegend,
-    required this.readyLegend,
-    required this.preparingLegend,
+    required this.remainingLegend,
     required this.totalLabel,
-    this.isPreparing = false,
     this.isUploading = false,
     this.isError = false,
   });
 
   final int total;
   final int backedUp;
-  final int ready;
-  final int preparing;
+  final int remaining;
 
   /// Text after the percentage, e.g. "backed up".
   final String backedUpLabel;
   final String backedUpLegend;
-  final String readyLegend;
-  final String preparingLegend;
+  final String remainingLegend;
   final String totalLabel;
 
-  final bool isPreparing;
   final bool isUploading;
   final bool isError;
 
@@ -88,8 +82,7 @@ class _BackupStageBarState extends State<BackupStageBar> with SingleTickerProvid
     final count = _numberFormat(locale);
     final fraction = widget.total == 0 ? 0.0 : widget.backedUp / widget.total;
     final backedColor = widget.isError ? scheme.error : context.primaryColor;
-    final readyColor = context.primaryColor.withValues(alpha: 0.4);
-    final preparingColor = context.isDarkTheme ? const Color(0xFFF4B64A) : const Color(0xFFD9A23A);
+    final remainingColor = context.primaryColor.withValues(alpha: 0.4);
     final secondary = context.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceSecondary);
     const tabular = [FontFeature.tabularFigures()];
 
@@ -144,16 +137,12 @@ class _BackupStageBarState extends State<BackupStageBar> with SingleTickerProvid
                 if (widget.total == 0) {
                   return ColoredBox(color: scheme.secondaryContainer);
                 }
-                final available = math.max(0.0, constraints.maxWidth - 2 * _gap);
-                double width(int value) => (available * value / widget.total).clamp(0.0, available);
-                // Preparing keeps a visible sliver; the ready stripe absorbs the difference so the row never overflows.
-                final backedWidth = width(widget.backedUp);
-                final preparingWidth = widget.preparing > 0
-                    ? math.max(0.0, math.min(math.max(width(widget.preparing), 4.0), available - backedWidth))
-                    : 0.0;
-                final readyWidth = math.max(
+                final available = math.max(0.0, constraints.maxWidth - _gap);
+                final backedWidth = (available * widget.backedUp / widget.total).clamp(0.0, available);
+                // The stripe absorbs rounding so the row never overflows.
+                final remainingWidth = math.max(
                   0.0,
-                  math.min(width(widget.ready), available - backedWidth - preparingWidth),
+                  math.min(available * widget.remaining / widget.total, available - backedWidth),
                 );
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -163,11 +152,9 @@ class _BackupStageBarState extends State<BackupStageBar> with SingleTickerProvid
                     AnimatedContainer(
                       duration: _duration,
                       curve: _curve,
-                      width: readyWidth,
+                      width: remainingWidth,
                       child: CustomPaint(painter: _StripesPainter(_stripes, context.primaryColor)),
                     ),
-                    const SizedBox(width: _gap),
-                    AnimatedContainer(duration: _duration, curve: _curve, width: preparingWidth, color: preparingColor),
                   ],
                 );
               },
@@ -180,13 +167,7 @@ class _BackupStageBarState extends State<BackupStageBar> with SingleTickerProvid
           runSpacing: 4,
           children: [
             _LegendItem(color: backedColor, label: widget.backedUpLegend, value: count.format(widget.backedUp)),
-            _LegendItem(color: readyColor, label: widget.readyLegend, value: count.format(widget.ready)),
-            _LegendItem(
-              color: preparingColor,
-              label: widget.preparingLegend,
-              value: count.format(widget.preparing),
-              busy: widget.isPreparing,
-            ),
+            _LegendItem(color: remainingColor, label: widget.remainingLegend, value: count.format(widget.remaining)),
           ],
         ),
       ],
@@ -211,12 +192,11 @@ class _BackupStageBarState extends State<BackupStageBar> with SingleTickerProvid
 }
 
 class _LegendItem extends StatelessWidget {
-  const _LegendItem({required this.color, required this.label, required this.value, this.busy = false});
+  const _LegendItem({required this.color, required this.label, required this.value});
 
   final Color color;
   final String label;
   final String value;
-  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -240,10 +220,6 @@ class _LegendItem extends StatelessWidget {
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
-        if (busy) ...[
-          const SizedBox(width: 6),
-          SizedBox.square(dimension: 12, child: CircularProgressIndicator(strokeWidth: 2, color: context.primaryColor)),
-        ],
       ],
     );
   }

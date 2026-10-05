@@ -16,9 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      RELEASE_TAG: v3.1.100-backup-menu
-      ANDROID_RELEASE_VERSION: '3.1.100'
-      ANDROID_RELEASE_BASE_BUILD: '5158'
+      RELEASE_TAG: v3.1.101-backup-menu
+      ANDROID_RELEASE_VERSION: '3.1.101'
+      ANDROID_RELEASE_BASE_BUILD: '5159'
     steps:
       - name: Checkout the source to publish
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -173,7 +173,7 @@ jobs:
           version_code = int(os.environ['ANDROID_RELEASE_BASE_BUILD']) + 2000
           Path(sys.argv[1]).write_text(
               f'Inhouse Photos Android {version} (ARM64, versionCode {version_code}).\n\n'
-              f'Nuevo menú de copia de seguridad, con el estilo del resto de ajustes. Una nube muestra las fotos subiendo mientras se copian y una barra separa lo respaldado, lo listo para subir y lo que se está preparando. Si la sincronización falla, el aviso y el botón Reintentar aparecen en la misma nube. Todo cabe en una pantalla.\n\n'
+              f'Simplifica el menú de copia de seguridad: la barra muestra solo lo respaldado y lo pendiente, sin la etapa «Preparando». Activar o desactivar la copia ahora se anima con suavidad: la nube da un pequeño salto con una onda al encenderla, se encoge al apagarla y los textos cambian sin solaparse.\n\n'
               'Instala Inhouse-Photos.apk o extráelo de Inhouse-Photos-Android.zip sobre la aplicación existente. Se conserva el certificado permanente de Inhouse Photos. El informe adjunto verifica la versión, el paquete, la firma y los ocho símbolos JNI.\n'
           )
           PY
@@ -181,7 +181,7 @@ jobs:
             python -c 'import json,sys; assert json.load(open(sys.argv[1]))["isDraft"], "Refusing to overwrite an already published Android release"' "$RUNNER_TEMP/existing-android-release.json"
           else
             gh release create "$RELEASE_TAG" --draft --target "$RELEASE_COMMIT" \
-              --title "Inhouse Photos $ANDROID_RELEASE_VERSION — nuevo menú de copia de seguridad" \
+              --title "Inhouse Photos $ANDROID_RELEASE_VERSION — menú de copia de seguridad más simple" \
               --notes-file "$RUNNER_TEMP/android-release-notes.md"
           fi
           gh release upload "$RELEASE_TAG" Inhouse-Photos.apk Inhouse-Photos-Android.zip \

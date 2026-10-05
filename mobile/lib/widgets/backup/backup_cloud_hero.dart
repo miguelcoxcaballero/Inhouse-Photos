@@ -10,7 +10,8 @@ import 'package:immich_mobile/extensions/theme_extensions.dart';
 enum BackupCloudState { off, idle, syncing, uploading, done, error }
 
 /// Cloud at the top of the backup page. While files upload, small photo-toned
-/// squares rise from both sides into it; every other state is static.
+/// squares rise from both sides into it. Turning backup on or off pops the cloud;
+/// every other change cross-fades.
 class BackupCloudHero extends StatefulWidget {
   const BackupCloudHero({super.key, required this.state, required this.title, this.subtitle, this.footer});
 
@@ -25,142 +26,265 @@ class BackupCloudHero extends StatefulWidget {
   State<BackupCloudHero> createState() => _BackupCloudHeroState();
 }
 
-class _BackupCloudHeroState extends State<BackupCloudHero> with SingleTickerProviderStateMixin {
+class _BackupCloudHeroState extends State<BackupCloudHero> with TickerProviderStateMixin {
   static const _cloudTop = 14.0;
   static const _ringSize = 78.0;
+  static const _circleSize = 64.0;
+  static const _switchDuration = Duration(milliseconds: 350);
+
+  // Text leaves during the first 40 % and the new text arrives after it, so they never overlap.
+  static const _textIn = Interval(0.4, 1, curve: Curves.easeOutCubic);
+  static const _textOut = Interval(0.6, 1, curve: Curves.easeIn);
 
   late final Ticker _ticker;
   final _seconds = ValueNotifier<double>(0);
+
+  /// Fades the rising photos in and out instead of cutting them.
+  late final AnimationController _presence = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 450),
+  );
+
+  /// One-shot pop played when backup is turned on or off.
+  late final AnimationController _toggle = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 650),
+    value: 1,
+  );
+  bool _turnedOn = true;
 
   @override
   void initState() {
     super.initState();
     _ticker = createTicker((elapsed) => _seconds.value = elapsed.inMicroseconds / Duration.microsecondsPerSecond);
+    _presence.addStatusListener((status) {
+      if (status == AnimationStatus.dismissed && _ticker.isActive) {
+        _ticker.stop();
+        _seconds.value = 0;
+      }
+    });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _syncTicker();
+    _syncMotion();
   }
 
   @override
   void didUpdateWidget(covariant BackupCloudHero oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _syncTicker();
+    final wasOff = oldWidget.state == BackupCloudState.off;
+    final isOff = widget.state == BackupCloudState.off;
+    if (wasOff != isOff && !_reduceMotion) {
+      _turnedOn = !isOff;
+      _toggle.forward(from: 0);
+    }
+    _syncMotion();
   }
 
-  bool get _animate => widget.state == BackupCloudState.uploading && !MediaQuery.disableAnimationsOf(context);
+  bool get _reduceMotion => MediaQuery.disableAnimationsOf(context);
 
-  void _syncTicker() {
-    if (_animate && !_ticker.isActive) {
-      _ticker.start();
-    } else if (!_animate && _ticker.isActive) {
-      _ticker.stop();
-      _seconds.value = 0;
+  void _syncMotion() {
+    if (_reduceMotion) {
+      _presence.value = 0;
+      return;
+    }
+    if (widget.state == BackupCloudState.uploading) {
+      if (!_ticker.isActive) {
+        _ticker.start();
+      }
+      _presence.forward();
+    } else {
+      _presence.reverse();
     }
   }
 
   @override
   void dispose() {
     _ticker.dispose();
+    _presence.dispose();
+    _toggle.dispose();
     _seconds.dispose();
     super.dispose();
   }
 
+  /// Turning on overshoots outwards, turning off dips inwards; both settle at 1.
+  double _popScale(double value) {
+    final peak = _turnedOn ? 1.14 : 0.9;
+    if (value < 0.35) {
+      return 1 + (peak - 1) * Curves.easeOut.transform(value / 0.35);
+    }
+    return peak + (1 - peak) * Curves.easeOutBack.transform((value - 0.35) / 0.65);
+  }
+
+  static Widget _fadeSlide(Widget child, Animation<double> animation) => FadeTransition(
+    opacity: animation,
+    child: SlideTransition(
+      position: Tween(
+        begin: const Offset(0, 0.25),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+      child: child,
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final scheme = context.colorScheme;
+    final primary = context.primaryColor;
     final isError = widget.state == BackupCloudState.error;
+    final showRing = widget.state == BackupCloudState.uploading || widget.state == BackupCloudState.syncing;
     // Keeps the text readable while a square passes behind it.
     final halo = [Shadow(color: scheme.surface, blurRadius: 6), Shadow(color: scheme.surface, blurRadius: 12)];
     final (icon, iconColor, circleColor) = switch (widget.state) {
       BackupCloudState.off => (Icons.cloud_off_outlined, scheme.onSurfaceSecondary, scheme.surfaceContainer),
       BackupCloudState.idle ||
-      BackupCloudState.uploading => (Icons.cloud_upload_outlined, context.primaryColor, scheme.surfaceContainer),
-      BackupCloudState.syncing => (Icons.cloud_sync_outlined, context.primaryColor, scheme.surfaceContainer),
-      BackupCloudState.done => (Icons.cloud_done_outlined, context.primaryColor, scheme.surfaceContainer),
+      BackupCloudState.uploading => (Icons.cloud_upload_outlined, primary, scheme.surfaceContainer),
+      BackupCloudState.syncing => (Icons.cloud_sync_outlined, primary, scheme.surfaceContainer),
+      BackupCloudState.done => (Icons.cloud_done_outlined, primary, scheme.surfaceContainer),
       BackupCloudState.error => (Icons.warning_rounded, scheme.error, scheme.errorContainer),
     };
 
-    return Stack(
-      children: [
-        if (_animate)
-          Positioned.fill(
-            child: RepaintBoundary(
-              child: CustomPaint(painter: _RisingPhotosPainter(_seconds, cloudCentreY: _cloudTop + _ringSize / 2)),
+    final cloud = SizedBox.square(
+      dimension: _ringSize,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          AnimatedSwitcher(
+            duration: _switchDuration,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(scale: Tween(begin: 0.85, end: 1.0).animate(animation), child: child),
+            ),
+            child: showRing
+                ? SizedBox.square(
+                    key: const ValueKey('ring'),
+                    dimension: _ringSize - 2,
+                    child: CircularProgressIndicator(strokeWidth: 3, strokeCap: StrokeCap.round, color: primary),
+                  )
+                : const SizedBox.square(key: ValueKey('no-ring'), dimension: _ringSize - 2),
+          ),
+          AnimatedContainer(
+            duration: _switchDuration,
+            curve: Curves.easeOutCubic,
+            width: _circleSize,
+            height: _circleSize,
+            decoration: BoxDecoration(color: circleColor, shape: BoxShape.circle),
+            child: AnimatedSwitcher(
+              duration: _switchDuration,
+              switchInCurve: Curves.easeOutBack,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(scale: Tween(begin: 0.5, end: 1.0).animate(animation), child: child),
+              ),
+              child: Icon(icon, key: ValueKey(icon), size: 32, color: iconColor),
             ),
           ),
+        ],
+      ),
+    );
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: CustomPaint(
+              painter: _RisingPhotosPainter(_seconds, _presence, cloudCentreY: _cloudTop + _ringSize / 2),
+            ),
+          ),
+        ),
         SizedBox(
           width: double.infinity,
           child: Column(
             children: [
               const SizedBox(height: _cloudTop),
-              ValueListenableBuilder<double>(
-                valueListenable: _seconds,
-                builder: (_, t, child) =>
-                    Transform.translate(offset: Offset(0, -1.5 * (1 - math.cos(2 * math.pi * t / 2.2))), child: child),
-                child: SizedBox.square(
-                  dimension: _ringSize,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      if (widget.state == BackupCloudState.uploading || widget.state == BackupCloudState.syncing)
-                        SizedBox.square(
-                          dimension: _ringSize - 2,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 3,
-                            strokeCap: StrokeCap.round,
-                            color: context.primaryColor,
+              AnimatedBuilder(
+                animation: Listenable.merge([_seconds, _presence, _toggle]),
+                builder: (context, child) {
+                  final bob = -1.5 * (1 - math.cos(2 * math.pi * _seconds.value / 2.2)) * _presence.value;
+                  final popping = _toggle.value < 1;
+                  return Transform.translate(
+                    offset: Offset(0, bob),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Turning on sends a single ring outwards from the cloud.
+                        if (popping && _turnedOn)
+                          IgnorePointer(
+                            child: Opacity(
+                              opacity: (1 - _toggle.value) * 0.6,
+                              child: Transform.scale(
+                                scale: 1 + 0.7 * Curves.easeOutCubic.transform(_toggle.value),
+                                child: Container(
+                                  width: _circleSize,
+                                  height: _circleSize,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: primary, width: 2),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(color: circleColor, shape: BoxShape.circle),
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 250),
-                          transitionBuilder: (child, animation) => FadeTransition(
-                            opacity: animation,
-                            child: ScaleTransition(scale: Tween(begin: 0.6, end: 1.0).animate(animation), child: child),
-                          ),
-                          child: Icon(icon, key: ValueKey(icon), size: 32, color: iconColor),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                        Transform.scale(scale: popping ? _popScale(_toggle.value) : 1, child: child),
+                      ],
+                    ),
+                  );
+                },
+                child: cloud,
               ),
               const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
+                  duration: _switchDuration,
+                  switchInCurve: _textIn,
+                  switchOutCurve: _textOut,
+                  transitionBuilder: _fadeSlide,
+                  // Keyed by state so live counts update in place without re-animating.
                   child: Text(
                     widget.title,
-                    key: ValueKey(widget.title),
+                    key: ValueKey(widget.state),
                     textAlign: TextAlign.center,
                     style: context.textTheme.titleMedium?.copyWith(color: isError ? scheme.error : null, shadows: halo),
                   ),
                 ),
               ),
-              if (widget.subtitle case final String subtitle) ...[
-                const SizedBox(height: 2),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    subtitle,
-                    textAlign: TextAlign.center,
-                    style: context.textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceSecondary,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                      shadows: halo,
+              AnimatedSize(
+                duration: _switchDuration,
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: Column(
+                  children: [
+                    AnimatedSwitcher(
+                      duration: _switchDuration,
+                      switchInCurve: _textIn,
+                      switchOutCurve: _textOut,
+                      transitionBuilder: _fadeSlide,
+                      child: widget.subtitle == null
+                          ? SizedBox(key: ValueKey(widget.state), width: double.infinity)
+                          : Padding(
+                              key: ValueKey(widget.state),
+                              padding: const EdgeInsets.fromLTRB(24, 2, 24, 0),
+                              child: Text(
+                                widget.subtitle!,
+                                textAlign: TextAlign.center,
+                                style: context.textTheme.bodyMedium?.copyWith(
+                                  color: scheme.onSurfaceSecondary,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                  shadows: halo,
+                                ),
+                              ),
+                            ),
                     ),
-                  ),
+                    if (widget.footer case final Widget footer) footer,
+                  ],
                 ),
-              ],
-              if (widget.footer case final Widget footer) footer,
+              ),
               const SizedBox(height: 8),
             ],
           ),
@@ -173,9 +297,11 @@ class _BackupCloudHeroState extends State<BackupCloudHero> with SingleTickerProv
 /// Twelve photo-like squares, half from each side, each rising into the cloud
 /// on its own period so the stream never pulses in sync.
 class _RisingPhotosPainter extends CustomPainter {
-  _RisingPhotosPainter(this.seconds, {required this.cloudCentreY}) : super(repaint: seconds);
+  _RisingPhotosPainter(this.seconds, this.presence, {required this.cloudCentreY})
+    : super(repaint: Listenable.merge([seconds, presence]));
 
   final ValueListenable<double> seconds;
+  final Animation<double> presence;
   final double cloudCentreY;
 
   // Muted photo tones shared with the inhouse photos website.
@@ -194,6 +320,10 @@ class _RisingPhotosPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final fade = presence.value;
+    if (fade == 0) {
+      return;
+    }
     final t = seconds.value;
     final target = Offset(size.width / 2, cloudCentreY);
     const rect = Rect.fromLTWH(-_side / 2, -_side / 2, _side, _side);
@@ -210,11 +340,13 @@ class _RisingPhotosPainter extends CustomPainter {
       final start = Offset(size.width * fraction + _side / 2, size.height - 6 - _side / 2);
       final eased = Curves.easeInOut.transform(phase);
       final centre = Offset.lerp(start, target, eased)!;
-      final opacity = phase < 0.12
-          ? phase / 0.12
-          : phase > 0.72
-          ? (1 - phase) / 0.28
-          : 1.0;
+      final opacity =
+          fade *
+          (phase < 0.12
+              ? phase / 0.12
+              : phase > 0.72
+              ? (1 - phase) / 0.28
+              : 1.0);
       final (from, to) = _tones[i % _tones.length];
 
       canvas
@@ -246,5 +378,5 @@ class _RisingPhotosPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RisingPhotosPainter oldDelegate) =>
-      oldDelegate.seconds != seconds || oldDelegate.cloudCentreY != cloudCentreY;
+      oldDelegate.seconds != seconds || oldDelegate.presence != presence || oldDelegate.cloudCentreY != cloudCentreY;
 }

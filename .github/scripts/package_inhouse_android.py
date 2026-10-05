@@ -73,7 +73,7 @@ def feature_description(feature: str) -> str:
     if feature == "backup-menu":
         return (
             "Nuevo menú de copia de seguridad: la nube muestra las fotos subiendo, la barra separa "
-            "lo respaldado, lo listo para subir y lo que se prepara, y todo cabe en una pantalla.\n\n"
+            "lo respaldado de lo pendiente y activar o desactivar la copia se anima con suavidad.\n\n"
         )
     if feature == "sync-recovery":
         return "La copia reintenta interrupciones de conexión y procesa bibliotecas grandes en lotes limitados.\n\n"

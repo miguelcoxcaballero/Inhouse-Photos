@@ -11,45 +11,39 @@ Widget _host(Widget child, {double width = 412}) => MaterialApp(
   ),
 );
 
-BackupStageBar _bar({
-  required int total,
-  required int backedUp,
-  required int ready,
-  required int preparing,
-  bool isUploading = false,
-}) => BackupStageBar(
-  total: total,
-  backedUp: backedUp,
-  ready: ready,
-  preparing: preparing,
-  isUploading: isUploading,
-  backedUpLabel: 'backed up',
-  backedUpLegend: 'Backed up',
-  readyLegend: 'Ready',
-  preparingLegend: 'Preparing',
-  totalLabel: 'Total',
-);
+BackupStageBar _bar({required int total, required int backedUp, required int remaining, bool isUploading = false}) =>
+    BackupStageBar(
+      total: total,
+      backedUp: backedUp,
+      remaining: remaining,
+      isUploading: isUploading,
+      backedUpLabel: 'backed up',
+      backedUpLegend: 'Backed up',
+      remainingLegend: 'Pending',
+      totalLabel: 'Total',
+    );
 
 void main() {
-  testWidgets('the stage bar shows every stage count', (tester) async {
-    await tester.pumpWidget(_host(_bar(total: 12840, backedUp: 11205, ready: 1539, preparing: 96)));
+  testWidgets('the bar shows backed-up and pending counts, without a preparing stage', (tester) async {
+    await tester.pumpWidget(_host(_bar(total: 12840, backedUp: 11205, remaining: 1635)));
     await tester.pumpAndSettle();
 
     expect(find.text('11,205'), findsOneWidget);
-    expect(find.text('1,539'), findsOneWidget);
-    expect(find.text('96'), findsOneWidget);
+    expect(find.text('1,635'), findsOneWidget);
+    expect(find.text('Pending'), findsOneWidget);
+    expect(find.text('Preparing'), findsNothing);
     expect(find.textContaining('87.3%'), findsOneWidget);
   });
 
   testWidgets('the stage bar never overflows at its edges', (tester) async {
-    // Nearly complete with a preparing sliver wider than what is left, on a narrow screen.
-    await tester.pumpWidget(_host(_bar(total: 100000, backedUp: 99999, ready: 0, preparing: 1), width: 220));
+    // Nearly complete, on a narrow screen.
+    await tester.pumpWidget(_host(_bar(total: 100000, backedUp: 99999, remaining: 1), width: 220));
     await tester.pumpAndSettle();
     // Empty library.
-    await tester.pumpWidget(_host(_bar(total: 0, backedUp: 0, ready: 0, preparing: 0), width: 220));
+    await tester.pumpWidget(_host(_bar(total: 0, backedUp: 0, remaining: 0), width: 220));
     await tester.pumpAndSettle();
     // Counts that do not add up to the total.
-    await tester.pumpWidget(_host(_bar(total: 10, backedUp: 8, ready: 9, preparing: 3), width: 220));
+    await tester.pumpWidget(_host(_bar(total: 10, backedUp: 8, remaining: 9), width: 220));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
@@ -69,6 +63,25 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.text('Waiting to upload'), findsOneWidget);
+  });
+
+  testWidgets('turning backup on and off pops the cloud once and settles', (tester) async {
+    await tester.pumpWidget(_host(const BackupCloudHero(state: BackupCloudState.off, title: 'Backup is off')));
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(_host(const BackupCloudHero(state: BackupCloudState.idle, title: 'Waiting to upload')));
+    await tester.pump(const Duration(milliseconds: 120));
+    final popping = tester
+        .widgetList<Transform>(find.byType(Transform))
+        .any((t) => t.transform.getMaxScaleOnAxis() > 1.01);
+    expect(popping, isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Waiting to upload'), findsOneWidget);
+    expect(find.text('Backup is off'), findsNothing);
+
+    await tester.pumpWidget(_host(const BackupCloudHero(state: BackupCloudState.off, title: 'Backup is off')));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.cloud_off_outlined), findsOneWidget);
   });
 
   testWidgets('the cloud stays still when animations are disabled', (tester) async {

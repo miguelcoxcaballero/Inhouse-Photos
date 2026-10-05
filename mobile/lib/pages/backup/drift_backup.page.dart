@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/album/local_album.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
@@ -214,11 +215,24 @@ class _BackupSwitchCardState extends ConsumerState<_BackupSwitchCard> {
   late bool _isEnabled = ref.read(appConfigProvider).backup.enabled;
 
   Future<void> _onToggle(bool value) async {
-    await ref.read(settingsProvider).write(.backupEnabled, value);
-
+    unawaited(HapticFeedback.selectionClick());
+    // Flip the switch straight away so the animation follows the finger, then persist.
     setState(() {
       _isEnabled = value;
     });
+    try {
+      await ref.read(settingsProvider).write(.backupEnabled, value);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isEnabled = !value;
+        });
+      }
+      rethrow;
+    }
+    if (!mounted) {
+      return;
+    }
 
     if (value) {
       widget.onStart.call();
@@ -254,20 +268,52 @@ class _BackupSwitchCardState extends ConsumerState<_BackupSwitchCard> {
         child: ListTile(
           contentPadding: const EdgeInsets.only(left: 16, right: 12),
           onTap: () => _onToggle(!_isEnabled),
-          leading: Container(
+          leading: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
             decoration: BoxDecoration(
               borderRadius: const BorderRadius.all(Radius.circular(16)),
-              color: context.isDarkTheme ? Colors.black26 : Colors.white.withAlpha(100),
+              color: _isEnabled
+                  ? context.primaryColor.withValues(alpha: 0.14)
+                  : context.isDarkTheme
+                  ? Colors.black26
+                  : Colors.white.withAlpha(100),
             ),
             padding: const EdgeInsets.all(16.0),
-            child: Icon(Icons.cloud_upload_outlined, color: context.primaryColor),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              switchInCurve: Curves.easeOutBack,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: RotationTransition(
+                  turns: Tween(begin: -0.08, end: 0.0).animate(animation),
+                  child: ScaleTransition(scale: Tween(begin: 0.6, end: 1.0).animate(animation), child: child),
+                ),
+              ),
+              child: Icon(
+                _isEnabled ? Icons.cloud_upload_outlined : Icons.cloud_off_outlined,
+                key: ValueKey(_isEnabled),
+                color: context.primaryColor,
+              ),
+            ),
           ),
           title: Text(
             "backup_controller_page_backup".t(context: context),
             style: context.textTheme.titleMedium!.copyWith(color: context.primaryColor),
           ),
           subtitle: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
+            duration: const Duration(milliseconds: 300),
+            // The old text leaves before the new one arrives, so they never overlap.
+            switchInCurve: const Interval(0.4, 1, curve: Curves.easeOutCubic),
+            switchOutCurve: const Interval(0.6, 1, curve: Curves.easeIn),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween(begin: const Offset(0, 0.3), end: Offset.zero).animate(animation),
+                child: child,
+              ),
+            ),
             layoutBuilder: (current, previous) =>
                 Stack(alignment: AlignmentDirectional.centerStart, children: [...previous, ?current]),
             child: Text(
@@ -283,7 +329,7 @@ class _BackupSwitchCardState extends ConsumerState<_BackupSwitchCard> {
   }
 }
 
-/// The cloud with its animation and the staged progress bar below it.
+/// The cloud with its animation and the progress bar below it.
 class _BackupStatus extends ConsumerWidget {
   const _BackupStatus({required this.onRetry});
 
@@ -316,7 +362,6 @@ class _BackupStatus extends ConsumerWidget {
       ),
       _ when backup.isSyncing => (BackupCloudState.syncing, "backup_hero_syncing".t(context: context), null),
       _ when isComplete => (BackupCloudState.done, "backup_hero_done".t(context: context), null),
-      _ when syncStatus.isHashing => (BackupCloudState.syncing, "backup_hero_preparing".t(context: context), pending),
       _ => (BackupCloudState.idle, "backup_hero_waiting".t(context: context), pending),
     };
 
@@ -353,15 +398,12 @@ class _BackupStatus extends ConsumerWidget {
           child: BackupStageBar(
             total: backup.totalCount,
             backedUp: backup.backupCount,
-            ready: (backup.remainderCount - backup.processingCount).clamp(0, backup.remainderCount),
-            preparing: backup.processingCount,
-            isPreparing: syncStatus.isHashing,
+            remaining: backup.remainderCount,
             isUploading: activeUploads > 0,
             isError: isError,
             backedUpLabel: "backup_bar_backed_up".t(context: context),
             backedUpLegend: "backup_bar_legend_backed_up".t(context: context),
-            readyLegend: "backup_bar_legend_ready".t(context: context),
-            preparingLegend: "preparing".t(context: context),
+            remainingLegend: "backup_pending_title".t(context: context),
             totalLabel: "total".t(context: context),
           ),
         ),
