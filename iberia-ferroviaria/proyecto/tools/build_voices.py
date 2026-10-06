@@ -2,52 +2,52 @@
 
 Uso (desde proyecto/):
   node tools/voice_lines.mjs > ../investigacion/voces/frases.json
-  python3 tools/build_voices.py <kokoro.onnx> <voices-es.bin>
+  python3 tools/build_voices.py <carpeta-de-voces-piper>
 
-Modelo: Kokoro-82M v1.0 (Apache-2.0), versión cuantizada model_quantized.onnx de
-onnx-community/Kokoro-82M-v1.0-ONNX (sha256 fbae9257…a1478, publicada también como paquete npm
-kokoro-q8-shards). Voces ef_dora, em_alex y em_santa (Apache-2.0) convertidas a un .npz con
-claves por voz y forma (510, 1, 256). Requiere los paquetes kokoro-onnx y soundfile, y ffmpeg con libmp3lame.
-Las frases ya generadas se reutilizan desde ../investigacion/voces/<id>.mp3; sin modelo, solo se reempaqueta.
+Motor: Piper (paquete PyPI piper-tts, GPL-3.0, solo en la generación). Voces en castellano de España,
+publicadas por sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models):
+  vits-piper-es_ES-davefx-medium   (dataset davefx, CC0)
+  vits-piper-es_ES-sharvard-medium (dataset Sharvard, Universidad de Edimburgo, CC BY 3.0; hablantes M y F)
+Hace falta ffmpeg con libmp3lame. Las frases ya generadas se reutilizan desde ../investigacion/voces/<id>.mp3;
+sin carpeta de voces, solo se reempaqueta.
 """
-import base64, json, os, subprocess, sys, tempfile
+import base64, json, os, subprocess, sys, tempfile, wave
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE = os.path.join(ROOT, '..', 'investigacion', 'voces')
 OUT = os.path.join(ROOT, 'dist', 'assets', 'voices.js')
 
-# Voz, velocidad y tratamiento de cada personaje. El tono burlesco lo ponen el guion, el ritmo y el
-# entorno sonoro; la voz se deja natural.
+# Voz (modelo, hablante) y ritmo de cada personaje. Sin efectos: prima la naturalidad; el tono burlesco
+# lo ponen el guion y las cortinillas del juego. length_scale > 1 habla más despacio.
 CAST = {
-    # presidente: voz grave y pausada, con la reverberación de un hemiciclo
-    'president': ('em_santa', 0.9, 'aecho=0.85:0.55:70|130:0.16|0.09,highpass=f=70'),
-    # ministra: ritmo de rueda de prensa, micrófono de atril
-    'minister': ('ef_dora', 1.04, 'highpass=f=90,equalizer=f=3200:t=q:w=1.2:g=2.5'),
-    # ministro: deprisa, como quien dicta un tuit
-    'successor': ('em_alex', 1.16, 'highpass=f=80,equalizer=f=2500:t=q:w=1.4:g=1.5'),
+    'president': ('es_ES-davefx-medium', None, 1.08),   # pausado, de mitin
+    'minister': ('es_ES-sharvard-medium', 1, 1.0),      # rueda de prensa
+    'successor': ('es_ES-sharvard-medium', 0, 0.9),     # deprisa, como quien dicta un tuit
 }
 
 
 def main():
     lines = json.load(open(os.path.join(CACHE, 'frases.json'), encoding='utf-8'))
-    kokoro = None
-    if len(sys.argv) >= 3:
-        from kokoro_onnx import Kokoro
-        kokoro = Kokoro(sys.argv[1], sys.argv[2])
+    models = {}
+    if len(sys.argv) >= 2:
+        from piper import PiperVoice, SynthesisConfig
+        for name, _, _ in CAST.values():
+            if name not in models:
+                models[name] = PiperVoice.load(os.path.join(sys.argv[1], f'vits-piper-{name}', f'{name}.onnx'))
     clips, made, total = {}, 0, 0.0
     for item in lines:
         mp3 = os.path.join(CACHE, item['id'] + '.mp3')
         if not os.path.exists(mp3):
-            if kokoro is None:
-                sys.exit(f'Falta {mp3} y no se ha indicado el modelo.')
-            import soundfile as sf
-            voice, speed, fx = CAST[item['person']]
-            audio, sr = kokoro.create(item['text'], voice=voice, speed=speed, lang='es')
+            if not models:
+                sys.exit(f'Falta {mp3} y no se ha indicado la carpeta de voces.')
+            name, speaker, length = CAST[item['person']]
+            cfg = SynthesisConfig(speaker_id=speaker, length_scale=length, noise_scale=0.7, noise_w_scale=0.9)
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
-                sf.write(tmp.name, audio, sr)
+                with wave.open(tmp.name, 'wb') as w:
+                    models[name].synthesize_wav(item['text'], w, syn_config=cfg)
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', tmp.name, '-af',
-                            fx + ',silenceremove=start_periods=1:start_threshold=-50dB,loudnorm=I=-17:TP=-1.5:LRA=11',
-                            '-ar', '24000', '-ac', '1', '-c:a', 'libmp3lame', '-b:a', '48k', mp3], check=True)
+                            'silenceremove=start_periods=1:start_threshold=-55dB,loudnorm=I=-17:TP=-1.5:LRA=11',
+                            '-ar', '22050', '-ac', '1', '-c:a', 'libmp3lame', '-b:a', '56k', mp3], check=True)
             os.unlink(tmp.name)
             made += 1
             print(f"{item['person']:9} {item['text'][:70]}", flush=True)
@@ -56,7 +56,7 @@ def main():
         total += dur
         clips[item['id']] = base64.b64encode(open(mp3, 'rb').read()).decode()
     with open(OUT, 'w', encoding='utf-8') as f:
-        f.write('// Generado por tools/build_voices.py: voces neuronales (Kokoro-82M, Apache-2.0) en MP3, una por frase.\n')
+        f.write('// Generado por tools/build_voices.py: voces neuronales (Piper: davefx CC0, Sharvard CC BY 3.0) en MP3, una por frase.\n')
         f.write('export const CLIPS = ' + json.dumps(clips, separators=(',', ':')) + ';\n')
     print(f'{len(clips)} frases ({made} nuevas), {total / 60:.1f} min, {os.path.getsize(OUT) / 1e6:.2f} MB → {OUT}')
 

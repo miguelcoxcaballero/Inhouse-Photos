@@ -2,7 +2,7 @@ IBERIA FERROVIARIA — PLAN Y ESTADO V0.6
 6 de octubre de 2026.
 
 HECHO EN 0.6
-- Voces neuronales pregrabadas (Kokoro-82M) para los 32 diálogos, con tratamiento por personaje, cortinillas, subtítulos resaltados y música atenuada; respaldo con la voz del sistema.
+- Voces neuronales pregrabadas en castellano (Piper: davefx y Sharvard) para los 32 diálogos, con cortinillas, subtítulos resaltados y música atenuada; respaldo con la voz del sistema.
 - Diálogos de capítulos, decisiones y tutorial reescritos con ironía y expresiones castizas.
 
 HECHO EN 0.5

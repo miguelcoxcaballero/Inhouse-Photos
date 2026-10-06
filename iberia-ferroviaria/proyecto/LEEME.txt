@@ -40,7 +40,7 @@ En modo automático la música cambia según lo que haces y la hora del día (pi
 
 LOS PERSONAJES HABLAN
 Pedro Sancho, Raquel Sanz y Óscar del Puente leen en voz alta sus diálogos (tutorial, decisiones y capítulos), con la frase en curso resaltada. Cada uno tiene su propia interpretación burlesca: el presidente, solemne y lento, con fanfarria de inauguración; la ministra, con optimismo de rueda de prensa y «ding» de megafonía; el ministro, a la velocidad de un tuit, con pío de notificación. La música baja mientras hablan.
-Las voces son neuronales y van dentro del juego (funcionan sin conexión): se generaron con el modelo Kokoro-82M (voces ef_dora, em_santa y em_alex), una grabación por frase, con un tratamiento por personaje (hemiciclo para el presidente, micrófono de atril para la ministra, ritmo de tuit para el ministro). Si se añade un diálogo nuevo sin regenerar las voces, ese diálogo se lee con la voz en español del sistema. El botón 🔊 repite o detiene; «Música» → «Silenciar personajes» las apaga.
+Las voces son neuronales, entrenadas con grabaciones de hablantes de castellano de España, y van dentro del juego (funcionan sin conexión): se generaron con Piper, una grabación por frase, sin efectos que las desnaturalicen. Pedro Sancho usa la voz davefx (más pausada); Raquel Sanz y Óscar del Puente, las voces femenina y masculina de Sharvard (él, más deprisa). Si se añade un diálogo nuevo sin regenerar las voces, ese diálogo se lee con la voz en español del sistema. El botón 🔊 repite o detiene; «Música» → «Silenciar personajes» las apaga.
 Los diálogos se han reescrito en tono irónico y castizo. Las fechas e hitos reales (Pajares, S106, abonos, iryo, gálibo) siguen siendo correctos; el resto es sátira de ficción.
 
 GUARDADO
@@ -56,7 +56,7 @@ dist/map-v3.js: mapa ilustrado, luz, red, trenes, estaciones y obras.
 dist/app.js, dist/index.html, dist/style-v3.css: interfaz.
 dist/train3d.js: modelos 3D procedurales por familia (three.js), miniaturas y visor.
 dist/voice.js: voces de los personajes (clips neuronales, respaldo con la voz del sistema, cortinillas y subtítulos). dist/assets/voices.js: clips MP3 generados.
-tools/voice_lines.mjs y tools/build_voices.py: regeneran las voces (Kokoro-82M con kokoro-onnx; frases y MP3 en investigacion/voces).
+tools/voice_lines.mjs y tools/build_voices.py: regeneran las voces (Piper con piper-tts; frases y MP3 en investigacion/voces).
 dist/music.js: banda sonora (12 piezas, sintetizadores Web Audio, arreglos y reproductor); dist/render-music.html la exporta a WAV.
 dist/train-art.js: ilustraciones laterales (alternativa sin WebGL) por serie (perfil del morro, rodadura, pantógrafo o diésel, puertas, pisos y librea).
 dist/story.js, dist/data.js, dist/gtfs.js: campaña, catálogo y fuentes, importador GTFS.
@@ -74,6 +74,6 @@ Horarios: Renfe Data, CC BY 4.0 (https://data.renfe.com). Copia de los ZIP: inve
 Vías: © OpenStreetMap contributors, ODbL 1.0 (LICENSE-OSM.txt). España y Portugal: georgique/world-geojson, GPL-3.0 (LICENSE-GEODATA.txt). Otros contornos: Natural Earth, dominio público.
 Tipografías: SIL Open Font License 1.1 (dist/assets/fonts).
 three.js r159: MIT (dist/assets/LICENSE-three.txt).
-Voces: generadas con Kokoro-82M v1.0 y sus voces ef_dora, em_alex y em_santa (hexgrad, Apache-2.0); son voces sintéticas, no imitan a ninguna persona real.
+Voces: sintetizadas con Piper (rhasspy) a partir de los modelos es_ES-davefx-medium (dataset davefx, CC0) y es_ES-sharvard-medium (Sharvard Corpus, Universidad de Edimburgo, CC BY 3.0), distribuidos por sherpa-onnx. Son voces sintéticas; no imitan a ninguna persona real.
 Banda sonora: composición original para este proyecto.
 Las marcas identifican operadores y fabricantes. No es un producto oficial de Renfe, Adif ni Alsa.

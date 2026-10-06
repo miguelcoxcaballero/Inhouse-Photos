@@ -1,4 +1,4 @@
-// Voces de los personajes. Primero, voces neuronales pregrabadas (Kokoro-82M, assets/voices.js, una por frase);
+// Voces de los personajes. Primero, voces neuronales pregrabadas (Piper, assets/voices.js, una por frase);
 // si falta alguna frase, la síntesis de voz del sistema (Web Speech API). Cada personaje tiene su ritmo y su cortinilla.
 import {CLIPS} from './assets/voices.js';
 
