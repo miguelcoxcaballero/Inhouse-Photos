@@ -305,19 +305,20 @@ namespace InhousePhotos {
       finally{updatingManager=false;}
     }
     void RenderSystemUpdate() {
-      Rule();content.Children.Add(Label("Inhouse Photos",22));
-      var row=new StackPanel{Margin=new Thickness(0,2,0,8)};
-      var version=Label("Comprobando la versión instalada…",16);
-      var detail=Label("La actualización continúa en el ordenador aunque cierres el móvil.",14,muted);
-      var bar=new ProgressBar{Minimum=0,Maximum=100,Height=4,Foreground=accent,Visibility=Visibility.Collapsed,Margin=new Thickness(0,0,0,9)};
-      var update=new Button{Content="Actualizar Inhouse Photos",IsEnabled=false,HorizontalAlignment=HorizontalAlignment.Left};
-      row.Children.Add(version);row.Children.Add(detail);row.Children.Add(bar);row.Children.Add(update);content.Children.Add(row);
+      Section("Actualizaciones");
+      var parts=Ui.ListRow("refresh","Comprobando la versión instalada…","La actualización continúa en el ordenador aunque cierres el móvil.");
+      var row=parts.Root;var version=parts.Heading;var detail=parts.Detail;
+      var bar=new ProgressBar{Minimum=0,Maximum=100};
+      AutomationProperties.SetName(bar,"Progreso de la actualización");
+      var barMeasure=Ui.Constrain(bar,320);barMeasure.Margin=new Thickness(0,10,0,2);barMeasure.Visibility=Visibility.Collapsed;parts.Body.Children.Add(barMeasure);
+      var update=Ui.Button("Actualizar Inhouse Photos");update.IsEnabled=false;update.Margin=new Thickness(0);parts.Trailing.Children.Add(update);
+      content.Children.Add(row);
       void Refresh() {
         var state=SystemUpdates.Status();
-        version.Text=String.IsNullOrEmpty(state.CurrentVersion)?"Actualización pendiente":"Versión "+state.CurrentVersion;
-        bar.Visibility=state.Busy?Visibility.Visible:Visibility.Collapsed;bar.Value=state.Progress;
+        version.Text=String.IsNullOrEmpty(state.CurrentVersion)?"Actualización pendiente":"Inhouse Photos "+state.CurrentVersion;
+        barMeasure.Visibility=state.Busy?Visibility.Visible:Visibility.Collapsed;bar.Value=state.Progress;
         update.IsEnabled=state.Available&&!state.Busy&&!busy&&!monitorBusy&&!updatingManager&&backupCancellation==null;
-        update.Content=state.Phase=="error"?"Reintentar actualización":"Actualizar Inhouse Photos";
+        Ui.SetCaption(update,state.Phase=="error"?"Reintentar actualización":"Actualizar Inhouse Photos");
         if(state.Phase=="downloading")detail.Text="Descargando Inhouse Photos · "+state.Progress+" %";
         else if(state.Phase=="waiting")detail.Text="Continuando la actualización guardada. Los originales y trabajos pendientes se conservan.";
         else if(state.Phase=="installing")detail.Text="Instalando la actualización verificada…";
@@ -328,6 +329,8 @@ namespace InhousePhotos {
         else detail.Text=state.Notes;
         var stageDetail=ProductInstallation.StageMessage(state.Stage);
         if(state.Busy&&stageDetail!=null)detail.Text=stageDetail;
+        detail.Foreground=state.Phase=="error"?accent:Ui.Ink2;
+        detail.Visibility=String.IsNullOrWhiteSpace(detail.Text)?Visibility.Collapsed:Visibility.Visible;
       }
       update.Click+=async(sender,e)=>{
         update.IsEnabled=false;
@@ -342,25 +345,18 @@ namespace InhousePhotos {
     }
     Task RenderManagement() {
       RenderSystemUpdate();
-      Rule();content.Children.Add(Label("Inicio automático",22));
-      var startupRow=new Grid{Margin=new Thickness(0,4,0,4)};
-      startupRow.ColumnDefinitions.Add(new ColumnDefinition());
-      startupRow.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
-      var startupDetails=new StackPanel{Margin=new Thickness(0,0,20,0)};
-      var startupTitle=Label("Iniciar con Windows",17);startupTitle.FontWeight=FontWeights.SemiBold;startupTitle.Margin=new Thickness(0,0,0,4);
-      startupDetails.Children.Add(startupTitle);
-      startupDetails.Children.Add(Label("El gestor arranca en segundo plano al iniciar sesión. No necesitas abrir Docker; apagarlo no detiene el servidor ni una copia en curso.",14,muted));
-      var startupState=Label("Comprobando el inicio automático…",13,muted);startupDetails.Children.Add(startupState);
-      var retry=new Button{Content="Volver a comprobar",Visibility=Visibility.Collapsed,HorizontalAlignment=HorizontalAlignment.Left};startupDetails.Children.Add(retry);
-      startupRow.Children.Add(startupDetails);
-      var auto=new CheckBox{IsEnabled=false,Visibility=Visibility.Hidden,VerticalAlignment=VerticalAlignment.Center,Foreground=Foreground};
-      AutomationProperties.SetName(auto,"Iniciar con Windows");Grid.SetColumn(auto,1);startupRow.Children.Add(auto);
-      auto.Template=(ControlTemplate)XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='CheckBox'><StackPanel Orientation='Horizontal'><Border x:Name='track' Width='44' Height='26' CornerRadius='13' Background='#DCD5CB' Margin='0,0,12,0'><Ellipse x:Name='thumb' Width='20' Height='20' Fill='#FFFFFF' HorizontalAlignment='Left' Margin='3'/></Border><ContentPresenter VerticalAlignment='Center'/></StackPanel><ControlTemplate.Triggers><Trigger Property='IsChecked' Value='True'><Setter TargetName='track' Property='Background' Value='#A94712'/><Setter TargetName='thumb' Property='HorizontalAlignment' Value='Right'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.45'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
+      Section("Inicio automático");
+      var parts=Ui.ListRow("power","Iniciar con Windows","El gestor arranca en segundo plano al iniciar sesión. Apagarlo no detiene el servidor ni una copia en curso.");
+      var startupRow=parts.Root;
+      var startupState=Ui.Caption("Comprobando el inicio automático…");startupState.Margin=new Thickness(0,6,0,0);parts.Body.Children.Add(startupState);
+      var retry=Ui.Button("Volver a comprobar","Link");retry.Visibility=Visibility.Collapsed;retry.Margin=new Thickness(0,6,0,0);parts.Body.Children.Add(retry);
+      var auto=new CheckBox{IsEnabled=false,Visibility=Visibility.Hidden,VerticalAlignment=VerticalAlignment.Center,Style=Ui.StyleOf("Switch")};
+      AutomationProperties.SetName(auto,"Iniciar con Windows");parts.Trailing.Children.Add(auto);
       content.Children.Add(startupRow);
       bool startupKnown=false,startupEnabled=false;
       async Task RefreshStartupState() {
         startupKnown=false;auto.IsEnabled=false;auto.Visibility=Visibility.Hidden;
-        startupState.Text="Comprobando el inicio automático…";startupState.Visibility=Visibility.Visible;retry.Visibility=Visibility.Collapsed;
+        startupState.Text="Comprobando el inicio automático…";startupState.Foreground=Ui.Ink3;startupState.Visibility=Visibility.Visible;retry.Visibility=Visibility.Collapsed;
         try {
           var enabled=await Startup.IsEnabled();
           if(!content.Children.Contains(startupRow))return;
@@ -369,7 +365,7 @@ namespace InhousePhotos {
           startupState.Visibility=Visibility.Collapsed;
         } catch(Exception ex) {
           if(!content.Children.Contains(startupRow))return;
-          startupState.Text="No se pudo comprobar el inicio automático: "+ex.Message;
+          startupState.Text="No se pudo comprobar el inicio automático: "+ex.Message;startupState.Foreground=accent;
           retry.Visibility=Visibility.Visible;
         }
       }
@@ -392,27 +388,26 @@ namespace InhousePhotos {
       // The Windows task query can take seconds; the Settings page stays usable
       // while the switch remains unavailable until its actual state is known.
       _=RefreshStartupState();
-      Rule();RenderUsbConnection();
-      Action("Ver conexión USB en la web  ↗",()=>{Open(Backend.CanonicalEndpoint(prefs.Endpoint)+"/descargas/servidor/");return Task.CompletedTask;});
-      Rule();content.Children.Add(Label("Conexión del servidor",22));
+      RenderUsbConnection();
+      var web=Action("Ver conexión USB en la web",()=>{Open(Backend.CanonicalEndpoint(prefs.Endpoint)+"/descargas/servidor/");return Task.CompletedTask;},false,"external");
+      Ui.SetStyle(web,"Link");web.Margin=new Thickness(40,0,0,0);
+      Section("Biblioteca");
       if(prefs.Managed&&File.Exists(prefs.ReceiptPath)) {
         var receipt=Backend.Json.Deserialize<AdoptionReceipt>(File.ReadAllText(prefs.ReceiptPath));
         var counts=receipt.Counts.Split('|');
-        var connectionRow=new StackPanel{Margin=new Thickness(0,4,0,4)};
-        var connectionTitle=Label("Biblioteca vinculada",17);connectionTitle.FontWeight=FontWeights.SemiBold;connectionTitle.Margin=new Thickness(0,0,0,4);connectionRow.Children.Add(connectionTitle);
-        connectionRow.Children.Add(Label("Ya está conectada. No necesitas vincularla de nuevo.",14,muted));
-        connectionRow.Children.Add(Label("Al vincularla se verificaron "+counts[0]+" fotos y vídeos, "+counts[1]+" cuentas y "+counts[2]+" álbumes. Esa instantánea no es una copia de las fotos.",14,muted));
-        content.Children.Add(connectionRow);
+        var linked=Ui.ListRow("photo","Biblioteca vinculada","Al vincularla se verificaron "+counts[0]+" fotos y vídeos, "+counts[1]+" cuentas y "+counts[2]+" álbumes. Esa instantánea no es una copia de las fotos.");
+        content.Children.Add(linked.Root);
         int detailsStart=content.Children.Count;
         Action("Abrir informe y copia de migración",()=>{Open(Path.GetDirectoryName(prefs.ReceiptPath));return Task.FromResult(0);});
         Action("Desvincular el gestor",async()=>{if(!Confirm("Se devolverá el inicio automático al sistema anterior. No se tocarán las fotos, la base de datos ni las cuentas. ¿Continuar?"))return;await Startup.ReleaseOwnership(prefs);notice.Text="Gestor desvinculado. El servidor y sus datos permanecen intactos.";await Render();});
-        var details=new StackPanel();while(content.Children.Count>detailsStart){var child=content.Children[detailsStart];content.Children.RemoveAt(detailsStart);details.Children.Add(child);}
-        content.Children.Add(new Expander{Header="Informe y recuperación",Content=details,Foreground=muted,Margin=new Thickness(0,4,0,8)});
+        var details=new StackPanel();
+        details.Children.Add(Ui.Secondary("Abre el informe de verificación o devuelve el arranque al sistema anterior. Ninguna opción toca fotos, base de datos ni cuentas."));
+        var detailActions=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,12,0,0)};details.Children.Add(detailActions);
+        while(content.Children.Count>detailsStart){var child=content.Children[detailsStart];content.Children.RemoveAt(detailsStart);((FrameworkElement)child).Margin=new Thickness(0,0,8,0);detailActions.Children.Add(child);}
+        content.Children.Add(new Expander{Header="Informe y recuperación",Content=details,Margin=new Thickness(0,8,0,0)});
       } else {
-        var connectionRow=new StackPanel{Margin=new Thickness(0,4,0,4)};
-        var connectionTitle=Label("Biblioteca pendiente de vincular",17);connectionTitle.FontWeight=FontWeights.SemiBold;connectionTitle.Margin=new Thickness(0,0,0,4);connectionRow.Children.Add(connectionTitle);
-        connectionRow.Children.Add(Label("Antes de gestionar el arranque, comprobaremos la biblioteca y restauraremos una copia en una base de datos temporal aislada. No se detendrá el servidor original.",14,muted));
-        content.Children.Add(connectionRow);
+        var pending=Ui.ListRow("photo","Biblioteca pendiente de vincular","Antes de gestionar el arranque, comprobaremos la biblioteca y restauraremos una copia en una base de datos temporal aislada. No se detendrá el servidor original.");
+        content.Children.Add(pending.Root);
       }
       if(!prefs.Managed)Action("Preparar mi biblioteca",async()=>{page="Inicio";await Render();},true);
       return Task.FromResult(0);

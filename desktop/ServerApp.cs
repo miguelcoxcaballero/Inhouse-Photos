@@ -11,7 +11,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
@@ -253,69 +255,104 @@ namespace InhousePhotos {
     readonly Dictionary<string,Button> tabs=new Dictionary<string,Button>();
     readonly Dictionary<string,Border> navRails=new Dictionary<string,Border>();
     readonly Dictionary<string,TextBlock> navTitles=new Dictionary<string,TextBlock>();
+    readonly Dictionary<string,Viewbox> navIcons=new Dictionary<string,Viewbox>();
     readonly TextBlock sidebarLocation=new TextBlock();
+    readonly ScrollViewer pageScroll=new ScrollViewer();
     string page="Inicio"; bool busy, refreshing;
     string renderedPage;
     internal bool DisableTransitions {get;set;}
     CancellationTokenSource backupCancellation;
-    readonly Brush accent=new SolidColorBrush(Color.FromRgb(169,71,18));
-    readonly Brush muted=new SolidColorBrush(Color.FromRgb(104,95,85));
-    readonly Brush line=new SolidColorBrush(Color.FromRgb(220,213,203));
+    readonly Brush accent=Ui.Accent;
+    readonly Brush muted=Ui.Ink2;
+    readonly Brush line=Ui.Hairline;
     public ServerWindow() {
+      Ui.Apply(this);
       var workWidth=Math.Max(320,SystemParameters.WorkArea.Width-28);
       var workHeight=Math.Max(320,SystemParameters.WorkArea.Height-28);
       Title="Inhouse Photos Server"; Width=Math.Min(1080,workWidth);Height=Math.Min(760,workHeight);
-      MinWidth=Math.Min(760,workWidth);MinHeight=Math.Min(500,workHeight);
-      Background=new SolidColorBrush(Color.FromRgb(246,243,238));Foreground=new SolidColorBrush(Color.FromRgb(32,28,24));FontFamily=new FontFamily("Segoe UI");FontSize=14;WindowStartupLocation=WindowStartupLocation.CenterScreen;
-      Resources.Add(typeof(Button),XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Setter Property='Background' Value='#FFFCF8'/><Setter Property='Foreground' Value='#201C18'/><Setter Property='BorderBrush' Value='#DCD5CB'/><Setter Property='BorderThickness' Value='1'/><Setter Property='Padding' Value='16,9'/><Setter Property='Margin' Value='0,5,8,5'/><Setter Property='MinHeight' Value='38'/><Setter Property='FontWeight' Value='SemiBold'/><Setter Property='Cursor' Value='Hand'/><Setter Property='HorizontalContentAlignment' Value='Left'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='Button'><Border x:Name='bg' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' Padding='{TemplateBinding Padding}' CornerRadius='8'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='bg' Property='BorderBrush' Value='#A94712'/></Trigger><Trigger Property='IsPressed' Value='True'><Setter TargetName='bg' Property='Opacity' Value='0.72'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='bg' Property='BorderBrush' Value='#A94712'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='bg' Property='Opacity' Value='0.4'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>"));
-      var root=new Grid{Background=Background}; root.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(236)});root.ColumnDefinitions.Add(new ColumnDefinition());Content=root;
-      var sidebarShell=new Border{Background=new SolidColorBrush(Color.FromRgb(239,234,227)),BorderBrush=line,BorderThickness=new Thickness(0,0,1,0)};
+      MinWidth=Math.Min(820,workWidth);MinHeight=Math.Min(560,workHeight);
+      WindowStartupLocation=WindowStartupLocation.CenterScreen;
+      var root=new Grid{Background=Ui.Paper}; root.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(240)});root.ColumnDefinitions.Add(new ColumnDefinition());Content=root;
+      var sidebarShell=new Border{Background=Ui.Sidebar,BorderBrush=Ui.Hairline,BorderThickness=new Thickness(0,0,1,0)};
       root.Children.Add(sidebarShell);
-      var sidebar=new Grid{Margin=new Thickness(20,27,18,22)};sidebar.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});sidebar.RowDefinitions.Add(new RowDefinition());sidebar.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});sidebarShell.Child=sidebar;
-      var brandBlock=new StackPanel();Grid.SetRow(brandBlock,0);sidebar.Children.Add(brandBlock);
+      var sidebar=new Grid{Margin=new Thickness(12,20,12,16)};sidebar.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});sidebar.RowDefinitions.Add(new RowDefinition());sidebar.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});sidebarShell.Child=sidebar;
       using(var brandStream=typeof(ServerWindow).Assembly.GetManifestResourceStream("InhousePhotos.brand.xaml"))Icon=(ImageSource)XamlReader.Load(brandStream);
-      brandBlock.Children.Add(new Image{Source=Icon,Width=44,Height=44,HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(3,0,0,9)});
-      brandBlock.Children.Add(Label("inhouse photos",20,Foreground));
-      var navigation=new StackPanel{Margin=new Thickness(0,26,0,0)};
-      var navScroll=new ScrollViewer{Content=navigation,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
+      var brandBlock=new Grid{Margin=new Thickness(8,0,8,24)};
+      brandBlock.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});brandBlock.ColumnDefinitions.Add(new ColumnDefinition());
+      brandBlock.Children.Add(new Image{Source=Icon,Width=32,Height=32,VerticalAlignment=VerticalAlignment.Center});
+      var brandWords=new StackPanel{Margin=new Thickness(10,0,0,0),VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(brandWords,1);
+      var wordmark=Ui.Text("Inhouse Photos",15,Ui.Ink,true);wordmark.LineHeight=20;brandWords.Children.Add(wordmark);
+      var product=Ui.Caption("Servidor");product.LineHeight=16;brandWords.Children.Add(product);
+      brandBlock.Children.Add(brandWords);Grid.SetRow(brandBlock,0);sidebar.Children.Add(brandBlock);
+      var navigation=new StackPanel();
+      AutomationProperties.SetName(navigation,"Navegación");
+      var navScroll=new ScrollViewer{Content=navigation,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Focusable=false};
       Grid.SetRow(navScroll,1);sidebar.Children.Add(navScroll);
       var navLabels=new Dictionary<string,string>{{"Inicio","Resumen"},{"Conectar","Conectar móvil"},{"Protección","Copias"},{"Discos","Almacenamiento"},{"Configuración","Ajustes"}};
+      var navGlyphs=new Dictionary<string,string>{{"Inicio","home"},{"Conectar","phone"},{"Protección","shield"},{"Discos","drive"},{"Configuración","sliders"}};
       foreach(var name in new[]{"Inicio","Conectar","Protección","Discos","Configuración"}) {
-        var captured=name;var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(4)});row.ColumnDefinitions.Add(new ColumnDefinition());
-        var rail=new Border{Width=3,Height=22,CornerRadius=new CornerRadius(2),Background=accent,Visibility=Visibility.Hidden,VerticalAlignment=VerticalAlignment.Center};row.Children.Add(rail);
-        var title=new TextBlock{Text=navLabels[name],FontSize=14,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,0,0)};Grid.SetColumn(title,1);row.Children.Add(title);
-        var button=new Button{Content=row,Background=Brushes.Transparent,BorderBrush=Brushes.Transparent,BorderThickness=new Thickness(1),Padding=new Thickness(12,8,8,8),Margin=new Thickness(0,2,0,2),HorizontalContentAlignment=HorizontalAlignment.Stretch};
+        var captured=name;var row=new Grid{MinHeight=36};
+        row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(3)});row.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});row.ColumnDefinitions.Add(new ColumnDefinition());
+        var rail=new Border{Width=3,Height=16,CornerRadius=new CornerRadius(1.5),Background=accent,Visibility=Visibility.Hidden,VerticalAlignment=VerticalAlignment.Center};row.Children.Add(rail);
+        var glyph=Ui.Icon(navGlyphs[name],16,Ui.Ink2);glyph.Margin=new Thickness(11,0,12,0);glyph.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(glyph,1);row.Children.Add(glyph);
+        var title=new TextBlock{Text=navLabels[name],FontSize=14,VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};Grid.SetColumn(title,2);row.Children.Add(title);
+        var button=new Button{Content=row,Style=Ui.StyleOf("Nav")};
+        AutomationProperties.SetName(button,navLabels[name]);
         button.Click+=async(s,e)=>{if(!busy||backupCancellation!=null){page=captured;notice.Text="";await Render();}};
-        tabs[name]=button;navRails[name]=rail;navTitles[name]=title;navigation.Children.Add(button);
+        tabs[name]=button;navRails[name]=rail;navTitles[name]=title;navIcons[name]=glyph;navigation.Children.Add(button);
       }
-      var footer=new StackPanel();Grid.SetRow(footer,2);sidebar.Children.Add(footer);
-      footer.Children.Add(new Border{Height=1,Background=line,Margin=new Thickness(0,0,0,14)});
-      footer.Children.Add(Label("Biblioteca en este PC",12,muted));
-      sidebarLocation.FontSize=12;sidebarLocation.Foreground=Foreground;sidebarLocation.TextTrimming=TextTrimming.CharacterEllipsis;sidebarLocation.Margin=new Thickness(0,0,0,7);footer.Children.Add(sidebarLocation);
-      footer.Children.Add(Label("Versión "+Backend.Version,11,muted));
-      var right=new DockPanel{Margin=new Thickness(32,29,36,24)};Grid.SetColumn(right,1);root.Children.Add(right);
-      notice.TextWrapping=TextWrapping.Wrap;notice.Foreground=Foreground;notice.FontSize=14;
-      var noticePanel=new Border{Background=new SolidColorBrush(Color.FromRgb(246,231,216)),BorderBrush=accent,BorderThickness=new Thickness(3,0,0,0),CornerRadius=new CornerRadius(6),Padding=new Thickness(14,10,14,10),Margin=new Thickness(0,10,0,0),Child=notice,Visibility=Visibility.Collapsed};
-      DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty,typeof(TextBlock)).AddValueChanged(notice,(s,e)=>noticePanel.Visibility=String.IsNullOrWhiteSpace(notice.Text)?Visibility.Collapsed:Visibility.Visible);
+      var footer=new StackPanel{Margin=new Thickness(8,0,8,0)};Grid.SetRow(footer,2);sidebar.Children.Add(footer);
+      footer.Children.Add(Ui.Divider(new Thickness(0,0,0,12)));
+      footer.Children.Add(Ui.Caption("Biblioteca"));
+      sidebarLocation.FontSize=13;sidebarLocation.Foreground=Ui.Ink;sidebarLocation.TextTrimming=TextTrimming.CharacterEllipsis;sidebarLocation.Margin=new Thickness(0,2,0,8);footer.Children.Add(sidebarLocation);
+      footer.Children.Add(Ui.Caption("Versión "+Backend.Version));
+      var right=new DockPanel();Grid.SetColumn(right,1);root.Children.Add(right);
+      notice.TextWrapping=TextWrapping.Wrap;notice.Foreground=Ui.Ink;notice.FontSize=14;notice.VerticalAlignment=VerticalAlignment.Center;
+      Typography.SetNumeralAlignment(notice,FontNumeralAlignment.Tabular);
+      AutomationProperties.SetLiveSetting(notice,AutomationLiveSetting.Polite);
+      var noticeRow=new Grid();noticeRow.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});noticeRow.ColumnDefinitions.Add(new ColumnDefinition());
+      var noticeIcon=Ui.Icon("info",18,accent);noticeIcon.Margin=new Thickness(0,1,12,0);noticeIcon.VerticalAlignment=VerticalAlignment.Top;noticeRow.Children.Add(noticeIcon);
+      Grid.SetColumn(notice,1);noticeRow.Children.Add(notice);
+      var noticePanel=new Border{Background=Ui.Surface,BorderBrush=Ui.Stroke,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(8),Padding=new Thickness(14,11,16,11),Margin=new Thickness(40,0,40,16),Child=noticeRow,Visibility=Visibility.Collapsed};
+      DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty,typeof(TextBlock)).AddValueChanged(notice,(s,e)=>{
+        var show=!String.IsNullOrWhiteSpace(notice.Text);
+        if(show&&noticePanel.Visibility!=Visibility.Visible&&!DisableTransitions)Ui.Enter(noticePanel,4,140);
+        noticePanel.Visibility=show?Visibility.Visible:Visibility.Collapsed;
+      });
       DockPanel.SetDock(noticePanel,Dock.Bottom);right.Children.Add(noticePanel);
       content.RenderTransform=contentMotion;
-      right.Children.Add(new ScrollViewer{Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+      // Every page shares one measure: left aligned, fluid up to 880 px.
+      var measure=Ui.Constrain(content,880);measure.Margin=new Thickness(40,32,40,40);
+      pageScroll.Content=measure;pageScroll.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;pageScroll.HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled;pageScroll.Focusable=false;
+      right.Children.Add(pageScroll);
       Loaded+=async(s,e)=>await Render();
       Closing+=(s,e)=>{if(busy&&!updateClose){e.Cancel=true;notice.Text="Espera a que termine la operación antes de cerrar.";}};
       // Do not destroy and rebuild a visible page on a timer: it resets scroll
       // position and makes controls disappear while someone is using them.
     }
-    TextBlock Label(string text,double size,Brush color=null) {return new TextBlock{Text=text,FontSize=size,Foreground=color??Foreground,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,10)};}
-    void Heading(string text,string description){var title=Label(text,30);title.FontWeight=FontWeights.SemiBold;title.Margin=new Thickness(0,0,0,5);content.Children.Add(title);content.Children.Add(Label(description,14,muted));content.Children.Add(new Border{Height=18});}
-    void Rule(){content.Children.Add(new Border{Height=1,Background=line,Margin=new Thickness(0,18,0,20)});}
-    Button Action(string title,Func<Task> task,bool primary=false) {
-      var button=new Button{Content=title,HorizontalAlignment=HorizontalAlignment.Left};if(primary){button.Background=accent;button.BorderBrush=accent;button.Foreground=Brushes.White;}
+    TextBlock Label(string text,double size,Brush color=null) {var block=Ui.Text(text,size,color??Ui.Ink);block.Margin=new Thickness(0,0,0,8);return block;}
+    // Page header: one display title and, when it earns its place, one line.
+    void Heading(string text,string description){
+      var title=Ui.Display(text);title.Margin=new Thickness(0,0,0,String.IsNullOrEmpty(description)?24:4);content.Children.Add(title);
+      if(!String.IsNullOrEmpty(description)){var line=Ui.Secondary(description);line.Margin=new Thickness(0,0,0,24);content.Children.Add(line);}
+    }
+    // Section header inside a page.
+    TextBlock Section(string text,string caption=null){
+      var title=Ui.Subtitle(text);title.Margin=new Thickness(0,36,0,caption==null?4:2);content.Children.Add(title);
+      if(caption!=null){var detail=Ui.Secondary(caption);detail.Margin=new Thickness(0,0,0,4);content.Children.Add(detail);}
+      return title;
+    }
+    void Rule(){content.Children.Add(Ui.Divider(new Thickness(0,24,0,24)));}
+    Button Action(string title,Func<Task> task,bool primary=false,string icon=null) {
+      var button=Ui.Button(title,primary?"Primary":"Secondary",icon);button.Margin=new Thickness(0,16,8,0);
       button.Click+=async(s,e)=>{if(busy||SystemUpdates.BlocksOperations(prefs)||RuntimeUpdates.BlocksOperations(prefs)){notice.Text="Espera a que termine o se recupere la actualización actual.";return;}busy=true;button.IsEnabled=false;notice.Text="Trabajando…";try{await task();if(notice.Text=="Trabajando…")notice.Text="";}catch(Exception ex){notice.Text=ex.Message;}finally{busy=false;button.IsEnabled=true;}};content.Children.Add(button);return button;
     }
     string PickFolder(){using(var dialog=new System.Windows.Forms.FolderBrowserDialog()){dialog.Description="Selecciona una carpeta";return dialog.ShowDialog()==System.Windows.Forms.DialogResult.OK?dialog.SelectedPath:null;}}
     bool Confirm(string message){return MessageBox.Show(this,message,"Inhouse Photos",MessageBoxButton.OKCancel,MessageBoxImage.Warning)==MessageBoxResult.OK;}
     void Open(string url){Process.Start(new ProcessStartInfo(url){UseShellExecute=true});}
     internal void PreviewPage(string target) { if(!tabs.ContainsKey(target))throw new ArgumentException("Unknown preview page");page=target; }
+    // Preview only: shows the Copias page mid-copy without starting a copy.
+    internal void PreviewBackupRunning() {prefs=Backend.Load();if(String.IsNullOrWhiteSpace(prefs.BackupDestination))prefs.BackupDestination=@"E:\";busy=true;backupCancellation=new CancellationTokenSource();backupProgressText="2 de 3 · Copiando fotos y vídeos nuevos…";page="Protección";}
     internal void PreviewMigration() {prefs=new Preferences{Installation=@"D:\Immich",Managed=false,Endpoint="",LocalEndpoint="http://127.0.0.1:2283"};busy=true;page="Inicio";}
     public async Task Render(){
       if(refreshing)return;
@@ -335,14 +372,16 @@ namespace InhousePhotos {
       content.Opacity=1;
       contentMotion.Y=0;
       content.Children.Clear();
+      if(pageChanged)pageScroll.ScrollToTop();
       foreach(var item in tabs) {
         item.Value.IsEnabled=false;
         item.Value.Visibility=prefs.Managed||item.Key=="Inicio"?Visibility.Visible:Visibility.Collapsed;
         var selected=item.Key==page;
-        item.Value.Foreground=selected?Foreground:muted;
-        item.Value.Background=selected?new SolidColorBrush(Color.FromRgb(240,225,211)):Brushes.Transparent;
+        item.Value.Tag=selected?"Selected":null;
         navRails[item.Key].Visibility=selected?Visibility.Visible:Visibility.Hidden;
-        navTitles[item.Key].Foreground=selected?Foreground:muted;
+        navTitles[item.Key].Foreground=selected?Ui.Ink:Ui.Ink2;
+        Ui.IconPath(navIcons[item.Key]).Stroke=selected?Ui.Ink:Ui.Ink2;
+        if(selected)AutomationProperties.SetItemStatus(item.Value,"Página actual");else AutomationProperties.SetItemStatus(item.Value,"");
       }
       var pageRendered=false;
       try {
@@ -350,29 +389,65 @@ namespace InhousePhotos {
         else await RenderSimpleHome();
         pageRendered=true;
       } catch(Exception ex) {
-        content.Children.Add(Label(ex.Message,16,accent));
+        content.Children.Add(EmptyState("alert",Tone.Critical,"No se pudo mostrar esta página",ex.Message));
       } finally {
         if(pageRendered&&pageChanged&&!DisableTransitions&&SystemParameters.ClientAreaAnimation){
           var duration=new Duration(TimeSpan.FromMilliseconds(160));
-          var easing=new QuadraticEase{EasingMode=EasingMode.EaseOut};
+          var easing=new CubicEase{EasingMode=EasingMode.EaseOut};
           content.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(0,1,duration){EasingFunction=easing,FillBehavior=FillBehavior.Stop});
-          contentMotion.BeginAnimation(TranslateTransform.YProperty,new DoubleAnimation(7,0,duration){EasingFunction=easing,FillBehavior=FillBehavior.Stop});
+          contentMotion.BeginAnimation(TranslateTransform.YProperty,new DoubleAnimation(6,0,duration){EasingFunction=easing,FillBehavior=FillBehavior.Stop});
         }
         renderedPage=page;
         refreshing=false;
         foreach(var item in tabs)item.Value.IsEnabled=prefs.Managed||item.Key=="Inicio";
       }
     }
+    // Centred empty or error state: a tinted mark, one sentence, one action.
+    StackPanel EmptyState(string icon,Tone tone,string title,string detail) {
+      var panel=new StackPanel{Margin=new Thickness(0,8,0,8),MaxWidth=520,HorizontalAlignment=HorizontalAlignment.Left};
+      var mark=new Grid{Width=48,Height=48,HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,0,0,16)};
+      mark.Children.Add(new System.Windows.Shapes.Ellipse{Fill=tone==Tone.Critical?Ui.CriticalTint:tone==Tone.Attention?Ui.AccentTint:tone==Tone.Good?Ui.GoodTint:(Brush)Ui.NeutralTint});
+      var glyph=Ui.Icon(icon,24,tone==Tone.Critical?Ui.Critical:tone==Tone.Attention?Ui.Accent:tone==Tone.Good?Ui.Good:(Brush)Ui.Ink2);
+      glyph.HorizontalAlignment=HorizontalAlignment.Center;glyph.VerticalAlignment=VerticalAlignment.Center;mark.Children.Add(glyph);
+      panel.Children.Add(mark);
+      panel.Children.Add(Ui.Title(title));
+      if(!String.IsNullOrEmpty(detail)){var line=Ui.Secondary(detail);line.Margin=new Thickness(0,6,0,0);panel.Children.Add(line);}
+      return panel;
+    }
   }
   public static class Program {
+    static double PreviewScale(string value) {
+      var scale=Double.Parse(value,System.Globalization.CultureInfo.InvariantCulture);
+      if(scale<1||scale>3)throw new ArgumentOutOfRangeException("scale","Escala de vista previa no válida.");
+      return scale;
+    }
+    // Renders a laid-out element at a DPI scale (1 = 100 %, 1.5 = 150 %).
+    static void SavePreview(FrameworkElement root,int width,int height,double scale,string path) {
+      root.Width=width;root.Height=height;root.Measure(new Size(width,height));root.Arrange(new Rect(0,0,width,height));root.UpdateLayout();
+      var bitmap=new RenderTargetBitmap((int)Math.Round(width*scale),(int)Math.Round(height*scale),96*scale,96*scale,PixelFormats.Pbgra32);bitmap.Render(root);
+      var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using(var stream=File.Create(path))encoder.Save(stream);
+    }
     [STAThread] public static int Main(string[] args){
       PairingClient.RegisterQrAssembly();
       ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
       if(args.Length==1&&args[0]=="--complete-product-install")return ProductInstallation.Complete();
       if(args.Length==1&&args[0]==UsbNetworkSafety.HelperArgument)return UsbNetworkSafety.RunElevated();
-      if(args.Length==2&&args[0]=="--render-setup-preview") {
+      // Offscreen previews of the secondary windows. They construct the UI
+      // only: no window is shown, no installer, disk or server action runs.
+      if(args.Length>=2&&args.Length<=4&&args[0]=="--render-setup-preview") {
+        Ui.ReduceMotion=true;
         var previewApp=new Application();var setupWindow=new NewServerWindow();
-        previewApp.Dispatcher.BeginInvoke(new Action(()=>{var root=(FrameworkElement)setupWindow.Content;root.Width=660;root.Height=1000;root.Measure(new Size(660,1000));root.Arrange(new Rect(0,0,660,1000));root.UpdateLayout();var bmp=new RenderTargetBitmap(660,1000,96,96,PixelFormats.Pbgra32);bmp.Render(root);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bmp));using(var stream=File.Create(args[1]))encoder.Save(stream);previewApp.Shutdown();}));return previewApp.Run();
+        var setupStep=args.Length>=3?int.Parse(args[2]):0;var setupScale=args.Length>=4?PreviewScale(args[3]):1;
+        if(setupStep<0||setupStep>4)throw new ArgumentOutOfRangeException("step");
+        previewApp.Dispatcher.BeginInvoke(new Action(()=>{setupWindow.PreviewStep(setupStep);SavePreview((FrameworkElement)setupWindow.Content,700,780,setupScale,args[1]);previewApp.Shutdown();}));return previewApp.Run();
+      }
+      if(args.Length>=2&&args.Length<=3&&(args[0]=="--render-installer-preview"||args[0]=="--render-storage-preview")) {
+        Ui.ReduceMotion=true;
+        var previewApp=new Application();var scale=args.Length==3?PreviewScale(args[2]):1;
+        Window previewWindow;
+        if(args[0]=="--render-installer-preview")previewWindow=new SetupProgram.SetupWindow();
+        else {var storage=new StorageWindow();storage.PreviewInventory();previewWindow=storage;}
+        previewApp.Dispatcher.BeginInvoke(new Action(()=>{SavePreview((FrameworkElement)previewWindow.Content,(int)previewWindow.Width,(int)previewWindow.Height,scale,args[1]);previewApp.Shutdown();}));return previewApp.Run();
       }
       if(args.Length==3&&args[0]=="--verify-recovery") {
         try{Backend.VerifyRestore(args[1],"sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23",args[2],Console.WriteLine).GetAwaiter().GetResult();return 0;}catch(Exception ex){Console.Error.WriteLine(ex.Message);return 22;}
@@ -581,13 +656,14 @@ namespace InhousePhotos {
       if(!first){if(!args.Contains("--startup")){try{using(var activate=EventWaitHandle.OpenExisting(@"Local\InhousePhotosServer.Activate"))activate.Set();}catch{}}return 0;}
       var app=new Application();var window=new ServerWindow();
       if(preview){
-        window.DisableTransitions=true;
+        window.DisableTransitions=true;Ui.ReduceMotion=true;
         window.DisablePairingRequests=true;
         var previewWidth=args.Length>=5?int.Parse(args[3]):1080;
         var previewHeight=args.Length>=5?int.Parse(args[4]):760;
+        var previewScale=args.Length>=6?PreviewScale(args[5]):1;
         if(previewWidth<760||previewHeight<600||previewWidth>2400||previewHeight>1800)throw new ArgumentOutOfRangeException("preview","Tamaño de vista previa no válido.");
-        if(args.Length>=3){if(args[2]=="Migracion")window.PreviewMigration();else window.PreviewPage(args[2]);}
-        app.Dispatcher.BeginInvoke(new Action(async()=>{await window.Render();var root=(FrameworkElement)window.Content;root.Width=previewWidth;root.Height=previewHeight;root.Measure(new Size(previewWidth,previewHeight));root.Arrange(new Rect(0,0,previewWidth,previewHeight));root.UpdateLayout();var bmp=new RenderTargetBitmap(previewWidth,previewHeight,96,96,PixelFormats.Pbgra32);bmp.Render(root);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bmp));using(var stream=File.Create(args[1]))encoder.Save(stream);app.Shutdown();}));app.Run();return 0;
+        if(args.Length>=3){if(args[2]=="Migracion")window.PreviewMigration();else if(args[2]=="CopiaEnCurso")window.PreviewBackupRunning();else window.PreviewPage(args[2]);}
+        app.Dispatcher.BeginInvoke(new Action(async()=>{await window.Render();SavePreview((FrameworkElement)window.Content,previewWidth,previewHeight,previewScale,args[1]);app.Shutdown();}));app.Run();return 0;
       }
       app.DispatcherUnhandledException+=(s,e)=>{MessageBox.Show("No se pudo completar la operación. Reinicia la aplicación; no se ha solicitado borrar datos.","Inhouse Photos");e.Handled=true;};
       var hidden=args.Contains("--startup");window.InitializeLifecycle(hidden);

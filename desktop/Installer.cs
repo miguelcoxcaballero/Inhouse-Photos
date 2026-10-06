@@ -175,92 +175,93 @@ namespace InhousePhotos {
         var application=new Application();return application.Run(new SetupWindow());
       }catch(Exception ex){if(args.Length==0)MessageBox.Show(ex.Message,"Inhouse Photos",MessageBoxButton.OK,MessageBoxImage.Error);else Console.Error.WriteLine(ex.Message);return 1;}
     }
-    sealed class SetupWindow:Window {
-      static readonly Brush Page=new SolidColorBrush(Color.FromRgb(246,243,238));
-      static readonly Brush Text=new SolidColorBrush(Color.FromRgb(32,28,24));
-      static readonly Brush Muted=new SolidColorBrush(Color.FromRgb(109,98,89));
-      static readonly Brush Accent=new SolidColorBrush(Color.FromRgb(169,71,18));
-      static readonly Brush Rule=new SolidColorBrush(Color.FromRgb(226,216,205));
-      static readonly Brush Warning=new SolidColorBrush(Color.FromRgb(177,62,45));
+    internal sealed class SetupWindow:Window {
+      static readonly Brush Page=Ui.Paper;
+      static readonly Brush Text=Ui.Ink;
+      static readonly Brush Muted=Ui.Ink2;
+      static readonly Brush Accent=Ui.Accent;
+      static readonly Brush Rule=Ui.Hairline;
+      static readonly Brush Warning=Ui.Critical;
       readonly TextBlock statusTitle;
       readonly TextBlock statusDetail;
       readonly Border statusPanel;
-      readonly ProgressBar progress;
+      readonly FrameworkElement progress;
       readonly Button button;
       bool installed,installing;
 
       static TextBlock Copy(string value,double size,Brush color,bool bold=false) {
-        return new TextBlock {Text=value,FontSize=size,Foreground=color,FontWeight=bold?FontWeights.SemiBold:FontWeights.Normal,
-          TextWrapping=TextWrapping.Wrap,LineHeight=size*1.42};
+        return Ui.Text(value,size,color,bold);
       }
-      static FrameworkElement Step(string number,string title,string detail) {
-        var row=new Grid {Margin=new Thickness(0,13,0,13)};
-        row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(48)});
+      static FrameworkElement Step(int number,string title,string detail) {
+        var row=new Grid {Margin=new Thickness(0,16,0,16)};
+        row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(40)});
         row.ColumnDefinitions.Add(new ColumnDefinition());
-        var index=Copy(number,13,Accent,true);index.Margin=new Thickness(0,3,0,0);
+        var index=new Ui.StepMarker(number);index.VerticalAlignment=VerticalAlignment.Top;index.HorizontalAlignment=HorizontalAlignment.Left;
         Grid.SetColumn(index,0);row.Children.Add(index);
-        var words=new StackPanel();words.Children.Add(Copy(title,17,Text,true));
-        var description=Copy(detail,14,Muted);description.Margin=new Thickness(0,3,0,0);words.Children.Add(description);
+        var words=new StackPanel();words.Children.Add(Copy(title,Ui.BodySize,Text,true));
+        var description=Copy(detail,Ui.BodySize,Muted);description.Margin=new Thickness(0,2,0,0);words.Children.Add(description);
         Grid.SetColumn(words,1);row.Children.Add(words);
         return row;
       }
       static Border Divider() {return new Border {Height=1,Background=Rule};}
 
       public SetupWindow() {
+        Ui.Apply(this);
         Title="Instalar Inhouse Photos";
         Width=Math.Min(610,Math.Max(480,SystemParameters.WorkArea.Width-48));
         Height=Math.Min(730,Math.Max(500,SystemParameters.WorkArea.Height-48));
-        MinWidth=450;MinHeight=480;ResizeMode=ResizeMode.CanResize;WindowStartupLocation=WindowStartupLocation.CenterScreen;
-        Background=Page;Foreground=Text;FontFamily=new FontFamily("Segoe UI");
+        MinWidth=480;MinHeight=520;ResizeMode=ResizeMode.CanResize;WindowStartupLocation=WindowStartupLocation.CenterScreen;
         using(var brand=Assembly.GetExecutingAssembly().GetManifestResourceStream("InhousePhotos.brand.xaml"))Icon=(ImageSource)XamlReader.Load(brand);
         var root=new Grid{Background=Page};root.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});
         root.RowDefinitions.Add(new RowDefinition());root.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});Content=root;
 
-        var header=new Grid {Margin=new Thickness(34,25,34,20)};
-        header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(48)});
+        var header=new Grid {Margin=new Thickness(40,28,40,28)};
+        header.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});
         header.ColumnDefinitions.Add(new ColumnDefinition());
-        var mark=new Image {Source=Icon,Width=38,Height=38,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};
+        var mark=new Image {Source=Icon,Width=32,Height=32,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,12,0)};
         header.Children.Add(mark);
-        var brandText=new StackPanel();brandText.Children.Add(Copy("INHOUSE PHOTOS",13,Accent,true));
-        brandText.Children.Add(Copy("Servidor para Windows",14,Muted));Grid.SetColumn(brandText,1);header.Children.Add(brandText);
+        var brandText=new StackPanel{VerticalAlignment=VerticalAlignment.Center};brandText.Children.Add(Copy("Inhouse Photos",15,Text,true));
+        brandText.Children.Add(Ui.Caption("Servidor para Windows"));Grid.SetColumn(brandText,1);header.Children.Add(brandText);
         Grid.SetRow(header,0);root.Children.Add(header);
 
-        var scroll=new ScrollViewer {VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
-        var body=new StackPanel {Margin=new Thickness(34,0,34,12)};scroll.Content=body;
-        var title=Copy("Inhouse Photos,\nlisto en tu PC.",30,Text,true);title.LineHeight=36;
+        var scroll=new ScrollViewer {VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Focusable=false};
+        var body=new StackPanel {Margin=new Thickness(40,0,40,16)};scroll.Content=body;
+        var title=Ui.Display("Instalar Inhouse Photos");
         body.Children.Add(title);
-        var introduction=Copy("Una sola instalación para el programa y el sistema que guarda tus fotos. Si ya tienes una biblioteca vinculada, también se actualiza y se comprueba aquí.",15,Muted);
-        introduction.Margin=new Thickness(0,13,0,20);body.Children.Add(introduction);
+        var introduction=Ui.Secondary("Una sola instalación para el programa y el sistema que guarda tus fotos. Si ya tienes una biblioteca vinculada, también se actualiza y se comprueba.");
+        introduction.Margin=new Thickness(0,6,0,24);body.Children.Add(introduction);
         body.Children.Add(Divider());
-        body.Children.Add(Step("01","Instalar Inhouse Photos","El programa queda actualizado, con su versión comprobada y un acceso en el menú Inicio."));
+        body.Children.Add(Step(1,"Instalar el programa","Con su versión comprobada y un acceso en el menú Inicio."));
         body.Children.Add(Divider());
-        body.Children.Add(Step("02","Preparar el sistema","El motor de fotos viene en este instalador. En un PC nuevo, al abrirlo se preparan los componentes que falten y se solicitan los permisos necesarios."));
+        body.Children.Add(Step(2,"Preparar el sistema","El motor de fotos viene incluido. En un PC nuevo, al abrirlo se preparan los componentes que falten y se piden los permisos necesarios."));
         body.Children.Add(Divider());
-        body.Children.Add(Step("03","Comprobar tu biblioteca","Si ya está vinculada, la instalación termina después de verificar el servidor. Si es la primera vez, al abrirlo eliges dónde guardar tus fotos."));
+        body.Children.Add(Step(3,"Comprobar tu biblioteca","Si ya está vinculada, la instalación termina después de verificar el servidor. Si es la primera vez, al abrirlo eliges dónde guardar tus fotos."));
         body.Children.Add(Divider());
 
-        var reassurance=new Grid {Margin=new Thickness(0,16,0,16)};
-        reassurance.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(30)});
+        var reassurance=new Grid {Margin=new Thickness(0,20,0,8)};
+        reassurance.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(40)});
         reassurance.ColumnDefinitions.Add(new ColumnDefinition());
-        reassurance.Children.Add(Copy("✓",18,Accent,true));
-        var safe=Copy("Tus fotos, cuentas, álbumes y discos se conservan. Al actualizar el motor puede haber una pausa breve en el acceso; no necesitas volver a subir tu biblioteca.",14,Text);
+        var shield=Ui.Icon("shield",20,Ui.Good);shield.VerticalAlignment=VerticalAlignment.Top;shield.HorizontalAlignment=HorizontalAlignment.Left;reassurance.Children.Add(shield);
+        var safe=Copy("Tus fotos, cuentas, álbumes y discos se conservan. Al actualizar el motor puede haber una pausa breve en el acceso; no necesitas volver a subir tu biblioteca.",Ui.BodySize,Text);
         Grid.SetColumn(safe,1);reassurance.Children.Add(safe);body.Children.Add(reassurance);
         Grid.SetRow(scroll,1);root.Children.Add(scroll);
 
-        var footer=new StackPanel {Margin=new Thickness(34,0,34,28)};
-        statusPanel=new Border {BorderBrush=Rule,BorderThickness=new Thickness(0,1,0,0),Padding=new Thickness(0,15,0,0),Margin=new Thickness(0,0,0,14)};
-        var statusStack=new StackPanel();statusTitle=Copy("Listo para instalar",15,Text,true);
-        statusDetail=Copy("Versión "+Backend.Version+"  ·  Windows 10 / 11",13,Muted);statusDetail.Margin=new Thickness(0,2,0,0);
+        var footerShell=new StackPanel();
+        footerShell.Children.Add(Divider());
+        var footer=new Grid {Margin=new Thickness(40,16,40,24)};footerShell.Children.Add(footer);
+        footer.ColumnDefinitions.Add(new ColumnDefinition());footer.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+        statusPanel=new Border {Margin=new Thickness(0,0,24,0),VerticalAlignment=VerticalAlignment.Center};
+        var statusStack=new StackPanel();statusTitle=Copy("Listo para instalar",Ui.BodySize,Text,true);
+        System.Windows.Automation.AutomationProperties.SetLiveSetting(statusTitle,System.Windows.Automation.AutomationLiveSetting.Polite);
+        statusDetail=Ui.Caption("Versión "+Backend.Version+"  ·  Windows 10 / 11");statusDetail.Margin=new Thickness(0,2,0,0);
         statusStack.Children.Add(statusTitle);
-        statusStack.Children.Add(new ScrollViewer{Content=statusDetail,MaxHeight=108,
+        statusStack.Children.Add(new ScrollViewer{Content=statusDetail,MaxHeight=108,Focusable=false,
           VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
-        progress=new ProgressBar {Height=4,Margin=new Thickness(0,10,0,0),Foreground=Accent,Background=Rule,
-          BorderThickness=new Thickness(0),IsIndeterminate=true,Visibility=Visibility.Collapsed};statusStack.Children.Add(progress);
+        var bar=new Ui.ActivityBar{Margin=new Thickness(0,10,0,0),Visibility=Visibility.Collapsed};progress=bar;statusStack.Children.Add(bar);
         statusPanel.Child=statusStack;footer.Children.Add(statusPanel);
-        button=new Button {Content="Instalar Inhouse Photos",Padding=new Thickness(20,12,20,12),MinHeight=48,FontSize=16,
-          FontWeight=FontWeights.SemiBold,BorderThickness=new Thickness(0),Background=Accent,Foreground=Brushes.White,
-          HorizontalContentAlignment=HorizontalAlignment.Center};footer.Children.Add(button);
-        Grid.SetRow(footer,2);root.Children.Add(footer);
+        button=Ui.Button("Instalar Inhouse Photos","Primary");button.Margin=new Thickness(0);button.MinHeight=36;button.VerticalAlignment=VerticalAlignment.Center;
+        Grid.SetColumn(button,1);footer.Children.Add(button);
+        Grid.SetRow(footerShell,2);root.Children.Add(footerShell);
         button.Click+=InstallClicked;
         Closing+=(sender,args)=>{
           if(!installing)return;
@@ -279,7 +280,7 @@ namespace InhousePhotos {
             Launch(false);Close();return;
           }
           installing=true;progress.Visibility=Visibility.Visible;
-          button.Content="Instalando…";
+          Ui.SetCaption(button,"Instalando…");
           statusTitle.Text="Preparando Inhouse Photos…";
           statusDetail.Text="Comprobando el programa, el motor de fotos y tu instalación actual.";
           await InstallProduct(message=>{
@@ -295,16 +296,16 @@ namespace InhousePhotos {
           statusTitle.Text=managed?"Instalación completa y verificada":"Programa actualizado y preparado";
           statusDetail.Text=managed?"El programa y tu servidor están comprobados. Puedes abrir Inhouse Photos; tus fotos y cuentas se conservan.":
             "Al abrir Inhouse Photos, elige dónde guardar tus fotos o conecta tu biblioteca existente. Se solicitarán las condiciones y permisos que necesite este PC.";
-          button.Content="Abrir Inhouse Photos";
+          Ui.SetCaption(button,"Abrir Inhouse Photos");
         }catch(ManagerRunningException) {
           statusTitle.Foreground=Warning;statusTitle.Text="Cierra el programa anterior";
           statusDetail.Text="En los iconos junto al reloj de Windows, haz clic derecho en Inhouse Photos y elige «Salir del gestor». Después pulsa Reintentar. No cierres el servidor de fotos; tu biblioteca se conserva.";
-          button.Content="Reintentar instalación";
+          Ui.SetCaption(button,"Reintentar instalación");
         }catch(Exception ex) {
           statusTitle.Foreground=Warning;statusTitle.Text=installed?"Instalado, pero no se pudo abrir":"No se pudo completar la instalación";
           statusDetail.Text=ex.Message+(installed?" Puedes volver a abrirlo o usar el menú Inicio.":
             " Tus fotos y el trabajo pendiente se conservan. Pulsa Reintentar para continuar; no necesitas desinstalar ni volver a subir nada.");
-          button.Content=installed?"Abrir Inhouse Photos":"Reintentar instalación";
+          Ui.SetCaption(button,installed?"Abrir Inhouse Photos":"Reintentar instalación");
         }finally {
           installing=false;progress.Visibility=Visibility.Collapsed;button.IsEnabled=true;
         }

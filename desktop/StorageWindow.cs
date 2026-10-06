@@ -29,40 +29,43 @@ namespace InhousePhotos {
     }
   }
   public sealed class StorageWindow:Window {
-    static readonly Brush page=new SolidColorBrush(Color.FromRgb(246,243,238));
-    static readonly Brush ink=new SolidColorBrush(Color.FromRgb(32,28,24));
-    static readonly Brush muted=new SolidColorBrush(Color.FromRgb(104,95,85));
-    static readonly Brush line=new SolidColorBrush(Color.FromRgb(220,213,203));
-    static readonly Brush accent=new SolidColorBrush(Color.FromRgb(169,71,18));
+    static readonly Brush ink=Ui.Ink;
+    static readonly Brush muted=Ui.Ink2;
+    static readonly Brush accent=Ui.Accent;
     readonly StackPanel rows=new StackPanel();readonly TextBlock status=new TextBlock();readonly ComboBox mode=new ComboBox();readonly ComboBox pool=new ComboBox();readonly TextBox confirmation=new TextBox();
     readonly Dictionary<CheckBox,StorageDisk> selection=new Dictionary<CheckBox,StorageDisk>();bool busy;
     public StorageWindow() {
+      Ui.Apply(this);
       Title="Inhouse Photos · Discos protegidos";Width=760;Height=760;MinWidth=640;MinHeight=600;WindowStartupLocation=WindowStartupLocation.CenterScreen;
-      Background=page;Foreground=ink;FontFamily=new FontFamily("Segoe UI");FontSize=15;
-      var panel=new StackPanel{Margin=new Thickness(32,28,32,32)};
-      Content=new ScrollViewer{Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
-      var title=Text("Discos y redundancia",30,ink,new Thickness(0,0,0,5));title.FontWeight=FontWeights.SemiBold;panel.Children.Add(title);
-      panel.Children.Add(Text("Opciones avanzadas de almacenamiento para este PC.",15,muted,new Thickness(0,0,0,18)));
-      var warning=new Border{Background=new SolidColorBrush(Color.FromRgb(246,231,216)),BorderBrush=accent,BorderThickness=new Thickness(3,0,0,0),Padding=new Thickness(15,12,15,12),Margin=new Thickness(0,0,0,22)};
-      warning.Child=Text("Solo puedes seleccionar discos vacíos sin particiones. La biblioteca actual y el disco de Windows están protegidos. RAID no sustituye una copia de seguridad.",14,ink,new Thickness(0));panel.Children.Add(warning);
+      using(var brand=typeof(StorageWindow).Assembly.GetManifestResourceStream("InhousePhotos.brand.xaml"))Icon=(ImageSource)System.Windows.Markup.XamlReader.Load(brand);
+      var panel=new StackPanel{Margin=new Thickness(40,32,40,40)};
+      Content=new ScrollViewer{Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Background=Ui.Paper,Focusable=false};
+      var title=Ui.Display("Discos y redundancia");title.Margin=new Thickness(0,0,0,6);panel.Children.Add(title);
+      var subtitle=Ui.Secondary("Opciones avanzadas de almacenamiento para este PC.");subtitle.Margin=new Thickness(0,0,0,24);panel.Children.Add(subtitle);
+      // Safety-critical: stated once, with an icon, before any choice.
+      var warning=new Grid{Margin=new Thickness(0,0,0,32)};
+      warning.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(30)});warning.ColumnDefinitions.Add(new ColumnDefinition());
+      var alert=Ui.Icon("alert",18,accent);alert.VerticalAlignment=VerticalAlignment.Top;alert.HorizontalAlignment=HorizontalAlignment.Left;alert.Margin=new Thickness(0,1,0,0);warning.Children.Add(alert);
+      var warningText=Ui.Body("Solo puedes seleccionar discos vacíos sin particiones. La biblioteca actual y el disco de Windows están protegidos. RAID no sustituye una copia de seguridad.");
+      Grid.SetColumn(warningText,1);warning.Children.Add(warningText);panel.Children.Add(warning);
 
       var choose=Step(panel,"1","Selecciona discos vacíos","Los discos con datos o que Windows no puede identificar aparecen desactivados.");
-      choose.Children.Add(rows);
-      Divider(panel);
+      rows.Margin=new Thickness(0,4,0,0);choose.Children.Add(rows);
 
       var protect=Step(panel,"2","Elige la protección","El espejo requiere al menos 2 discos; la paridad, al menos 3.");
       mode.Items.Add("Espejo · mínimo 2 discos");mode.Items.Add("Paridad · mínimo 3 discos");mode.Items.Add("Añadir discos a un grupo existente");mode.SelectedIndex=0;
-      StyleChoice(mode);mode.Margin=new Thickness(0,2,0,8);protect.Children.Add(mode);
-      var poolTitle=Text("Grupo de destino",14,muted,new Thickness(0,0,0,6));poolTitle.Visibility=Visibility.Collapsed;protect.Children.Add(poolTitle);
-      StyleChoice(pool);pool.Visibility=Visibility.Collapsed;protect.Children.Add(pool);
+      StyleChoice(mode);mode.Margin=new Thickness(0,4,0,12);System.Windows.Automation.AutomationProperties.SetName(mode,"Tipo de protección");protect.Children.Add(Ui.Constrain(mode,420));
+      var poolTitle=Ui.Body("Grupo de destino");poolTitle.Margin=new Thickness(0,0,0,6);poolTitle.Visibility=Visibility.Collapsed;protect.Children.Add(poolTitle);
+      StyleChoice(pool);pool.Visibility=Visibility.Collapsed;System.Windows.Automation.AutomationProperties.SetName(pool,"Grupo de destino");protect.Children.Add(Ui.Constrain(pool,420));
       mode.SelectionChanged+=(s,e)=>{var adding=mode.SelectedIndex==2;poolTitle.Visibility=adding?Visibility.Visible:Visibility.Collapsed;pool.Visibility=adding?Visibility.Visible:Visibility.Collapsed;};
-      Divider(panel);
 
       var confirm=Step(panel,"3","Confirma antes de aplicar","Revisarás una última vez los discos elegidos antes de cambiar su organización.");
-      confirm.Children.Add(Text("Para confirmar el uso de los discos seleccionados, escribe CREAR.",14,ink,new Thickness(0,0,0,7)));
-      confirmation.Padding=new Thickness(10);confirmation.MinHeight=42;confirmation.MaxLength=5;confirmation.Background=Brushes.White;confirmation.Foreground=ink;confirmation.BorderBrush=line;confirmation.BorderThickness=new Thickness(1);confirmation.Margin=new Thickness(0,0,0,12);confirm.Children.Add(confirmation);
-      var button=new Button{Content="Revisar y aplicar",Padding=new Thickness(18,12,18,12),MinHeight=44,HorizontalAlignment=HorizontalAlignment.Left,Background=accent,BorderBrush=accent,Foreground=Brushes.White,FontWeight=FontWeights.SemiBold};confirm.Children.Add(button);
-      status.TextWrapping=TextWrapping.Wrap;status.Foreground=muted;status.Margin=new Thickness(0,16,0,0);confirm.Children.Add(status);
+      var typeHint=Ui.Body("Para confirmar el uso de los discos seleccionados, escribe CREAR.");typeHint.Margin=new Thickness(0,4,0,8);confirm.Children.Add(typeHint);
+      confirmation.MaxLength=5;confirmation.Width=200;confirmation.HorizontalAlignment=HorizontalAlignment.Left;confirmation.Margin=new Thickness(0,0,0,16);
+      System.Windows.Automation.AutomationProperties.SetName(confirmation,"Escribe CREAR para confirmar");confirm.Children.Add(confirmation);
+      var button=Ui.Button("Revisar y aplicar","Primary");button.Margin=new Thickness(0);confirm.Children.Add(button);
+      status.TextWrapping=TextWrapping.Wrap;status.Foreground=muted;status.Margin=new Thickness(0,16,0,0);
+      System.Windows.Automation.AutomationProperties.SetLiveSetting(status,System.Windows.Automation.AutomationLiveSetting.Polite);confirm.Children.Add(status);
       button.Click+=async(s,e)=>{
         if(busy)return;
         try {
@@ -82,23 +85,39 @@ namespace InhousePhotos {
       Loaded+=async(s,e)=>{status.Text="Comprobando los discos disponibles…";try{await LoadDisks();if(status.Text=="Comprobando los discos disponibles…")status.Text="";}catch(Exception ex){status.Foreground=accent;status.Text=ex.Message;}};
       Closing+=(s,e)=>{if(busy){e.Cancel=true;status.Text="Espera a que Windows confirme el resultado antes de cerrar.";}};
     }
-    static TextBlock Text(string value,double size,Brush color,Thickness margin){return new TextBlock{Text=value,FontSize=size,Foreground=color,TextWrapping=TextWrapping.Wrap,Margin=margin};}
+    // Numbered step: a marker, a title and one line, separated by hairlines.
     static StackPanel Step(StackPanel panel,string number,string title,string detail) {
-      var section=new StackPanel{Margin=new Thickness(0,0,0,18)};
-      var heading=Text(number+"  "+title,20,ink,new Thickness(0,0,0,5));heading.FontWeight=FontWeights.SemiBold;section.Children.Add(heading);
-      section.Children.Add(Text(detail,14,muted,new Thickness(0,0,0,13)));
+      if(number!="1")panel.Children.Add(Ui.Divider(new Thickness(0,8,0,24)));
+      var header=new Grid();header.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(36)});header.ColumnDefinitions.Add(new ColumnDefinition());
+      var marker=new Ui.StepMarker(int.Parse(number));marker.VerticalAlignment=VerticalAlignment.Top;marker.HorizontalAlignment=HorizontalAlignment.Left;marker.Margin=new Thickness(0,1,0,0);header.Children.Add(marker);
+      var words=new StackPanel();Grid.SetColumn(words,1);header.Children.Add(words);
+      words.Children.Add(Ui.Subtitle(title));
+      var line=Ui.Secondary(detail);line.Margin=new Thickness(0,2,0,0);words.Children.Add(line);
+      panel.Children.Add(header);
+      var section=new StackPanel{Margin=new Thickness(36,12,0,16)};
       panel.Children.Add(section);return section;
     }
-    static void Divider(StackPanel panel){panel.Children.Add(new Border{Height=1,Background=line,Margin=new Thickness(0,0,0,22)});}
-    static void StyleChoice(ComboBox choice){choice.MinHeight=42;choice.Padding=new Thickness(9);choice.Background=Brushes.White;choice.Foreground=ink;choice.BorderBrush=line;choice.BorderThickness=new Thickness(1);}
+    static void StyleChoice(ComboBox choice){choice.HorizontalAlignment=HorizontalAlignment.Stretch;}
     async Task LoadDisks() {
-      var inventory=Backend.Json.Deserialize<StorageInventory>(await StorageBackend.Execute("Inspect",null));rows.Children.Clear();selection.Clear();pool.Items.Clear();
+      Fill(Backend.Json.Deserialize<StorageInventory>(await StorageBackend.Execute("Inspect",null)));
+    }
+    // Preview only: sample rows so the layout can be reviewed without touching disks.
+    internal void PreviewInventory() {
+      Fill(new StorageInventory{Pools=new List<StoragePoolInfo>(),Disks=new List<StorageDisk>{
+        new StorageDisk{Model="Samsung SSD 870 EVO",Serial="S6PNNX0T000001",Size=1000204886016,Eligible=true,Reason="Vacío y sin particiones"},
+        new StorageDisk{Model="WDC WD40EFRX",Serial="WD-WCC7K0000002",Size=4000787030016,Eligible=true,Reason="Vacío y sin particiones"},
+        new StorageDisk{Model="Samsung SSD 980",Serial="S64ANS0T000003",Size=500107862016,Eligible=false,Reason="Contiene la biblioteca actual"}}});
+    }
+    void Fill(StorageInventory inventory) {
+      rows.Children.Clear();selection.Clear();pool.Items.Clear();
+      rows.Children.Add(Ui.Divider(new Thickness(0)));
       foreach(var disk in inventory.Disks){
         var label=new StackPanel();
-        var diskName=Text(disk.Model+" · "+Backend.Size(disk.Size),15,ink,new Thickness(0,0,0,3));diskName.FontWeight=FontWeights.SemiBold;label.Children.Add(diskName);
-        label.Children.Add(Text(disk.Serial+" · "+disk.Reason,13,muted,new Thickness(0)));
-        var box=new CheckBox{Content=label,IsEnabled=disk.Eligible,Foreground=ink,VerticalContentAlignment=VerticalAlignment.Center};
-        rows.Children.Add(new Border{Child=box,BorderBrush=line,BorderThickness=new Thickness(0,0,0,1),Padding=new Thickness(2,10,0,10)});selection.Add(box,disk);
+        var diskName=Ui.Text(disk.Model+" · "+Backend.Size(disk.Size),Ui.BodySize,ink,true);label.Children.Add(diskName);
+        var detail=Ui.Caption(disk.Serial+" · "+disk.Reason);detail.Margin=new Thickness(0,2,0,0);label.Children.Add(detail);
+        var box=new CheckBox{Content=label,IsEnabled=disk.Eligible,VerticalContentAlignment=VerticalAlignment.Center};
+        System.Windows.Automation.AutomationProperties.SetName(box,disk.Model+" "+Backend.Size(disk.Size)+", "+disk.Reason);
+        rows.Children.Add(new Border{Child=box,BorderBrush=Ui.Hairline,BorderThickness=new Thickness(0,0,0,1),Padding=new Thickness(0,12,0,12)});selection.Add(box,disk);
       }
       foreach(var item in inventory.Pools)pool.Items.Add(item);
       if(!inventory.Disks.Any(d=>d.Eligible)){status.Foreground=accent;status.Text="No hay discos vacíos disponibles. Conecta discos nuevos; los que contienen datos no se pueden seleccionar.";}

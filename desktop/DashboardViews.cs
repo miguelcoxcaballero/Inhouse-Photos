@@ -10,24 +10,26 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using Ellipse = System.Windows.Shapes.Ellipse;
 
 namespace InhousePhotos {
   public sealed partial class ServerWindow {
-    readonly Brush good=new SolidColorBrush(Color.FromRgb(44,114,77));
-    readonly Brush surface=new SolidColorBrush(Color.FromRgb(255,252,248));
-    readonly Brush divider=new SolidColorBrush(Color.FromRgb(220,213,203));
+    readonly Brush good=Ui.Good;
+    readonly Brush surface=Ui.Surface;
+    readonly Brush divider=Ui.Hairline;
     bool? lastLocal, lastEndpoint, lastVerified;
     DateTime lastHealthCheck=DateTime.MinValue;
     int overviewGeneration;
     int connectGeneration;
     string backupProgressText;
     TextBlock backupProgressView;
+    Action<string> backupProgressStage;
 
     void SetBackupProgress(string text) {
       backupProgressText=text;
-      notice.Text=text;
+      // The Copias page shows progress in its own hero; elsewhere it uses the notice.
+      notice.Text=page=="Protección"&&backupProgressView!=null?"":text;
       if(page=="Protección"&&backupProgressView!=null)backupProgressView.Text=text;
+      if(page=="Protección"&&backupProgressStage!=null)backupProgressStage(text);
     }
 
     Task RenderManagedPage() {
@@ -43,23 +45,24 @@ namespace InhousePhotos {
 
     Border Panel(Panel inside) {
       return new Border {Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(0),
-        Margin=new Thickness(0,4,0,12),Child=inside};
+        Margin=new Thickness(0,0,0,8),Child=inside};
     }
     StackPanel Column() {return new StackPanel{Orientation=Orientation.Vertical};}
-    Button PlaceAction(Panel host,string caption,Func<Task> task,bool primary=false) {
-      var button=Action(caption,task,primary);
+    static bool Horizontal(Panel host){var stack=host as StackPanel;return stack!=null&&stack.Orientation==Orientation.Horizontal;}
+    Button PlaceAction(Panel host,string caption,Func<Task> task,bool primary=false,string icon=null) {
+      var button=Action(caption,task,primary,icon);
       content.Children.Remove(button);
+      button.Margin=Horizontal(host)?new Thickness(0,0,8,0):new Thickness(0,16,8,0);
       host.Children.Add(button);
       return button;
     }
-    Button PlaceLink(Panel host,string caption,Func<Task> task) {
-      var button=PlaceAction(host,caption,task);
-      button.Background=Brushes.Transparent;button.BorderBrush=Brushes.Transparent;
-      button.BorderThickness=new Thickness(0);button.Padding=new Thickness(0);
-      button.Margin=new Thickness(0,10,0,0);button.MinHeight=28;button.Foreground=accent;
+    Button PlaceLink(Panel host,string caption,Func<Task> task,string icon=null) {
+      var button=PlaceAction(host,caption,task,false,icon);
+      Ui.SetStyle(button,"Link");
+      button.Margin=Horizontal(host)?new Thickness(0,0,16,0):new Thickness(0,8,0,0);
       return button;
     }
-    TextBlock Fine(string text,Brush color=null) {return Label(text,14,color??muted);}
+    TextBlock Fine(string text,Brush color=null) {var block=Ui.Text(text,Ui.BodySize,color??muted);block.Margin=new Thickness(0,0,0,8);return block;}
     Task GoTo(string target) {page=target;return Render();}
     string DateLabel(string iso) {
       DateTime value;
@@ -86,50 +89,57 @@ namespace InhousePhotos {
       return Uri.TryCreate(value,UriKind.Absolute,out address)&&address.IsLoopback;
     }
 
-    StackPanel StatusLine(string text,Brush color) {
-      var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,12)};
-      row.Children.Add(new Ellipse{Width=9,Height=9,Fill=color,Margin=new Thickness(0,5,9,0)});
-      row.Children.Add(new TextBlock{Text=text,FontSize=13,FontWeight=FontWeights.SemiBold,Foreground=color});
+    // Small status pill: a dot and a short label on a tint of the same tone.
+    Border Pill(string text,Tone tone) {
+      var ink=tone==Tone.Good?Ui.Good:tone==Tone.Attention?Ui.Accent:tone==Tone.Critical?Ui.Critical:(Brush)Ui.Ink2;
+      var tint=tone==Tone.Good?Ui.GoodTint:tone==Tone.Attention?Ui.AccentTint:tone==Tone.Critical?Ui.CriticalTint:(Brush)Ui.NeutralTint;
+      var row=new StackPanel{Orientation=Orientation.Horizontal};
+      row.Children.Add(new System.Windows.Shapes.Ellipse{Width=6,Height=6,Fill=ink,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,6,0)});
+      var label=Ui.Text(text,Ui.CaptionSize,ink,true);label.TextWrapping=TextWrapping.NoWrap;row.Children.Add(label);
+      return new Border{Background=tint,CornerRadius=new CornerRadius(10),Padding=new Thickness(8,2,10,2),Child=row,
+        HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,0,0,10)};
+    }
+    void Divide(){content.Children.Add(Ui.Divider(new Thickness(0)));}
+
+    // Wire a non-standard button (a whole list row) through the same guard as Action.
+    void Wire(Button button,Func<Task> task) {
+      button.Click+=async(s,e)=>{if(busy||SystemUpdates.BlocksOperations(prefs)||RuntimeUpdates.BlocksOperations(prefs)){notice.Text="Espera a que termine o se recupere la actualización actual.";return;}busy=true;button.IsEnabled=false;notice.Text="Trabajando…";try{await task();if(notice.Text=="Trabajando…")notice.Text="";}catch(Exception ex){notice.Text=ex.Message;}finally{busy=false;button.IsEnabled=true;}};
+    }
+    // Overview row that opens another page: whole row is one focusable target.
+    Ui.Row NavigationRow(string icon,string title,string detail,string value,Brush valueColor,string target) {
+      var row=Ui.ListRow(icon,title,detail);
+      var valueText=Ui.Text(value,Ui.BodySize,valueColor??Ui.Ink,true);valueText.TextWrapping=TextWrapping.NoWrap;valueText.VerticalAlignment=VerticalAlignment.Center;
+      row.Trailing.Children.Add(valueText);
+      var chevron=Ui.Icon("chevron",16,Ui.Ink3);chevron.Margin=new Thickness(12,0,0,0);chevron.VerticalAlignment=VerticalAlignment.Center;row.Trailing.Children.Add(chevron);
+      var button=new Button{Style=Ui.StyleOf("Row"),Content=row.Root};
+      AutomationProperties.SetName(button,title+": "+value);AutomationProperties.SetHelpText(button,detail??"");
+      Wire(button,()=>GoTo(target));
+      content.Children.Add(button);
       return row;
     }
+
     // USB device detection and USB network readiness are different facts. Keep
     // both visible, and update this section rather than rebuilding the page.
     // In particular, a charging/MTP phone must never be labelled ready to upload.
     void RenderUsbConnection(bool compact=false) {
-      var section=Column();section.Margin=new Thickness(0,compact?8:2,0,2);
-      var heading=Label(compact?"CABLE USB":"Transferencia por cable",compact?12:22,compact?muted:Foreground);
-      heading.FontWeight=FontWeights.SemiBold;heading.Margin=new Thickness(0,0,0,compact?9:13);section.Children.Add(heading);
-      var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(38)});row.ColumnDefinitions.Add(new ColumnDefinition());
-      var cableDrawing=new DrawingGroup();
-      cableDrawing.Children.Add(new GeometryDrawing(null,new Pen(accent,1.8){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round},
-        Geometry.Parse("M 12,27 L 12,5 M 8,9 L 12,5 L 16,9 M 12,19 L 6,15 L 6,12 M 12,23 L 19,18 L 19,14")));
-      cableDrawing.Children.Add(new GeometryDrawing(accent,null,new EllipseGeometry(new Point(6,10),2,2)));
-      cableDrawing.Children.Add(new GeometryDrawing(accent,null,new RectangleGeometry(new Rect(17,10,4,4))));
-      cableDrawing.Children.Add(new GeometryDrawing(accent,null,new EllipseGeometry(new Point(12,29),2.5,2.5)));
-      var cableIcon=new Image{Source=new DrawingImage(cableDrawing),Width=24,Height=32,VerticalAlignment=VerticalAlignment.Top,
-        HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,1,0,0)};row.Children.Add(cableIcon);
-      var body=Column();Grid.SetColumn(body,1);row.Children.Add(body);
-      var title=Label("Detectando el móvil…",compact?17:19);title.FontWeight=FontWeights.SemiBold;title.Margin=new Thickness(0,0,0,4);body.Children.Add(title);
-      var detail=Fine("Conecta un móvil con un cable de datos. Se detectará automáticamente.");detail.Margin=new Thickness(0,0,0,6);body.Children.Add(detail);
-      var next=Fine("");next.Margin=new Thickness(0,2,0,7);next.Visibility=Visibility.Collapsed;body.Children.Add(next);
-      var network=Fine("");network.Margin=new Thickness(0,0,0,7);network.Visibility=Visibility.Collapsed;body.Children.Add(network);
-      section.Children.Add(row);
-      var actions=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(38,0,0,0)};
-      var prepare=new Button{Content="Preparar red USB",HorizontalAlignment=HorizontalAlignment.Left,Visibility=Visibility.Collapsed,
-        Margin=new Thickness(0,4,12,0)};AutomationProperties.SetName(prepare,"Preparar la red del móvil detectado por USB");actions.Children.Add(prepare);
-      var check=new Button{Content="Volver a detectar",HorizontalAlignment=HorizontalAlignment.Left,Background=Brushes.Transparent,
-        BorderBrush=Brushes.Transparent,BorderThickness=new Thickness(0),Foreground=accent,Padding=new Thickness(0),
-        Margin=new Thickness(0,4,0,0),MinHeight=28};actions.Children.Add(check);section.Children.Add(actions);
-      var activity=Fine("");activity.Margin=new Thickness(38,7,0,0);activity.Visibility=Visibility.Collapsed;section.Children.Add(activity);
+      if(!compact)Section("Transferencia por cable","Sube fotos más rápido con el móvil conectado por USB.");
+      var parts=Ui.ListRow("usb","Detectando el móvil…","Conecta un móvil con un cable de datos. Se detectará automáticamente.");
+      var section=parts.Root;var body=parts.Body;var title=parts.Heading;var detail=parts.Detail;var cableIcon=parts.Icon;
+      var next=Fine("");next.Margin=new Thickness(0,4,0,0);next.Visibility=Visibility.Collapsed;body.Children.Add(next);
+      var network=Fine("");network.Margin=new Thickness(0,4,0,0);network.Visibility=Visibility.Collapsed;body.Children.Add(network);
+      var activity=Fine("");activity.Margin=new Thickness(0,6,0,0);activity.Visibility=Visibility.Collapsed;body.Children.Add(activity);
+      var prepare=Ui.Button("Preparar red USB");prepare.Visibility=Visibility.Collapsed;prepare.Margin=new Thickness(0,0,12,0);
+      AutomationProperties.SetName(prepare,"Preparar la red del móvil detectado por USB");parts.Trailing.Children.Add(prepare);
+      var check=Ui.Button("Volver a detectar","Link");parts.Trailing.Children.Add(check);
       content.Children.Add(section);
       var monitor=UsbDeviceMonitor.Current;string lastSignature=null;bool preparing=false;
       void Update() {
         if(!content.Children.Contains(section))return;
         var status=monitor.Snapshot;
         var signature=status.State+"|"+status.Title+"|"+status.Message+"|"+status.Action+"|"+status.DeviceName+"|"+status.LinkMbps+"|"+status.CanPrepare;
-        title.Text=status.Title;detail.Text=status.Message;
-        title.Foreground=status.State=="ready"?good:Foreground;
-        cableIcon.Opacity=status.Connected?1:0.45;
+        title.Text=status.Title;detail.Text=status.Message;detail.Visibility=String.IsNullOrWhiteSpace(detail.Text)?Visibility.Collapsed:Visibility.Visible;
+        title.Foreground=status.State=="ready"?good:Ui.Ink;
+        Ui.IconPath(cableIcon).Stroke=status.State=="ready"?good:status.Connected?Ui.Ink:Ui.Ink3;
         next.Text=status.Action=="Volver a comprobar"||status.Action=="Preparar conexión USB"?"":status.Action??"";
         next.Visibility=String.IsNullOrWhiteSpace(next.Text)?Visibility.Collapsed:Visibility.Visible;
         network.Text=status.State=="ready"?"Red por cable disponible"+(status.LinkMbps>0?" · enlace de "+status.LinkMbps+" Mbps":"")+". La velocidad real de subida aparece en el móvil.":"";
@@ -167,45 +177,52 @@ namespace InhousePhotos {
       };
       Update();
     }
-    ProgressBar SpaceBar(long total,long free) {
-      return new ProgressBar{Minimum=0,Maximum=Math.Max(1,total),Value=Math.Max(0,Math.Min(total,total-free)),Height=8,
-        Foreground=accent,Background=divider,
-        BorderThickness=new Thickness(0),Margin=new Thickness(0,12,0,9)};
-    }
-    StackPanel StepHeading(string number,string name) {
-      var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,4,0,12)};
-      row.Children.Add(new TextBlock{Text=number.PadLeft(2,'0'),Foreground=accent,FontSize=13,FontWeight=FontWeights.SemiBold,
-        Width=35,VerticalAlignment=VerticalAlignment.Center});
-      row.Children.Add(new TextBlock{Text=name,Foreground=Foreground,FontSize=18,FontWeight=FontWeights.SemiBold});
-      return row;
+    ProgressBar SpaceBar(long total,long free,bool low=false) {
+      var bar=new ProgressBar{Minimum=0,Maximum=Math.Max(1,total),Value=Math.Max(0,Math.Min(total,total-free)),Height=4,
+        Foreground=low?Ui.Accent:Ui.Ink2};
+      AutomationProperties.SetName(bar,"Espacio usado");
+      return bar;
     }
 
     Task RenderOverview() {
-      Heading("Tu biblioteca","Estado y próximos pasos, sin tener que revisar cada ajuste.");
+      Heading("Resumen",null);
       var disk=default(DiskInfo);
       string diskIssue=null;
       try {disk=LibraryDisk();if(disk==null)diskIssue="No se encuentra el disco de tu biblioteca.";}
       catch(Exception ex){diskIssue=ex.Message;}
-      var hero=Column();
-      var healthLine=StatusLine("SERVIDOR",diskIssue==null&&lastLocal==true&&lastVerified!=false?good:accent);
-      var healthDot=(Ellipse)healthLine.Children[0];hero.Children.Add(healthLine);
-      var state=Label(diskIssue!=null?"No encuentro el disco de tus fotos":lastLocal==true?(lastVerified==false?"Hay que verificar la biblioteca":"Tus fotos están disponibles"):lastLocal==false?"El servidor está detenido":"Comprobando el servidor…",25);
-      state.FontWeight=FontWeights.SemiBold;
-      hero.Children.Add(state);
-      hero.Children.Add(Fine(diskIssue??(disk==null?"": "Fotos guardadas en el disco "+disk.Root.TrimEnd('\\'))));
-      var mainAction=PlaceAction(hero,"Comprobar servidor",async()=>{
+
+      // Status first: one sentence about the library and its one next action.
+      var hero=new Grid{Margin=new Thickness(0,0,0,24)};
+      hero.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+      hero.ColumnDefinitions.Add(new ColumnDefinition());
+      hero.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+      var mark=new Ui.StatusMark(44);mark.VerticalAlignment=VerticalAlignment.Center;
+      mark.Set(diskIssue!=null?Tone.Attention:lastLocal==true?(lastVerified==false?Tone.Attention:Tone.Good):lastLocal==false?Tone.Attention:Tone.Busy);
+      hero.Children.Add(mark);
+      var words=new StackPanel{Margin=new Thickness(16,0,16,0),VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(words,1);hero.Children.Add(words);
+      var state=Ui.Title(diskIssue!=null?"No encuentro el disco de tus fotos":lastLocal==true?(lastVerified==false?"Hay que verificar la biblioteca":"Tus fotos están disponibles"):lastLocal==false?"El servidor está detenido":"Comprobando el servidor…");
+      words.Children.Add(state);
+      var where=Ui.Secondary(diskIssue??(disk==null?"":"Fotos guardadas en el disco "+disk.Root.TrimEnd('\\')));where.Margin=new Thickness(0,2,0,0);words.Children.Add(where);
+      var actionHost=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(actionHost,2);hero.Children.Add(actionHost);
+      var mainAction=PlaceAction(actionHost,"Comprobar servidor",async()=>{
         if(diskIssue!=null)await GoTo("Discos");
         else if(lastVerified==false){await Backend.ReverifyExisting(prefs,text=>Dispatcher.Invoke(()=>notice.Text=text));lastVerified=true;lastHealthCheck=DateTime.MinValue;await Render();}
         else if(lastLocal!=true){await Backend.StartManaged(prefs,text=>Dispatcher.Invoke(()=>notice.Text=text));lastLocal=true;lastHealthCheck=DateTime.MinValue;await Render();}
         else Open(Backend.CanonicalEndpoint(lastEndpoint==true?prefs.Endpoint:prefs.LocalEndpoint));
       },true);
-      if(diskIssue!=null)mainAction.Content="Ver almacenamiento";
-      else if(lastVerified==false)mainAction.Content="Volver a verificar";
-      else if(lastLocal==true)mainAction.Content="Abrir mis fotos  ↗";
-      else if(lastLocal==false)mainAction.Content="Iniciar servidor";
+      mainAction.Margin=new Thickness(0);
+      if(diskIssue!=null)Ui.SetCaption(mainAction,"Ver almacenamiento");
+      else if(lastVerified==false)Ui.SetCaption(mainAction,"Volver a verificar");
+      else if(lastLocal==true)Ui.SetCaption(mainAction,"Abrir mis fotos","external");
+      else if(lastLocal==false)Ui.SetCaption(mainAction,"Iniciar servidor");
       content.Children.Add(hero);
-      RenderUsbConnection(true);
-      Rule();
+      Divide();
+
+      var storage=NavigationRow("drive","Almacenamiento",
+        disk==null?"Conecta el disco de la biblioteca":"Disco "+disk.Root.TrimEnd('\\')+" · "+Backend.Size(disk.Total)+" en total",
+        disk==null?"No disponible":Backend.Size(disk.Free)+" libres",disk!=null&&LowSpace(disk)?accent:null,"Discos");
+      if(disk!=null){var meter=Ui.Constrain(SpaceBar(disk.Total,disk.Free,LowSpace(disk)),320);meter.Margin=new Thickness(0,10,0,2);storage.Body.Children.Add(meter);}
+      Divide();
 
       var backup=Backend.ReadFullBackupStatus(prefs);
       var backupAtSelectedDestination=BackupAtSelectedDestination(backup);
@@ -213,49 +230,33 @@ namespace InhousePhotos {
       DateTime completed;
       var backupOld=backup.FilesPresent&&DateTime.TryParse(backup.CompletedUtc,out completed)&&
         DateTime.UtcNow-completed.ToUniversalTime()>TimeSpan.FromDays(8);
-      var metrics=new Grid{Margin=new Thickness(0,2,0,13)};
-      metrics.ColumnDefinitions.Add(new ColumnDefinition());metrics.ColumnDefinitions.Add(new ColumnDefinition());
-      var spaceCard=Column();spaceCard.Margin=new Thickness(0,0,20,0);
-      spaceCard.Children.Add(Fine("ALMACENAMIENTO",muted));
-      var free=Label(disk==null?"No disponible":Backend.Size(disk.Free)+" libres",23,disk!=null&&LowSpace(disk)?accent:Foreground);
-      free.FontWeight=FontWeights.SemiBold;spaceCard.Children.Add(free);
-      spaceCard.Children.Add(Fine(disk==null?"Conecta el disco de la biblioteca":disk.Root+" · "+Backend.Size(disk.Total)+" en total"));
-      if(disk!=null)spaceCard.Children.Add(SpaceBar(disk.Total,disk.Free));
-      PlaceLink(spaceCard,"Ver almacenamiento  →",()=>GoTo("Discos"));
-      var backupCard=Column();backupCard.Margin=new Thickness(20,0,0,0);
-      backupCard.Children.Add(Fine("SEGUNDA COPIA",muted));
       var backupValue=String.IsNullOrWhiteSpace(prefs.BackupDestination)?"No configurada":
         backup.HasCompletedRecord&&!backupAtSelectedDestination?"Pendiente en esta unidad":
         backup.FilesPresent?(backupOld?"Conviene renovarla":"Copia disponible"):
         backup.HasCompletedRecord?"Disco no disponible":"Pendiente de crear";
-      var backupState=Label(backupValue,23,backupAtSelectedDestination&&backup.FilesPresent&&!backupOld?good:Foreground);backupState.FontWeight=FontWeights.SemiBold;backupCard.Children.Add(backupState);
-      backupCard.Children.Add(Fine(!String.IsNullOrWhiteSpace(schedule.LastError)?"Último intento: "+schedule.LastError:
+      var backupDetail=!String.IsNullOrWhiteSpace(schedule.LastError)?"Último intento: "+schedule.LastError:
         backup.HasCompletedRecord&&!backupAtSelectedDestination?
         backup.FilesPresent?"La copia anterior sigue en "+Path.GetDirectoryName(backup.BackupFolder):"La copia anterior no está disponible":
         backup.FilesPresent?"Última: "+DateLabel(backup.CompletedUtc):
-        String.IsNullOrWhiteSpace(prefs.BackupDestination)?"Elige otra unidad, mejor en otro disco":"Todavía no hay una copia completa"));
-      PlaceLink(backupCard,String.IsNullOrWhiteSpace(prefs.BackupDestination)?"Preparar copia  →":"Ver copias  →",()=>GoTo("Protección"));
-      var separator=new Border{Width=1,Background=line,HorizontalAlignment=HorizontalAlignment.Left};
-      Grid.SetColumn(spaceCard,0);Grid.SetColumn(separator,1);Grid.SetColumn(backupCard,1);
-      metrics.Children.Add(spaceCard);metrics.Children.Add(separator);metrics.Children.Add(backupCard);
-      content.Children.Add(metrics);
-      Rule();
-      var accessRow=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,8)};
-      accessRow.Children.Add(new TextBlock{Text="MÓVIL",Foreground=muted,FontSize=12,FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,14,0),VerticalAlignment=VerticalAlignment.Center});
+        String.IsNullOrWhiteSpace(prefs.BackupDestination)?"Elige otra unidad, mejor en otro disco":"Todavía no hay una copia completa";
+      var backupHealthy=backupAtSelectedDestination&&backup.FilesPresent&&!backupOld;
+      NavigationRow(backupHealthy?"cloudDone":"cloud","Copia de seguridad",backupDetail,backupValue,backupHealthy?good:accent,"Protección");
+      Divide();
+
       var localOnly=LocalOnlyEndpoint(prefs.Endpoint);
-      var accessText=new TextBlock{Text=localOnly?"Solo en este PC":String.IsNullOrWhiteSpace(prefs.Endpoint)?"Sin configurar":lastEndpoint==true?"Responde desde este PC":lastEndpoint==false?"No responde desde este PC":"Comprobando…",
-        Foreground=!localOnly&&lastEndpoint==true?good:accent,FontSize=14,TextWrapping=TextWrapping.Wrap};
-      accessRow.Children.Add(accessText);content.Children.Add(accessRow);
-      content.Children.Add(Fine(localOnly?"La dirección actual solo funciona en este PC.":
-        String.IsNullOrWhiteSpace(prefs.Endpoint)?"Configura una dirección HTTPS para conectar el móvil.":"Prueba desde el móvil con datos móviles para verificar el acceso exterior."));
-      var accessActions=Column();content.Children.Add(accessActions);
-      PlaceLink(accessActions,"Conectar un móvil  →",()=>GoTo("Conectar"));
+      var accessValue=localOnly?"Solo en este PC":String.IsNullOrWhiteSpace(prefs.Endpoint)?"Sin configurar":lastEndpoint==true?"Responde desde este PC":lastEndpoint==false?"No responde desde este PC":"Comprobando…";
+      var access=NavigationRow("phone","Acceso desde el móvil",localOnly?"La dirección actual solo funciona en este PC.":
+        String.IsNullOrWhiteSpace(prefs.Endpoint)?"Configura una dirección HTTPS para conectar el móvil.":"Prueba desde el móvil con datos móviles para verificar el acceso exterior.",
+        accessValue,!localOnly&&lastEndpoint==true?good:lastEndpoint==null&&!localOnly&&!String.IsNullOrWhiteSpace(prefs.Endpoint)?Ui.Ink2:accent,"Conectar");
+      var accessText=(TextBlock)access.Trailing.Children[0];
+      Divide();
+      RenderUsbConnection(true);
       var generation=++overviewGeneration;
-      RefreshOverviewHealth(generation,state,mainAction,accessText,healthDot,diskIssue==null);
+      RefreshOverviewHealth(generation,state,mark,mainAction,accessText,diskIssue==null);
       return Task.FromResult(0);
     }
 
-    async void RefreshOverviewHealth(int generation,TextBlock state,Button action,TextBlock access,Ellipse healthDot,bool diskReady) {
+    async void RefreshOverviewHealth(int generation,TextBlock state,Ui.StatusMark mark,Button action,TextBlock access,bool diskReady) {
       if(DateTime.UtcNow-lastHealthCheck<TimeSpan.FromSeconds(20)&&lastLocal.HasValue&&lastEndpoint.HasValue&&lastVerified.HasValue)return;
       try {
         var localTask=Backend.Ping(prefs.LocalEndpoint);
@@ -270,58 +271,82 @@ namespace InhousePhotos {
         lastLocal=local;lastEndpoint=remote;lastVerified=verified;lastHealthCheck=DateTime.UtcNow;
         if(generation!=overviewGeneration||page!="Inicio")return;
         state.Text=!diskReady?"No encuentro el disco de tus fotos":local?(verified?"Tus fotos están disponibles":"Hay que verificar la biblioteca"):"El servidor está detenido";
-        state.Foreground=diskReady&&local&&verified?good:accent;
-        healthDot.Fill=diskReady&&local&&verified?good:accent;
-        action.Content=!diskReady?"Ver almacenamiento":local?(verified?"Abrir mis fotos  ↗":"Volver a verificar"):"Iniciar servidor";
+        mark.Set(diskReady&&local&&verified?Tone.Good:Tone.Attention);
+        if(!diskReady)Ui.SetCaption(action,"Ver almacenamiento");
+        else if(local&&verified)Ui.SetCaption(action,"Abrir mis fotos","external");
+        else Ui.SetCaption(action,local?"Volver a verificar":"Iniciar servidor");
         access.Text=LocalOnlyEndpoint(prefs.Endpoint)?"Solo en este PC":String.IsNullOrWhiteSpace(prefs.Endpoint)?"Sin configurar":remote?"Responde desde este PC":"No responde desde este PC";
         access.Foreground=remote?good:accent;
-      } catch {if(generation==overviewGeneration&&page=="Inicio"&&diskReady)state.Text="No se pudo comprobar el servidor";}
+      } catch {if(generation==overviewGeneration&&page=="Inicio"&&diskReady){state.Text="No se pudo comprobar el servidor";mark.Set(Tone.Attention);}}
     }
 
     Task RenderBackupPage() {
-      Heading("Copias de seguridad","Protege tus fotos en otra unidad, sin cambiar tu biblioteca actual.");
+      Heading("Copias de seguridad","Una segunda copia de tus fotos, vídeos y álbumes en otra unidad.");
       var backup=Backend.ReadFullBackupStatus(prefs);
       var backupAtSelectedDestination=BackupAtSelectedDestination(backup);
-      var summary=Column();summary.Children.Add(StatusLine("ÚLTIMA COPIA COMPLETA",backup.FilesPresent?good:accent));
-      var state=backup.HasCompletedRecord&&!backupAtSelectedDestination?
+      var noDestination=String.IsNullOrWhiteSpace(prefs.BackupDestination);
+      DateTime completed;
+      var backupOld=backup.FilesPresent&&DateTime.TryParse(backup.CompletedUtc,out completed)&&
+        DateTime.UtcNow-completed.ToUniversalTime()>TimeSpan.FromDays(8);
+
+      // Hero: the cloud, the state in one line, and the page's primary action.
+      var hero=new Grid{Margin=new Thickness(0,0,0,8)};
+      hero.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+      hero.ColumnDefinitions.Add(new ColumnDefinition());
+      var cloud=new Ui.BackupCloud{VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,-8,0,0)};hero.Children.Add(cloud);
+      var words=new StackPanel{Margin=new Thickness(16,8,0,0)};Grid.SetColumn(words,1);hero.Children.Add(words);
+      var restingState=backup.HasCompletedRecord&&!backupAtSelectedDestination?
         backup.FilesPresent?"Copia anterior disponible":"Copia anterior no disponible":
         backup.FilesPresent?"Copia disponible":backup.HasCompletedRecord?"Disco de copia no disponible":"Todavía no hay una copia completa";
-      var stateText=Label(state,24,backup.FilesPresent?good:Foreground);stateText.FontWeight=FontWeights.SemiBold;summary.Children.Add(stateText);
+      var restingCloud=noDestination&&!backup.HasCompletedRecord?Ui.CloudState.Off:
+        backup.FilesPresent&&backupAtSelectedDestination&&!backupOld?Ui.CloudState.Done:
+        backup.HasCompletedRecord?Ui.CloudState.Attention:Ui.CloudState.Idle;
+      var stateText=Ui.Title(restingState);words.Children.Add(stateText);
+      var facts=Column();words.Children.Add(facts);
       if(backup.HasCompletedRecord){
-        summary.Children.Add(Fine("Terminó el "+DateLabel(backup.CompletedUtc)));
-        summary.Children.Add(Fine(backup.BackupFolder));
-        if(!backupAtSelectedDestination)summary.Children.Add(Fine("Todavía no hay una copia completa registrada en la unidad elegida ahora.",accent));
-      } else summary.Children.Add(Fine("Las copias solo de la base de datos no incluyen tus fotos ni vídeos."));
-      if(backup.FilesPresent)PlaceAction(summary,"Abrir carpeta de la copia  ↗",()=>{
-        Process.Start(new ProcessStartInfo(backup.BackupFolder){UseShellExecute=true});return Task.FromResult(0);
-      });
-      content.Children.Add(Panel(summary));
+        var when=Ui.Secondary("Terminó el "+DateLabel(backup.CompletedUtc));when.Margin=new Thickness(0,2,0,0);facts.Children.Add(when);
+        var folder=Ui.Caption(backup.BackupFolder);folder.Margin=new Thickness(0,2,0,0);folder.TextTrimming=TextTrimming.CharacterEllipsis;folder.TextWrapping=TextWrapping.NoWrap;folder.ToolTip=backup.BackupFolder;facts.Children.Add(folder);
+        if(!backupAtSelectedDestination){var pending=Ui.Text("Todavía no hay una copia completa registrada en la unidad elegida ahora.",Ui.BodySize,accent);pending.Margin=new Thickness(0,6,0,0);facts.Children.Add(pending);}
+      } else {var none=Ui.Secondary(noDestination?"Elige primero la unidad donde guardarla.":"Las copias solo de la base de datos no incluyen tus fotos ni vídeos.");none.Margin=new Thickness(0,2,0,0);facts.Children.Add(none);}
 
-      content.Children.Add(StepHeading("1","Unidad de la segunda copia"));
-      var destination=String.IsNullOrWhiteSpace(prefs.BackupDestination);
-      var target=Label(destination?"Sin destino elegido":prefs.BackupDestination,16,destination?accent:Foreground);
-      target.FontWeight=FontWeights.SemiBold;content.Children.Add(target);
-      content.Children.Add(Fine(destination?"Elige otra unidad. Mejor si es un disco físico distinto.":"El destino está guardado. Puedes cambiarlo sin mover la biblioteca."));
-      Action(String.IsNullOrWhiteSpace(prefs.BackupDestination)?"Elegir destino":"Cambiar destino",async()=>{
-        var path=PickFolder();if(path==null)return;
-        Backend.ValidateBackup(Backend.Library(prefs),path);
-        prefs.BackupDestination=path;Backend.Save(prefs);await Render();notice.Text="Destino guardado. Si es una unidad nueva, falta crear una copia completa allí. La copia anterior no se ha borrado.";
-      },String.IsNullOrWhiteSpace(prefs.BackupDestination));
-
-      Rule();content.Children.Add(StepHeading("2","Crea la primera copia"));
-      if(!String.IsNullOrWhiteSpace(prefs.BackupDestination)) {
-        content.Children.Add(Fine("Base de datos  →  Fotos y vídeos  →  Comprobación final"));
-        content.Children.Add(Fine("No sobrescribe archivos existentes. Evita editar la biblioteca durante la copia."));
-        var progress=Fine(backupProgressText??"Copia en curso…");progress.Visibility=backupCancellation==null?Visibility.Collapsed:Visibility.Visible;
-        backupProgressView=progress;content.Children.Add(progress);
-        var activity=new ProgressBar{IsIndeterminate=true,Height=6,Foreground=accent,Background=divider,
-          BorderThickness=new Thickness(0),Margin=new Thickness(0,2,0,12),Visibility=backupCancellation==null?Visibility.Collapsed:Visibility.Visible};
-        content.Children.Add(activity);
-        var cancel=new Button{Content="Detener copia",Visibility=backupCancellation==null?Visibility.Collapsed:Visibility.Visible,HorizontalAlignment=HorizontalAlignment.Left};
-        cancel.Click+=(s,e)=>{if(backupCancellation!=null){backupCancellation.Cancel();SetBackupProgress("Deteniendo la copia. Se conservarán los archivos ya copiados.");}};
-        var create=Action("Crear copia completa",async()=>{
+      // Live progress, visible only while a copy runs.
+      var progress=Ui.Secondary(backupProgressText??"Copia en curso…");progress.Margin=new Thickness(0,2,0,0);
+      AutomationProperties.SetLiveSetting(progress,AutomationLiveSetting.Polite);
+      backupProgressView=progress;words.Children.Add(progress);
+      var stageNames=new[]{"Base de datos","Fotos y vídeos","Comprobación"};
+      var stages=new WrapPanel{Margin=new Thickness(0,14,0,0)};
+      var stageMarks=new Ui.StepMarker[3];var stageLabels=new TextBlock[3];
+      for(var i=0;i<3;i++){
+        if(i>0)stages.Children.Add(new Border{Width=24,Height=1,Background=Ui.Stroke,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(10,0,10,0)});
+        stageMarks[i]=new Ui.StepMarker(i+1,20);stages.Children.Add(stageMarks[i]);
+        stageLabels[i]=Ui.Text(stageNames[i],Ui.BodySize,Ui.Ink2);stageLabels[i].TextWrapping=TextWrapping.NoWrap;stageLabels[i].VerticalAlignment=VerticalAlignment.Center;stageLabels[i].Margin=new Thickness(8,0,0,0);
+        stages.Children.Add(stageLabels[i]);
+      }
+      if(!noDestination)words.Children.Add(stages);
+      backupProgressStage=text=>{
+        var index=text==null?-1:text.Contains("1 de 3")?0:text.Contains("2 de 3")?1:text.Contains("3 de 3")?2:-1;
+        for(var i=0;i<3;i++){
+          stageMarks[i].Set(index<0?Ui.StepState.Pending:i<index?Ui.StepState.Done:i==index?Ui.StepState.Current:Ui.StepState.Pending);
+          stageLabels[i].Foreground=index>=0&&i<=index?Ui.Ink:Ui.Ink2;
+        }
+      };
+      var actions=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,20,0,0)};words.Children.Add(actions);
+      var cancel=Ui.Button("Detener copia");cancel.Margin=new Thickness(0,0,8,0);
+      cancel.Click+=(s,e)=>{if(backupCancellation!=null){backupCancellation.Cancel();SetBackupProgress("Deteniendo la copia. Se conservarán los archivos ya copiados.");}};
+      Button create=null;
+      void ShowRunning(bool running){
+        cloud.Set(running?Ui.CloudState.Copying:restingCloud);
+        stateText.Text=running?"Copiando tu biblioteca":restingState;
+        facts.Visibility=running?Visibility.Collapsed:Visibility.Visible;
+        progress.Visibility=running?Visibility.Visible:Visibility.Collapsed;
+        cancel.Visibility=running?Visibility.Visible:Visibility.Collapsed;
+        if(create!=null)create.Visibility=running?Visibility.Collapsed:Visibility.Visible;
+        backupProgressStage(running?backupProgressText:null);
+      }
+      if(!noDestination) {
+        create=PlaceAction(actions,"Crear copia completa",async()=>{
           if(!Confirm("Se copiarán fotos, vídeos y base de datos a otra unidad. La primera copia puede tardar bastante. No se borrarán archivos existentes. ¿Continuar?"))return;
-          backupCancellation=new CancellationTokenSource();cancel.Visibility=Visibility.Visible;progress.Visibility=Visibility.Visible;activity.Visibility=Visibility.Visible;
+          backupCancellation=new CancellationTokenSource();ShowRunning(true);
           try {var result=await Backend.Backup(prefs,text=>Dispatcher.Invoke(()=>SetBackupProgress(text)),backupCancellation.Token);
             var scheduleUpdated=true;
             try{Backend.RecordManualBackupSuccessForSchedule();}catch{scheduleUpdated=false;}
@@ -330,15 +355,32 @@ namespace InhousePhotos {
           } finally {backupCancellation.Dispose();backupCancellation=null;backupProgressText=null;await Render();}
         },true);
         create.IsEnabled=backupCancellation==null;
-        content.Children.Add(cancel);
-      } else content.Children.Add(Fine("Este paso estará disponible al elegir el destino."));
+      }
+      actions.Children.Add(cancel);
+      if(backup.FilesPresent)PlaceLink(actions,"Abrir carpeta de la copia",()=>{
+        Process.Start(new ProcessStartInfo(backup.BackupFolder){UseShellExecute=true});return Task.FromResult(0);
+      },"external").Margin=new Thickness(8,0,0,0);
+      content.Children.Add(hero);
+      ShowRunning(backupCancellation!=null);
 
-      Rule();content.Children.Add(StepHeading("3","Mantenla al día"));
+      Section("Destino");
+      var target=Ui.ListRow("drive",noDestination?"Sin destino elegido":prefs.BackupDestination,
+        noDestination?"Elige otra unidad. Mejor si es un disco físico distinto.":"Puedes cambiarlo sin mover la biblioteca.");
+      if(noDestination)target.Heading.Foreground=accent;
+      content.Children.Add(target.Root);
+      PlaceAction(target.Trailing,noDestination?"Elegir destino":"Cambiar destino",async()=>{
+        var path=PickFolder();if(path==null)return;
+        Backend.ValidateBackup(Backend.Library(prefs),path);
+        prefs.BackupDestination=path;Backend.Save(prefs);await Render();notice.Text="Destino guardado. Si es una unidad nueva, falta crear una copia completa allí. La copia anterior no se ha borrado.";
+      },noDestination).Margin=new Thickness(0);
+
+      Section("Copia semanal");
       var schedule=Backend.ReadBackupSchedule();
-      content.Children.Add(StatusLine(schedule.Enabled?"COPIA SEMANAL ACTIVADA":"COPIA SEMANAL DESACTIVADA",schedule.Enabled?good:muted));
-      content.Children.Add(Fine(schedule.Enabled?"Próxima comprobación: "+DateLabel(schedule.NextDueUtc)+". El PC y el gestor deben estar encendidos.":"Es opcional. Actívala cuando tengas un disco de copia conectado."));
-      if(!String.IsNullOrWhiteSpace(schedule.LastError))content.Children.Add(Fine("Último problema: "+schedule.LastError,accent));
-      var scheduleButton=Action(schedule.Enabled?"Desactivar copia semanal":"Activar copia semanal",async()=>{
+      var weekly=Ui.ListRow("calendar",schedule.Enabled?"Activada":"Desactivada",
+        schedule.Enabled?"Próxima comprobación: "+DateLabel(schedule.NextDueUtc)+". El PC y el gestor deben estar encendidos.":"Es opcional. Actívala cuando tengas un disco de copia conectado.");
+      if(!String.IsNullOrWhiteSpace(schedule.LastError)){var problem=Ui.Text("Último problema: "+schedule.LastError,Ui.BodySize,accent);problem.Margin=new Thickness(0,4,0,0);weekly.Body.Children.Add(problem);}
+      content.Children.Add(weekly.Root);
+      var scheduleButton=PlaceAction(weekly.Trailing,schedule.Enabled?"Desactivar copia semanal":"Activar copia semanal",async()=>{
         if(schedule.Enabled){Backend.SetBackupScheduleEnabled(false);await Render();notice.Text="Copia semanal desactivada. No se ha detenido el servidor.";return;}
         if(String.IsNullOrWhiteSpace(prefs.BackupDestination))throw new IOException("Elige primero otra unidad para la copia.");
         if(!await Startup.IsEnabled()){
@@ -347,9 +389,14 @@ namespace InhousePhotos {
         }
         Backend.SetBackupScheduleEnabled(true);await Render();notice.Text="Copia semanal activada. Puedes hacer la primera copia ahora.";
       });
+      scheduleButton.Margin=new Thickness(0);
       scheduleButton.IsEnabled=schedule.Enabled||!String.IsNullOrWhiteSpace(prefs.BackupDestination);
-      Rule();
-      content.Children.Add(Fine("El gestor confirma que terminó la copia y que siguen presentes los archivos. No se ha probado una restauración completa."));
+
+      content.Children.Add(Ui.Divider(new Thickness(0,24,0,16)));
+      var safety=new Grid();safety.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(40)});safety.ColumnDefinitions.Add(new ColumnDefinition());
+      var shield=Ui.Icon("shield",20,Ui.Ink2);shield.VerticalAlignment=VerticalAlignment.Top;shield.HorizontalAlignment=HorizontalAlignment.Left;safety.Children.Add(shield);
+      var safetyText=Ui.Secondary("Las copias solo añaden archivos: nunca borran ni sobrescriben lo que ya hay en el destino. Evita editar la biblioteca durante la copia. El gestor confirma que terminó y que los archivos siguen presentes; no se ha probado una restauración completa.");
+      Grid.SetColumn(safetyText,1);safety.Children.Add(safetyText);content.Children.Add(safety);
       return Task.FromResult(0);
     }
 
@@ -358,62 +405,84 @@ namespace InhousePhotos {
       try {
         var disk=LibraryDisk();
         if(disk==null)throw new IOException("El disco de la biblioteca no está disponible.");
-        var summary=Column();summary.Children.Add(StatusLine("BIBLIOTECA DE FOTOS",LowSpace(disk)?accent:good));
-        var diskTitle=Label("Disco "+disk.Root.TrimEnd('\\'),26);diskTitle.FontWeight=FontWeights.SemiBold;summary.Children.Add(diskTitle);
-        var free=Label(Backend.Size(disk.Free)+" libres",29,LowSpace(disk)?accent:good);free.FontWeight=FontWeights.SemiBold;summary.Children.Add(free);
-        summary.Children.Add(SpaceBar(disk.Total,disk.Free));
+        var low=LowSpace(disk);
+        var summary=new Grid();
+        summary.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(40)});summary.ColumnDefinitions.Add(new ColumnDefinition());summary.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+        var driveIcon=Ui.Icon("drive",24,Ui.Ink2);driveIcon.VerticalAlignment=VerticalAlignment.Top;driveIcon.HorizontalAlignment=HorizontalAlignment.Left;driveIcon.Margin=new Thickness(0,2,0,0);summary.Children.Add(driveIcon);
+        var names=new StackPanel();Grid.SetColumn(names,1);summary.Children.Add(names);
+        names.Children.Add(Ui.Title("Disco "+disk.Root.TrimEnd('\\')));
+        var role=Ui.Secondary("Guarda tu biblioteca de fotos");role.Margin=new Thickness(0,2,0,0);names.Children.Add(role);
+        var free=Ui.Text(Backend.Size(disk.Free)+" libres",Ui.TitleSize,low?accent:Ui.Ink,true);free.TextWrapping=TextWrapping.NoWrap;free.VerticalAlignment=VerticalAlignment.Top;
+        Grid.SetColumn(free,2);summary.Children.Add(free);
+        content.Children.Add(summary);
+        var bar=SpaceBar(disk.Total,disk.Free,low);bar.Height=6;bar.Margin=new Thickness(40,20,0,8);content.Children.Add(bar);
+        var scale=new Grid{Margin=new Thickness(40,0,0,0)};
         var used=Math.Max(0,disk.Total-disk.Free);
-        summary.Children.Add(Fine(Backend.Size(used)+" usados  ·  "+Backend.Size(disk.Total)+" en total"));
-        summary.Children.Add(Fine("Este es el disco que guarda tu biblioteca de fotos."));
-        if(LowSpace(disk))summary.Children.Add(Fine("Queda poco espacio. Amplía el disco antes de seguir subiendo fotos.",accent));
-        content.Children.Add(Panel(summary));
-      }catch(Exception ex){content.Children.Add(Label(ex.Message,17,accent));}
+        var usedText=Ui.Caption(Backend.Size(used)+" usados");scale.Children.Add(usedText);
+        var totalText=Ui.Caption(Backend.Size(disk.Total)+" en total");totalText.HorizontalAlignment=HorizontalAlignment.Right;scale.Children.Add(totalText);
+        content.Children.Add(scale);
+        if(low){var warning=Ui.Text("Queda poco espacio. Amplía el disco antes de seguir subiendo fotos.",Ui.BodySize,accent);warning.Margin=new Thickness(40,12,0,0);content.Children.Add(warning);}
+      }catch(Exception ex){content.Children.Add(EmptyState("drive",Tone.Attention,"Disco no disponible",ex.Message));}
+
+      Section("Unidad de la segunda copia");
       if(!String.IsNullOrWhiteSpace(prefs.BackupDestination)) {
-        content.Children.Add(Label("Unidad de la segunda copia",20));
+        Ui.Row copy;
         try {var drive=new DriveInfo(Path.GetPathRoot(prefs.BackupDestination));
-          content.Children.Add(StatusLine(drive.IsReady?Backend.Size(drive.AvailableFreeSpace)+" libres":"No está conectado",drive.IsReady?good:accent));
-          content.Children.Add(Fine(prefs.BackupDestination));}
-        catch {content.Children.Add(StatusLine("No está conectado",accent));content.Children.Add(Fine("Conecta el disco antes de hacer una copia."));}
+          copy=Ui.ListRow("drive",prefs.BackupDestination,drive.IsReady?null:"Conecta el disco antes de hacer una copia.");
+          var state=Ui.Text(drive.IsReady?Backend.Size(drive.AvailableFreeSpace)+" libres":"No está conectado",Ui.BodySize,drive.IsReady?Ui.Ink:accent,true);
+          state.TextWrapping=TextWrapping.NoWrap;copy.Trailing.Children.Add(state);}
+        catch {copy=Ui.ListRow("drive",prefs.BackupDestination,"Conecta el disco antes de hacer una copia.");
+          var state=Ui.Text("No está conectado",Ui.BodySize,accent,true);state.TextWrapping=TextWrapping.NoWrap;copy.Trailing.Children.Add(state);}
+        content.Children.Add(copy.Root);
       } else {
-        content.Children.Add(Label("Unidad de la segunda copia",20));
-        content.Children.Add(StatusLine("Sin configurar",accent));
-        Action("Preparar una copia  →",()=>GoTo("Protección"));
+        var copy=Ui.ListRow("drive","Sin configurar","Elige otra unidad para guardar una segunda copia.");
+        copy.Heading.Foreground=accent;content.Children.Add(copy.Root);
+        PlaceAction(copy.Trailing,"Preparar una copia",()=>GoTo("Protección"),false,"arrow").Margin=new Thickness(0);
       }
-      Rule();
-      var advanced=Column();advanced.Children.Add(Fine("Estos controles cambian la configuración de Windows. No trasladan la biblioteca."));
-      PlaceAction(advanced,"Ver todos los discos",async()=>{advanced.Children.Add(Fine(await Task.Run(()=>Backend.PhysicalDisks())));});
-      PlaceAction(advanced,"Configurar discos protegidos",()=>{
+      var advanced=Column();
+      var explain=Ui.Secondary("Estos controles cambian la configuración de Windows. No trasladan la biblioteca.");explain.Margin=new Thickness(0,0,0,12);advanced.Children.Add(explain);
+      var advancedActions=new StackPanel{Orientation=Orientation.Horizontal};advanced.Children.Add(advancedActions);
+      var inventory=Column();inventory.Margin=new Thickness(0,12,0,0);advanced.Children.Add(inventory);
+      PlaceAction(advancedActions,"Ver todos los discos",async()=>{inventory.Children.Add(Fine(await Task.Run(()=>Backend.PhysicalDisks())));});
+      PlaceAction(advancedActions,"Configurar discos protegidos",()=>{
         Process.Start(new ProcessStartInfo(typeof(Program).Assembly.Location,"--storage"){
           UseShellExecute=true,Verb="runas",WindowStyle=ProcessWindowStyle.Normal});return Task.FromResult(0);
       });
-      content.Children.Add(new Expander{Header="Opciones avanzadas de discos",Content=advanced,Foreground=muted,Margin=new Thickness(0,4,0,8)});
-      content.Children.Add(Fine("Un espejo o RAID no sustituye una copia en otro disco."));
+      var expander=new Expander{Header="Opciones avanzadas de discos",Content=advanced,Margin=new Thickness(0,24,0,0)};
+      content.Children.Add(expander);
+      var raid=Ui.Caption("Un espejo o RAID no sustituye una copia en otro disco.");raid.Margin=new Thickness(0,4,0,0);content.Children.Add(raid);
       return Task.FromResult(0);
     }
 
     Task RenderConnectPage() {return RenderPairingPage();}
 
     async Task RenderSettingsPage() {
-      Heading("Ajustes","Acceso desde el móvil y arranque automático. Lo técnico queda aparte.");
-      var mobile=Column();
-      mobile.Children.Add(StatusLine("DIRECCIÓN PARA EL MÓVIL",accent));
-      mobile.Children.Add(Fine("Guarda la dirección HTTPS de tu biblioteca. Esta comprobación se hace desde este PC; prueba el acceso exterior con datos móviles."));
-      var endpoint=new TextBox{Text=LocalOnlyEndpoint(prefs.Endpoint)?"":prefs.Endpoint??"",Padding=new Thickness(12),FontSize=16,Background=surface,
-        Foreground=Foreground,BorderThickness=new Thickness(1),BorderBrush=divider,Margin=new Thickness(0,4,0,10)};
-      mobile.Children.Add(endpoint);
-      PlaceAction(mobile,"Comprobar y guardar dirección",async()=>{
+      Heading("Ajustes",null);
+      var mobileTitle=Section("Dirección para el móvil","La dirección HTTPS de tu biblioteca.");mobileTitle.Margin=new Thickness(0,0,0,2);
+      var field=new Grid();
+      field.ColumnDefinitions.Add(new ColumnDefinition());field.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+      var endpoint=new TextBox{Text=LocalOnlyEndpoint(prefs.Endpoint)?"":prefs.Endpoint??""};
+      AutomationProperties.SetName(endpoint,"Dirección HTTPS para el móvil");
+      field.Children.Add(endpoint);
+      var saveHost=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(8,0,0,0)};Grid.SetColumn(saveHost,1);field.Children.Add(saveHost);
+      var fieldMeasure=Ui.Constrain(field,640);fieldMeasure.Margin=new Thickness(0,12,0,0);content.Children.Add(fieldMeasure);
+      PlaceAction(saveHost,"Comprobar y guardar",async()=>{
         var url=Backend.CanonicalEndpoint(endpoint.Text);
         if(LocalOnlyEndpoint(url))throw new IOException("Esta dirección solo funciona en este PC. Usa tu dominio HTTPS para el móvil.");
         if(!await Backend.Ping(url))throw new IOException("La dirección no responde desde este PC. No se ha guardado.");
         prefs.Endpoint=url;Backend.Save(prefs);lastHealthCheck=DateTime.MinValue;
         notice.Text="Dirección guardada. Pruébala también desde el móvil con datos móviles.";
-      },true);
-      content.Children.Add(Panel(mobile));
+      },true).Margin=new Thickness(0);
+      var hint=Ui.Caption("Se comprueba desde este PC. Prueba el acceso exterior con datos móviles.");hint.Margin=new Thickness(0,8,0,0);content.Children.Add(hint);
       await RenderManagement();
+
       var advanced=Column();
-      advanced.Children.Add(Label("Carpeta del servidor",18));
-      advanced.Children.Add(Fine(prefs.Installation??"Sin configurar"));
-      PlaceAction(advanced,"Cambiar carpeta",async()=>{
+      Ui.Row TechnicalRow(string icon,string title,string detail,bool first=false){
+        if(!first)advanced.Children.Add(Ui.Divider(new Thickness(0)));
+        var row=Ui.ListRow(icon,title,detail);advanced.Children.Add(row.Root);return row;
+      }
+      var folderRow=TechnicalRow("folder","Carpeta del servidor",prefs.Installation??"Sin configurar",true);
+      PlaceAction(folderRow.Trailing,"Cambiar carpeta",async()=>{
         var path=PickFolder();if(path==null)return;
         if(!File.Exists(Path.Combine(path,"docker-compose.yml"))||!File.Exists(Path.Combine(path,".env")))
           throw new InvalidOperationException("La carpeta no contiene un servidor compatible.");
@@ -424,14 +493,14 @@ namespace InhousePhotos {
         await Startup.SetEnabled(prefs,false);Backend.SetBackupScheduleEnabled(false);
         prefs.Installation=path;prefs.Managed=false;prefs.ReceiptPath=null;prefs.ProjectName=null;
         Backend.Save(prefs);page="Inicio";await Render();
-      });
-      advanced.Children.Add(Label("Diagnóstico",18));
-      PlaceAction(advanced,"Abrir registro de errores",()=>{
+      }).Margin=new Thickness(0);
+      var diagnostics=TechnicalRow("wrench","Diagnóstico","El estado de los servicios se consulta solo cuando lo solicitas.");
+      var serviceReport=Fine("");serviceReport.Margin=new Thickness(0,6,0,0);serviceReport.Visibility=Visibility.Collapsed;diagnostics.Body.Children.Add(serviceReport);
+      PlaceAction(diagnostics.Trailing,"Abrir registro de errores",()=>{
         var path=Path.Combine(Backend.SettingsDir,"diagnostics");Directory.CreateDirectory(path);
         Process.Start(new ProcessStartInfo(path){UseShellExecute=true});return Task.FromResult(0);
       });
-      var serviceReport=Fine("El estado detallado de los servicios se consulta solo cuando lo solicitas.");
-      PlaceAction(advanced,"Comprobar servicios",async()=>{
+      PlaceAction(diagnostics.Trailing,"Comprobar servicios",async()=>{
         var data=await Backend.Compose(prefs,"ps --format json",15);
         var names=new Dictionary<string,string>{{"immich-server","Galería"},{"immich-machine-learning","Análisis"},{"database","Base de datos"},{"redis","Tareas"},{"caddy","Conexión segura"}};
         var lines=data.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries).Select(line=>{
@@ -440,18 +509,18 @@ namespace InhousePhotos {
           var state=Convert.ToString(row.ContainsKey("State")?row["State"]:"");
           return (names.ContainsKey(key)?names[key]:key)+" · "+(state=="running"?"Activo":state);
         });
-        serviceReport.Text=String.Join("\n",lines);
-      });
-      advanced.Children.Add(serviceReport);
-      PlaceAction(advanced,"Guardar solo base de datos",async()=>{
+        serviceReport.Text=String.Join("\n",lines);serviceReport.Visibility=Visibility.Visible;
+      }).Margin=new Thickness(0);
+      var snapshotRow=TechnicalRow("drive","Instantánea de la base de datos","Una instantánea de base de datos no contiene fotos ni vídeos.");
+      PlaceAction(snapshotRow.Trailing,"Guardar solo base de datos",async()=>{
         notice.Text="Instantánea de metadatos guardada: "+await Backend.Snapshot(prefs);
-      });
-      advanced.Children.Add(Fine("Una instantánea de base de datos no contiene fotos ni vídeos."));
-      PlaceAction(advanced,"Licencia del generador QR",()=>{
+      }).Margin=new Thickness(0);
+      var licenseRow=TechnicalRow("info","Licencias","Los códigos QR se generan en este PC con QRCoder.");
+      PlaceAction(licenseRow.Trailing,"Licencia del generador QR",()=>{
         MessageBox.Show(this,PairingClient.QrLicense(),"QRCoder · licencia MIT",MessageBoxButton.OK,MessageBoxImage.Information);
         return Task.CompletedTask;
-      });
-      content.Children.Add(new Expander{Header="Opciones técnicas",Content=advanced,Foreground=muted,Margin=new Thickness(0,20,0,10)});
+      }).Margin=new Thickness(0);
+      content.Children.Add(new Expander{Header="Opciones técnicas",Content=advanced,Margin=new Thickness(0,36,0,0)});
     }
   }
 }

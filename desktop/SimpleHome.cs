@@ -2,40 +2,42 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 
 namespace InhousePhotos {
   public sealed partial class ServerWindow {
-    StackPanel SetupCard(string number,string eyebrow,string title,string description,bool highlighted=false) {
-      var row=new Grid{Margin=new Thickness(0,5,0,19)};
+    // One option of the first-run choice: icon, title, one sentence, actions.
+    StackPanel SetupCard(string icon,string title,string description,bool first=false) {
+      if(!first)content.Children.Add(Ui.Divider(new Thickness(0,28,0,28)));
+      var row=new Grid();
       row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(40)});
       row.ColumnDefinitions.Add(new ColumnDefinition());
-      row.Children.Add(new TextBlock{Text=number,Foreground=highlighted?accent:muted,FontSize=14,
-        FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,3,0,0)});
+      var glyph=Ui.Icon(icon,22,Ui.Ink2);glyph.VerticalAlignment=VerticalAlignment.Top;glyph.HorizontalAlignment=HorizontalAlignment.Left;glyph.Margin=new Thickness(0,0,0,0);row.Children.Add(glyph);
       var body=new StackPanel();Grid.SetColumn(body,1);row.Children.Add(body);
-      var caption=Label(eyebrow,12,muted);caption.FontWeight=FontWeights.SemiBold;caption.Margin=new Thickness(0,0,0,5);body.Children.Add(caption);
-      var heading=Label(title,20);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new Thickness(0,0,0,7);body.Children.Add(heading);
-      var detail=Label(description,14,muted);detail.Margin=new Thickness(0,0,0,12);body.Children.Add(detail);
+      body.Children.Add(Ui.Subtitle(title));
+      var detail=Ui.Secondary(description);detail.Margin=new Thickness(0,4,0,0);detail.MaxWidth=620;detail.HorizontalAlignment=HorizontalAlignment.Left;body.Children.Add(detail);
       content.Children.Add(row);
-      content.Children.Add(new Border{Height=1,Background=divider,Margin=new Thickness(0,0,0,17)});
       return body;
     }
 
+    StackPanel SetupActions(StackPanel body) {
+      var actions=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,16,0,0)};body.Children.Add(actions);return actions;
+    }
     Button SetupAction(StackPanel host,string title,Func<Task> task,bool primary=false) {
-      var button=Action(title,task,primary);
-      content.Children.Remove(button);
-      button.Margin=new Thickness(0,5,8,3);
-      host.Children.Add(button);
+      var button=PlaceAction(host,title,task,primary);
+      if(!Horizontal(host))button.Margin=new Thickness(0,8,8,0);
       return button;
     }
 
     Task RenderSimpleHome() {
-      Heading("Tu biblioteca, en este PC.","Elige cómo empezar. Tus fotos y cuentas no se moverán al conectar un servidor existente.");
+      Heading("Configura tu biblioteca","Tus fotos y cuentas no se mueven al conectar un servidor existente.");
       if(String.IsNullOrEmpty(prefs.Installation)) {
-        var existing=SetupCard("01","Ya tengo mis fotos aquí","Conectar mi servidor","Buscaremos la biblioteca que ya funciona en este ordenador. Podrás confirmar la carpeta antes de conectar nada.",true);
-        var matchesPanel=new StackPanel();
-        SetupAction(existing,"Buscar mi biblioteca",async()=>{
+        var existing=SetupCard("photo","Conectar mi servidor","Buscaremos la biblioteca que ya funciona en este ordenador. Podrás confirmar la carpeta antes de conectar nada.",true);
+        var existingActions=SetupActions(existing);
+        var matchesPanel=new StackPanel{Margin=new Thickness(0,8,0,0)};
+        SetupAction(existingActions,"Buscar mi biblioteca",async()=>{
           matchesPanel.Children.Clear();
           var matches=await Backend.DiscoverExistingInstallations();
           if(matches.Count==1){prefs.Installation=matches[0];Backend.Save(prefs);await Render();notice.Text="Hemos encontrado tu biblioteca. Comprueba la carpeta y pulsa Conectar.";return;}
@@ -43,43 +45,50 @@ namespace InhousePhotos {
           notice.Text="Hay varias bibliotecas en este PC. Elige cuál quieres conectar:";
           foreach(var folder in matches){var selected=folder;SetupAction(matchesPanel,"Usar "+selected,async()=>{prefs.Installation=selected;Backend.Save(prefs);await Render();});}
         },true);
-        SetupAction(existing,"Elegir carpeta manualmente",async()=>{
+        SetupAction(existingActions,"Elegir carpeta…",async()=>{
           var folder=PickFolder();if(folder==null)return;
           if(!File.Exists(Path.Combine(folder,"docker-compose.yml"))||!File.Exists(Path.Combine(folder,".env")))throw new IOException("Esa carpeta no contiene la configuración de un servidor compatible. No se ha cambiado nada.");
           prefs.Installation=folder;Backend.Save(prefs);await Render();
         });
         existing.Children.Add(matchesPanel);
 
-        var fresh=SetupCard("02","Empiezo de cero","Crear una biblioteca nueva","Te guiaremos para elegir dónde guardar las fotos y preparar un servidor nuevo. No modifica otra biblioteca existente.");
-        SetupAction(fresh,File.Exists(NewServer.PendingFile)?"Continuar configuración":"Crear biblioteca nueva",async()=>{
+        var fresh=SetupCard("folder","Crear una biblioteca nueva","Elige dónde guardar las fotos y prepara un servidor nuevo. No modifica otra biblioteca existente.");
+        SetupAction(SetupActions(fresh),File.Exists(NewServer.PendingFile)?"Continuar configuración":"Crear biblioteca nueva",async()=>{
           var wizard=new NewServerWindow{Owner=this};
           if(wizard.ShowDialog()==true){prefs=wizard.Result;notice.Text="Tu biblioteca está preparada.";await Render();}
         });
       } else {
-        var found=SetupCard("01","Servidor existente","Biblioteca encontrada","Esta es la carpeta que vamos a comprobar. Puedes cambiarla antes de continuar.",true);
-        var path=Label(prefs.Installation,15,accent);path.FontWeight=FontWeights.SemiBold;path.Margin=new Thickness(0,0,0,9);found.Children.Add(path);
-        SetupAction(found,"Cambiar carpeta",async()=>{
+        var found=SetupCard("folder","Biblioteca encontrada","Esta es la carpeta que vamos a comprobar. Puedes cambiarla antes de continuar.",true);
+        var pathRow=new Grid{Margin=new Thickness(0,12,0,0)};
+        pathRow.ColumnDefinitions.Add(new ColumnDefinition());pathRow.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+        var path=Ui.Text(prefs.Installation,Ui.BodySize,Ui.Ink,true);path.VerticalAlignment=VerticalAlignment.Center;path.TextTrimming=TextTrimming.CharacterEllipsis;path.TextWrapping=TextWrapping.NoWrap;path.ToolTip=prefs.Installation;
+        pathRow.Children.Add(path);
+        var change=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(16,0,0,0)};Grid.SetColumn(change,1);pathRow.Children.Add(change);
+        found.Children.Add(pathRow);
+        SetupAction(change,"Cambiar carpeta",async()=>{
           var folder=PickFolder();if(folder==null)return;
           if(!File.Exists(Path.Combine(folder,"docker-compose.yml"))||!File.Exists(Path.Combine(folder,".env")))throw new IOException("Esa carpeta no contiene la configuración de un servidor compatible. No se ha cambiado nada.");
           prefs.Installation=folder;Backend.Save(prefs);await Render();
-        });
-        var body=SetupCard("02","Antes de conectar","Una comprobación en 5 pasos","Probamos una copia de la base de datos en un entorno aislado. El servidor seguirá encendido y las fotos permanecerán en su sitio.");
+        }).Margin=new Thickness(0);
+        var body=SetupCard("shield","Comprobación antes de conectar","Probamos una copia de la base de datos en un entorno aislado. El servidor seguirá encendido y las fotos permanecerán en su sitio.");
         var names=new[]{"Comprobar el servidor","Guardar la base de datos para la prueba","Probar recuperación aislada","Confirmar que nada cambió","Conectar el gestor"};
-        var markers=new TextBlock[names.Length];var labels=new TextBlock[names.Length];
+        var markers=new Ui.StepMarker[names.Length];var labels=new TextBlock[names.Length];
+        var checklist=new StackPanel{Margin=new Thickness(0,16,0,0)};body.Children.Add(checklist);
         for(var i=0;i<names.Length;i++){
-          var step=new Grid{Margin=new Thickness(0,1,0,6)};step.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(28)});step.ColumnDefinitions.Add(new ColumnDefinition());
-          markers[i]=new TextBlock{Text=(i+1).ToString(),FontSize=13,Foreground=muted,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center};step.Children.Add(markers[i]);
-          labels[i]=new TextBlock{Text=names[i],FontSize=14,Foreground=muted,TextWrapping=TextWrapping.Wrap};Grid.SetColumn(labels[i],1);step.Children.Add(labels[i]);body.Children.Add(step);
+          var step=new Grid{Margin=new Thickness(0,0,0,10)};step.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(34)});step.ColumnDefinitions.Add(new ColumnDefinition());
+          markers[i]=new Ui.StepMarker(i+1);markers[i].HorizontalAlignment=HorizontalAlignment.Left;step.Children.Add(markers[i]);
+          labels[i]=Ui.Text(names[i],Ui.BodySize,Ui.Ink2);labels[i].VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(labels[i],1);step.Children.Add(labels[i]);checklist.Children.Add(step);
         }
-        var status=Label("Lista para comprobar. Puedes seguir usando tus fotos.",14,muted);status.Margin=new Thickness(0,7,0,4);body.Children.Add(status);
-        var progress=new ProgressBar{Minimum=0,Maximum=5,Value=0,Height=5,Foreground=accent,Margin=new Thickness(0,5,0,13),Visibility=Visibility.Collapsed};body.Children.Add(progress);
-        SetupAction(body,"Conectar esta biblioteca",async()=>{
+        var status=Ui.Secondary("Lista para comprobar. Puedes seguir usando tus fotos.");status.Margin=new Thickness(0,6,0,0);
+        AutomationProperties.SetLiveSetting(status,AutomationLiveSetting.Polite);body.Children.Add(status);
+        var progress=new ProgressBar{Minimum=0,Maximum=5,Value=0,Margin=new Thickness(0,12,0,0),Visibility=Visibility.Collapsed};
+        AutomationProperties.SetName(progress,"Progreso de la comprobación");body.Children.Add(Ui.Constrain(progress,420));
+        SetupAction(SetupActions(body),"Conectar esta biblioteca",async()=>{
           progress.Visibility=Visibility.Visible;
           Action<int,string> milestone=(index,message)=>Dispatcher.Invoke(()=>{
             for(var i=0;i<labels.Length;i++){
-              markers[i].Text=i<index?"✓":i==index?"●":(i+1).ToString();
-              markers[i].Foreground=i<=index?accent:muted;
-              labels[i].Foreground=i<=index?Foreground:muted;
+              markers[i].Set(i<index?Ui.StepState.Done:i==index?Ui.StepState.Current:Ui.StepState.Pending);
+              labels[i].Foreground=i<=index?Ui.Ink:Ui.Ink2;
             }
             progress.Value=index;
             status.Text="Paso "+(index+1)+" de 5 · "+message;
@@ -98,11 +107,11 @@ namespace InhousePhotos {
             else notice.Text="No hemos cambiado tus fotos ni cuentas. "+ex.Message;
           }
         },true);
-        var safety=Label("Esta verificación comprueba la base de datos; no es una copia completa de tus fotos y vídeos.",13,muted);
-        safety.Margin=new Thickness(0,11,0,0);body.Children.Add(safety);
+        var safety=Ui.Caption("Esta verificación comprueba la base de datos; no es una copia completa de tus fotos y vídeos.");
+        safety.Margin=new Thickness(0,12,0,0);body.Children.Add(safety);
 
-        var fresh=SetupCard("03","Otra opción","Crear una biblioteca nueva","Solo si prefieres empezar de cero. Tu biblioteca encontrada no se sustituirá desde esta pantalla.");
-        SetupAction(fresh,File.Exists(NewServer.PendingFile)?"Continuar configuración nueva":"Configurar servidor nuevo",async()=>{
+        var fresh=SetupCard("photo","Crear una biblioteca nueva","Solo si prefieres empezar de cero. La biblioteca encontrada no se sustituirá desde esta pantalla.");
+        SetupAction(SetupActions(fresh),File.Exists(NewServer.PendingFile)?"Continuar configuración nueva":"Configurar servidor nuevo",async()=>{
           var wizard=new NewServerWindow{Owner=this};
           if(wizard.ShowDialog()==true){prefs=wizard.Result;notice.Text="Tu biblioteca está preparada.";await Render();}
         });
