@@ -31,15 +31,26 @@ CAST = {
 
 
 def directed(item, direction):
+    """Convierte la dirección de voz en puntuación: «…» en las pausas largas, coma en las cortas."""
     chunks = direction.get(item['raw'])
     if not chunks:
         return item['text']
     out = ''
-    for text, _, pause in chunks:
-        out += text.rstrip('.,')
-        out += '... ' if pause >= 280 else ', ' if pause > 0 else ''
-    last = chunks[-1][0].strip()
-    return out + (last[-1] if last[-1] in '.!?' else '.')
+    for k, (text, _, pause) in enumerate(chunks):
+        word = text.split()[0]
+        if out.endswith(', ') and word[:1].isupper() and word.lower() in item['raw']:
+            text = text[0].lower() + text[1:]  # sigue la frase tras una coma
+        if k == len(chunks) - 1:
+            out += text
+        elif text[-1] in '!?':
+            out += text + ' '
+        elif pause >= 280:
+            out += text.rstrip('.,') + '... '
+        elif text[-1] == '.':
+            out += text + ' '
+        else:
+            out += text.rstrip(',') + ', '
+    return out
 
 
 def main():
