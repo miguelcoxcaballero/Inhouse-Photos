@@ -30,6 +30,7 @@ dist/operations.js: jornadas por turnos, incidencias, sol y fases de obra.
 dist/engine.js: economía mensual, flota, compras, obras y validación de partidas.
 dist/map-v3.js: mapa ilustrado, luz, red, trenes, estaciones y obras.
 dist/app.js, dist/index.html, dist/style-v3.css: interfaz.
+dist/train-art.js: ilustraciones laterales por serie (perfil del morro, rodadura, pantógrafo o diésel, puertas, pisos y librea).
 dist/story.js, dist/data.js, dist/gtfs.js: campaña, catálogo y fuentes, importador GTFS.
 dist/assets/timetable.js: horario procesado (generado). dist/assets/fonts: Fraunces, Figtree e IBM Plex Mono (SIL OFL).
 tools/build_timetable.py: regenera el horario a partir de los ZIP GTFS (Python 3 con numpy).

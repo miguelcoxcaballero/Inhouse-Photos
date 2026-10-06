@@ -7,6 +7,7 @@ import * as G from './gtfs.js';
 import * as S from './schedule.js';
 import {kindLabel, networkName} from './network.js';
 import {RailMap} from './map-v3.js';
+import {trainArt, artKey} from './train-art.js';
 import {REAL_TRAIN_CATALOGUE, COMMUTER_NETWORKS} from './assets/realdata.js';
 
 const $ = id => document.getElementById(id);
@@ -96,17 +97,19 @@ function statusOf(r) {
 }
 function workOn(r) { return state.projects.find(p => !p.done && (p.route === r.id || PROJECTS.find(d => d.id === p.id)?.routes.includes(r.id))); }
 
-/** Ilustración lateral de un tren según su categoría. */
-function trainArt(category = '', color = '#8a2a46') {
-  const c = category.toLowerCase(), av = /alta|av 20|avril/.test(c), metric = /métrico/.test(c), diesel = /diésel/.test(c), commuter = /cercan/.test(c);
-  const body = av ? 'M8 52 C8 40 14 34 30 34 L236 34 C258 34 278 42 292 52 Z' : 'M10 52 L10 30 Q10 24 18 24 L276 24 Q288 24 290 34 L292 52 Z';
-  const roof = av ? '' : `<rect x="16" y="20" width="268" height="5" rx="2.5" fill="#cfc6b4"/>`;
-  const stripe = `<rect x="${av ? 26 : 12}" y="${av ? 44 : 41}" width="${av ? 250 : 278}" height="4" fill="${color}"/>`;
-  const windows = Array.from({length: av ? 11 : 9}, (_, i) => `<rect x="${(av ? 44 : 30) + i * (av ? 20 : 26)}" y="${av ? 38 : 30}" width="${av ? 13 : 17}" height="${av ? 5 : 8}" rx="2" fill="#2e3a44"/>`).join('');
-  const doors = commuter ? [70, 150, 230].map(x => `<rect x="${x}" y="28" width="10" height="23" rx="1.5" fill="#9aa3a6"/>`).join('') : '';
-  const panto = diesel || metric ? `<rect x="40" y="16" width="26" height="6" rx="2" fill="#77706a"/>` : `<path d="M120 20 L132 9 L146 20 M126 14 L140 14" stroke="#555" stroke-width="2" fill="none"/>`;
-  const nose = av ? '' : `<rect x="278" y="30" width="10" height="10" rx="2" fill="#2e3a44"/>`;
-  return `<svg class="train-art" viewBox="0 0 300 66" role="img" aria-label="Ilustración de ${esc(category)}"><path d="M0 60 H300" stroke="#8b7b62" stroke-width="2"/>${panto}${roof}<path d="${body}" fill="#f6f1e6" stroke="#3a3128" stroke-width="1.6"/>${stripe}${windows}${doors}${nose}<g fill="#3a3128">${[40, 70, 200, 230].map(x => `<circle cx="${x}" cy="55" r="5"/>`).join('')}</g></svg>`;
+/** Serie ilustrada para una circulación: producto, núcleo y tracción de la relación. */
+function tripArtKey(t, r) {
+  if (t.bus) return 'bus';
+  const code = t.line !== undefined && t.line !== null ? S.lineCode(t.line) : '';
+  if (r?.fleet) { const f = state.fleet.find(f => f.id === r.fleet); if (f) return artKey(f.model); }
+  if (code === 'AVLO') return '106avlo';
+  if (code === 'AVE' || code === 'EM') return '112';
+  if (code === 'Avant') return '114';
+  if (code === 'Alvia' || code === 'IC') return '130';
+  if (code === 'MD' || code === 'PX') return '449';
+  if (code === 'R' || code === 'RE' || code === 'TC') return r?.power === 'diesel' ? '599' : '449';
+  if (r?.gauge === 'metric' || S.LINES[t.line]?.metric) return '2900';
+  return r?.net === 'rodalies' ? '447' : r?.net === 'madrid' ? '465' : '463';
 }
 
 // ------------------------------------------------------------ selección en el mapa
@@ -425,14 +428,14 @@ function fleetPage() {
     body += `<dl class="figures"><div><dt>Unidades</dt><dd>${n(total)}</dd></div><div><dt>Asignadas</dt><dd>${n(total - free)}</dd></div><div><dt>Libres</dt><dd>${n(free)}</dd></div><div><dt>En taller</dt><dd>${n(state.refits.filter(r => !r.done).reduce((v, r) => v + r.qty, 0))}</dd></div></dl>
     <table><thead><tr><th style="width:150px"></th><th>Material</th><th class="num">Parque</th><th class="num">Libres</th><th>Estado</th></tr></thead><tbody>${state.fleet.filter(f => f.qty > 0).map(f => {
       const m = MODEL[f.model];
-      return `<tr class="clickable" data-action="fleet-detail" data-id="${f.id}"><td>${trainArt(m.category, '#8a2a46')}</td><td><strong>${esc(m.name)}</strong><small>${esc(f.origin)} · desde ${f.born} · ${GAUGES[m.gauge]} · ${POWERS[m.power] || m.power}</small></td><td class="num">${f.qty}</td><td class="num">${E.available(state, f)}</td><td style="min-width:120px"><div class="bar ${f.condition < 50 ? '' : 'green'}"><span style="width:${f.condition}%"></span></div><small>${n(f.condition)} %</small></td></tr>`;
+      return `<tr class="clickable" data-action="fleet-detail" data-id="${f.id}"><td>${trainArt(f.model)}</td><td><strong>${esc(m.name)}</strong><small>${esc(f.origin)} · desde ${f.born} · ${GAUGES[m.gauge]} · ${POWERS[m.power] || m.power}</small></td><td class="num">${f.qty}</td><td class="num">${E.available(state, f)}</td><td style="min-width:120px"><div class="bar ${f.condition < 50 ? '' : 'green'}"><span style="width:${f.condition}%"></span></div><small>${n(f.condition)} %</small></td></tr>`;
     }).join('')}</tbody></table><p class="note">Las unidades asignadas a una línea no pueden venderse ni entrar en taller. Libéralas reduciendo salidas o suspendiendo el servicio. Las unidades necesarias se calculan con el pico de trenes simultáneos del horario oficial.</p>`;
   } else if (ui.fleetTab === 'workshop') {
     body += state.refits.length ? `<div class="rows">${state.refits.map(r => `<div><span class="status ${r.done ? 'on' : 'works'}"></span><div><h3>${esc(MODEL[r.model].name)} · ${r.qty} unidades</h3><p>${r.done ? 'Reforma completada' : 'Salida prevista: ' + E.dateOf(r.due)}</p></div><span></span></div>`).join('')}</div>` : '<div class="empty">No hay trenes en reforma. Elige un lote con unidades libres en Parque.</div>';
     body += '<p class="note">Una reforma cuesta el 12 % del precio base y dura 5 meses. Devuelve el estado al 98 % conservando la edad del vehículo.</p>';
   } else {
     const records = REAL_TRAIN_CATALOGUE.filter(t => !ui.trainQuery || [t.series, t.name, t.category, t.builder].join(' ').toLowerCase().includes(ui.trainQuery.toLowerCase()));
-    body += `<div class="toolbar"><input type="search" id="trainSearch" placeholder="Serie, fabricante o familia" value="${esc(ui.trainQuery)}"></div><table><thead><tr><th>Serie</th><th>Familia</th><th class="num">Velocidad</th><th class="num">Plazas</th></tr></thead><tbody>${records.map(t => `<tr class="clickable" data-action="train-record" data-id="${t.id}"><td><strong>${esc(t.series || t.name)}</strong><small>${esc(t.name || '')}</small></td><td>${esc(t.category || '')}<small>${esc(t.builder || '')}</small></td><td class="num">${t.maxSpeedKmH?.length ? t.maxSpeedKmH.join('/') + ' km/h' : '—'}</td><td class="num">${t.seatedCapacity?.length ? t.seatedCapacity.join('/') : '—'}</td></tr>`).join('')}</tbody></table><p class="note">Fichas documentales de series y programas (Renfe Data 2020 y fuentes posteriores). No equivalen a unidades físicas ni a asignaciones diarias.</p>`;
+    body += `<div class="toolbar"><input type="search" id="trainSearch" placeholder="Serie, fabricante o familia" value="${esc(ui.trainQuery)}"></div><table><thead><tr><th style="width:150px"></th><th>Serie</th><th>Familia</th><th class="num">Velocidad</th><th class="num">Plazas</th></tr></thead><tbody>${records.map(t => `<tr class="clickable" data-action="train-record" data-id="${t.id}"><td>${trainArt(t.series || t.id)}</td><td><strong>${esc(t.series || t.name)}</strong><small>${esc(t.name || '')}</small></td><td>${esc(t.category || '')}<small>${esc(t.builder || '')}</small></td><td class="num">${t.maxSpeedKmH?.length ? t.maxSpeedKmH.join('/') + ' km/h' : '—'}</td><td class="num">${t.seatedCapacity?.length ? t.seatedCapacity.join('/') : '—'}</td></tr>`).join('')}</tbody></table><p class="note">Fichas documentales de series y programas (Renfe Data 2020 y fuentes posteriores). No equivalen a unidades físicas ni a asignaciones diarias.</p>`;
   }
   return [header('Flota y talleres', 'Los trenes que hacen posible la red.'), body];
 }
@@ -443,7 +446,7 @@ function marketPage() {
   if (ui.marketTab === 'catalogue') {
     body += `<div class="catalogue">${MODELS.map(m => {
       const unlocked = E.yearOf(state) >= m.year, q = E.purchaseQuote(state, m.id, 1);
-      return `<div>${trainArt(m.category, m.category.includes('Alta') ? '#a3123a' : m.category.includes('Cercan') ? '#55803a' : '#c27a18')}<div><h3>${esc(m.name)}</h3><p>${esc(m.desc)}</p><div class="specline"><span><b>${m.speed}</b> km/h</span><span><b>${n(m.seats)}</b> plazas*</span><span>${GAUGES[m.gauge]}</span><span>${POWERS[m.power] || m.power}</span><span>plazo base <b>${m.lead}</b> meses</span><span>${esc(m.maker)}</span></div></div>
+      return `<div>${trainArt(m.id)}<div><h3>${esc(m.name)}</h3><p>${esc(m.desc)}</p><div class="specline"><span><b>${m.speed}</b> km/h</span><span><b>${n(m.seats)}</b> plazas*</span><span>${GAUGES[m.gauge]}</span><span>${POWERS[m.power] || m.power}</span><span>plazo base <b>${m.lead}</b> meses</span><span>${esc(m.maker)}</span></div></div>
       <div style="text-align:right"><strong style="font:600 20px var(--serif)">${money(q.total)}</strong><br><button class="btn small ${unlocked ? 'primary' : ''}" data-action="purchase" data-id="${m.id}" ${!unlocked || state.ended ? 'disabled' : ''}>${unlocked ? 'Encargar' : 'Desde ' + m.year}</button></div></div>`;
     }).join('')}</div><p class="note">* Capacidad de simulación; en Cercanías incluye plazas de pie. Precios y plazos son parámetros del juego; anticipo del 30 % y saldo a la entrega de cada lote.</p>`;
   } else if (ui.marketTab === 'orders') {
@@ -601,7 +604,7 @@ function trainInspector() {
   }
   const pos = t.trip ? S.position(t.trip, minute, t.delay || 0) : null;
   const where = !pos ? (minute < t.dep ? 'Sale a las ' + clock(t.dep + (t.delay || 0)) : 'Ha llegado a destino') : pos.stopped ? 'Detenido en ' + S.STATIONS[t.trip.stations[pos.at]].name : 'Hacia ' + S.STATIONS[t.trip.stations[pos.next]].name;
-  const body = `<p>${trainArt(t.bus ? 'Autobús' : r?.kind === 'av' ? 'Alta velocidad' : r?.kind === 'commuter' ? 'Cercanías' : 'Media distancia', color)}</p>
+  const body = `<p>${trainArt(tripArtKey(t, r))}</p>
   <dl class="figures"><div><dt>Estado</dt><dd style="font-size:17px">${esc(where)}</dd></div><div><dt>Retraso</dt><dd class="${t.delay > 5 ? 'neg' : 'pos'}">${t.delay ? '+' + t.delay + ' min' : 'En hora'}</dd></div></dl>
   <p class="small">${esc(t.model || (t.bus ? 'Autobús de sustitución' : 'Material no publicado en el GTFS'))}${r ? ' · ' + esc(routeName(r)) : ''}</p>
   <div class="toolbar"><button class="btn small ${map.follow ? 'primary' : ''}" data-action="follow">${map.follow ? 'Siguiendo al tren' : 'Seguir en el mapa'}</button>${r ? `<button class="btn small" data-action="route" data-id="${r.id}">Gestionar la línea</button>` : ''}</div>
@@ -667,7 +670,7 @@ function dayReport() {
 function fleetDetail(id) {
   const f = state.fleet.find(f => f.id === id), m = MODEL[f.model], free = E.available(state, f);
   const used = state.routes.filter(r => r.active && r.fleet === f.id);
-  showModal(`<div class="content"><div class="kicker">Lote de material</div><h1>${esc(m.name)}</h1>${trainArt(m.category)}<dl class="figures"><div><dt>Unidades</dt><dd>${f.qty}</dd></div><div><dt>Libres</dt><dd>${free}</dd></div><div><dt>Estado</dt><dd>${n(f.condition)} %</dd></div></dl>
+  showModal(`<div class="content"><div class="kicker">Lote de material</div><h1>${esc(m.name)}</h1>${trainArt(f.model)}<dl class="figures"><div><dt>Unidades</dt><dd>${f.qty}</dd></div><div><dt>Libres</dt><dd>${free}</dd></div><div><dt>Estado</dt><dd>${n(f.condition)} %</dd></div></dl>
   <p class="small">${used.length ? 'Asignado a: ' + used.map(r => esc(routeName(r)) + ' (' + r.units + ')').join(', ') : 'Sin asignar.'}</p>
   <label for="fleetQty">Unidades libres a gestionar</label><input id="fleetQty" type="number" min="1" max="${free}" value="${Math.min(2, free)}">
   <p class="callout">Reforma: ${money(m.price * .12)} por unidad · 5 meses. Venta: unos ${money(m.price * .23 * f.condition / 100)} por unidad.</p>
@@ -675,7 +678,7 @@ function fleetDetail(id) {
 }
 function purchaseDialog(id) {
   const m = MODEL[id];
-  showModal(`<div class="content"><div class="kicker">Nuevo pedido</div><h1>${esc(m.name)}</h1>${trainArt(m.category)}<p>${esc(m.desc)}</p><label for="buyQty">Unidades (1–30)</label><input id="buyQty" type="number" min="1" max="30" value="4" data-model="${id}"><div id="purchaseQuote"></div><div class="actions"><button class="btn primary" data-action="confirm-buy" data-id="${id}">Firmar pedido</button><button class="btn" data-action="close-modal">Cancelar</button></div><p class="note">Entregas de hasta 2 unidades por mes; puede haber un retraso de 2 a 6 meses.</p></div>`, 'single');
+  showModal(`<div class="content"><div class="kicker">Nuevo pedido</div><h1>${esc(m.name)}</h1>${trainArt(id)}<p>${esc(m.desc)}</p><label for="buyQty">Unidades (1–30)</label><input id="buyQty" type="number" min="1" max="30" value="4" data-model="${id}"><div id="purchaseQuote"></div><div class="actions"><button class="btn primary" data-action="confirm-buy" data-id="${id}">Firmar pedido</button><button class="btn" data-action="close-modal">Cancelar</button></div><p class="note">Entregas de hasta 2 unidades por mes; puede haber un retraso de 2 a 6 meses.</p></div>`, 'single');
   updateQuote();
 }
 function updateQuote() {
@@ -703,7 +706,7 @@ function help() {
 function trainRecord(id) {
   const t = REAL_TRAIN_CATALOGUE.find(x => x.id === id); if (!t) return;
   const rows = [['Categoría', t.category], ['Fabricante', t.builder], ['Velocidad máxima', t.maxSpeedKmH?.join(' / ') + ' km/h'], ['Plazas sentadas', t.seatedCapacity?.join(' / ')], ['Tracción', t.traction], ['Longitud', t.lengthM ? t.lengthM + ' m' : null], ['Unidades construidas (fuente)', t.constructedUnitsReported], ['Estado documental', t.status]];
-  showModal(`<div class="content"><div class="kicker">Ficha de serie</div><h1>${esc(t.name || t.series)}</h1>${trainArt(t.category || '')}<table><tbody>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v !== undefined && v !== null && !String(v).startsWith('undefined') ? esc(v) : '<span class="muted">No verificado</span>'}</td></tr>`).join('')}</tbody></table><p class="note">${(t.sources || []).map(s => typeof s === 'string' ? `<a href="${esc(s)}" target="_blank" rel="noopener noreferrer">Fuente</a>` : `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Fuente')}</a>`).join(' · ')}</p><div class="actions"><button class="btn" data-action="close-modal">Cerrar</button></div></div>`, 'single');
+  showModal(`<div class="content"><div class="kicker">Ficha de serie</div><h1>${esc(t.name || t.series)}</h1>${trainArt(t.series || t.id)}<table><tbody>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v !== undefined && v !== null && !String(v).startsWith('undefined') ? esc(v) : '<span class="muted">No verificado</span>'}</td></tr>`).join('')}</tbody></table><p class="note">${(t.sources || []).map(s => typeof s === 'string' ? `<a href="${esc(s)}" target="_blank" rel="noopener noreferrer">Fuente</a>` : `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Fuente')}</a>`).join(' · ')}</p><div class="actions"><button class="btn" data-action="close-modal">Cerrar</button></div></div>`, 'single');
 }
 function realTripModal(id) { inspect = {type: 'train', id}; map.selectedTrain = id; screen = null; if (layer !== 'real' && !plan().some(t => t.id === id)) setLayer('real'); render(); }
 
