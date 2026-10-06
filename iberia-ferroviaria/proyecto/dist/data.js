@@ -62,8 +62,6 @@ export const ROUTES = [
  ['alicante-murcia','ali mur','ali mur',75,'uic','electric',200,60000,15,0,'av',11],
  ['barcelona-valencia','bcn vlc','bcn tar cas vlc',351,'iberian','electric',180,135000,35,0,'intercity'],
  ['valencia-alicante','vlc ali','vlc xat enc ali',185,'iberian','electric',140,80000,23,0,'intercity'],
- ['valencia-castellon','vlc cas','vlc sag cas',70,'iberian','electric',120,90000,8,0,'commuter'],
- ['valencia-xativa','vlc xat','vlc xat',60,'iberian','electric',120,62000,7,0,'commuter'],
  ['murcia-cartagena','mur car','mur car',64,'iberian','diesel',110,48000,8,0,'regional'],
  ['murcia-lorca','mur lor','mur lor',62,'iberian','diesel',100,52000,7,0,'regional',84,'almeria'],
  ['murcia-almeria','mur alm','mur lor alm',200,'uic','electric',250,83000,26,0,'av',84,'almeria'],
@@ -84,12 +82,10 @@ export const ROUTES = [
  ['pamplona-donostia','pam don','pam don',92,'iberian','electric',100,52000,14,0,'regional'],
  ['vitoria-bilbao','vit bil','vit bil',100,'iberian','electric',100,65000,16,0,'regional'],
  ['vitoria-donostia','vit don','vit don',125,'iberian','electric',110,52000,17,0,'regional'],
- ['donostia-irun','don iru','don iru',22,'iberian','electric',90,63000,4,0,'commuter'],
  ['burgos-vitoria','bur vit','bur vit',111,'iberian','electric',120,42000,16,0,'regional'],
  ['palencia-santander','pal san','pal san',217,'iberian','electric',110,43000,25,0,'intercity'],
  ['valladolid-leon','vll leo','vll pal leo',166,'uic','electric',250,62000,24,0,'av'],
  ['leon-oviedo','leo ovi','leo ovi',123,'iberian','electric',100,65000,22,0,'intercity'],
- ['oviedo-gijon','ovi gij','ovi gij',32,'iberian','electric',100,95000,4,0,'commuter'],
  ['santander-oviedo','san ovi','san ovi',211,'metric','diesel',75,28000,18,0,'regional'],
  ['bilbao-santander','bil san','bil san',119,'metric','diesel',75,39000,13,0,'regional'],
  ['ferrol-oviedo','fer ovi','fer ovi',321,'metric','diesel',65,23000,27,0,'regional'],
@@ -103,7 +99,6 @@ export const ROUTES = [
  ['madrid-plasencia','mad pla','mad pla',252,'iberian','diesel',110,48000,27,0,'intercity'],
  ['plasencia-badajoz','pla bad','pla cac mer bad',188,'iberian','diesel',180,52000,25,0,'regional',6],
  ['merida-sevilla','mer sev','mer sev',201,'iberian','diesel',90,34000,23,0,'regional'],
- ['madrid-guadalajara','mad gua','mad gua',58,'iberian','electric',100,120000,6,0,'commuter']
 ].map(([id,ends,via,km,gauge,power,speed,demand,fare,active,kind,unlock=0,project=null])=>({id,ends:ends.split(' '),via:via.split(' '),km,gauge,power,speed,demand,fare,active:!!active,kind,unlock,project,level:0,frequency:active?3:2,fleet:null,units:0}));
 export const MODELS = [
  {id:'s112',name:'S112 · Pato',maker:'Talgo / Bombardier',category:'Alta velocidad',gauge:'uic',power:'electric',speed:300,seats:365,price:24,lead:30,year:2022,energy:.65,desc:'Unidad existente. Las compras adicionales del juego son una reedición hipotética.'},

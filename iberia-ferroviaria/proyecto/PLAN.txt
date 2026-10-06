@@ -1,5 +1,13 @@
-IBERIA FERROVIARIA — PLAN Y ESTADO V0.3
+IBERIA FERROVIARIA — PLAN Y ESTADO V0.4
 6 de octubre de 2026.
+
+HECHO EN 0.4
+- Sin Cercanías ni Rodalies: el juego se centra en AV/LD/MD (217 relaciones).
+- Interacción por ciudades: menú visual con ilustración, conexiones con +/−, estación mejorable y salidas.
+- Peticiones de ciudades con plazo y recompensa; momentos del día ⚡; cambios de servicio en plena jornada.
+- Viajeros e ingresos visibles al llegar cada tren; contadores de «Hoy»; trenes llenos en el mapa.
+- Tutorial guiado de 15 pasos.
+- Campaña desde el lunes 3 de enero de 2022; economía más ajustada.
 
 HECHO EN 0.3
 1. Horario oficial completo integrado: GTFS Renfe de Cercanías/Rodalies y AV/LD/MD, tres días tipo, todas las líneas, números de tren, paradas y autobuses por obras. Pipeline reproducible (tools/build_timetable.py).

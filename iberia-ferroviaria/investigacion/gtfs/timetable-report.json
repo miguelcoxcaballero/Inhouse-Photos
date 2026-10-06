@@ -23,24 +23,22 @@
    }
   ],
   "counts": {
-   "L": 6631,
-   "S": 5169,
-   "D": 5257
+   "L": 1581,
+   "S": 1216,
+   "D": 1323
   },
   "geometry": {
-   "osm": 2048,
-   "shape": 369,
-   "straight": 201,
-   "road": 122
+   "osm": 1453,
+   "straight": 128
   }
  },
- "stations": 1503,
- "lines": 85,
- "patterns": 1581,
- "timings": 2847,
- "edges": 2740,
- "routes": 288,
- "autoRoutes": 165,
+ "stations": 1006,
+ "lines": 13,
+ "patterns": 975,
+ "timings": 1517,
+ "edges": 1581,
+ "routes": 217,
+ "autoRoutes": 166,
  "unmatchedTop": [
   [
    "x-barcelona--lleida",
@@ -203,5 +201,5 @@
    8
   ]
  ],
- "bytes": 1441093
+ "bytes": 724795
 }

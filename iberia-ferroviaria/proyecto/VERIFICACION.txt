@@ -1,3 +1,7 @@
+VERIFICACIÓN V0.4 — 6 DE OCTUBRE DE 2026
+Pasan test.mjs, v2-test.mjs, v3-test.mjs (horario AV/LD/MD sin Cercanías, peticiones y estaciones) y ui-v3-test.mjs (tutorial, menú de ciudad con +/−, jornada, paneles, obra, noche y móvil) sin errores de JavaScript. La campaña automatizada completa los cinco capítulos en 2050 atendiendo peticiones y mejorando estaciones.
+Las cifras de la sección siguiente corresponden a la v0.3 (con Cercanías).
+
 VERIFICACIÓN V0.3 — 6 DE OCTUBRE DE 2026
 
 RESULTADO

@@ -16,6 +16,26 @@ export function ensureOps(s) {
   return s.ops;
 }
 
+const SURGES = ['Partido de fútbol', 'Congreso internacional', 'Puente festivo', 'Concierto multitudinario', 'Feria regional', 'Huelga de autobuses', 'Oposiciones en la capital', 'Final de temporada turística'];
+/** Comprueba los momentos del día: refuerzo a tiempo → bonificación. Devuelve los recién cumplidos. */
+export function checkSurges(s) {
+  const op = ensureOps(s), done = [];
+  for (const x of op.surges || []) {
+    if (x.done || x.failed || op.phase !== 'running') continue;
+    const r = s.routes.find(r => r.id === x.route);
+    if (op.minute >= x.at && r?.active && r.frequency >= x.need) { x.done = true; s.cash += x.bonus; s.satisfaction = E.clamp(s.satisfaction + .3, 0, 100); done.push(x); }
+    else if (op.minute > x.until) { x.failed = true; s.satisfaction = E.clamp(s.satisfaction - .3, 0, 100); }
+  }
+  return done;
+}
+/** Fuerza una incidencia cercana (tutorial). */
+export function injectIncident(s, minute) {
+  const op = ensureOps(s), t = servicePlan(s).find(t => t.dep <= minute + 20 && t.arrival > minute + 40 && !t.bus);
+  if (!t) return null;
+  const x = {trip: 'inc-tut-' + s.month + '-' + op.day, id: 'inc-tut', type: 'breakdown', route: t.route, target: t.id, label: t.label, place: '', at: Math.round(minute + 10), delay: 28, span: 60, reason: 'Fallo de tracción'};
+  op.incidents.push(x);
+  return x;
+}
 const INCIDENTS = {
   breakdown: {title: 'Avería de material', icon: '⚙', reasons: ['Fallo de tracción', 'Avería de puertas', 'Pantógrafo dañado', 'Fallo de freno detectado en ruta']},
   signal: {title: 'Incidencia de infraestructura', icon: '⚠', reasons: ['Fallo de señalización', 'Avería de un desvío', 'Corte de tensión en catenaria', 'Robo de cable']},
@@ -131,6 +151,17 @@ export function startDay(s) {
       op.incidents.push({trip: id, id, type, route: trip.route, target: trip.id, label: trip.label, place, at, delay, span: type === 'weather' ? 240 : 60 + Math.floor(E.random(s) * 60), reason});
     }
   }
+  // Momentos del día: picos de demanda que premian reforzar una relación a tiempo.
+  op.surges = [];
+  const open = s.routes.filter(r => r.active && r.frequency < E.maxFrequency(r));
+  for (let i = 0; i < Math.min(2, open.length) && E.random(s) < .85; i++) {
+    const r = open[Math.floor(E.random(s) * open.length)];
+    if (op.surges.some(x => x.route === r.id)) continue;
+    const ev = SURGES[Math.floor(E.random(s) * SURGES.length)], start = dayBounds(servicePlan(s)).first;
+    const at = start + 90 + Math.floor(E.random(s) * 420);
+    op.surges.push({id: 'sg-' + s.month + '-' + op.day + '-' + i, route: r.id, city: r.ends[Math.floor(E.random(s) * 2)], reason: ev, at, until: at + 180,
+      need: Math.min(E.maxFrequency(r), r.frequency + Math.max(1, Math.ceil(E.maxFrequency(r) * .15))), bonus: Math.round((0.15 + E.random(s) * .35) * 100) / 100, done: false, failed: false});
+  }
   op.minute = dayBounds(servicePlan(s)).first;
   op.phase = 'running';
 }
@@ -182,14 +213,14 @@ export function nextDay(s) {
   if (op.phase !== 'review') throw Error('Cierra primero la jornada.');
   const {last, completed, priority} = op;
   if (op.day >= opDays(s.month)) { if (!E.step(s)) throw Error('No se puede cerrar el mes.'); op.day = 1; } else op.day++;
-  Object.assign(op, {phase: 'planning', minute: 0, incidents: [], resolved: [], choices: {}, last, completed, priority});
+  Object.assign(op, {phase: 'planning', minute: 0, incidents: [], resolved: [], choices: {}, surges: [], last, completed, priority});
 }
 
 export function skipMonth(s) {
   const op = ensureOps(s);
   if (op.phase === 'running') throw Error('Termina la jornada antes de delegar el mes.');
   if (!E.step(s)) return false;
-  Object.assign(op, {day: 1, phase: 'planning', minute: 0, incidents: [], resolved: [], choices: {}});
+  Object.assign(op, {day: 1, phase: 'planning', minute: 0, incidents: [], resolved: [], choices: {}, surges: []});
   return true;
 }
 

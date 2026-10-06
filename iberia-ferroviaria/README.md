@@ -1,6 +1,6 @@
-# Iberia Ferroviaria · v0.3
+# Iberia Ferroviaria · v0.4
 
-Juego de gestión ferroviaria en español: diriges Renfe de 2022 a 2050 sobre el mapa de España, con **el horario oficial de todos los trenes** (Cercanías, Rodalies, Media Distancia, Larga Distancia y Alta Velocidad).
+Juego de gestión ferroviaria en español: diriges Renfe de 2022 a 2050 sobre el mapa de España, con **el horario oficial de todos los trenes de Alta Velocidad, Larga y Media Distancia**, ciudades que piden cosas y un tutorial guiado.
 
 - **Jugar:** abre [`outputs/Iberia-Ferroviaria.html`](outputs/Iberia-Ferroviaria.html) en un navegador moderno. Funciona sin conexión.
 - **Instrucciones, datos y licencias:** [`proyecto/LEEME.txt`](proyecto/LEEME.txt).

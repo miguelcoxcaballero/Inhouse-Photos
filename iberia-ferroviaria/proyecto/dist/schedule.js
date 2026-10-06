@@ -3,7 +3,9 @@
 import {TT} from './assets/timetable.js';
 
 export const DAY_TYPES = {L: 'Laborable', S: 'Sábado', D: 'Domingo y festivo'};
-export const STATIONS = TT.stations.map(([id, name, lon, lat, traffic], i) => ({i, id, name, lon, lat, traffic}));
+const SMALL = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'y', 'i', 'en', 'a']);
+const tidy = name => name === name.toUpperCase() ? name.toLowerCase().replace(/(^|[\s\-\/(.'])(\p{L})/gu, (m, sep, ch) => sep + ch.toUpperCase()).replace(/\s(\p{L}+)/gu, (m, w) => SMALL.has(w.toLowerCase()) ? ' ' + w.toLowerCase() : m) : name;
+export const STATIONS = TT.stations.map(([id, name, lon, lat, traffic], i) => ({i, id, name: tidy(name), lon, lat, traffic}));
 export const STATION = Object.fromEntries(STATIONS.map(s => [s.id, s]));
 export const LINES = TT.lines;
 export const NETWORKS = TT.networks;

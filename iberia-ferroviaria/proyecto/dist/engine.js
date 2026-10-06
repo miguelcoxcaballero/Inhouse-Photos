@@ -7,13 +7,13 @@ export const dateOf=(m)=>new Date(Date.UTC(2022+Math.floor(m/12),m%12,1)).toLoca
 export const routeName=r=>r.name||r.ends.map(id=>CITY[id]?.name||id).join(' — ');
 const copy=x=>JSON.parse(JSON.stringify(x));
 // Servicios con los que arranca la campaña (fracción de la oferta publicada).
-const START_SERVICE={'madrid-barcelona':.1,'madrid-valencia':.18,'madrid-sevilla':.15,'c-madrid-c1':.5,'c-madrid-c3':.4,'c-madrid-c4a':.35,'c-madrid-c4b':.35,'c-madrid-c5':.4,'c-madrid-c10':.35,'madrid-guadalajara':.35,'c-rodalies-r1':.3,'c-rodalies-r2s':.3,'c-rodalies-r3':.2,'c-rodalies-r4':.25};
+const START_SERVICE={'madrid-barcelona':.25,'madrid-valencia':.3,'madrid-sevilla':.3,'madrid-toledo':.4,'sevilla-cadiz':.4,'santiago-vigo':.35,'barcelona-girona':.3,'madrid-valladolid':.25};
 export const maxFrequency=r=>r.real?r.baseFrequency:r.kind==='commuter'?64:16;
 export function initialState(seed=72022){
- const s={version:2,month:0,seed,cash:500,debt:0,reputation:52,satisfaction:60,policy:'public',started:false,ended:false,maintenance:1,chapter:0,claimed:[],decided:[],flags:{},history:[],log:[],orders:[],projects:[],refits:[],routes:copy(ALL_ROUTES),fleet:[],nextId:20,stats:{refurbished:0,purchased:0,delivered:0,upgrades:0,built:0,passengers:0},last:{revenue:0,cost:0,subsidy:0,net:0,passengers:0},seen:[]};
- [['s112',26,76,2010],['s130',16,72,2008],['s599',28,64,2009],['s449',26,71,2010],['civia',90,69,2007],['metric',18,57,1996]].forEach(([model,qty,condition,born],i)=>s.fleet.push({id:'f'+i,model,qty,condition,born,origin:'Parque inicial ficticio'}));
- for(const r of s.routes){const share=START_SERVICE[r.id];if(!share)continue;const f=r.kind==='commuter'?s.fleet.find(f=>f.model==='civia'):s.fleet.find(f=>f.model==='s112');r.active=true;r.fleet=f.id;r.frequency=Math.max(1,Math.round((r.real?r.baseFrequency:r.frequency)*share));r.units=requiredUnits(r,MODEL[f.model],r.frequency);}
- historic(s);log(s,'Tu mandato comienza','Tres corredores de alta velocidad y los núcleos de Madrid y Barcelona funcionan con servicios mínimos. El resto de la red necesita material, una decisión de reapertura o terminar sus obras.');return s;
+ const s={version:2,stations:{},requests:[],month:0,seed,cash:500,debt:0,reputation:52,satisfaction:60,policy:'public',started:false,ended:false,maintenance:1,chapter:0,claimed:[],decided:[],flags:{},history:[],log:[],orders:[],projects:[],refits:[],routes:copy(ALL_ROUTES),fleet:[],nextId:20,stats:{requests:0,refurbished:0,purchased:0,delivered:0,upgrades:0,built:0,passengers:0},last:{revenue:0,cost:0,subsidy:0,net:0,passengers:0},seen:[]};
+ [['s112',24,76,2010],['s130',14,72,2008],['s599',24,64,2009],['s449',26,71,2010],['metric',10,57,1996]].forEach(([model,qty,condition,born],i)=>s.fleet.push({id:'f'+i,model,qty,condition,born,origin:'Parque inicial ficticio'}));
+ for(const r of s.routes){const share=START_SERVICE[r.id];if(!share)continue;const f=s.fleet.find(f=>f.qty&&compatible(r,MODEL[f.model])&&f.model===(r.kind==='av'?'s112':r.power==='diesel'?'s599':'s449'))||s.fleet.find(f=>compatible(r,MODEL[f.model]));r.active=true;r.fleet=f.id;r.frequency=Math.max(1,Math.round((r.real?r.baseFrequency:r.frequency)*share));r.units=requiredUnits(r,MODEL[f.model],r.frequency);}
+ historic(s);generateRequest(s,true);generateRequest(s,true);log(s,'Tu mandato comienza','Ocho relaciones funcionan con servicios mínimos. El resto de la red necesita material, una decisión de reapertura o terminar sus obras.');return s;
 }
 export function random(s){s.seed=(Math.imul(s.seed,1664525)+1013904223)>>>0;return s.seed/4294967296;}
 export function log(s,title,body){s.log.unshift({month:Math.min(s.month,347),title,body});s.log=s.log.slice(0,100);}
@@ -27,8 +27,9 @@ export function metrics(s,r,override={}){
  const speed=Math.min(r.speed,m.speed),trainTime=r.real&&r.minutes?r.minutes/60*Math.max(1,r.speed/Math.max(60,m.speed))**.35:r.km/(speed*.78)+.3,busTime=r.km/73+.5;
  const year=yearOf(s),season=1+.10*Math.sin(s.month/12*Math.PI*2),recovery=Math.min(1.25,.72+s.month*.009);
  const growth=1+Math.min(.55,(year-2022)*.012),discounted=s.flags.passes>s.month&&r.kind!=='av';
- const demand=r.demand*recovery*growth*season*(discounted?1.18:1);
- const reliability=clamp(67+f.condition*.29+(s.maintenance-1)*7+r.level*2,50,99);
+ const stationBoost=1+.06*((s.stations?.[r.ends[0]]||0)+(s.stations?.[r.ends[1]]||0));
+ const demand=r.demand*recovery*growth*season*(discounted?1.18:1)*stationBoost;
+ const reliability=clamp(67+f.condition*.29+(s.maintenance-1)*7+r.level*2+(stationBoost-1)*12,50,99);
  const rivals=(r.kind==='av'&&s.month>=10)?1.5:(r.kind==='av'?.7:.08);
  const busFare=Math.max(4,r.km*.066)*(s.flags.buswar>s.month?.78:1);
  const trainWeight=Math.exp(clamp(1.6-trainTime*.2-r.fare/35+Math.min(r.frequency,40)*.045+(reliability-80)*.018+(s.reputation-50)*.012+r.level*.12,-3,4));
@@ -53,7 +54,7 @@ export function balance(s){
  return {passengers,revenue,cost,subsidy,net:revenue+subsidy-cost,punctuality:parts.length?sum('punctuality')/parts.length:0,share:parts.length?sum('share')/parts.length:0};
 }
 export function configureRoute(s,id,fleetId,frequency,fare,first=null,last=null){
- ensurePlaying(s);if(s.ops?.phase==='running')throw Error('Termina la jornada antes de modificar el plan de circulación.');const r=s.routes.find(x=>x.id===id),f=s.fleet.find(x=>x.id===fleetId);
+ ensurePlaying(s);const r=s.routes.find(x=>x.id===id),f=s.fleet.find(x=>x.id===fleetId);
  if(!r||!f)throw Error('Selecciona una línea y material disponible.');
  if(!isUnlocked(s,r))throw Error('La infraestructura todavía no está disponible.');
  const m=MODEL[f.model];frequency=Number(frequency);fare=Number(fare);
@@ -68,7 +69,7 @@ export function configureRoute(s,id,fleetId,frequency,fare,first=null,last=null)
  if(opening)s.cash-=4;Object.assign(r,{fleet:fleetId,frequency,fare,units,active:true});if(first!==null)Object.assign(r,{first,last});
  if(opening)log(s,'Servicio recuperado',routeName(r));return r;
 }
-export function closeRoute(s,id){ensurePlaying(s);if(s.ops?.phase==='running')throw Error('Termina la jornada antes de suspender un servicio.');const r=s.routes.find(r=>r.id===id);if(!r||!r.active)throw Error('El servicio ya está cerrado.');r.active=false;r.fleet=null;r.units=0;s.reputation=clamp(s.reputation-1,5,100);log(s,'Servicio suspendido',routeName(r));}
+export function closeRoute(s,id){ensurePlaying(s);const r=s.routes.find(r=>r.id===id);if(!r||!r.active)throw Error('El servicio ya está cerrado.');r.active=false;r.fleet=null;r.units=0;s.reputation=clamp(s.reputation-1,5,100);log(s,'Servicio suspendido',routeName(r));}
 export function upgradeRoute(s,id){ensurePlaying(s);const r=s.routes.find(r=>r.id===id);if(!r||r.level>=3)throw Error('La línea ya tiene el nivel máximo.');if(s.projects.some(p=>p.id==='upgrade-'+id&&!p.done))throw Error('La mejora ya está en curso.');const cost=12+12*r.level;spend(s,cost);s.projects.push({id:'upgrade-'+id,type:'upgrade',route:id,due:s.month+4,started:s.month,cost,done:false});log(s,'Mejora contratada',routeName(r)+' · información, accesibilidad y fiabilidad.');}
 export function purchaseQuote(s,model,qty){
  const m=MODEL[model];qty=Number(qty);if(!m||!Number.isInteger(qty)||qty<1||qty>30)throw Error('Selecciona entre 1 y 30 unidades.');
@@ -89,12 +90,12 @@ export function spend(s,cost){if(!Number.isFinite(cost)||cost<0)throw Error('Imp
 export function pendingDecision(s){if(!s.started||s.ended)return null;return DECISIONS.find(d=>s.month>=d.at&&!s.decided.includes(d.id))||null;}
 export function decide(s,id,index){ensurePlaying(s);const d=pendingDecision(s);if(!d||d.id!==id||!d.choices[index])throw Error('Decisión no disponible.');const c=d.choices[index];if((c.effects.cash||0)<0)spend(s,-c.effects.cash);else s.cash+=c.effects.cash||0;s.reputation=clamp(s.reputation+(c.effects.reputation||0),5,100);if(c.policy)s.policy=c.policy;if(c.flag==='fleetcare')s.fleet.forEach(f=>f.condition=clamp(f.condition+8,0,100));else if(c.flag)s.flags[c.flag]=s.month+({passes:18,rural:60,factory:36,backlog:18}[c.flag]||12);s.decided.push(id);log(s,d.title,c.label);}
 export const dailyTrains=s=>s.routes.filter(r=>r.active).reduce((n,r)=>n+r.frequency*(r.circular?1:2),0);
-export function objectiveValue(s,key){switch(key){case 'active':return s.routes.filter(r=>r.active).length;case 'trains':return dailyTrains(s);case 'satisfaction':return Math.round(s.satisfaction);case 'solvent':return s.cash>s.debt?1:0;case 'projects':return s.projects.filter(p=>p.type==='infrastructure'&&p.done).length;case 'mediterranean':return s.projects.filter(p=>['encina','almeria'].includes(p.id)&&p.done).length;default:return s.stats[key]||0;}}
+export function objectiveValue(s,key){switch(key){case 'active':return s.routes.filter(r=>r.active).length;case 'trains':return dailyTrains(s);case 'requests':return s.stats.requests||0;case 'stations':return Object.values(s.stations||{}).reduce((a,b)=>a+b,0);case 'satisfaction':return Math.round(s.satisfaction);case 'solvent':return s.cash>s.debt?1:0;case 'projects':return s.projects.filter(p=>p.type==='infrastructure'&&p.done).length;case 'mediterranean':return s.projects.filter(p=>['encina','almeria'].includes(p.id)&&p.done).length;default:return s.stats[key]||0;}}
 export function chapterReady(s){const c=CHAPTERS[s.chapter];return !!c&&yearOf(s)>=c.year&&c.objectives.every(([k,target])=>objectiveValue(s,k)>=target)&&!s.claimed.includes(c.id);}
 export function claimChapter(s){ensurePlaying(s);if(!chapterReady(s))throw Error('Aún quedan objetivos o no ha empezado la etapa.');const c=CHAPTERS[s.chapter];s.claimed.push(c.id);s.cash+=c.reward;s.reputation=clamp(s.reputation+5,0,100);log(s,'Capítulo completado',c.title+' · '+c.reward+' M€ de financiación adicional.');if(s.chapter<4)s.chapter++;}
 function addFleet(s,model,qty,origin){const f=s.fleet.find(f=>f.origin===origin&&f.model===model&&f.born===yearOf(s));if(f)f.qty+=qty;else s.fleet.push({id:'f'+s.nextId++,model,qty,condition:100,born:yearOf(s),origin});}
 function historic(s){
- for(const h of HISTORICAL_ORDERS){if(h.signed>s.month||h.tender||!h.model)continue;let o=s.orders.find(o=>o.id===h.id);if(!o){o={id:h.id,model:h.model,qty:h.qty,delivered:0,historical:true,start:h.signed,first:h.start,next:h.start,total:0,remaining:0};s.orders.push(o);if(h.signed===s.month)log(s,'Contrato histórico registrado',h.name+' · '+h.qty+' unidades. Financiación externa al presupuesto de campaña.');}if(s.month<h.start)continue;const target=Math.min(h.qty,1+Math.floor((s.month-h.start)*(h.qty-1)/(h.span-1)));const count=target-o.delivered;if(count>0){addFleet(s,h.model,count,'Contrato histórico '+h.id);o.delivered+=count;if(s.month%6===0||o.delivered===h.qty)log(s,'Material del plan de renovación',h.name+': '+o.delivered+' / '+h.qty+' entregados en la simulación.');}}
+ for(const h of HISTORICAL_ORDERS){if(h.signed>s.month||h.tender||!h.model||MODEL[h.model].category==='Cercanías')continue;let o=s.orders.find(o=>o.id===h.id);if(!o){o={id:h.id,model:h.model,qty:h.qty,delivered:0,historical:true,start:h.signed,first:h.start,next:h.start,total:0,remaining:0};s.orders.push(o);if(h.signed===s.month)log(s,'Contrato histórico registrado',h.name+' · '+h.qty+' unidades. Financiación externa al presupuesto de campaña.');}if(s.month<h.start)continue;const target=Math.min(h.qty,1+Math.floor((s.month-h.start)*(h.qty-1)/(h.span-1)));const count=target-o.delivered;if(count>0){addFleet(s,h.model,count,'Contrato histórico '+h.id);o.delivered+=count;if(s.month%6===0||o.delivered===h.qty)log(s,'Material del plan de renovación',h.name+': '+o.delivered+' / '+h.qty+' entregados en la simulación.');}}
 }
 export function step(s){
  if(s.ended||!s.started||pendingDecision(s))return false;
@@ -124,9 +125,25 @@ export function step(s){
  if(s.month%18===0&&s.month<340){s.flags.buswar=s.month+6;log(s,'Alsa refuerza sus ofertas','Evento simulado: presión en precios de autobús durante seis meses.');}
  if(s.month%12===0&&s.satisfaction>=70)s.reputation=clamp(s.reputation+1,0,100);
  if(s.cash<0){if(s.debt<1500){const rescue=Math.min(100,1500-s.debt);s.cash+=rescue;s.debt+=rescue;s.reputation=clamp(s.reputation-5,5,100);log(s,'Crédito puente automático',rescue+' M€ para mantener la operación. Revisa los servicios deficitarios.');}else if(s.cash<-100){s.ended=true;s.ending='insolvency';log(s,'Fin del mandato','La deuda y la falta de liquidez obligan a intervenir la compañía.');}}
+ checkRequests(s);if(s.month<346)generateRequest(s);
  if(s.month>=348){s.ended=true;s.ending='2050';log(s,'31 de diciembre de 2050','Tu mandato ha concluido. Consulta tu legado en Campaña.');}
  return true;
 }
+// ---- Ciudades: estaciones mejorables y peticiones con plazo y recompensa (parámetros de juego).
+export const STATION_LEVELS=['Apeadero','Estación renovada','Intercambiador','Gran estación'];
+export function stationCost(s,city){const lv=s.stations?.[city]||0;const pop=CITY_POP[city]||60;return Math.round((4+Math.sqrt(pop)*.35)*(lv+1));}
+export function upgradeStation(s,city){ensurePlaying(s);if(!CITY[city])throw Error('Ciudad desconocida.');s.stations||={};const lv=s.stations[city]||0;if(lv>=3)throw Error('La estación ya tiene el nivel máximo.');spend(s,stationCost(s,city));s.stations[city]=lv+1;s.reputation=clamp(s.reputation+1,5,100);log(s,'Estación mejorada',CITY[city].name+' · '+STATION_LEVELS[lv+1]+'.');}
+export const cityRoutes=(s,city)=>s.routes.filter(r=>r.ends.includes(city));
+export function requestDone(s,q){const r=s.routes.find(r=>r.id===q.route);if(!r)return false;if(q.type==='open')return r.active;if(q.type==='more')return r.active&&r.frequency>=q.target;if(q.type==='fare')return r.active&&r.fare<=q.target;if(q.type==='station')return (s.stations?.[q.city]||0)>=q.target;return false;}
+export function checkRequests(s){s.requests||=[];s.stats.requests||=0;for(const q of [...s.requests]){if(requestDone(s,q)){s.cash+=q.reward;s.reputation=clamp(s.reputation+2,5,100);s.satisfaction=clamp(s.satisfaction+1,0,100);s.stats.requests++;s.requests=s.requests.filter(x=>x!==q);log(s,'Petición atendida',(CITY[q.city]?.name||q.city)+' · +'+q.reward+' M€');}else if(s.month>q.until){s.reputation=clamp(s.reputation-2,5,100);s.requests=s.requests.filter(x=>x!==q);log(s,'Petición sin atender',(CITY[q.city]?.name||q.city)+' esperaba una respuesta.');}}}
+export function generateRequest(s,force=false){
+ s.requests||=[];if(s.requests.length>=4||(!force&&random(s)>.7))return null;
+ const pool=s.routes.filter(r=>isUnlocked(s,r)&&!s.requests.some(q=>q.route===r.id)&&r.ends.some(c=>CITY_POP[c]));if(!pool.length)return null;
+ const r=pool[Math.floor(random(s)*pool.length)],city=r.ends.find(c=>CITY_POP[c])||r.ends[0],max=maxFrequency(r),roll=random(s);let q;
+ if(!r.active)q={type:'open'};else if(r.frequency<max&&roll<.6)q={type:'more',target:Math.min(max,r.frequency+Math.max(1,Math.ceil(max*.2)))};else if(roll<.8&&(s.stations?.[city]||0)<3)q={type:'station',target:(s.stations?.[city]||0)+1};else q={type:'fare',target:Math.max(2,Math.round(r.fare*.85))};
+ Object.assign(q,{id:'q'+s.nextId++,city,route:r.id,until:s.month+4,reward:Math.round(6+random(s)*10+Math.sqrt(r.km)*.6)});s.requests.push(q);return q;}
+const CITY_POP={mad:6700,bcn:5600,vlc:1600,ali:760,mur:700,car:215,lor:95,alm:200,gra:530,mal:1000,sev:1500,cor:320,cad:400,hue:145,alg:260,ron:34,ant:41,jae:112,cic:75,pue:47,cue:54,alb:173,xat:30,cas:300,tar:300,gir:200,fig:47,zar:760,lle:140,huc:53,ter:36,sag:68,pam:370,log:150,bil:1000,vit:255,don:440,iru:62,san:300,bur:175,pal:78,vll:420,seg:52,leo:200,ovi:220,gij:270,fer:65,aco:420,scq:98,vig:480,pon:83,our:105,lug:98,zam:60,sal:150,avi:57,pla:40,cac:96,mer:60,bad:150,tol:85,gua:87,cal:20,alc:30,med:20};
+export const cityPopulation=id=>CITY_POP[id]||null;
 export function finalScore(s){return Math.round(clamp(s.routes.filter(r=>r.active).length/60*20+dailyTrains(s)/5000*15,0,35)+s.satisfaction*.3+clamp((s.cash-s.debt)/1000*15,0,15)+s.claimed.length*4);}
 // Partidas v0.2 (version 1): se añaden las relaciones del horario oficial y se actualizan sus datos de referencia.
 function migrate(s){
@@ -134,6 +151,7 @@ function migrate(s){
  const legacy=s.version===1;
  if(legacy)s.version=2;
  if(s.version!==2)return s;
+ s.routes=s.routes.filter(r=>ROUTE_DEF[r.id]||r.custom);s.stations||={};s.requests||=[];
  const known=new Set(s.routes.map(r=>r.id));
  for(const r of s.routes){const def=ROUTE_DEF[r.id];if(!def)continue;for(const k of ['real','baseFrequency','peak','minutes','net','code','color','products','stations','generated','name'])if(def[k]!==undefined)r[k]=def[k];else delete r[k];
   // Solo las partidas v0.2 se adaptan al horario oficial; en una partida actual, unidades incoherentes se rechazan.
@@ -157,6 +175,8 @@ export function validateSave(input){
  const ids=new Set();for(const f of s.fleet){if(!safeId(f.id)||ids.has(f.id)||!MODEL[f.model]||!Number.isInteger(f.qty)||f.qty<0||!Number.isFinite(f.born)||!Number.isFinite(f.condition)||f.condition<0||f.condition>100)throw Error('Flota no válida.');ids.add(f.id);}
  for(const f of s.fleet)if(available(s,f)<0)throw Error('Hay trenes asignados más de una vez.');
  for(const r of s.routes.filter(r=>r.active)){const f=s.fleet.find(f=>f.id===r.fleet);if(!f||!compatible(r,MODEL[f.model]))throw Error('Asignación de material incompatible.');}
- if(s.ops){const o=s.ops;if(!Number.isInteger(o.day)||o.day<1||o.day>new Date(Date.UTC(2022+Math.floor(Math.min(s.month,347)/12),Math.min(s.month,347)%12+1,0)).getUTCDate()||!Number.isFinite(o.minute)||o.minute<0||o.minute>5000||!['planning','running','review'].includes(o.phase)||!Array.isArray(o.incidents)||!Array.isArray(o.resolved)||o.incidents.length>50||o.resolved.length>50||!['balanced','punctual'].includes(o.priority)||!Number.isInteger(o.completed)||o.completed<0)throw Error('Jornada guardada no válida.');for(const x of o.incidents)if(typeof x.trip!=='string'||!routeIds.has(x.route)||!Number.isFinite(x.at)||x.at<0||!Number.isFinite(x.delay)||x.delay<0||x.delay>500||typeof x.reason!=='string')throw Error('Incidencia inválida.');if(o.choices!==undefined&&(typeof o.choices!=='object'||Array.isArray(o.choices)||Object.values(o.choices).some(v=>!['team','bus','wait'].includes(v))))throw Error('Jornada guardada no válida.');if(o.last){if(typeof o.last.date!=='string'||['trains','late','punctuality','passengers','net','first','last','incidents','attended'].some(k=>!Number.isFinite(o.last[k])))throw Error('Resumen de jornada inválido.');}}
+ if(s.stations!==undefined&&(typeof s.stations!=='object'||Array.isArray(s.stations)||Object.entries(s.stations).some(([k,v])=>!CITY[k]||!Number.isInteger(v)||v<0||v>3)))throw Error('Estaciones no válidas.');
+ if(s.requests!==undefined&&(!Array.isArray(s.requests)||s.requests.length>10||s.requests.some(q=>!safeId(q.id)||!routeIds.has(q.route)||!CITY[q.city]||!['open','more','fare','station'].includes(q.type)||!Number.isFinite(q.reward)||q.reward<0||q.reward>100||!Number.isFinite(q.until))))throw Error('Peticiones no válidas.');
+ if(s.ops){const o=s.ops;if(!Number.isInteger(o.day)||o.day<1||o.day>new Date(Date.UTC(2022+Math.floor(Math.min(s.month,347)/12),Math.min(s.month,347)%12+1,0)).getUTCDate()||!Number.isFinite(o.minute)||o.minute<0||o.minute>5000||!['planning','running','review'].includes(o.phase)||!Array.isArray(o.incidents)||!Array.isArray(o.resolved)||o.incidents.length>50||o.resolved.length>50||!['balanced','punctual'].includes(o.priority)||!Number.isInteger(o.completed)||o.completed<0)throw Error('Jornada guardada no válida.');for(const x of o.incidents)if(typeof x.trip!=='string'||!routeIds.has(x.route)||!Number.isFinite(x.at)||x.at<0||!Number.isFinite(x.delay)||x.delay<0||x.delay>500||typeof x.reason!=='string')throw Error('Incidencia inválida.');if(o.surges!==undefined&&(!Array.isArray(o.surges)||o.surges.length>10||o.surges.some(x=>!routeIds.has(x.route)||!Number.isFinite(x.need)||!Number.isFinite(x.bonus)||x.bonus>5)))throw Error('Jornada guardada no válida.');if(o.choices!==undefined&&(typeof o.choices!=='object'||Array.isArray(o.choices)||Object.values(o.choices).some(v=>!['team','bus','wait'].includes(v))))throw Error('Jornada guardada no válida.');if(o.last){if(typeof o.last.date!=='string'||['trains','late','punctuality','passengers','net','first','last','incidents','attended'].some(k=>!Number.isFinite(o.last[k])))throw Error('Resumen de jornada inválido.');}}
  return s;
 }

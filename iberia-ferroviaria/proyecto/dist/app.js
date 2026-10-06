@@ -8,6 +8,7 @@ import * as S from './schedule.js';
 import {kindLabel, networkName} from './network.js';
 import {RailMap} from './map-v3.js';
 import {trainArt, artKey} from './train-art.js';
+import {citySkyline} from './city-art.js';
 import {REAL_TRAIN_CATALOGUE, COMMUTER_NETWORKS} from './assets/realdata.js';
 
 const $ = id => document.getElementById(id);
@@ -67,6 +68,8 @@ const map = new RailMap($('map'), {
   getState: () => state,
   getView: () => ({mode: layer === 'real' ? 'real' : 'campaign', trips: viewTrips(), minute: currentMinute(), date: O.dayDate(state), dayType: dayType(), networkKey: netKey}),
   onPick: hit => pick(hit),
+  getCities: () => mapCities(),
+  getPopups: () => popups,
 });
 
 // ------------------------------------------------------------ utilidades de UI
@@ -76,7 +79,7 @@ function autosave(announce = false) {
   catch { if (announce) toast('El navegador no permite guardar aquí. Exporta la partida.'); return false; }
 }
 function act(fn, message) {
-  try { fn(); if (message) toast(message); netKey = networkKey(); map.dirty = true; autosave(); render(); return true; }
+  try { fn(); if (message) toast(message); netKey = networkKey(); map.dirty = true; afterCityAction(); autosave(); render(); return true; }
   catch (error) { toast(error.message); return false; }
 }
 function icon(name) { return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`; }
@@ -112,10 +115,209 @@ function tripArtKey(t, r) {
   return r?.net === 'rodalies' ? '447' : r?.net === 'madrid' ? '465' : '463';
 }
 
+
+// ------------------------------------------------------------ ciudades: datos para el mapa
+let cityCache = {key: null, list: []};
+function mapCities() {
+  const op = state.ops;
+  const key = netKey + '#' + JSON.stringify(state.requests || []) + JSON.stringify(state.stations || {}) + state.month + '#' + JSON.stringify(op.surges || []) + Math.floor((op.minute || 0) / 15) + op.phase;
+  if (cityCache.key === key) return cityCache.list;
+  const ids = new Set(CITIES.map(c => c.id));
+  for (const r of state.routes) for (const c of r.ends) ids.add(c);
+  const list = [];
+  for (const id of ids) {
+    const c = CITY[id];
+    if (!c) continue;
+    const routes = E.cityRoutes(state, id), active = routes.filter(r => r.active).length;
+    if (!routes.length && !E.cityPopulation(id)) continue;
+    const crowd = routes.some(r => r.active && E.metrics(state, r).occupancy > .93);
+    const request = (state.requests || []).some(q => q.city === id) || liveSurges().some(x => x.city === id);
+    list.push({id, name: c.name, lon: c.lon, lat: c.lat, pop: E.cityPopulation(id), total: routes.length, active,
+      status: !routes.length || !active ? 'off' : active === routes.length ? 'on' : 'some', crowd, request, station: state.stations?.[id] || 0});
+  }
+  list.sort((a, b) => (a.pop || 0) - (b.pop || 0));
+  return (cityCache = {key, list}).list;
+}
+function liveSurges() { const op = state.ops; return op.phase === 'running' ? (op.surges || []).filter(x => !x.done && !x.failed && op.minute >= x.at - 30) : []; }
+function otherEnd(r, id) { const o = r.ends.find(c => c !== id) || r.ends[0]; return CITY[o]?.name || o; }
+function nearCity(st, c) { return Math.hypot((st.lon - c.lon) * 85, (st.lat - c.lat) * 111) < 18; }
+
+// ------------------------------------------------------------ viajeros e ingresos de la jornada
+let popups = [], today = {pax: 0, money: 0, trains: 0}, perTrip = {}, seenSurges = new Set();
+function resetToday() { today = {pax: 0, money: 0, trains: 0}; perTrip = {}; popups = []; seenSurges = new Set(); }
+function tripYield(t) {
+  const r = state.routes.find(r => r.id === t.route);
+  if (!r) return {pax: 0, money: 0};
+  if (!perTrip[r.id]) { const m = E.metrics(state, r), k = Math.max(1, r.frequency * (r.circular ? 1 : 2) * 30); perTrip[r.id] = {pax: m.passengers / k, money: m.revenue * 1e6 / k}; }
+  const y = perTrip[r.id], f = .7 + ((t.dep * 37 + t.id.length * 11) % 60) / 100;
+  return {pax: Math.max(1, Math.round(y.pax * f)), money: y.money * f};
+}
+function spawnArrivals(from, to) {
+  const now = performance.now();
+  for (const t of plan()) {
+    if (!(t.arrival > from && t.arrival <= to)) continue;
+    const y = tripYield(t);
+    today.pax += y.pax; today.money += y.money; today.trains++;
+    let ll = null;
+    if (t.trip) { const st = S.STATIONS[t.trip.stations.at(-1)]; ll = [st.lon, st.lat]; } else if (t.coords?.length) ll = t.coords.at(-1);
+    if (ll && popups.length < 50) popups.push({lon: ll[0], lat: ll[1], text: '+' + n(y.pax) + ' viajeros', sub: '+' + n(y.money / 1000, 1) + ' mil €', color: '#2f7d48', born: now});
+  }
+  popups = popups.filter(p => now - p.born < 2700);
+}
+function celebrate(city, text, sub) {
+  const c = CITY[city];
+  if (c) popups.push({lon: c.lon, lat: c.lat, text, sub, color: '#b07a12', born: performance.now()});
+}
+function checkSurgeEvents() {
+  for (const x of state.ops.surges || []) {
+    if (!seenSurges.has(x.id) && state.ops.minute >= x.at - 30 && !x.done && !x.failed) {
+      seenSurges.add(x.id);
+      const r = state.routes.find(r => r.id === x.route);
+      showAlert({type: 'surge', reason: x.reason + ' en ' + (CITY[x.city]?.name || ''), route: x.route, place: `refuerza hasta ${x.need} salidas antes de las ${clock(x.until)} · +${n(x.bonus * 1000)} mil €`, city: x.city}, r);
+    }
+  }
+  for (const x of O.checkSurges(state)) { celebrate(x.city, '¡Refuerzo a tiempo!', '+' + n(x.bonus * 1000) + ' mil €'); toast('Momento del día cumplido: ' + x.reason + ' · +' + n(x.bonus * 1000) + ' mil €'); cityCache.key = null; }
+}
+
+// ------------------------------------------------------------ acciones rápidas sobre conexiones
+function fleetFor(r, freq) {
+  const lots = state.fleet.filter(f => f.qty && f.condition >= 30 && E.compatible(r, MODEL[f.model]));
+  const fits = f => E.available(state, f, r.id) >= E.requiredUnits(r, MODEL[f.model], freq);
+  return lots.find(f => f.id === r.fleet && fits(f)) || lots.filter(fits).sort((a, b) => E.available(state, b, r.id) - E.available(state, a, r.id))[0] || null;
+}
+function setService(r, freq, fare = r.fare) {
+  const max = E.maxFrequency(r);
+  freq = Math.max(1, Math.min(max, freq));
+  let f = fleetFor(r, freq), want = freq;
+  while (!f && freq > 1) { freq--; f = fleetFor(r, freq); }
+  if (!f) throw Error('No hay trenes compatibles libres para esta conexión. Compra material o libera unidades de otra línea.');
+  E.configureRoute(state, r.id, f.id, freq, fare);
+  if (freq < want) toast(`Solo hay trenes para ${freq} salidas por sentido.`);
+}
+function afterCityAction() {
+  const before = state.stats.requests || 0, cash = state.cash;
+  E.checkRequests(state);
+  if ((state.stats.requests || 0) > before) {
+    const gain = state.cash - cash;
+    toast(`¡Petición atendida! +${money(gain)} y más reputación.`);
+    const city = inspect?.type === 'city' ? inspect.id : 'mad';
+    celebrate(city, '¡Petición cumplida!', '+' + money(gain));
+  }
+  if (state.ops.phase === 'running') checkSurgeEvents();
+  perTrip = {}; cityCache.key = null;
+}
+function reqText(q) {
+  const r = state.routes.find(r => r.id === q.route), dest = r ? otherEnd(r, q.city) : '';
+  return {open: `Quiere recuperar el tren con ${dest}`, more: `Pide ${q.target} salidas por sentido con ${dest}`, fare: `Pide bajar a ${q.target} € la tarifa con ${dest}`,
+    station: `Quiere una estación mejor: ${E.STATION_LEVELS[q.target]}`}[q.type];
+}
+function doRequest(q) {
+  const r = state.routes.find(r => r.id === q.route);
+  if (q.type === 'station') E.upgradeStation(state, q.city);
+  else if (q.type === 'open') setService(r, Math.max(1, Math.round(E.maxFrequency(r) * .4)));
+  else if (q.type === 'more') setService(r, q.target);
+  else if (q.type === 'fare') setService(r, r.frequency, q.target);
+}
+
+// ------------------------------------------------------------ menú visual de la ciudad
+function stationIcon(level, active) {
+  const h = 10 + level * 5, w = 16 + level * 6;
+  return `<svg viewBox="0 0 44 34" class="st-icon ${active ? 'on' : ''}"><path d="M${22 - w / 2} 30 V${30 - h} L22 ${24 - h} L${22 + w / 2} ${30 - h} V30 Z"/>${level >= 2 ? `<path d="M${22 + w / 2} 30 V${32 - h} Q${30 + w / 2} ${26 - h} ${40} ${32 - h} V30" fill="none"/>` : ''}<rect x="${22 - 3}" y="${24}" width="6" height="6"/></svg>`;
+}
+function cityInspector() {
+  const id = inspect.id, c = CITY[id];
+  if (!c) return null;
+  map.selectedCity = id;
+  const routes = E.cityRoutes(state, id).sort((a, b) => (b.active - a.active) || ((S.routeStats(b.id, 'L')?.trips || 0) - (S.routeStats(a.id, 'L')?.trips || 0)));
+  const pop = E.cityPopulation(id), level = state.stations?.[id] || 0, m = currentMinute(), light = O.daylight(state, m, c.lon, c.lat).light;
+  const reqs = (state.requests || []).filter(q => q.city === id), surges = liveSurges().filter(x => x.city === id);
+  const incidents = state.ops.incidents.filter(x => routes.some(r => r.id === x.route) && m >= x.at && !state.ops.resolved.includes(x.trip));
+  const active = routes.filter(r => r.active);
+  const monthly = active.reduce((v, r) => v + E.metrics(state, r).net, 0), pax = active.reduce((v, r) => v + E.metrics(state, r).passengers, 0);
+  const deps = plan().filter(t => t.dep >= m - 1 && routes.some(r => r.id === t.route) && (t.trip ? nearCity(S.STATIONS[t.trip.stations[0]], c) : t.ends?.[0] === id || (t.coords && Math.hypot(t.coords[0][0] - c.lon, t.coords[0][1] - c.lat) < .2))).slice(0, 6);
+  const cards = routes.map(r => {
+    const max = E.maxFrequency(r), unlocked = E.isUnlocked(state, r), mt = r.active ? E.metrics(state, r) : null, official = r.real ? S.routeStats(r.id, 'L')?.trips || 0 : 0;
+    const pct = r.active ? r.frequency / max * 100 : 0;
+    const surge = surges.find(x => x.route === r.id), req = reqs.find(q => q.route === r.id);
+    return `<div class="conn ${r.active ? 'on' : unlocked ? 'off' : 'locked'} ${surge || req ? 'hot' : ''}">
+      <div class="conn-top">${routeChip(r)}<strong>${esc(otherEnd(r, id))}</strong>${surge ? `<span class="flag">Necesita ${surge.need}</span>` : req ? '<span class="flag">Petición</span><span><i class="crowd">▮▮▮</i>Trenes llenos</span>' : ''}</div>
+      <div class="conn-bar"><span style="width:${pct}%;background:${routeColor(r)}"></span></div>
+      <div class="conn-meta">${r.active ? `<b>${r.frequency}</b>/${max} salidas por sentido · <span class="${mt.net >= 0 ? 'pos' : 'neg'}">${signed(mt.net)}/mes</span>${mt.occupancy > .93 ? ' · <span class="neg">trenes llenos</span>' : ''}` : unlocked ? (r.real ? `${n(official)} trenes en el horario real` : 'Sin horario publicado') : esc(statusOf(r)[1])}</div>
+      <div class="conn-actions">${r.active ? `<button class="round" data-action="freq-down" data-id="${r.id}" aria-label="Menos trenes" ${r.frequency <= 1 ? 'disabled' : ''}>−</button><button class="round plus" data-action="freq-up" data-id="${r.id}" aria-label="Más trenes" ${r.frequency >= max ? 'disabled' : ''}>+</button>` : unlocked ? `<button class="btn small primary" data-action="open-route" data-id="${r.id}" ${state.ended ? 'disabled' : ''}>Abrir · 4 M€</button>` : '<span class="small muted">🚧 En obras</span>'}<button class="btn small ghost" data-action="route" data-id="${r.id}">Detalles</button></div></div>`;
+  }).join('');
+  const body = `<div class="city-hero">${citySkyline(id, c.name, pop || 30, level, light, m)}<div class="city-title"><span>${pop ? (pop >= 1000 ? n(pop / 1000, 1) + ' millones de habitantes' : n(pop) + ' mil habitantes') : 'Localidad'}</span><h2>${esc(c.name)}</h2></div></div>
+  <div class="city-stats"><div><b>${active.length}/${routes.length}</b><span>conexiones</span></div><div><b>${n(pax / 30)}</b><span>viajeros/día</span></div><div><b class="${monthly >= 0 ? 'pos' : 'neg'}">${signed(monthly)}</b><span>al mes</span></div></div>
+  ${incidents.map(x => `<div class="req red"><b>${O.INCIDENT_TYPES[x.type]?.icon || '⚠'} ${esc(x.reason)}</b><span>${esc(routeName(state.routes.find(r => r.id === x.route)))} · demora ${x.delay} min</span><div class="actions">${Object.entries(O.RESPONSES).map(([k, v]) => `<button class="btn small ${k === 'team' ? 'primary' : ''}" data-action="respond" data-id="${x.trip}" data-option="${k}">${esc(v.label)}</button>`).join('')}</div></div>`).join('')}
+  ${surges.map(x => `<div class="req gold"><b>⚡ ${esc(x.reason)}</b><span>Refuerza la conexión con ${esc(otherEnd(state.routes.find(r => r.id === x.route), id))} hasta ${x.need} salidas antes de las ${clock(x.until)}.</span><em>+${n(x.bonus * 1000)} mil €</em></div>`).join('')}
+  ${reqs.map(q => `<div class="req"><b>❗ ${esc(reqText(q))}</b><span>Plazo: ${E.dateOf(q.until)} · recompensa</span><em>+${q.reward} M€</em><div class="actions"><button class="btn small primary" data-action="request" data-id="${q.id}">${q.type === 'station' ? 'Mejorar estación' : q.type === 'open' ? 'Abrir conexión' : q.type === 'fare' ? 'Bajar tarifa' : 'Poner más trenes'}</button></div></div>`).join('')}
+  <h3 class="sub">Conexiones</h3><div class="conns">${cards || '<p class="muted">Sin conexiones ferroviarias en el juego.</p>'}</div>
+  <h3 class="sub">Estación · ${E.STATION_LEVELS[level]}</h3>
+  <div class="stations">${[0, 1, 2, 3].map(l => `<div class="${l <= level ? 'have' : ''}">${stationIcon(l, l === level)}<span>${E.STATION_LEVELS[l]}</span></div>`).join('')}</div>
+  ${level < 3 ? `<button class="btn primary" data-action="station-up" data-id="${id}" ${state.ended ? 'disabled' : ''}>Mejorar a «${E.STATION_LEVELS[level + 1]}» · ${E.stationCost(state, id)} M€</button><p class="small muted">+6 % de demanda y más fiabilidad en todas sus conexiones.</p>` : '<p class="small">Estación al máximo nivel.</p>'}
+  ${deps.length ? `<h3 class="sub">Próximas salidas</h3><div class="board">${boardRows(deps, m)}</div>` : ''}`;
+  return {kicker: 'Ciudad', title: esc(c.name), body, cls: 'city'};
+}
+
+// ------------------------------------------------------------ tutorial guiado
+const routeById = id => state.routes.find(r => r.id === id);
+const TUTORIAL = [
+  {title: 'Bienvenida', text: 'Soy Raquel Sanz (personaje ficticio). En unos minutos te enseño a dirigir la red. Puedes saltar el tutorial cuando quieras.', next: true},
+  {title: 'Las ciudades mandan', text: 'Cada círculo es una ciudad. Verde: todas sus conexiones funcionan; ámbar: algunas; gris: ninguna. Pulsa sobre Madrid.', city: 'mad', when: () => inspect?.type === 'city' && inspect.id === 'mad', enter: () => { map.focusAt(-3.7, 40.4, 1.6); }},
+  {title: 'El menú de la ciudad', text: 'Aquí tienes la ciudad, sus conexiones y su estación. En el mapa, las conexiones en servicio se marcan en dorado.', target: '#inspector .city-hero', next: true},
+  {title: 'Más trenes', text: 'Pulsa + en la conexión con València para ofrecer más trenes del horario real.', target: '[data-action=freq-up][data-id=madrid-valencia]', when: () => routeById('madrid-valencia')?.frequency > tut.f0, enter: () => { tut.f0 = routeById('madrid-valencia')?.frequency || 0; }},
+  {title: 'Abre una conexión', text: 'Las conexiones grises están cerradas. Abre la de Salamanca: cuesta 4 M€ y usa trenes libres compatibles.', target: '[data-action=open-route][data-id=madrid-salamanca]', when: () => routeById('madrid-salamanca')?.active},
+  {title: 'Peticiones', text: 'Las ciudades con ❗ te piden algo: abrir una conexión, más trenes, bajar una tarifa o mejorar su estación. Cumplirlas da dinero y reputación. Las tienes aquí, a la izquierda.', target: '#mission .requests', next: true, enter: () => { inspect = null; renderInspector(); }},
+  {title: 'Empieza el día', text: 'Cada jornada empieza con el primer tren real y termina con el último. Pulsa «Comenzar jornada».', target: '[data-action=day-start]', when: () => state.ops.phase === 'running'},
+  {title: 'Más deprisa', text: 'Elige 10× para que el reloj avance más rápido.', target: '.speed', when: () => speedIndex >= 2},
+  {title: 'Viajeros e ingresos', text: 'Cada tren que llega suma viajeros e ingresos: los verás aparecer sobre las ciudades y en «Hoy», arriba.', target: '#resources', when: () => today.trains >= 6},
+  {title: '¡Una avería!', text: 'Ha surgido una incidencia. Pulsa «Decidir» y elige cómo responder.', target: '.alert-pill', when: () => state.ops.resolved.length > 0, enter: () => { if (state.ops.phase === 'running' && !O.injectIncident(state, state.ops.minute)) tutorialNext(); }},
+  {title: 'Momentos del día', text: 'A veces una ciudad tiene un pico de demanda: un partido, un congreso… Si refuerzas a tiempo la conexión indicada ganas una bonificación. Puedes cambiar los trenes en plena jornada.', next: true},
+  {title: 'Fin de la jornada', text: 'Pulsa «Hasta el último tren» para cerrar el día.', target: '[data-action=day-end]', when: () => state.ops.phase === 'review'},
+  {title: 'El parte del día', text: 'Puntualidad, viajeros y resultado del día. Pulsa «Siguiente jornada».', target: '#modal [data-action=day-next]', when: () => state.ops.phase === 'planning'},
+  {title: 'Compra trenes', text: 'Para crecer necesitas más material, y tarda unos dos años en llegar. Abre «Compras».', target: '[data-screen=market]', when: () => screen === 'market'},
+  {title: '¡A dirigir!', text: 'Cumple los objetivos del capítulo para recibir financiación. Acércate con la rueda para ver trenes, estaciones y obras. ¡Buen viaje!', target: '#mission', next: true},
+];
+let tut = null;
+function startTutorial() { tut = {step: -1, f0: 0}; state.tutorial = {done: false}; tutorialNext(); }
+function tutorialNext() {
+  if (!tut) return;
+  tut.step++;
+  if (tut.step >= TUTORIAL.length) return endTutorial();
+  TUTORIAL[tut.step].enter?.();
+  renderCoach();
+}
+function endTutorial() { tut = null; state.tutorial = {done: true}; autosave(); $('coach')?.remove(); $('spot')?.remove(); toast('Tutorial completado. Lo puedes repetir desde Ayuda.'); }
+function renderCoach() {
+  if (!tut) return;
+  const step = TUTORIAL[tut.step];
+  if (step.when?.()) return tutorialNext();
+  let coach = $('coach'), spot = $('spot');
+  if (!coach) {
+    coach = document.createElement('div'); coach.id = 'coach'; coach.className = 'coach';
+    spot = document.createElement('div'); spot.id = 'spot'; spot.className = 'spot';
+  }
+  const host = $('modal').open ? $('modal') : document.body;
+  if (coach.parentNode !== host) { host.appendChild(spot); host.appendChild(coach); }
+  const html = `<div class="portrait p1" aria-hidden="true"></div><div><div class="kicker">Tutorial · ${tut.step + 1}/${TUTORIAL.length}</div><h3>${esc(step.title)}</h3><p>${esc(step.text)}</p><div class="actions">${step.next ? '<button class="btn small primary" data-action="tutorial-next">Siguiente</button>' : '<button class="btn small ghost" data-action="tutorial-next">Omitir paso</button>'}<button class="btn small ghost" data-action="tutorial-skip">Salir</button></div></div>`;
+  if (coach.dataset.step !== String(tut.step)) { coach.innerHTML = html; coach.dataset.step = tut.step; }
+  let rect = null;
+  if (step.city) { const c = CITY[step.city], p = map.screenOf(c.lon, c.lat), cr = $('map').getBoundingClientRect(); rect = {left: cr.left + p[0] - 26, top: cr.top + p[1] - 26, width: 52, height: 52, round: true}; }
+  else if (step.target) { const el = (host === $('modal') ? $('modal') : document).querySelector(step.target); if (el && el.offsetParent !== null) { const b = el.getBoundingClientRect(); rect = {left: b.left - 6, top: b.top - 6, width: b.width + 12, height: b.height + 12}; } }
+  const hostRect = host === document.body ? {left: 0, top: 0} : host.getBoundingClientRect();
+  if (rect) { Object.assign(spot.style, {display: 'block', left: rect.left - hostRect.left + 'px', top: rect.top - hostRect.top + 'px', width: rect.width + 'px', height: rect.height + 'px', borderRadius: rect.round ? '50%' : '14px'}); }
+  else spot.style.display = 'none';
+  const W = coach.offsetWidth || 380, H = coach.offsetHeight || 170, vw = innerWidth, vh = innerHeight;
+  let x = rect ? rect.left + rect.width / 2 - W / 2 : vw / 2 - W / 2, y = rect ? (rect.top + rect.height + H + 24 < vh ? rect.top + rect.height + 14 : rect.top - H - 14) : vh / 2 - H / 2;
+  x = Math.max(12, Math.min(vw - W - 12, x)); y = Math.max(12, Math.min(vh - H - 12, y));
+  coach.style.left = x - hostRect.left + 'px'; coach.style.top = y - hostRect.top + 'px';
+}
+
 // ------------------------------------------------------------ selección en el mapa
 function pick(hit) {
-  if (!hit) { if (inspect) { inspect = null; map.selected = null; map.selectedTrain = null; map.follow = false; renderInspector(); } return; }
+  if (!hit) { if (inspect) { inspect = null; map.selected = null; map.selectedTrain = null; map.selectedCity = null; map.follow = false; renderInspector(); } return; }
   if (hit.type === 'route') return selectRoute(hit.id, false);
+  map.selectedCity = null;
+  if (hit.type === 'city') { inspect = {type: 'city', id: hit.id}; map.selected = null; map.selectedTrain = null; map.selectedCity = hit.id; }
   if (hit.type === 'train') { inspect = {type: 'train', id: hit.id}; map.selectedTrain = hit.id; map.selected = null; }
   if (hit.type === 'station') { inspect = {type: 'station', id: hit.id}; map.selectedTrain = null; }
   if (hit.type === 'work') { inspect = {type: 'work', id: hit.id}; }
@@ -135,19 +337,22 @@ function frame(t) {
   if (playing) {
     const rate = SPEEDS[speedIndex][0] * dt / 1000;
     if (op.phase === 'running') {
-      const ended = O.moveClock(state, rate);
+      const before = op.minute, ended = O.moveClock(state, rate);
+      spawnArrivals(before, op.minute);
       checkIncidents();
+      checkSurgeEvents();
       if (ended) { pause(); finishDay(); }
     } else if (layer === 'real') {
       observerMinute = Math.min(1560, observerMinute + rate);
       if (observerMinute >= 1560) pause();
     } else pause();
   }
-  if (t - lastTimeline > 120) { lastTimeline = t; renderClock(); drawTimeline(); }
+  if (t - lastTimeline > 120) { lastTimeline = t; renderClock(); drawTimeline(); renderCoach(); }
   if (t - lastPanel > 1000) {
     lastPanel = t;
     if (playing && screen === 'ops') renderDrawer();
-    if (playing && inspect && ['train', 'station'].includes(inspect.type)) renderInspector();
+    if (playing && inspect && ['train', 'station', 'city'].includes(inspect.type)) renderInspector();
+    if (playing) { renderHud(); renderMission(); }
   }
 }
 function play() {
@@ -158,7 +363,7 @@ function play() {
   if ($('modal').open) return;
   const op = state.ops;
   if (op.phase === 'review') return dayReport();
-  if (op.phase === 'planning' && layer !== 'real') { try { O.startDay(state); seenIncidents = new Set(); netKey = networkKey(); } catch (e) { return toast(e.message); } }
+  if (op.phase === 'planning' && layer !== 'real') { try { O.startDay(state); seenIncidents = new Set(); resetToday(); netKey = networkKey(); } catch (e) { return toast(e.message); } }
   playing = true; renderDaybar();
 }
 function pause() { playing = false; renderDaybar(); }
@@ -173,8 +378,14 @@ function checkIncidents() {
     }
   }
 }
-function showAlert(x) {
-  const r = state.routes.find(r => r.id === x.route);
+function showAlert(x, rr) {
+  const r = rr || state.routes.find(r => r.id === x.route);
+  if (x.type === 'surge') {
+    document.querySelector('.alert-pill')?.remove();
+    const el = document.createElement('div'); el.className = 'alert-pill gold';
+    el.innerHTML = `<span>⚡</span><span><b>${esc(x.reason)}</b> · ${esc(x.place)}</span><button class="btn small gold" data-action="city" data-id="${x.city}">Ver ciudad</button>`;
+    $('game').appendChild(el); clearTimeout(alertTimer); alertTimer = setTimeout(() => el.remove(), 12000); return;
+  }
   document.querySelector('.alert-pill')?.remove();
   const el = document.createElement('div');
   el.className = 'alert-pill';
@@ -205,8 +416,8 @@ function renderHud() {
   $('resources').innerHTML = [
     ['Tesorería', money(state.cash), ''],
     ['Resultado / mes', `<span class="${b.net >= 0 ? 'pos' : 'neg'}">${signed(b.net)}</span>`, ''],
-    ['Trenes hoy', n(trains), ''],
-    ['Viajeros / mes', n(b.passengers / 1e6, 1) + ' M', ''],
+    ['Viajeros hoy', state.ops.phase === 'planning' ? '—' : n(today.pax), ''],
+    ['Ingresos hoy', state.ops.phase === 'planning' ? '—' : today.money < 1e6 ? n(today.money / 1000) + ' mil €' : n(today.money / 1e6, 2) + ' M€', ''],
     ['Satisfacción', n(state.satisfaction) + '<small>%</small>', ''],
   ].map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
   renderClock();
@@ -225,18 +436,18 @@ function renderNav() {
 function renderMission() {
   const c = CHAPTERS[state.chapter];
   const el = $('mission');
-  el.classList.toggle('hidden', !!screen || !!inspect || !state.started);
+  el.classList.toggle('hidden', !!screen || (!!inspect && innerWidth < 1200) || !state.started);
   if (!c) return;
   el.innerHTML = `<div class="kicker">Capítulo ${state.chapter + 1} · ${c.years}</div><h2>${esc(c.title)}</h2><ul>${c.objectives.map(([k, target, title]) => {
     const v = E.objectiveValue(state, k), done = v >= target;
     return `<li class="${done ? 'done' : ''}"><i></i><span>${esc(title)}<div class="meter"><span style="width:${Math.min(100, v / target * 100)}%"></span></div></span><span>${k === 'solvent' ? (v ? '✓' : '—') : n(Math.min(v, target)) + '/' + n(target)}</span></li>`;
-  }).join('')}</ul>`;
+  }).join('')}</ul>${(state.requests || []).length || liveSurges().length ? `<div class="requests"><div class="kicker">Peticiones de las ciudades</div>${liveSurges().map(x => `<button data-action="city" data-id="${x.city}"><b>⚡ ${esc(CITY[x.city]?.name)}</b><span>${esc(x.reason)} · hasta ${clock(x.until)}</span><em>+${n(x.bonus * 1000)}k€</em></button>`).join('')}${(state.requests || []).map(q => `<button data-action="city" data-id="${q.city}"><b>❗ ${esc(CITY[q.city]?.name)}</b><span>${esc(reqText(q))}</span><em>+${q.reward} M€</em></button>`).join('')}</div>` : ''}`;
 }
 function renderLegend() {
   const items = layer === 'works'
     ? [['#d18a2a', 'Obra en ejecución'], ['#5a4630', 'Tramo terminado'], ['#a06a1c', 'Proyecto negociable', true]]
-    : [['#a3123a', 'AVE · AVLO · Avant'], ['#2f6f9f', 'Alvia · Intercity'], ['#c27a18', 'Media Distancia'], ['#75B6E0', 'Cercanías (color de línea)'], ['#c98a1c', 'Autobús de sustitución', true], ['#8a7c69', layer === 'real' ? 'Geometría aproximada' : 'Por recuperar', true]];
-  $('legend').innerHTML = items.map(([c, t, d]) => `<span><i class="${d ? 'dash' : ''}" style="background:${c};color:${c}"></i>${t}</span>`).join('') + `<span class="muted">${layer === 'real' ? 'Todas las circulaciones publicadas · ' + S.DAY_TYPES[dayType()] : 'Grosor: trenes por día'}</span>`;
+    : [['#a3123a', 'AVE · AVLO · Avant'], ['#2f6f9f', 'Alvia · Intercity'], ['#c27a18', 'Media Distancia'], ['#8a7c69', layer === 'real' ? 'Geometría aproximada' : 'Por recuperar', true]];
+  $('legend').innerHTML = items.map(([c, t, d]) => `<span><i class="${d ? 'dash' : ''}" style="background:${c};color:${c}"></i>${t}</span>`).join('') + (layer === 'works' ? '' : '<span><i class="dot" style="border-color:#3f9d5a"></i>Ciudad conectada</span><span><i class="dot" style="border-color:#f0b544"></i>Parcial</span><span><i class="dot" style="border-color:#9c8b74"></i>Sin tren</span><span><i class="pin">!</i>Petición</span><span><i class="crowd">▮▮▮</i>Trenes llenos</span>') + `<span class="muted">${layer === 'real' ? 'Todas las circulaciones publicadas · ' + S.DAY_TYPES[dayType()] : 'Pulsa una ciudad'}</span>`;
 }
 function renderDaybar() {
   const op = state.ops, trips = plan(), b = O.dayBounds(trips);
@@ -348,7 +559,7 @@ function opsPage() {
 
 function networkPage() {
   const q = ui.routeQuery.toLowerCase();
-  const tabs = [['all', 'Todas'], ['av', 'Alta velocidad'], ['ld', 'Larga y media distancia'], ['commuter', 'Cercanías y Rodalies']];
+  const tabs = [['all', 'Todas'], ['av', 'Alta velocidad'], ['ld', 'Larga y media distancia']];
   const statuses = [['all', 'Cualquier estado'], ['active', 'En servicio'], ['closed', 'Por recuperar'], ['works', 'En obras']];
   let list = state.routes.filter(r => {
     if (ui.routeTab === 'av' && r.kind !== 'av') return false;
@@ -368,15 +579,8 @@ function networkPage() {
   };
   const thead = '<thead><tr><th></th><th>Relación</th><th class="num">Trenes / día*</th><th>Estado</th><th class="num">Viajeros / mes</th><th class="num">Resultado</th></tr></thead>';
   let body = `<div class="tabs">${tabs.map(([k, t]) => `<button class="${ui.routeTab === k ? 'active' : ''}" data-action="route-tab" data-id="${k}">${t}</button>`).join('')}</div>
-  <div class="toolbar"><input type="search" id="routeSearch" placeholder="Buscar ciudad, línea o producto (C5, R2, Alvia…)" value="${esc(ui.routeQuery)}" aria-label="Buscar relación"><select id="routeStatus" aria-label="Estado">${statuses.map(([k, t]) => `<option value="${k}" ${ui.routeStatus === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
-  if (ui.routeTab === 'commuter') {
-    for (const net of S.NETWORKS) {
-      const lines = list.filter(r => r.net === net.id);
-      if (!lines.length) continue;
-      const doc = COMMUTER_NETWORKS.find(x => x.id === net.id), activeN = lines.filter(r => r.active).length;
-      body += `<div class="group-title"><h2>${esc(net.name)}</h2><span>${activeN}/${lines.length} líneas en servicio</span>${doc?.source ? `<a class="small" href="${esc(doc.source)}" target="_blank" rel="noopener noreferrer">Plano oficial</a>` : ''}<button class="btn small" data-action="network-zoom" data-id="${net.id}">Ver en el mapa</button><button class="btn small primary" data-action="open-network" data-id="${net.id}">Reabrir núcleo</button></div><table>${thead}<tbody>${lines.map(row).join('')}</tbody></table>`;
-    }
-  } else body += `<table>${thead}<tbody>${list.map(row).join('')}</tbody></table>`;
+  <div class="toolbar"><input type="search" id="routeSearch" placeholder="Buscar ciudad o producto (AVE, Alvia, MD…)" value="${esc(ui.routeQuery)}" aria-label="Buscar relación"><select id="routeStatus" aria-label="Estado">${statuses.map(([k, t]) => `<option value="${k}" ${ui.routeStatus === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
+  body += `<table>${thead}<tbody>${list.map(row).join('')}</tbody></table>`;
   if (!list.length) body += '<div class="empty">No hay relaciones que coincidan.</div>';
   body += `<p class="note">* Circulaciones publicadas por Renfe en un día laborable (GTFS de octubre de 2026), en ambos sentidos. Las relaciones sin cifra no tienen horario publicado (proyectos, servicios perdidos o líneas propias) y funcionan con un plan simulado. ${state.routes.length} relaciones en total.</p>`;
   return [header('Red y servicios', 'Cada línea, su horario.', 'Abre o ajusta servicios: material compatible, salidas por sentido sobre el horario oficial y tarifa media. Abrir un servicio cuesta 4 M€.'), body];
@@ -534,12 +738,14 @@ function archivePage() {
 function renderInspector() {
   const el = $('inspector');
   renderMission();
-  if (!inspect) { el.classList.add('hidden'); map.selected = null; return; }
-  const fn = {route: routeInspector, train: trainInspector, station: stationInspector, work: workInspector}[inspect.type];
+  if (!inspect) { el.classList.add('hidden'); map.selected = null; map.selectedCity = null; return; }
+  if (inspect.type !== 'city') map.selectedCity = null;
+  const fn = {route: routeInspector, train: trainInspector, station: stationInspector, work: workInspector, city: cityInspector}[inspect.type];
   const out = fn?.();
   if (!out) { inspect = null; el.classList.add('hidden'); return; }
   const scroll = el.querySelector('.body')?.scrollTop || 0;
-  el.innerHTML = `<header><div><div class="kicker">${out.kicker}</div><h2>${out.title}</h2></div><button class="close" data-action="close-inspector" aria-label="Cerrar">×</button></header><div class="body">${out.body}</div>`;
+  el.classList.toggle('wide', out.cls === 'city');
+  el.innerHTML = out.cls === 'city' ? `<button class="close floating" data-action="close-inspector" aria-label="Cerrar">×</button><div class="body city-body">${out.body}</div>` : `<header><div><div class="kicker">${out.kicker}</div><h2>${out.title}</h2></div><button class="close" data-action="close-inspector" aria-label="Cerrar">×</button></header><div class="body">${out.body}</div>`;
   el.classList.remove('hidden');
   el.querySelector('.body').scrollTop = scroll;
   if (inspect.type === 'route') updatePreview();
@@ -695,13 +901,13 @@ function saveDialog() {
 }
 function help() {
   showModal(`<div class="content"><div class="kicker">Cómo jugar</div><h1>Un día, un turno.</h1><ol class="method">
-  <li><b>Prepara la jornada.</b> Abre o ajusta líneas en <b>Red</b> o pulsando una vía del mapa: material compatible, salidas por sentido (sobre el horario oficial) y tarifa.</li>
-  <li><b>Comienza la jornada.</b> El reloj arranca con el primer tren y termina con el último. Cambia la velocidad (1×–30×) o pausa con <kbd>Espacio</kbd>.</li>
+  <li><b>Pulsa una ciudad.</b> Su menú muestra sus conexiones: ábrelas, pon más o menos trenes con + y −, mejora su estación y atiende sus peticiones (❗).</li>
+  <li><b>Comienza la jornada.</b> El reloj arranca con el primer tren y termina con el último. Cada llegada suma viajeros e ingresos. Atento a los momentos ⚡: refuerza a tiempo y cobra la bonificación. Cambia la velocidad (1×–30×) o pausa con <kbd>Espacio</kbd>.</li>
   <li><b>Decide ante las incidencias.</b> Averías, fallos de infraestructura, intrusiones o meteorología: equipo de intervención, plan por carretera o esperar.</li>
   <li><b>Lee el parte del día</b> y pasa a la siguiente jornada. Al cerrar el mes se liquidan las cuentas. Puedes delegar el resto del mes.</li>
   <li><b>Crece.</b> Compra trenes (unos dos años de plazo), reforma material, financia obras y visítalas con zoom en la capa <b>Obras</b>.</li>
   <li><b>Explora.</b> La capa <b>Horario real</b> muestra todas las circulaciones publicadas. Pulsa un tren para seguirlo o una estación para ver su panel de salidas.</li></ol>
-  <p class="small">Atajos: <kbd>Espacio</kbd> pausa · <kbd>1</kbd>–<kbd>4</kbd> velocidad · <kbd>+</kbd>/<kbd>−</kbd> zoom · <kbd>Esc</kbd> cerrar.</p><div class="actions"><button class="btn primary" data-action="close-modal">Entendido</button></div></div>`, 'single');
+  <p class="small">Atajos: <kbd>Espacio</kbd> pausa · <kbd>1</kbd>–<kbd>4</kbd> velocidad · <kbd>+</kbd>/<kbd>−</kbd> zoom · <kbd>Esc</kbd> cerrar.</p><div class="actions"><button class="btn primary" data-action="close-modal">Entendido</button><button class="btn" data-action="tutorial-start">Repetir el tutorial</button></div></div>`, 'single');
 }
 function trainRecord(id) {
   const t = REAL_TRAIN_CATALOGUE.find(x => x.id === id); if (!t) return;
@@ -740,10 +946,10 @@ document.addEventListener('click', event => {
     case 'close-drawer': screen = null; render(); break;
     case 'close-inspector': inspect = null; map.selected = null; map.selectedTrain = null; map.follow = false; renderInspector(); break;
     case 'close-modal': closeModal(); break;
-    case 'begin': state = E.initialState(); O.ensureOps(state); state.started = true; closeModal(); netKey = networkKey(); map.dirty = true; render(); autosave(); showDecision(); break;
+    case 'begin': state = E.initialState(); O.ensureOps(state); state.ops.day = 3; state.started = true; tut = null; closeModal(); netKey = networkKey(); map.dirty = true; render(); autosave(); showDecision(); break;
     case 'continue': if (saved) { state = E.validateSave(saved); O.ensureOps(state); state.started = true; closeModal(); netKey = networkKey(); map.dirty = true; render(); if (E.pendingDecision(state)) showDecision(); } break;
     case 'observe': closeModal(); setLayer('real'); observerMinute = 480; play(); break;
-    case 'decision': if (act(() => E.decide(state, id, +b.dataset.choice))) { closeModal(); if (E.pendingDecision(state)) showDecision(); } break;
+    case 'decision': if (act(() => E.decide(state, id, +b.dataset.choice))) { closeModal(); if (E.pendingDecision(state)) showDecision(); else if (!state.tutorial?.done && !tut && state.month === 0) startTutorial(); } break;
     case 'claim': act(() => E.claimChapter(state), 'Financiación recibida. Tu siguiente etapa está preparada.'); break;
     case 'play': playing ? pause() : play(); break;
     case 'speed': speedIndex = +id; renderDaybar(); break;
@@ -755,6 +961,14 @@ document.addEventListener('click', event => {
     case 'open-incidents': document.querySelector('.alert-pill')?.remove(); navigate('ops'); if (screen !== 'ops') navigate('ops'); break;
     case 'respond': act(() => O.resolveIncident(state, id, b.dataset.option), O.RESPONSES[b.dataset.option].note); break;
     case 'route': selectRoute(id); break;
+    case 'city': { const c = CITY[id]; document.querySelector('.alert-pill')?.remove(); inspect = {type: 'city', id}; screen = null; map.selectedCity = id; if (c && map.zoom < 1.4) map.focusAt(c.lon, c.lat, 1.6); render(); break; }
+    case 'freq-up': case 'freq-down': { const r = routeById(id), step = Math.max(1, Math.round(E.maxFrequency(r) * .1)); act(() => setService(r, r.frequency + (a === 'freq-up' ? step : -step))); break; }
+    case 'open-route': { const r = routeById(id); act(() => setService(r, Math.max(1, Math.round(E.maxFrequency(r) * .4))), 'Conexión abierta: ' + routeName(r) + '.'); break; }
+    case 'request': { const q = (state.requests || []).find(q => q.id === id); if (q) act(() => doRequest(q)); break; }
+    case 'station-up': act(() => E.upgradeStation(state, id), 'Estación mejorada.'); celebrate(id, 'Estación mejorada', E.STATION_LEVELS[state.stations?.[id] || 0]); break;
+    case 'tutorial-next': tutorialNext(); break;
+    case 'tutorial-skip': endTutorial(); break;
+    case 'tutorial-start': closeModal(); startTutorial(); break;
     case 'route-zoom': map.focus(id, true); break;
     case 'route-trips': { const r = state.routes.find(r => r.id === id); ui.ttStation = ''; ui.ttStationId = undefined; screen = 'timetables'; inspect = null; const first = S.routeTrips(dayType(), id)[0]; if (first) { ui.ttStationId = first.stations[0]; ui.ttStation = S.STATIONS[first.stations[0]].name.toLowerCase(); } render(); if (r) toast('Salidas desde ' + S.STATIONS[first?.stations[0]]?.name); break; }
     case 'route-tab': ui.routeTab = id; renderDrawer(); break;

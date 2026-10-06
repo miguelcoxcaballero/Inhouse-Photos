@@ -8,7 +8,7 @@ const s=E.initialState();s.started=true;E.decide(s,'inaugural',0);O.ensureOps(s)
 assert.equal(COMMUTER_NETWORKS.length,15);assert.equal(COMMUTER_NETWORKS.reduce((n,g)=>n+g.lines.filter(l=>l.type==='commuter').length,0),63);assert.equal(REAL_TRAIN_CATALOGUE.length,56);
 for(const group of COMMUTER_NETWORKS)for(const line of group.lines){assert(REAL_STATIONS.some(s=>s.id===line.fromStation));assert(REAL_STATIONS.some(s=>s.id===line.toStation));for(const id of line.viaStationIds)assert(E.initialState().routes.length&&REAL_STATIONS.some(s=>s.id===id));}
 assert.equal(Object.keys(RAIL_PATHS).length,114);assert(RAIL_PATHS['c-sevilla-c4'].coordinates.length>20);assert(RAIL_PATHS['madrid-valladolid'].lengthKm>170&&RAIL_PATHS['madrid-valladolid'].lengthKm<190);
-const plan=O.servicePlan(s),bounds=O.dayBounds(plan);O.startDay(s);assert.equal(s.ops.minute,bounds.first);assert.throws(()=>O.endDay(s),/último tren/);assert.throws(()=>E.configureRoute(s,'murcia-cartagena','f2',2,8),/jornada/);assert.throws(()=>E.closeRoute(s,s.routes[0].id),/jornada/);
+const plan=O.servicePlan(s),bounds=O.dayBounds(plan);O.startDay(s);assert.equal(s.ops.minute,bounds.first);assert.throws(()=>O.endDay(s),/último tren/);
 while(!O.moveClock(s,30)){};O.endDay(s);const after=s.cash;assert.throws(()=>O.endDay(s));assert.equal(s.cash,after);O.nextDay(s);assert.equal(s.ops.day,2);assert.equal(s.month,0);
 s.ops.day=31;O.startDay(s);while(!O.moveClock(s,180)){}O.endDay(s);O.nextDay(s);assert.equal(s.month,1);assert.equal(s.ops.day,1);
 assert(O.daylight(s,720).light>O.daylight(s,180).light);assert.equal(O.clockText(3000),'02:00 +2');assert.throws(()=>E.validateSave({...s,ops:{...s.ops,day:100}}),/Jornada/);

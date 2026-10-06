@@ -28,6 +28,8 @@ LD_ZIP = sys.argv[2] if len(sys.argv) > 2 else os.path.join(INV, 'gtfs', 'renfe-
 RAIL = os.path.join(INV, 'railgeo', 'railways-iberia-compact.json')
 OUT = os.path.join(ROOT, 'dist', 'assets', 'timetable.js')
 REPORT = os.path.join(INV, 'gtfs', 'timetable-report.json')
+# v0.4: el juego se centra en AV/LD/MD; las circulaciones de Cercanías/Rodalies no se incluyen.
+INCLUDE_CERCANIAS = os.environ.get('INCLUDE_CERCANIAS') == '1'
 DAYS = {'L': '20261014', 'S': '20261017', 'D': '20261018'}
 WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
@@ -269,7 +271,7 @@ console.log(JSON.stringify({cities:D.CITIES,routes:D.ROUTES,networks:COMMUTER_NE
     ld_routes = {r['route_id']: r for r in rows(ld, 'routes.txt')}
     active = {k: (active_services(cer, False, d), active_services(ld, True, d)) for k, d in DAYS.items()}
     trips = {}  # trip_id -> dict
-    for t in rows(cer, 'trips.txt'):
+    for t in (rows(cer, 'trips.txt') if INCLUDE_CERCANIAS else []):
         r = cer_routes.get(t['route_id'])
         if not r or r['route_type'] not in ('2', '3'):
             continue

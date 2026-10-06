@@ -138,52 +138,27 @@ export class RailMap {
 
   // ------------------------------------------------------------ interacción
   hit(x, y) {
-    const v = this.opts.getView();
-    // 1. Trenes
-    let best = null, bd = 11;
+    // 1. Ciudades (la forma principal de interactuar)
+    let best = null, bd = Infinity;
+    for (const c of this.cityPoints || []) {
+      const ci = (this.opts.getCities?.() || []).find(k => k.id === c.id), p = ci ? this.project(ci.lon, ci.lat) : [c.x, c.y]; // posición con la vista actual
+      const d = Math.hypot(p[0] - x, p[1] - y); if (d < c.r + 9 && d < bd) { bd = d; best = {type: 'city', id: c.id}; }
+    }
+    if (best) return best;
+    // 2. Peticiones y obras
+    for (const w of this.workPoints || []) if (Math.hypot(w.x - x, w.y - y) < 14) return {type: 'work', id: w.id};
+    // 3. Trenes
+    bd = 11;
     for (const p of this.trainPoints || []) { const d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = {type: 'train', id: p.id}; } }
     if (best) return best;
-    // 2. Obras
-    for (const w of this.workPoints || []) if (Math.hypot(w.x - x, w.y - y) < 14) return {type: 'work', id: w.id};
-    // 3. Estaciones
-    if (this.zoom >= 4) {
-      bd = this.zoom > 12 ? 9 : 6;
-      for (const s of this.stationPoints || []) { const d = Math.hypot(s.x - x, s.y - y); if (d < bd) { bd = d; best = {type: 'station', id: s.id}; } }
-      if (best) return best;
+    // 4. Estaciones cuando el zoom es grande
+    if (this.zoom >= 9) {
+      bd = 8;
+      for (const st of this.stationPoints || []) { const d = Math.hypot(st.x - x, st.y - y); if (d < bd) { bd = d; best = {type: 'station', id: st.id}; } }
     }
-    // 4. Tramos de la red
-    const [lon, lat] = this.unproject(x, y), tol = 9 / (this.base * this.zoom);
-    const usage = S.edgeUsage(v.dayType || 'L'), state = this.opts.getState(), active = new Set(state.routes.filter(r => r.active).map(r => r.id));
-    bd = 9;
-    for (let i = 0; i < this.edgeBox.length; i++) {
-      const b = this.edgeBox[i];
-      if (lon < b[0] - tol || lon > b[2] + tol || lat < b[1] - tol || lat > b[3] + tol) continue;
-      const e = S.edge(i), pts = e.pts.map(p => this.project(p[0], p[1]));
-      for (let k = 1; k < pts.length; k++) {
-        const a = pts[k - 1], c = pts[k], dx = c[0] - a[0], dy = c[1] - a[1];
-        const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
-        const d = Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy);
-        if (d < bd) {
-          const u = usage.get(i);
-          if (!u) continue;
-          const routes = [...u.routes.entries()].sort((p, q) => (active.has(q[0]) - active.has(p[0])) || q[1] - p[1]);
-          bd = d; best = {type: 'route', id: routes[0][0], edge: i};
-        }
-      }
-    }
-    if (best) return best;
-    // 5. Corredores de campaña sin horario (geometría OSM o conceptual)
-    for (const r of state.routes) {
-      if (r.real) continue;
-      const pts = this.routeCoords(r.id).map(p => this.project(p[0], p[1]));
-      for (let k = 1; k < pts.length; k++) {
-        const a = pts[k - 1], c = pts[k], dx = c[0] - a[0], dy = c[1] - a[1];
-        const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
-        if (Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) < 7) return {type: 'route', id: r.id};
-      }
-    }
-    return null;
+    return best;
   }
+  screenOf(lon, lat) { return this.project(lon, lat); }
 
   // ------------------------------------------------------------ capas en caché
   ctxOf(name) { const c = this.caches[name].getContext('2d'); c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.clearRect(0, 0, this.w, this.h); return c; }
@@ -350,9 +325,7 @@ export class RailMap {
       const p = this.project(ci.lon, ci.lat);
       if (!this.visible(p, 10)) continue;
       const major = ci.pop >= 700, size = Math.round((major ? 15 : ci.pop > 200 ? 13 : 12) + Math.min(5, Math.log2(z) * 1.2));
-      c.fillStyle = night > .5 ? '#fff0c8' : '#3c2f2a';
-      c.beginPath(); c.arc(p[0], p[1], major ? 3.6 : 2.4, 0, Math.PI * 2); c.fill();
-      label(ci.name, p[0], p[1], size, major ? 700 : 600, major);
+      label(ci.name, p[0] + 6, p[1], size, major ? 700 : 600, major);
     }
     if (z >= 7) {
       const list = S.STATIONS.filter(s => s.traffic).sort((a, b) => b.traffic - a.traffic);
@@ -413,14 +386,28 @@ export class RailMap {
     this.blit('lines', this.layer === 'works' ? .55 : 1 - night * .12);
     this.drawSelected(view, night);
     this.drawWorks(view, night, t);
-    this.blit('labels');
     this.drawStations(view, night);
+    this.drawCities(view, night, t);
+    this.blit('labels');
     this.drawTrains(view, night, t);
+    this.drawPopups(view, night, t);
     this.drawHover(view, night);
     this.drawScale(night);
   }
 
   drawSelected(view, night) {
+    if (this.selectedCity) {
+      const c = this.ctx, state = this.opts.getState();
+      c.lineCap = 'round'; c.lineJoin = 'round';
+      for (const r of state.routes.filter(r => r.ends.includes(this.selectedCity))) {
+        const edges = S.routeEdges(r.id), paths = edges.length ? edges.map(i => S.edge(i).pts) : [this.routeCoords(r.id)];
+        c.beginPath();
+        for (const path of paths) path.forEach(([lon, lat], k) => { const p = this.project(lon, lat); k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); });
+        c.setLineDash(r.active ? [] : [5, 6]);
+        c.strokeStyle = r.active ? 'rgba(243,179,61,.95)' : night > .5 ? 'rgba(255,230,180,.55)' : 'rgba(120,90,50,.55)';
+        c.lineWidth = r.active ? 4.5 : 2.2; c.stroke(); c.setLineDash([]);
+      }
+    }
     if (!this.selected) return;
     const c = this.ctx, pts = this.routeCoords(this.selected), edges = S.routeEdges(this.selected);
     c.lineCap = 'round'; c.lineJoin = 'round';
@@ -563,7 +550,7 @@ export class RailMap {
 
   drawTrains(view, night, t) {
     const c = this.ctx, minute = view.minute, trips = view.trips || [];
-    const scale = this.zoom < 2 ? .75 : this.zoom < 6 ? 1 : this.zoom < 20 ? 1.35 : this.zoom < 60 ? 1.8 : 2.4;
+    const scale = this.zoom < 2 ? 1.05 : this.zoom < 6 ? 1.2 : this.zoom < 20 ? 1.4 : this.zoom < 60 ? 1.8 : 2.4;
     this.trainPoints = [];
     let follow = null;
     for (const trip of trips) {
@@ -580,7 +567,7 @@ export class RailMap {
       if (trip.id === this.selectedTrain) follow = p;
       if (!this.visible(p, 20)) continue;
       const color = trip.line !== undefined && trip.line !== null ? this.lineColor(trip.line) : '#8a3550';
-      this.trainSprite(c, p[0], p[1], this.zoom < 2.2 ? null : pos.angle, color, scale, night, trip.delay > 5, trip.bus, trip.id === this.selectedTrain);
+      this.trainSprite(c, p[0], p[1], pos.angle, color, scale, night, trip.delay > 5, trip.bus, trip.id === this.selectedTrain);
       this.trainPoints.push({id: trip.id, x: p[0], y: p[1]});
       if (this.zoom > 28 && trip.label) {
         c.font = '600 11px "IBM Plex Mono", monospace'; const wd = c.measureText(trip.label).width;
@@ -604,6 +591,10 @@ export class RailMap {
       const st = S.STATIONS[this.hover.id], p = this.stationPoints.find(p => p.id === this.hover.id);
       if (!p) return;
       text = st.name; sub = st.traffic + ' circulaciones en laborable'; at = [p.x, p.y];
+    } else if (this.hover.type === 'city') {
+      const ci = (this.opts.getCities?.() || []).find(c => c.id === this.hover.id), p = this.cityPoints?.find(p => p.id === this.hover.id);
+      if (!ci || !p) return;
+      text = ci.name; sub = (ci.request ? '¡Tiene una petición! · ' : '') + ci.active + '/' + ci.total + ' conexiones · pulsa para abrir'; at = [p.x, p.y];
     } else if (this.hover.type === 'route') {
       const r = state.routes.find(r => r.id === this.hover.id); if (!r) return;
       text = r.name || r.id; sub = r.active ? 'En servicio · ' + r.frequency + ' salidas por sentido' : 'Sin servicio · pulsa para gestionar';
@@ -619,6 +610,58 @@ export class RailMap {
     c.beginPath(); c.roundRect(x, y, wd, 44, 10); c.fill(); c.stroke();
     c.fillStyle = night > .5 ? '#ffe7b0' : '#2a221c'; c.font = '700 13px Figtree'; c.fillText(text, x + 11, y + 18);
     c.fillStyle = night > .5 ? '#c9bfa8' : '#6b5d4c'; c.font = '500 12px Figtree'; c.fillText(sub, x + 11, y + 35);
+  }
+
+  drawCities(view, night, t) {
+    const c = this.ctx, cities = this.opts.getCities?.() || [];
+    this.cityPoints = [];
+    const pulse = (Math.sin(t / 300) + 1) / 2;
+    for (const ci of cities) {
+      if (!ci.pop && this.zoom < 2.6 && !ci.request && ci.status === 'off') continue;
+      const p = this.project(ci.lon, ci.lat);
+      if (!this.visible(p, 30)) continue;
+      const base = ci.pop ? Math.max(5, Math.min(13, 3 + Math.sqrt(ci.pop) * .14)) : 4;
+      const r = base * Math.min(1.6, Math.max(1, Math.pow(this.zoom, .15)));
+      this.cityPoints.push({id: ci.id, x: p[0], y: p[1], r});
+      const ring = ci.status === 'on' ? '#3f9d5a' : ci.status === 'some' ? '#f0b544' : night > .5 ? '#9a93a8' : '#9c8b74';
+      if (ci.id === this.selectedCity) { c.fillStyle = 'rgba(243,179,61,.35)'; c.beginPath(); c.arc(p[0], p[1], r + 10 + pulse * 3, 0, Math.PI * 2); c.fill(); }
+      if (ci.id === this.hover?.id && this.hover?.type === 'city') { c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.arc(p[0], p[1], r + 7, 0, Math.PI * 2); c.fill(); }
+      c.fillStyle = night > .5 ? '#2a2638' : '#fffaf0'; c.strokeStyle = ring; c.lineWidth = Math.max(2.4, r * .38);
+      c.beginPath(); c.arc(p[0], p[1], r, 0, Math.PI * 2); c.fill(); c.stroke();
+      // estación: puntos según nivel
+      for (let k = 0; k < (ci.station || 0); k++) { c.fillStyle = '#c98a1c'; c.beginPath(); c.arc(p[0] - 4 + k * 4, p[1] + r + 5, 1.8, 0, Math.PI * 2); c.fill(); }
+      if (ci.pop >= 400) { c.fillStyle = ring; c.beginPath(); c.arc(p[0], p[1], r * .38, 0, Math.PI * 2); c.fill(); }
+      if (!ci.pop && this.zoom >= 2.6) { c.font = '600 11px Figtree'; c.lineWidth = 3; c.strokeStyle = night > .5 ? 'rgba(10,15,30,.85)' : 'rgba(245,238,218,.92)'; c.strokeText(ci.name, p[0] + r + 4, p[1] + 4); c.fillStyle = night > .5 ? '#e5d6b4' : '#4b4234'; c.fillText(ci.name, p[0] + r + 4, p[1] + 4); }
+      if (ci.crowd) { // andén lleno: tres figuras
+        c.fillStyle = '#c23b2f';
+        for (let k = 0; k < 3; k++) { const x = p[0] - r - 12 + k * 5, y = p[1] - 2; c.beginPath(); c.arc(x, y - 4, 1.8, 0, Math.PI * 2); c.fill(); c.fillRect(x - 1.6, y - 2, 3.2, 5); }
+      }
+      if (ci.request) { // petición: chincheta con exclamación
+        const y = p[1] - r - 16 - pulse * 3;
+        c.fillStyle = '#c23b2f'; c.beginPath(); c.arc(p[0], y, 9, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.moveTo(p[0] - 5, y + 6); c.lineTo(p[0], y + 13); c.lineTo(p[0] + 5, y + 6); c.fill();
+        c.fillStyle = '#fff'; c.font = '800 12px Figtree'; c.textAlign = 'center'; c.fillText('!', p[0], y + 4.5); c.textAlign = 'left';
+      }
+    }
+  }
+
+  drawPopups(view, night, t) {
+    const c = this.ctx, list = this.opts.getPopups?.() || [], now = performance.now();
+    for (const pop of list) {
+      const age = (now - pop.born) / 2600;
+      if (age > 1) continue;
+      const p = this.project(pop.lon, pop.lat);
+      if (!this.visible(p, 20)) continue;
+      const y = p[1] - 18 - age * 34, a = age < .15 ? age / .15 : 1 - Math.max(0, age - .6) / .4;
+      c.globalAlpha = Math.max(0, a);
+      c.font = '800 13px Figtree'; const w1 = c.measureText(pop.text).width * 1.08;
+      c.font = '600 11px Figtree'; const w2 = pop.sub ? c.measureText(pop.sub).width : 0;
+      const w = Math.max(w1, w2) + 14;
+      c.fillStyle = night > .5 ? 'rgba(20,24,40,.9)' : 'rgba(255,250,240,.95)'; c.beginPath(); c.roundRect(p[0] - w / 2, y - 15, w, pop.sub ? 32 : 20, 9); c.fill();
+      c.fillStyle = pop.color || '#3f7d4e'; c.font = '800 14px Figtree'; c.textAlign = 'center'; c.fillText(pop.text, p[0], y);
+      if (pop.sub) { c.fillStyle = night > .5 ? '#e8d9b8' : '#5d5143'; c.font = '600 11px Figtree'; c.fillText(pop.sub, p[0], y + 13); }
+      c.textAlign = 'left'; c.globalAlpha = 1;
+    }
   }
 
   drawScale(night) {

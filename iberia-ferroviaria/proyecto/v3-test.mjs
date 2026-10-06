@@ -9,20 +9,18 @@ const ok = [];
 
 // 1. Horario oficial: tres días tipo, Cercanías/Rodalies y AV/LD/MD.
 {
-  for (const k of ['L', 'S', 'D']) assert(S.dayTrips(k).length > 4000, 'faltan circulaciones ' + k);
+  for (const k of ['L', 'S', 'D']) assert(S.dayTrips(k).length > 1000, 'faltan circulaciones ' + k);
   const L = S.dayTrips('L');
   const kinds = new Set(L.map(t => S.LINES[t.line].kind));
-  for (const k of ['commuter', 'av', 'ld', 'md']) assert(kinds.has(k), 'falta ' + k);
-  const nets = new Set(L.map(t => S.LINES[t.line].net).filter(Boolean));
-  assert(nets.size >= 15, 'núcleos: ' + nets.size);
+  for (const k of ['av', 'ld', 'md']) assert(kinds.has(k), 'falta ' + k);
+  assert(!kinds.has('commuter'), 'sin Cercanías');
   for (const t of L) {
     for (let j = 1; j < t.times.length; j++) assert(t.times[j] >= t.times[j - 1], 'horas no crecientes ' + t.key);
     assert(t.start >= 180, 'los nocturnos se cierran al final del día');
     assert.equal(t.edges.length, t.stations.length - 1);
   }
-  assert(L.some(t => t.bus), 'servicio alternativo por carretera publicado');
   assert(L.some(t => S.LINES[t.line].code === 'AVE' && t.number), 'número de tren AVE');
-  ok.push(`Horario oficial: ${L.length} circulaciones en laborable, ${nets.size} núcleos, AV/LD/MD y autobuses por obras.`);
+  ok.push(`Horario oficial AV/LD/MD: ${L.length} circulaciones en laborable, sin Cercanías.`);
 }
 // 2. Geometría de tramos sobre la península y posiciones interpoladas.
 {
@@ -62,16 +60,16 @@ const ok = [];
   assert.equal(b.first, Math.min(...plan.map(t => t.dep)));
   O.startDay(s);
   assert.equal(s.ops.minute, b.first);
-  assert(b.last > 1440, 'la jornada termina después de medianoche');
+  assert(b.last > 1260 && b.last === Math.max(...plan.map(t => t.arrival)), 'la jornada termina con la última llegada');
   assert.equal(E.requiredUnits(r, MODEL.s112, r.baseFrequency), Math.ceil(r.peak * 1.12));
-  const c5 = s.routes.find(r => r.id === 'c-madrid-c5');
-  assert.throws(() => E.configureRoute(s, c5.id, c5.fleet, c5.baseFrequency + 1, 1.7), /jornada|salidas/);
+  assert.throws(() => E.configureRoute(s, r.id, r.fleet, r.baseFrequency + 1, 40), /salidas/);
+  E.configureRoute(s, r.id, r.fleet, r.frequency - 1, r.fare); // se puede ajustar durante la jornada
   while (!O.moveClock(s, 45)) {}
   const report = O.endDay(s);
-  assert(report.trains === plan.length && report.km > 1000 && report.first === b.first);
+  assert(report.trains === plan.length - 2 && report.km > 1000);
   O.nextDay(s);
   assert.equal(s.ops.day, 15);
-  ok.push(`Jornada real: ${plan.length} circulaciones de ${O.clockText(b.first)} a ${O.clockText(b.last)}, parte del día y unidades por pico simultáneo.`);
+  ok.push(`Jornada real (con refuerzo en directo): ${plan.length} circulaciones de ${O.clockText(b.first)} a ${O.clockText(b.last)}, parte del día y unidades por pico simultáneo.`);
 }
 // 5. Incidencias con respuesta y demoras propagadas.
 {
@@ -107,6 +105,7 @@ const ok = [];
   const legacy = JSON.parse(JSON.stringify(s));
   legacy.version = 1;
   legacy.routes = legacy.routes.filter(r => !r.generated);
+  legacy.routes.push({...legacy.routes[0], id: 'c-madrid-c5', active: false}); // línea de Cercanías de una partida antigua
   for (const r of legacy.routes) { delete r.real; delete r.baseFrequency; delete r.peak; }
   const back = E.validateSave(legacy);
   assert.equal(back.version, 2);
@@ -115,3 +114,22 @@ const ok = [];
   ok.push(`Partidas v0.2 migradas: ${ALL_ROUTES.length} relaciones jugables.`);
 }
 console.log(ok.map(x => '✓ ' + x).join('\n'));
+
+// 8. Ciudades: estaciones y peticiones.
+{
+  const s = E.initialState(); s.started = true; E.decide(s, 'inaugural', 0);
+  assert(s.requests.length >= 1);
+  const cash = s.cash, cost = E.stationCost(s, 'mad');
+  E.upgradeStation(s, 'mad');
+  assert.equal(s.stations.mad, 1); assert(Math.abs(s.cash - (cash - cost)) < 1e-9);
+  const q = s.requests[0], r = s.routes.find(r => r.id === q.route);
+  if (q.type === 'open') { const f = s.fleet.find(f => E.compatible(r, MODEL[f.model]) && E.available(s, f) >= E.requiredUnits(r, MODEL[f.model], 1)); E.configureRoute(s, r.id, f.id, 1, r.fare); }
+  else if (q.type === 'station') { while ((s.stations[q.city] || 0) < q.target) E.upgradeStation(s, q.city); }
+  else if (q.type === 'fare') E.configureRoute(s, r.id, r.fleet, r.frequency, q.target);
+  else { const f = s.fleet.find(f => f.id === r.fleet); E.configureRoute(s, r.id, f.id, q.target, r.fare); }
+  const before = s.cash; E.checkRequests(s);
+  assert.equal(s.stats.requests, 1); assert(s.cash > before);
+  assert.equal(E.validateSave(JSON.parse(JSON.stringify(s))).stations.mad, 1);
+  ok.push('Ciudades: mejora de estación y petición atendida con recompensa.');
+}
+console.log(ok.slice(-1).map(x => '✓ ' + x).join('\n'));

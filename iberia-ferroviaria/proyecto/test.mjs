@@ -24,7 +24,9 @@ const summary=[];
  const projects=['encina','almeria','teruel','loja'];let custom=false;
  for(let month=0;month<348&&!s.ended;month++){
   for(const r of s.routes.filter(r=>!r.active&&E.isUnlocked(s,r))){const want=Math.max(1,Math.round((r.real?r.baseFrequency:4)*.75));const f=s.fleet.find(f=>f.qty&&f.condition>=30&&E.compatible(r,MODEL[f.model])&&E.available(s,f)>=E.requiredUnits(r,MODEL[f.model],want));if(f&&s.cash>100&&E.metrics(s,r,{active:true,fleet:f.id,frequency:want,units:E.requiredUnits(r,MODEL[f.model],want)}).net>-.3)E.configureRoute(s,r.id,f.id,want,r.fare);}
-  if(s.month%12===6&&s.cash>300)for(const m of [s.month>=60?'s453':'civia',s.month>=72?'s480':'s449','s599','s112'])try{E.buy(s,m,10)}catch{}
+  if(s.month%12===6&&s.cash>300)for(const m of [s.month>=72?'s480':'s449','s599','s112','s130'])try{E.buy(s,m,10)}catch{}
+  for(const q of [...(s.requests||[])]){const r=s.routes.find(r=>r.id===q.route);try{if(q.type==='station')E.upgradeStation(s,q.city);else if(r.active&&q.type==='fare')E.configureRoute(s,r.id,r.fleet,r.frequency,q.target);else if(r.active&&q.type==='more'&&E.available(s,s.fleet.find(f=>f.id===r.fleet),r.id)>=E.requiredUnits(r,MODEL[s.fleet.find(f=>f.id===r.fleet).model],q.target))E.configureRoute(s,r.id,r.fleet,q.target,r.fare);}catch{}}
+  if(s.cash>350){const c=['mad','bcn','vlc','sev','zar','mal','bil','vll','ali','cor'].find(c=>(s.stations[c]||0)<3);if(c)E.upgradeStation(s,c);}
   if(s.month>12&&s.cash>250){const id=projects.find(id=>!s.projects.some(p=>p.id===id));if(id)E.startProject(s,id);}
   if(s.stats.upgrades+s.projects.filter(p=>p.type==='upgrade'&&!p.done).length<3&&s.cash>150){const r=s.routes.find(r=>r.active&&!s.projects.some(p=>p.id==='upgrade-'+r.id));if(r)E.upgradeRoute(s,r.id);}
   if(!custom&&s.month>140&&s.cash>400){E.buildLine(s,'mur','vlc','regional');custom=true;}
@@ -32,9 +34,9 @@ const summary=[];
   if(E.chapterReady(s))E.claimChapter(s);
   tick(s);
  }
- assert.equal(s.month,348);assert.equal(s.ended,true);assert.equal(s.ending,'2050');assert.equal(s.claimed.length,5);assert(s.routes.filter(r=>r.active).length>=75);assert(E.dailyTrains(s)>=3500);assert(s.projects.some(p=>p.type==='custom'&&p.done));assert(E.finalScore(s)>=80);assert.equal(E.step(s),false);assert.throws(()=>E.buy(s,'s599',1),/terminado/);
+ assert.equal(s.month,348);assert.equal(s.ended,true);assert.equal(s.ending,'2050');assert.equal(s.claimed.length,5);assert(s.routes.filter(r=>r.active).length>=55);assert(E.dailyTrains(s)>=900);assert(s.stats.requests>=25);assert(s.projects.some(p=>p.type==='custom'&&p.done));assert(E.finalScore(s)>=80);assert.equal(E.step(s),false);assert.throws(()=>E.buy(s,'s599',1),/terminado/);
  const tender=HISTORICAL_ORDERS.find(o=>o.tender);assert(!s.orders.some(o=>o.id===tender.id));
- for(const h of HISTORICAL_ORDERS.filter(o=>o.model)){assert.equal(s.orders.find(o=>o.id===h.id).delivered,h.qty);}
+ for(const h of HISTORICAL_ORDERS.filter(o=>o.model&&MODEL[o.model].category!=='Cercanías')){assert.equal(s.orders.find(o=>o.id===h.id).delivered,h.qty);}
  summary.push('Campaña completa por acciones legales: 5 capítulos, obras, línea nueva y cierre de 2050.');
  summary.push('Licitación 2026 sin entregas automáticas; pedidos históricos sin duplicar.');
  fs.mkdirSync('../work',{recursive:true});fs.writeFileSync('../work/end-state.json',JSON.stringify({month:s.month,cash:s.cash,score:E.finalScore(s),chapters:s.claimed,active:s.routes.filter(r=>r.active).length,passengers:s.stats.passengers},null,2));
