@@ -9,9 +9,16 @@ president/ (Pedro Sancho): dave-1…6.wav
   «Chat» (preguntas y exclamaciones), convertidas a 24 kHz mono y recortadas de silencios.
   Fuente: https://github.com/NabuCasa/voice-datasets (cita solicitada por los autores).
 
-minister/ (Raquel Sanz) y successor/ (Óscar del Puente):
-  Ver las notas de cada carpeta. Candidatas: voces de estudio integradas en XTTS-v2 (voces sintéticas de Coqui,
-  sin identidad real) verificadas con tools/voice_accent.py como castellano de España (distinción /θ/).
+minister/ (Raquel Sanz): xtts-speaker.txt → «Camilla Holmström»
+successor/ (Óscar del Puente): xtts-speaker.txt → «Eugenio Mataracı»
+  Voces de estudio integradas en XTTS-v2 (voces sintéticas de Coqui con nombres inventados, sin identidad real).
+  Se probaron 22 con la misma frase (siete /θ/ esperados) y se midieron con tools/voice_accent.py y la variación
+  melódica (pYIN). Castellanas (θ≈7/7): Alison Dietlinde, Tammy Grit, Camilla Holmström, Alma María, Sofia Hellen,
+  Daisy Studious, Rosemary Okafor, Xavier Hayasaka, Andrew Chipper, Eugenio Mataracı, Ferran Simen, Luis Moray,
+  Viktor Eka. Con seseo (θ≈0): Ana Florence, Claribel Dervla, Gracie Wise, Tanja Adelina, Damien Black,
+  Dionisio Schuyler, Gilberto Mathias, Marcos Rudaski. Se eligieron las castellanas de mayor rango melódico
+  (Camilla 5,0 st; Eugenio 6,9 st).
 
-opciones/ y teatrales/: referencias sintéticas de pruebas anteriores (Supertonic, Piper, Chatterbox); descartadas
-  porque las voces clonadas a partir de ellas sonaban planas o con acento no peninsular.
+Descartado antes de llegar aquí: Kokoro, Piper, Supertonic 2, Chatterbox Multilingual, Zonos y F5-TTS Spanish,
+  con referencias sintéticas; sonaban planas, robóticas o con acento no peninsular. El historial de git conserva
+  aquellas pruebas.

@@ -6,9 +6,10 @@ Uso (desde proyecto/):
   python3 tools/build_voices.py                                  # solo reempaqueta los MP3
 
 Motor: XTTS-v2 (Coqui, licencia CPML: uso no comercial; paquete PyPI coqui-tts), con español «es».
-Referencias: grabaciones reales de hablantes de España, en ../investigacion/voces/referencias/<personaje>/*.wav
-(ver REFERENCIAS.txt allí: dave, CC0, grabado para crear voces sintéticas; Sharvard, CC BY 3.0, Universidad de
-Edimburgo). No son voces de las personas parodiadas ni de ninguna persona pública.
+Referencias (../investigacion/voces/referencias/<personaje>/, ver REFERENCIAS.txt): grabaciones reales .wav de
+un hablante de España (dave, CC0, grabado para crear voces sintéticas) o, con xtts-speaker.txt, una voz de estudio
+integrada en XTTS elegida con tools/voice_accent.py por su distinción castellana. No son voces de las personas
+parodiadas ni de ninguna persona pública.
 
 Interpretación: tools/voice_direction.json marca pausas y remates, que aquí se convierten en puntuación.
 Cada frase se genera hasta RETRIES veces y se descarta la toma con saltos de octava (artefactos) o con una
@@ -77,11 +78,18 @@ class Engine:
         self.latents = {}
 
     def voice(self, person):
+        """Referencia del personaje: grabaciones .wav de su carpeta o, si hay xtts-speaker.txt, una voz integrada de XTTS."""
         if person not in self.latents:
-            files = sorted(glob.glob(os.path.join(REFS, person, '*.wav')))
-            if not files:
-                sys.exit(f'Sin referencias en {os.path.join(REFS, person)}')
-            self.latents[person] = self.model.get_conditioning_latents(audio_path=files, gpt_cond_len=30, max_ref_length=60)
+            folder = os.path.join(REFS, person)
+            named = os.path.join(folder, 'xtts-speaker.txt')
+            files = sorted(glob.glob(os.path.join(folder, '*.wav')))
+            if os.path.exists(named):
+                spk = self.model.speaker_manager.speakers[open(named, encoding='utf-8').read().strip()]
+                self.latents[person] = (spk['gpt_cond_latent'], spk['speaker_embedding'])
+            elif files:
+                self.latents[person] = self.model.get_conditioning_latents(audio_path=files, gpt_cond_len=30, max_ref_length=60)
+            else:
+                sys.exit(f'Sin referencias en {folder}')
         return self.latents[person]
 
     def say(self, person, text):
