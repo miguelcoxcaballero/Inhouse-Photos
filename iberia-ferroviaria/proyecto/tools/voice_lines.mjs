@@ -10,7 +10,7 @@ const lines = [...CHAPTERS.map(c => [c.speaker, c.text]), ...DECISIONS.map(d => 
 const seen = new Set(), out = [];
 for (const [person, text] of lines) for (const s of sentences(text)) {
   const id = clipId(person, s);
-  if (!seen.has(id)) { seen.add(id); out.push({id, person, text: speechText(s)}); }
+  if (!seen.has(id)) { seen.add(id); out.push({id, person, raw: s, text: speechText(s)}); }
 }
 process.stdout.write(JSON.stringify(out, null, 1) + '\n');
 console.error(`${lines.length} diálogos, ${out.length} frases.`);
