@@ -1,0 +1,168 @@
+import {RAIL_PATHS} from './assets/railways.js';
+import {REAL_STATIONS,REAL_DATA_SOURCES} from './assets/realdata.js';
+export const SOURCES = [
+ ['geography','georgique/world-geojson · España y Portugal','https://github.com/georgique/world-geojson','Contornos detallados, licencia GPL-3.0. Seleccionados y empaquetados el 06-10-2026; geometrías conservadas. Código y licencia se incluyen en el proyecto editable. Otros países usan Natural Earth.'],
+ ['passes','Renfe · Abonos gratuitos, septiembre de 2022','https://www.renfe.com/es/es/grupo-renfe/comunicacion/renfe-al-dia/sala-de-prensa/usuarios-de-renfe-pueden-adquirir-los-abonos-gratuitos-de-cercanias-rodalies-y-md','Venta desde el 24 de agosto para viajes del 1 de septiembre al 31 de diciembre de 2022. La ayuda y el refuerzo de demanda del juego son una abstracción.'],
+ ['network','Adif · Declaración sobre la Red 2026','https://www.adif.es/sobre-adif/declaracion-red','Características de infraestructura, acceso y restricciones. Mapas de febrero de 2026 y actualización de julio. No se ha digitalizado toda la RFIG.'],
+ ['shortage','Renfe · Retraso de los Talgo S106, 2022','https://www.renfe.com/es/es/grupo-renfe/comunicacion/renfe-al-dia/sala-de-prensa/Renfe-analiza-contrato-talgo-retraso-entrega-trenes','30 trenes; 15 de ancho variable. Primera entrega prevista en enero de 2021. La falta de trenes limitaba la recuperación de servicios y la expansión.'],
+ ['s106start','Renfe · Inicio comercial del S106, 2024','https://www.renfe.com/es/es/grupo-renfe/comunicacion/renfe-al-dia/sala-de-prensa/renfe-programa-viajes-simulacion-comercial-s106','Inicio comercial el 21 de mayo de 2024. No equivale a la entrega simultánea de las 30 unidades.'],
+ ['s106types','Renfe · Composición del pedido S106','https://www.renfe.com/es/es/grupo-renfe/comunicacion/renfe-al-dia/sala-de-prensa/renfe-pone-circulacion-s106-incremento-14400-plazas-para-servicios-avlo-circulan-madrid-aragon-cataluna-comunitat-valenciana-murcia','30 unidades: 10 AVE fijas, 10 AVE variables, 5 Avlo fijas y 5 Avlo variables. El juego agrupa ambas configuraciones comerciales.'],
+ ['alstom','Alstom · Pedido y ampliación, 15-12-2022','https://www.alstom.com/es/press-releases-news/2022/12/alstom-suministrara-renfe-49-trenes-adicionales-coradia-stream','152 trenes contratados en marzo de 2021 y 49 adicionales en diciembre de 2022: 201, no 353.'],
+ ['stadler','Renfe · Plan de recepción Stadler, abril de 2026','https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/04/recta-final-renfe-comience-recibir-nuevos-trenes-cercanias','79 trenes: 24 de 100 m y 55 de 200 m tras ampliación. Previsión para 2026: 9 T100 y 8 T200. Plan anunciado, no actas de recepción.'],
+ ['stadlerupdate','Renfe · Ajustes Stadler, septiembre de 2026','https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/09/renfe-realiza-ajustes-trenes-stadler','La incorporación requiere ajustes y mejoras en la puesta en servicio. No se interpreta el anuncio como recepción de toda la flota.'],
+ ['md','Renfe · 28 trenes de Media Distancia','https://www.renfe.com/es/es/grupo-renfe/comunicacion/renfe-al-dia/sala-de-prensa/renfe-adjudica-caf-suministro-ventiocho-trenes-electricos-media-distancia-doscientos-noventa-millones-euros','Adjudicación inicial en octubre de 2022. 290 M€ incluye servicios, repuestos y mantenimiento; no es un precio unitario puro de compra.'],
+ ['mdplus','CAF · Ampliación de 32 MD, 27-06-2023','https://www.cafmobility.com/sala-prensa/renfe-amplia-32-unidades-contrato-suministro-trenes-media-distancia/','32 adicionales, 24 de tres coches y 8 de cuatro: total 60. La noticia de CAF de octubre de 2023 que repite 28 se trata como el mismo programa, no otro pedido acumulable.'],
+ ['caf29','CAF · 29 Cercanías, 28-03-2023','https://www.cafmobility.com/sala-prensa/renfe-confia-nuevamente-caf-adjudicacion-suministro-29-trenes-cercanias/','Pedido independiente de 29 trenes de Cercanías. No se suma a la ampliación de Media Distancia como si fueran la misma serie.'],
+ ['gauge','Moncloa · Gálibo de ancho métrico, 08-02-2023','https://www.lamoncloa.gob.es/serviciosdeprensa/notasprensa/transportes/Paginas/2023/080223-cantabria-nuevos-trenes.aspx','Incidencia de diseño y procedimiento del gálibo en el contrato de 31 unidades. Se anunció 2026 como objetivo; no se confirma aquí el cumplimiento.'],
+ ['fleetplan','Renfe · Los trenes del futuro','https://grupo.renfe.com/es/es/sociedades/viajeros/los-trenes-del-futuro','Resumen de 280 Cercanías de gran capacidad, 31 métricos, 6 alpinos, 60 MD, 29 Cercanías básicos, 26 cabezas S107 y 24 locomotoras de mercancías.'],
+ ['s107','Talgo · Transformación de Trenhotel, 26-05-2021','https://www.talgo.com/es/talgo-se-adjudica-un-contrato-con-renfe-por-2815-millones','26 cabezas motrices firmes para formar 13 trenes S107 con coches transformados. Hasta 40 motrices es un techo con opciones, no 40 trenes firmes.'],
+ ['loco1','Renfe · Recepción de las primeras Euro6000','https://www.renfe.com/es/es/grupo-renfe/comunicacion/renfe-al-dia/sala-de-prensa/renfe-mercancias-ultima-la-recepcion-de-las-locomotoras-de-gran-potencia-construidas-por-stadler-valencia','Primer lote de 12 locomotoras de ancho ibérico. El plan inicial preveía cuatro entregas antes de acabar 2022.'],
+ ['loco2','Renfe · 12 locomotoras de ancho estándar','https://www.renfe.com/es/es/grupo-renfe/comunicacion/renfe-al-dia/sala-de-prensa/renfe-adjudica-stadler-rail-suministro-mantenimiento-doce-locomotoras-ancho-estandar-136-millones-euros','Segundo lote de 12, diferente del de ancho ibérico. El contrato anunciaba entrega hasta el 31-12-2025; no se da por ejecutada sin confirmación.'],
+ ['annual','Renfe · Cuentas consolidadas 2024','https://grupo.renfe.com/content/dam/grupo-renfe/gobierno-y-transparencia/documentos/informacion-economica/cuentas-anuales/grupo-renfe/2024_InfAudit%2BCCAA%2BInfGestion%2BEINF_CONSO_FIRMADAS.pdf','Fuente de contraste de pedidos y renovación. Algunas cifras cuentan cabezas de reserva, transformaciones o mantenimiento: no son directamente aditivas con trenes completos.'],
+ ['tender','Renfe · Licitación AV, marzo de 2026','https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/03/renfe-lanza-licitacion-compra-de-trenes-av','30 trenes y 10 opcionales; 5 antes del mes 40 y totalidad antes del mes 78. Licitación, no adjudicación confirmada.'],
+ ['energy','Renfe · Revisión extraordinaria de contratos','https://www.renfe.com/es/es/grupo-renfe/comunicacion/renfe-al-dia/sala-de-prensa/el-consejo-administracion-renfe-aprueba-propuesta-preliminar-revision-precios-contratos-trenes','Pandemia y guerra de Ucrania motivan revisión preliminar por materias primas. El evento de cobertura energética es una decisión ficticia inspirada en ese contexto.'],
+ ['competition','CNMC · Informe ferroviario 2022','https://www.cnmc.es/prensa/informe-anual-ferroviario-22-20230731','Ouigo empezó en mayo de 2021 e iryo en noviembre de 2022. La competencia afecta a los corredores comerciales; las cuotas del juego son simuladas.'],
+ ['alsa','Alsa · Red de rutas','https://www.alsa.es/horarios-autobuses','Red de autobuses usada como referencia de competencia. No se ha importado un horario ni una tarifa exhaustiva de 2022.'],
+ ['alsasouth','Alsa · Granada y conexiones del sureste','https://www.alsa.es/es/destino/granada','Conexiones con Murcia, Alicante y Valencia. En el juego Alsa responde de forma ficticia a tus tarifas y frecuencias.'],
+ ['pajares','Moncloa · Inauguración de Pajares, 29-11-2023','https://www.lamoncloa.gob.es/presidente/actividades/Paginas/2023/291123-sanchez-inauguracion-variante-pajares.aspx','Fecha histórica de la inauguración. La línea de juego León–Oviedo representa el corredor completo y no solo la variante.'],
+ ['burgos','Adif AV · Apertura a Burgos, 21-07-2022','https://www.adifaltavelocidad.es/w/adif-av-convierte-a-burgos-en-el-nodo-de-conexi%C3%B3n-de-la-alta-velocidad-con-el-norte-del-pa%C3%ADs','Nueva infraestructura Venta de Baños–Burgos, 86,5 km. El corredor de juego es más largo que este tramo.'],
+ ['murcia','Adif AV · Alta velocidad a Murcia, 2022','https://www.adifaltavelocidad.es/w/inauguracion-alta-velocidad-murcia','La conexión de Murcia a la red de alta velocidad se completó en diciembre de 2022.'],
+ ['extremadura','Adif · Madrid–Extremadura','https://www.adif.es/w/adif-inicia-el-proceso-para-electrificar-la-l%C3%ADnea-ferroviaria-convencional-entre-madrid-y-extremadura','Plasencia–Badajoz en servicio desde 2022; electrificación posterior. Talayuela–Plasencia y Madrid–Oropesa tienen fases distintas. No se trata toda la línea como abierta en 2022.'],
+ ['med','Transportes · Corredor Mediterráneo, 22-04-2026','https://cdn.transportes.gob.es/portal-web-transportes/recursos-web/transportes/media/press_release/260422-np-corredor-mediterraneo.pdf','658 km en funcionamiento y casi 870 km en obras dentro del ámbito descrito por el Ministerio. No equivale a toda la red ferroviaria litoral.'],
+ ['almeria','Adif AV · Murcia–Almería','https://www.adifaltavelocidad.es/sobre-adif-av/red-av/murcia-almeria','Actuaciones en plataforma, estaciones, vía y sistemas. El periodo FEDER 2021–2027 no es por sí solo una fecha de inauguración.'],
+ ['closure','Adif · Cortes por obras Murcia–Almería','https://www.adif.es/w/modificacion-servicio-murcia-almeria','Servicios Murcia–Lorca–Águilas por carretera por obras. El juego agrupa esta zona en el proyecto del corredor.'],
+ ['encina','Adif · La Encina, 06-07-2026','https://www.adif.es/w/21_6_m_nuevos_trabajos_duplicacion_via_encina_alcudia','Segunda vía convencional y conversión del trazado histórico a ancho estándar son actuaciones distintas. La fecha de terminación de juego es una hipótesis.'],
+ ['encina2023','Adif · Xàtiva–La Encina, 09-09-2023','https://www.adif.es/w/puesta-servicio-nuevo-trazado-xativa-nudo-encina-corredor-mediterraneo-primera-fase?pageFromPlid=203','Apertura del nuevo trazado de ancho convencional. No confundir con la posterior conexión de alta velocidad en ancho estándar.'],
+ ['basque','Adif AV · Y vasca','https://www.adifaltavelocidad.es/sobre-adif-av/red-av/vitoria-bilbao-san-sebastian','Ramal vasco, nudo de Bergara y accesos urbanos tienen avances y contratos propios. No se afirma una inauguración conjunta confirmada.'],
+ ['cartagena','Adif AV · Torre Pacheco–Cartagena','https://www.adifaltavelocidad.es/w/licitacion-tramo-alta-velocidad-torre-pacheco-cartagena','Licitación de plataforma por 155 M€. La restauración de la estación histórica no equivale a la llegada del AVE.'],
+ ['teruel','Adif · Electrificación Zaragoza–Teruel–Sagunto','https://www.adif.es/w/adif-impulsa-la-electrificaci%C3%B3n-de-la-l%C3%ADnea-zaragoza-teruel-sagunto-con-una-nueva-inversi%C3%B3n-de-118-5-m%E2%82%AC','Actuaciones de electrificación y gálibos en un corredor convencional, relevantes especialmente para mercancías.'],
+ ['algeciras','Adif · Autopista ferroviaria Madrid–Algeciras, 24-07-2026','https://www.adif.es/w/inicio-trabajos-madrid-algeciras-autopista-ferroviaria','Obras de adaptación a autopista ferroviaria; no sustituyen todos los proyectos de electrificación y renovación del eje.'],
+ ['cantabria','Adif · Mejoras Palencia–Santander, 25-08-2026','https://www.adif.es/w/cantabria','Mejoras simultáneas de red convencional. El proyecto de campaña agrupa mejoras y no afirma una LAV completa a Santander.'],
+ ['sagrera','Adif · La Sagrera','https://www.adif.es/w/la-sagrera?pageFromPlid=335','Desde marzo de 2025 circulan trenes por el interior, sin que ello signifique apertura completa de la estación a viajeros.'],
+ ['loja','Adif · Corredor en Andalucía','https://www.adif.es/w/nueva-oficina-corredor-mediterraneo-almeria','Incluye obras de la variante de Loja y los ejes Murcia–Almería, Murcia–Cartagena y Almería–Granada–Antequera–Algeciras.'],
+ ['map','Natural Earth · Cartografía de dominio público','https://www.naturalearthdata.com/','Contornos geográficos reales generalizados. Base distribuida por world.geo.json; no sirve como inventario actualizado de vías.']
+].map(([id,title,url,note])=>({id,title,url,note}));
+export const CITIES = [
+ ['mad','Madrid',-3.7038,40.4168],['bcn','Barcelona',2.1734,41.3851],['vlc','València',-0.3763,39.4699],['ali','Alicante',-0.4907,38.3452],['mur','Murcia',-1.1307,37.9922],['car','Cartagena',-0.9845,37.605],['lor','Lorca',-1.700,37.671],['alm','Almería',-2.464,36.834],['gra','Granada',-3.5986,37.1773],['mal','Málaga',-4.4214,36.7213],['sev','Sevilla',-5.9845,37.3891],['cor','Córdoba',-4.7794,37.8882],['cad','Cádiz',-6.2886,36.5271],['hue','Huelva',-6.9447,37.2614],['alg','Algeciras',-5.4537,36.1408],['ron','Ronda',-5.167,36.746],['ant','Antequera',-4.561,37.019],['jae','Jaén',-3.790,37.779],['cic','Ciudad Real',-3.929,38.986],['pue','Puertollano',-4.112,38.688],['cue','Cuenca',-2.1374,40.0704],['alb','Albacete',-1.8585,38.9943],['xat','Xàtiva',-0.518,38.989],['enc','La Encina',-0.955,38.765],['cas','Castelló',-0.051,39.986],['tar','Tarragona',1.2445,41.1189],['gir','Girona',2.8214,41.9794],['fig','Figueres',2.961,42.267],['zar','Zaragoza',-0.8891,41.6488],['lle','Lleida',0.620,41.6176],['huc','Huesca',-0.4089,42.14],['ter','Teruel',-1.106,40.345],['sag','Sagunt',-0.278,39.680],['pam','Pamplona',-1.644,42.813],['log','Logroño',-2.4457,42.4627],['bil','Bilbao',-2.935,43.263],['vit','Vitoria',-2.673,42.847],['don','Donostia',-1.981,43.318],['iru','Irún',-1.789,43.338],['san','Santander',-3.8098,43.4623],['bur','Burgos',-3.6969,42.3439],['pal','Palencia',-4.527,42.010],['vll','Valladolid',-4.7245,41.6523],['seg','Segovia',-4.118,40.949],['leo','León',-5.5671,42.5987],['ovi','Oviedo',-5.8494,43.3614],['gij','Gijón',-5.6615,43.5322],['fer','Ferrol',-8.232,43.484],['aco','A Coruña',-8.4115,43.3623],['scq','Santiago',-8.5448,42.8782],['vig','Vigo',-8.7207,42.2406],['pon','Pontevedra',-8.645,42.431],['our','Ourense',-7.8639,42.3358],['lug','Lugo',-7.5558,43.0097],['zam','Zamora',-5.7446,41.5034],['sal','Salamanca',-5.6635,40.9701],['avi','Ávila',-4.699,40.656],['pla','Plasencia',-6.089,40.030],['cac','Cáceres',-6.3708,39.4753],['mer','Mérida',-6.338,38.916],['bad','Badajoz',-6.9707,38.8794],['tol','Toledo',-4.0273,39.8628],['gua','Guadalajara',-3.166,40.633],['cal','Calatayud',-1.644,41.354],['alc','Alcázar de S. Juan',-3.209,39.390],['med','Medina del Campo',-4.914,41.308]
+].map(([id,name,lon,lat])=>({id,name,lon,lat}));
+export const CITY = Object.fromEntries([...CITIES.map(c=>[c.id,c]),...REAL_STATIONS.map(s=>['st'+s.id,{id:'st'+s.id,name:s.name,lon:s.lon,lat:s.lat}])]);
+// Strategic service corridors; via points are a geographic simplification, not surveyed track geometry.
+export const ROUTES = [
+ ['madrid-barcelona','mad bcn','mad gua cal zar lle tar bcn',621,'uic','electric',300,170000,59,1,'av'],
+ ['madrid-valencia','mad vlc','mad cue vlc',391,'uic','electric',300,130000,39,1,'av'],
+ ['madrid-sevilla','mad sev','mad cic pue cor sev',471,'uic','electric',300,130000,49,1,'av'],
+ ['madrid-malaga','mad mal','mad cic pue cor ant mal',513,'uic','electric',300,108000,49,0,'av'],
+ ['madrid-alicante','mad ali','mad cue alb ali',515,'uic','electric',300,110000,45,0,'av'],
+ ['madrid-valladolid','mad vll','mad seg vll',179,'uic','electric',250,82000,26,0,'av'],
+ ['madrid-toledo','mad tol','mad tol',75,'uic','electric',200,70000,14,0,'regional'],
+ ['madrid-ourense','mad our','mad seg med zam our',506,'uic','electric',300,75000,48,0,'av'],
+ ['barcelona-girona','bcn fig','bcn gir fig',132,'uic','electric',250,65000,21,0,'av'],
+ ['zaragoza-huesca','zar huc','zar huc',79,'uic','electric',200,27000,14,0,'regional'],
+ ['valladolid-burgos','vll bur','vll pal bur',127,'uic','electric',250,38000,22,0,'av',6],
+ ['alicante-murcia','ali mur','ali mur',75,'uic','electric',200,60000,15,0,'av',11],
+ ['barcelona-valencia','bcn vlc','bcn tar cas vlc',351,'iberian','electric',180,135000,35,0,'intercity'],
+ ['valencia-alicante','vlc ali','vlc xat enc ali',185,'iberian','electric',140,80000,23,0,'intercity'],
+ ['valencia-castellon','vlc cas','vlc sag cas',70,'iberian','electric',120,90000,8,0,'commuter'],
+ ['valencia-xativa','vlc xat','vlc xat',60,'iberian','electric',120,62000,7,0,'commuter'],
+ ['murcia-cartagena','mur car','mur car',64,'iberian','diesel',110,48000,8,0,'regional'],
+ ['murcia-lorca','mur lor','mur lor',62,'iberian','diesel',100,52000,7,0,'regional',84,'almeria'],
+ ['murcia-almeria','mur alm','mur lor alm',200,'uic','electric',250,83000,26,0,'av',84,'almeria'],
+ ['granada-almeria','gra alm','gra alm',181,'iberian','diesel',100,38000,20,0,'regional'],
+ ['antequera-granada','ant gra','ant gra',126,'uic','electric',200,65000,23,0,'av'],
+ ['sevilla-cadiz','sev cad','sev cad',153,'iberian','electric',160,72000,18,0,'regional'],
+ ['sevilla-huelva','sev hue','sev hue',110,'iberian','diesel',110,44000,15,0,'regional'],
+ ['sevilla-cordoba','sev cor','sev cor',131,'uic','electric',250,75000,23,0,'av'],
+ ['cordoba-jaen','cor jae','cor jae',120,'iberian','electric',130,36000,15,0,'regional'],
+ ['antequera-algeciras','ant alg','ant ron alg',178,'iberian','diesel',90,38000,20,0,'regional'],
+ ['madrid-alcazar','mad alc','mad alc',149,'iberian','electric',140,60000,18,0,'regional'],
+ ['alcazar-albacete','alc alb','alc alb',128,'iberian','electric',140,38000,15,0,'regional'],
+ ['zaragoza-teruel','zar ter','zar ter',181,'iberian','diesel',110,32000,20,0,'regional'],
+ ['teruel-valencia','ter vlc','ter sag vlc',145,'iberian','diesel',100,38000,18,0,'regional'],
+ ['zaragoza-pamplona','zar pam','zar pam',178,'iberian','electric',140,55000,23,0,'regional'],
+ ['zaragoza-logrono','zar log','zar log',175,'iberian','electric',130,42000,20,0,'regional'],
+ ['logrono-bilbao','log bil','log vit bil',199,'iberian','electric',100,38000,23,0,'regional'],
+ ['pamplona-donostia','pam don','pam don',92,'iberian','electric',100,52000,14,0,'regional'],
+ ['vitoria-bilbao','vit bil','vit bil',100,'iberian','electric',100,65000,16,0,'regional'],
+ ['vitoria-donostia','vit don','vit don',125,'iberian','electric',110,52000,17,0,'regional'],
+ ['donostia-irun','don iru','don iru',22,'iberian','electric',90,63000,4,0,'commuter'],
+ ['burgos-vitoria','bur vit','bur vit',111,'iberian','electric',120,42000,16,0,'regional'],
+ ['palencia-santander','pal san','pal san',217,'iberian','electric',110,43000,25,0,'intercity'],
+ ['valladolid-leon','vll leo','vll pal leo',166,'uic','electric',250,62000,24,0,'av'],
+ ['leon-oviedo','leo ovi','leo ovi',123,'iberian','electric',100,65000,22,0,'intercity'],
+ ['oviedo-gijon','ovi gij','ovi gij',32,'iberian','electric',100,95000,4,0,'commuter'],
+ ['santander-oviedo','san ovi','san ovi',211,'metric','diesel',75,28000,18,0,'regional'],
+ ['bilbao-santander','bil san','bil san',119,'metric','diesel',75,39000,13,0,'regional'],
+ ['ferrol-oviedo','fer ovi','fer ovi',321,'metric','diesel',65,23000,27,0,'regional'],
+ ['coruna-santiago','aco scq','aco scq',75,'iberian','electric',160,82000,13,0,'regional'],
+ ['santiago-vigo','scq vig','scq pon vig',94,'iberian','electric',160,87000,15,0,'regional'],
+ ['ourense-santiago','our scq','our scq',87,'iberian','electric',200,66000,17,0,'intercity'],
+ ['ourense-lugo','our lug','our lug',117,'iberian','diesel',100,31000,14,0,'regional'],
+ ['coruna-ferrol','aco fer','aco fer',70,'iberian','diesel',100,40000,10,0,'regional'],
+ ['madrid-salamanca','mad sal','mad avi sal',212,'iberian','electric',140,59000,25,0,'intercity'],
+ ['valladolid-salamanca','vll sal','vll med sal',112,'iberian','electric',140,43000,15,0,'regional'],
+ ['madrid-plasencia','mad pla','mad pla',252,'iberian','diesel',110,48000,27,0,'intercity'],
+ ['plasencia-badajoz','pla bad','pla cac mer bad',188,'iberian','diesel',180,52000,25,0,'regional',6],
+ ['merida-sevilla','mer sev','mer sev',201,'iberian','diesel',90,34000,23,0,'regional'],
+ ['madrid-guadalajara','mad gua','mad gua',58,'iberian','electric',100,120000,6,0,'commuter']
+].map(([id,ends,via,km,gauge,power,speed,demand,fare,active,kind,unlock=0,project=null])=>({id,ends:ends.split(' '),via:via.split(' '),km,gauge,power,speed,demand,fare,active:!!active,kind,unlock,project,level:0,frequency:active?3:2,fleet:null,units:0}));
+export const MODELS = [
+ {id:'s112',name:'S112 · Pato',maker:'Talgo / Bombardier',category:'Alta velocidad',gauge:'uic',power:'electric',speed:300,seats:365,price:24,lead:30,year:2022,energy:.65,desc:'Unidad existente. Las compras adicionales del juego son una reedición hipotética.'},
+ {id:'s130',name:'S130 · Alvia',maker:'Talgo / Bombardier',category:'Intercity',gauge:'variable',power:'electric',speed:250,seats:299,price:20,lead:28,year:2022,energy:.62,desc:'Ancho variable: enlaza red estándar e ibérica. No circula sin catenaria.'},
+ {id:'s599',name:'S599 · Regional',maker:'CAF',category:'Regional diésel',gauge:'iberian',power:'diesel',speed:160,seats:184,price:6.5,lead:20,year:2022,energy:1.25,desc:'Para líneas de ancho ibérico sin electrificar. Precio y producción son de simulación.'},
+ {id:'s449',name:'S449 · Media Distancia',maker:'CAF',category:'Media Distancia',gauge:'iberian',power:'electric',speed:160,seats:260,price:8,lead:22,year:2022,energy:.45,desc:'Modelo de juego en ancho ibérico. Requiere electrificación.'},
+ {id:'civia',name:'Civia · Cercanías',maker:'Alstom / CAF',category:'Cercanías',gauge:'iberian',power:'electric',speed:120,seats:500,price:7,lead:20,year:2022,energy:.4,desc:'Capacidad de juego con plazas sentadas y de pie. Ideal para recorridos cortos.'},
+ {id:'metric',name:'Regional RAM',maker:'Parque de ancho métrico',category:'Ancho métrico',gauge:'metric',power:'diesel',speed:100,seats:150,price:5,lead:24,year:2022,energy:.8,desc:'Representación simplificada de la flota heredada de vía estrecha.'},
+ {id:'s106f',name:'S106 · Avril UIC',maker:'Talgo',category:'Alta velocidad',gauge:'uic',power:'electric',speed:300,seats:507,price:29,lead:36,year:2024,energy:.62,desc:'Versión de ancho fijo. La versión variable se compra por separado.'},
+ {id:'s106v',name:'S106 · Avril variable',maker:'Talgo',category:'Alta velocidad',gauge:'variable',power:'electric',speed:300,seats:507,price:31,lead:38,year:2024,energy:.65,desc:'Modelo simplificado de rodadura desplazable. Las líneas limitan su velocidad.'},
+ {id:'s107',name:'S107 · Talgo transformado',maker:'Talgo',category:'Alta velocidad',gauge:'variable',power:'electric',speed:300,seats:400,price:19,lead:30,year:2027,energy:.66,desc:'Capacidad y disponibilidad comercial en el juego son supuestos. Programa real de 13 composiciones.'},
+ {id:'s452',name:'S452 · Coradia Stream',maker:'Alstom',category:'Cercanías',gauge:'iberian',power:'electric',speed:140,seats:900,price:9,lead:30,year:2027,energy:.46,desc:'201 unidades contratadas entre pedido base y ampliación. Entregas de campaña estimadas.'},
+ {id:'s453',name:'S453 · Stadler T100',maker:'Stadler',category:'Cercanías',gauge:'iberian',power:'electric',speed:140,seats:912,price:11,lead:28,year:2026,energy:.5,desc:'100 metros. La mayor capacidad incluye viajeros de pie.'},
+ {id:'s453long',name:'S453 · Stadler T200',maker:'Stadler',category:'Cercanías',gauge:'iberian',power:'electric',speed:140,seats:1884,price:17,lead:30,year:2026,energy:.72,desc:'200 metros. Se simplifica la longitud útil de andén en esta versión.'},
+ {id:'s480',name:'S480 · CAF MD',maker:'CAF',category:'Media Distancia',gauge:'iberian',power:'electric',speed:200,seats:264,price:8.5,lead:28,year:2027,energy:.4,desc:'Batería de última milla: no habilita líneas diésel completas. Ancho ibérico en la simulación.'},
+ {id:'s460',name:'S460 · CAF Cercanías',maker:'CAF',category:'Cercanías',gauge:'iberian',power:'electric',speed:140,seats:550,price:7.5,lead:26,year:2027,energy:.4,desc:'Familia del contrato de 29 unidades. Capacidad simplificada para balance.'},
+ {id:'s401',name:'CAF RAM · Nueva generación',maker:'CAF',category:'Ancho métrico',gauge:'metric',power:'hybrid',speed:100,seats:180,price:6,lead:28,year:2027,energy:.45,desc:'El juego agrupa versiones eléctricas e híbridas; reparto técnico no modelado por subserie.'},
+ {id:'future',name:'AV 2030 · Nueva generación',maker:'Licitación abierta · hipotético',category:'Alta velocidad',gauge:'uic',power:'electric',speed:350,seats:500,price:34,lead:40,year:2026,energy:.42,desc:'Plataforma ficticia inspirada en la licitación de 2026. Sin fabricante adjudicado atribuido.'}
+];
+SOURCES.push(...REAL_DATA_SOURCES.filter(s=>!SOURCES.some(x=>x.url===s.url)));
+MODELS.push({id:'s480uic',name:'S480 · CAF MD UIC',maker:'CAF',category:'Media Distancia',gauge:'uic',power:'electric',speed:200,seats:264,price:8.5,lead:28,year:2027,energy:.4,desc:'Variante UIC documentada en2026. Batería de última milla; plazos de juego, no entrega certificada.'});
+SOURCES.push(...REAL_DATA_SOURCES.filter(s=>!SOURCES.some(x=>x.url===s.url)));
+export const MODEL=Object.fromEntries(MODELS.map(m=>[m.id,m]));
+export const HISTORICAL_ORDERS = [
+ {id:'h106f',name:'S106 · ancho fijo',model:'s106f',qty:15,signed:-60,start:28,span:18,source:'s106types',note:'Pedido previo a 2022. Inicio real de servicio 21-05-2024; reparto mensual del juego simulado.'},
+ {id:'h106v',name:'S106 · ancho variable',model:'s106v',qty:15,signed:-60,start:28,span:18,source:'s106types',note:'Segundo grupo del mismo contrato de 30. No son 30 adicionales.'},
+ {id:'h107',name:'Transformación S107',model:'s107',qty:13,signed:-8,start:64,span:24,source:'s107',note:'13 composiciones, no 26 trenes. Calendario de juego estimado; homologación no confirmada aquí.'},
+ {id:'h452',name:'Alstom · pedido base',model:'s452',qty:152,signed:-10,start:62,span:42,source:'alstom',note:'Firmado en 2021. Calendario de recepción posterior a 2026 es simulado.'},
+ {id:'h452plus',name:'Alstom · ampliación',model:'s452',qty:49,signed:11,start:92,span:18,source:'alstom',note:'Diciembre de 2022. 152 + 49 = 201 unidades.'},
+ {id:'h453short',name:'Stadler · 100 metros',model:'s453',qty:24,signed:-10,start:56,span:24,source:'stadler',note:'Plan de abril de 2026: 9 T100 durante 2026. Reparto del juego aproximado, no acta de entrega.'},
+ {id:'h453long',name:'Stadler · 200 metros base',model:'s453long',qty:35,signed:-10,start:56,span:28,source:'stadler',note:'Parte del pedido base de 59 de 2021.'},
+ {id:'h453plus',name:'Stadler · ampliación T200',model:'s453long',qty:20,signed:11,start:78,span:20,source:'stadler',note:'Ampliación de 2022: total Stadler de 79. Reparto temporal simulado.'},
+ {id:'h480',name:'CAF · Media Distancia base',model:'s480',qty:28,signed:9,start:65,span:24,source:'md',note:'Octubre de 2022. Fecha de entrada de campaña hipotética.'},
+ {id:'h480plus',name:'CAF · ampliación MD',model:'s480',qty:32,signed:17,start:83,span:24,source:'mdplus',note:'Junio de 2023. Total del programa: 60.'},
+ {id:'h480updateib',name:'CAF MD · actualización ibérica2026',model:'s480',qty:1,signed:53,start:76,span:12,source:'md70',note:'Ajuste documental al anuncio17-06-2026:61ibéricas en total, frente a60registros iniciales. No es fecha acreditada de firma.'},
+ {id:'h480updateuic',name:'CAF MD · actualización UIC2026',model:'s480uic',qty:9,signed:53,start:78,span:12,source:'md70',note:'9UIC del programa publicado de70. Recepciones de juego estimadas; no se duplican los60contratos previos.'},
+ {id:'h460',name:'CAF · Cercanías básicos',model:'s460',qty:29,signed:14,start:68,span:30,source:'caf29',note:'Marzo de 2023. Fecha de entrega de campaña estimada.'},
+ {id:'h401',name:'CAF · ancho métrico',model:'s401',qty:31,signed:-18,start:62,span:30,source:'gauge',note:'Contrato de 2020 afectado por definición de gálibo. Versiones agrupadas en el juego.'},
+ {id:'halpine',name:'CAF · 6 alpinos para C9',model:null,qty:6,signed:-18,start:62,span:18,source:'fleetplan',note:'Registro documental. Red alpina fuera del mapa operativo de esta versión.'},
+ {id:'hloco1',name:'Stadler · Euro6000 ibéricas',model:null,qty:12,signed:1,start:12,span:18,source:'loco1',note:'Registro documental de mercancías. No se convierte una locomotora en tren de pasajeros.'},
+ {id:'hloco2',name:'Stadler · Euro6000 estándar',model:null,qty:12,signed:10,start:46,span:24,source:'loco2',note:'Contrato independiente. 31-12-2025 era plazo anunciado; recepción del juego no certificada.'},
+ {id:'hlease',name:'Renfe Alquiler · Euro6000',model:null,qty:6,signed:35,start:60,span:18,source:'annual',note:'Aprobación de compra al cierre de 2024; ámbito de alquiler. Registro, sin explotación de pasajeros.'},
+ {id:'h2030',name:'Licitación AV 2026',model:null,qty:30,optional:10,signed:50,start:null,span:0,source:'tender',tender:true,note:'Licitación: 30 base y 10 opcionales. No suma unidades firmes ni provoca entregas automáticas.'}
+];
+export const PROJECTS = [
+ {id:'encina',name:'La Encina · continuidad mediterránea',region:'Comunitat Valenciana',routes:['valencia-alicante'],cost:120,duration:38,earliest:2027,source:'encina',effect:{gauge:'mixed',speed:220},desc:'Coordinar ancho estándar y capacidad convencional entre València, Xàtiva y La Encina.',status:'Obras y contratos documentados en 2026; sin fecha única confirmada.'},
+ {id:'almeria',name:'Murcia–Almería · cerrar la brecha',region:'Región de Murcia / Andalucía',routes:['murcia-almeria','murcia-lorca'],cost:180,duration:54,earliest:2028,source:'almeria',effect:{},desc:'Plataforma, vía, electrificación, estaciones y pruebas. Reabre también el servicio regional a Lorca.',status:'Obras documentadas. La disponibilidad de 2029 en campaña es hipótesis de juego.'},
+ {id:'basque',name:'Y vasca · el triángulo del norte',region:'Euskadi',routes:['vitoria-bilbao','vitoria-donostia'],cost:170,duration:60,earliest:2029,source:'basque',effect:{gauge:'mixed',speed:220},desc:'Mejorar los enlaces entre las capitales y su conexión europea.',status:'Varios tramos y accesos en fases distintas. Calendario de juego no oficial.'},
+ {id:'extremadura',name:'Extremadura · continuidad eléctrica',region:'Castilla-La Mancha / Extremadura',routes:['madrid-plasencia','plasencia-badajoz'],cost:115,duration:42,earliest:2027,source:'extremadura',effect:{power:'electric',speed:180},desc:'Agrupa la electrificación y mejora del corredor con conexiones hacia Plasencia.',status:'La electrificación Plasencia–Badajoz de 2023 se incorpora como hito automático.'},
+ {id:'cartagena',name:'Murcia–Cartagena · acceso al puerto',region:'Región de Murcia',routes:['murcia-cartagena'],cost:90,duration:42,earliest:2028,source:'cartagena',effect:{gauge:'mixed',power:'electric',speed:200},desc:'Impulsar el acceso ferroviario a Cartagena y la integración urbana.',status:'Obras y proyectos documentados; plataforma y estación son contratos diferentes.'},
+ {id:'teruel',name:'Zaragoza–Teruel–Sagunt',region:'Aragón / Comunitat Valenciana',routes:['zaragoza-teruel','teruel-valencia'],cost:85,duration:34,earliest:2026,source:'teruel',effect:{power:'electric',speed:140},desc:'Electrificación y renovación del eje transversal convencional.',status:'Programa real. Agrupación y plazo de campaña simulados.'},
+ {id:'algeciras',name:'Bobadilla–Algeciras',region:'Andalucía',routes:['antequera-algeciras'],cost:100,duration:42,earliest:2027,source:'algeciras',effect:{power:'electric',speed:130},desc:'Electrificación y mejora de capacidad; conexión estratégica del puerto.',status:'Adaptación de gálibos y electrificación no son una misma actuación.'},
+ {id:'cantabria',name:'Palencia–Santander · fiabilidad',region:'Castilla y León / Cantabria',routes:['palencia-santander'],cost:90,duration:36,earliest:2027,source:'cantabria',effect:{speed:160},desc:'Renovación y capacidad para mejorar la conexión con la meseta.',status:'Mejoras reales de red convencional; no representa una LAV íntegra.'},
+ {id:'sagrera',name:'La Sagrera · capacidad de Barcelona',region:'Catalunya',routes:['barcelona-girona','madrid-barcelona'],cost:110,duration:40,earliest:2028,source:'sagrera',effect:{capacity:1.3},desc:'Más capacidad terminal y mejor operación en el área de Barcelona.',status:'Circulaciones por el interior desde 2025; no significa estación completamente abierta.'},
+ {id:'loja',name:'Variante de Loja',region:'Andalucía',routes:['antequera-granada'],cost:85,duration:40,earliest:2028,source:'loja',effect:{speed:250,capacity:1.2},desc:'Mejorar prestaciones y capacidad en el acceso a Granada.',status:'Obras reales; la fecha final de juego es estimada.'}
+];
+export const GAUGES = {uic:'Estándar · 1.435 mm',iberian:'Ibérico · 1.668 mm',variable:'Variable · 1.435 / 1.668',metric:'Métrico · 1.000 mm',mixed:'Mixto · ibérico / estándar'};
+export const POWERS = {electric:'Eléctrico',diesel:'Diésel',hybrid:'Híbrido'};
+
+SOURCES.push({id:'md70',title:'Moncloa · programa CAF MD:70trenes,17-06-2026',url:'https://www.lamoncloa.gob.es/serviciosdeprensa/notasprensa/transportes-movilidad-sostenible/paginas/2026/170626-nuevos-trenes-renfe.aspx',note:'61ibéricos y9UIC,200km/h y hasta264plazas. Incorporación estimada desde2027.'});
+
+for(const r of ROUTES){if(RAIL_PATHS[r.id]?.lengthKm)r.km=Math.round(RAIL_PATHS[r.id].lengthKm);}

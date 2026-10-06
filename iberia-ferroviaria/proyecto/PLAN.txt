@@ -1,0 +1,20 @@
+IBERIA FERROVIARIA — PLAN Y ESTADO V0.3
+6 de octubre de 2026.
+
+HECHO EN 0.3
+1. Horario oficial completo integrado: GTFS Renfe de Cercanías/Rodalies y AV/LD/MD, tres días tipo, todas las líneas, números de tren, paradas y autobuses por obras. Pipeline reproducible (tools/build_timetable.py).
+2. Trazados realistas: 2.740 tramos entre paradas, 369 con shapes GTFS y 2.048 calculados sobre OSM; sin rectas entre ciudades salvo 201 tramos sin continuidad (marcados) y 122 recorridos por carretera.
+3. Jornadas por turnos: de la primera salida a la última llegada con trenes reales; incidencias con decisiones; parte del día.
+4. Luz solar calculada por fecha, hora oficial y longitud; luces urbanas y faros.
+5. Zoom hasta nivel de estación; fichas de tren, estación (panel de salidas), línea (histograma de salidas, oferta sobre el horario oficial) y obra (fases y frente sobre el trazado).
+6. Interfaz nueva: mapa a pantalla completa, paneles planos sin cajas anidadas, tipografías Fraunces/Figtree/IBM Plex Mono, ilustraciones de trenes, relieve y ríos, modo noche y móvil.
+7. 288 relaciones jugables (56 corredores + 72 líneas de Cercanías + relaciones AV/LD/MD del horario). Unidades necesarias según el pico simultáneo del horario. Economía reequilibrada por tren-km, canon y obligación de servicio público.
+8. Partidas v0.2 importables.
+
+SIGUIENTES PASOS PROPUESTOS
+- Horarios históricos: reconstruir 2022–2026 con versiones archivadas del GTFS (el archivo público conserva copias diarias desde marzo de 2026; harían falta otras fuentes para 2022).
+- Asignación de material por circulación y rotaciones (diagramas de turnos) con depósitos reales.
+- Vía estrecha (antigua FEVE) desde OSM railway=narrow_gauge para eliminar los tramos aproximados del norte.
+- Demanda por estación con datos públicos de viajeros (Renfe Data, Consorcios) en lugar de parámetros por línea.
+- Festivos autonómicos y locales; horarios de verano y Navidad.
+- Competidores ferroviarios (iryo, Ouigo) con sus horarios y efecto en la cuota por corredor.

@@ -1,0 +1,24 @@
+VERIFICACIÓN V0.3 — 6 DE OCTUBRE DE 2026
+
+RESULTADO
+Pasan test.mjs, v2-test.mjs y v3-test.mjs con Node 22, y el recorrido ui-v3-test.mjs en Chromium (Playwright 1.56) sobre el HTML autónomo, sin errores de JavaScript. Capturas en investigacion/verificacion-v0.3.
+
+MOTOR Y CAMPAÑA (test.mjs)
+Aislamiento de partidas, ancho/energía, reformas, anticipo y saldo, entregas, validación de guardados (unidades duplicadas rechazadas) e infraestructura bloqueada hasta terminar la obra.
+Una estrategia automatizada con acciones legales cierra diciembre de 2050 con los cinco capítulos, 277 relaciones activas, más de 3.500 circulaciones diarias, obras y una línea propia.
+
+HORARIO OFICIAL Y JORNADAS (v3-test.mjs)
+6.631 / 5.169 / 5.257 circulaciones (laborable, sábado, domingo); 15 núcleos; AV, LD, MD y Cercanías; horas no decrecientes; servicios nocturnos al final de la jornada.
+53.957 km de tramos dentro del ámbito peninsular; 3,4 % aproximado; posición interpolada sobre la vía y detenida en las paradas.
+Días tipo y festivos nacionales.
+Jornada con circulaciones reales: empieza en la primera salida y termina tras la última llegada (después de medianoche), oferta parcial repartida, unidades según el pico simultáneo, parte del día y día siguiente.
+Incidencias: la respuesta tiene coste, reduce la demora y no se puede repetir.
+Sol en Madrid: orto 06:46 el 21 de junio y ocaso 17:52 el 21 de diciembre (hora oficial); el ocaso avanza de este a oeste.
+Partidas v0.2 migradas a 288 relaciones.
+
+INTERFAZ (ui-v3-test.mjs)
+Portada, decisión, jornada, zoom en Madrid, ficha de tren con paradas, panel de salidas de Atocha, ficha de línea con previsión, nueve paneles, panel de Bilbao-Abando, visita de obra de La Encina, noche en Barcelona, parte del día, capa de horario real y móvil 390 × 844 sin desbordamiento.
+Coste de dibujo medido: unos 2 ms por fotograma con ~900 trenes simultáneos en pantalla.
+
+LÍMITES
+No se ha probado cada decisión posible ni el equilibrio de todas las estrategias. Los horarios son de 2026. La geometría OSM no certifica itinerarios. Material asignado, demanda, cuentas e incidencias son simulación.

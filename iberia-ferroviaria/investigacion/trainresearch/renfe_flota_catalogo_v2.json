@@ -1,0 +1,2372 @@
+{
+  "schemaVersion": 1,
+  "researchCutoff": "2026-10-06",
+  "purpose": "Inventario de series y variantes técnicas verificables para ampliar el catálogo. No es un registro completo de cada vehículo individual ni de todas las circulaciones.",
+  "coverage": {
+    "baseRenfeDataPassengerRows": 37,
+    "totalRecords": 56,
+    "completeIndividualUnitRegistry": false,
+    "complete2022OperationalRoster": false,
+    "liveTimetableAssignments": false
+  },
+  "definitions": {
+    "series": "Familia técnica de Renfe, por ejemplo446. Puede tener subseries y reformas.",
+    "unit": "Composición física identificada por matrícula. El dataset consultado no incluye matrículas.",
+    "circulation": "Servicio de un día con código de tren, horarios, estaciones, calendario y asignación de material. No implica una unidad física fija.",
+    "capacity": "Asientos y viajeros de pie deben ser campos distintos. La capacidad total cambia con el criterio de densidad por metro cuadrado.",
+    "speed": "Distinguir velocidad de diseño, homologada, autorizada por unidad y límite de cada tramo.",
+    "quantity": "Unidades construidas, contratadas, recibidas, homologadas y en servicio deben ser campos separados."
+  },
+  "sources": [
+    {
+      "id": "renfe-fichas-2020",
+      "publisher": "Renfe Data",
+      "title": "Fichas de nuestros trenes",
+      "url": "https://data.renfe.com/datastore/dump/4877096a-160f-4fb2-925d-d261b51a065f?format=json",
+      "date": "2020-04-01",
+      "license": "CC BY4.0",
+      "ref": "turn49view0",
+      "note": "Catálogo técnico histórico. Las cantidades son unidades construidas según la ficha, no parque operativo en2022."
+    },
+    {
+      "id": "renfe-civia-2026",
+      "publisher": "Renfe",
+      "title": "Preguntas y respuestas sobre los trenes que se incorporan a Cercanías Valencia",
+      "url": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/08/preguntas-y-respuestas-sobre-la-mejora-de-la-capacidad-de-cercan",
+      "date": "2026-08",
+      "ref": "turn71view3"
+    },
+    {
+      "id": "renfe-s106-2024",
+      "publisher": "Renfe",
+      "title": "Puesta en circulación S106",
+      "url": "https://www.renfe.com/es/es/grupo-renfe/comunicacion/renfe-al-dia/sala-de-prensa/renfe-pone-circulacion-s106-incremento-14400-plazas-para-servicios-avlo-circulan-madrid-aragon-cataluna-comunitat-valenciana-murcia",
+      "date": "2024-04-26",
+      "ref": "turn63search0"
+    },
+    {
+      "id": "talgo-av",
+      "publisher": "Talgo",
+      "title": "Alta Velocidad, proyectos Renfe S106 y S107",
+      "url": "https://www.talgo.com/es/alta-velocidad",
+      "date": null,
+      "ref": "turn63search2"
+    },
+    {
+      "id": "renfe-futuro",
+      "publisher": "Renfe",
+      "title": "Los trenes del futuro",
+      "url": "https://grupo.renfe.com/es/es/sociedades/viajeros/los-trenes-del-futuro",
+      "date": null,
+      "ref": "turn63search1"
+    },
+    {
+      "id": "renfe-stadler-2026-plan",
+      "publisher": "Renfe",
+      "title": "Recta final para recibir nuevos Cercanías",
+      "url": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/04/recta-final-renfe-comience-recibir-nuevos-trenes-cercanias",
+      "date": "2026-04",
+      "ref": "turn21view3"
+    },
+    {
+      "id": "renfe-stadler-2026-servicio",
+      "publisher": "Renfe",
+      "title": "Ajustes y mejoras nuevos trenes Stadler",
+      "url": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/09/renfe-realiza-ajustes-trenes-stadler",
+      "date": "2026-09",
+      "ref": "turn21view4"
+    },
+    {
+      "id": "renfe-s452-2026",
+      "publisher": "Renfe",
+      "title": "Siete S452para Málaga desde2028",
+      "url": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/08/renfe-preve-incorporar-siete-trenes-serie-452-cercanias-malaga-2028",
+      "date": "2026-08",
+      "ref": "turn20search2"
+    },
+    {
+      "id": "alstom-s452-2023",
+      "publisher": "Alstom",
+      "title": "201 Coradia Stream de gran capacidad",
+      "url": "https://www.alstom.com/press-releases-news/2023/6/alstom-reveals-future-design-201-coradia-stream-high-capacity-trains-renfe",
+      "date": "2023-06-15",
+      "ref": "turn68search2"
+    },
+    {
+      "id": "caf-cercanias-2023",
+      "publisher": "CAF",
+      "title": "Adjudicación de29trenes de Cercanías",
+      "url": "https://www.cafmobility.com/en/press-room/renfe-renews-trust-caf-awards-contract-supply-29-commuter-trains/",
+      "date": "2023-03-28",
+      "ref": "turn56search3"
+    },
+    {
+      "id": "renfe-rse-2024",
+      "publisher": "Renfe",
+      "title": "Informe de Responsabilidad Social2024",
+      "url": "https://grupo.renfe.com/content/dam/grupo-renfe/sostenibilidad/informes-rse/english/MemoriaRenfe2024_ENG.pdf",
+      "date": "2024",
+      "ref": "turn65search9"
+    },
+    {
+      "id": "moncloa-s480-2026",
+      "publisher": "Ministerio de Transportes / Moncloa",
+      "title": "70 nuevos trenes CAF S480 en certificación",
+      "url": "https://www.lamoncloa.gob.es/serviciosdeprensa/notasprensa/transportes-movilidad-sostenible/paginas/2026/170626-nuevos-trenes-renfe.aspx",
+      "date": "2026-06-17",
+      "ref": "turn59view1"
+    },
+    {
+      "id": "mpt-am-2024",
+      "publisher": "Ministerio de Transportes / Delegación Cantabria",
+      "title": "Nuevos trenes de ancho métrico",
+      "url": "https://mptmd.gob.es/portal/delegaciones_gobierno/delegaciones/cantabria/actualidad/2024/02/2024_02_26_01",
+      "date": "2024-02-26",
+      "ref": "turn58search0"
+    },
+    {
+      "id": "renfe-s490-2022",
+      "publisher": "Renfe",
+      "title": "Remodelación S490 para Media Distancia",
+      "url": "https://www.renfe.com/es/es/grupo-renfe/comunicacion/renfe-al-dia/sala-de-prensa/renfe-realizara-la-remodelacion-de-trenes-de-la-serie-490",
+      "date": "2022-05-19",
+      "ref": "turn71view4"
+    },
+    {
+      "id": "renfe-manual-2024",
+      "publisher": "Renfe",
+      "title": "Manual de materias comunes, Ingeniería y Mantenimiento2024",
+      "url": "https://www.renfe.com/content/dam/renfe/es/Grupo-Empresa/Talento-y-personas/Empleo/2024/ingenier%C3%ADa-y-mantenimiento/01.%20IYM%20Manual_Materias_Comunesv2.pdf",
+      "date": "2024",
+      "ref": "turn72search8"
+    },
+    {
+      "id": "renfe-s100",
+      "publisher": "Renfe",
+      "title": "Ficha S100",
+      "url": "https://grupo.renfe.com/es/es/conoce-renfe/nuestros-trenes/s-100",
+      "date": null,
+      "ref": "turn71view0"
+    },
+    {
+      "id": "renfe-s120",
+      "publisher": "Renfe",
+      "title": "Ficha S120 / S121",
+      "url": "https://grupo.renfe.com/es/es/conoce-renfe/nuestros-trenes/s-120",
+      "date": null,
+      "ref": "turn71view1"
+    },
+    {
+      "id": "renfe-s730",
+      "publisher": "Renfe",
+      "title": "Ficha S730 dual",
+      "url": "https://grupo.renfe.com/es/es/conoce-renfe/nuestros-trenes/s-730-dual",
+      "date": null,
+      "ref": "turn31view1"
+    },
+    {
+      "id": "renfe-s449",
+      "publisher": "Renfe",
+      "title": "Ficha S449",
+      "url": "https://grupo.renfe.com/es/es/conoce-renfe/nuestros-trenes/r449",
+      "date": null,
+      "ref": "turn21view2"
+    },
+    {
+      "id": "renfe-s598",
+      "publisher": "Renfe",
+      "title": "Ficha S598",
+      "url": "https://grupo.renfe.com/es/es/conoce-renfe/nuestros-trenes/s598",
+      "date": null,
+      "ref": "turn53view5"
+    },
+    {
+      "id": "renfe-s446",
+      "publisher": "Renfe",
+      "title": "Ficha S446",
+      "url": "https://grupo.renfe.com/es/es/conoce-renfe/nuestros-trenes/r446",
+      "date": null,
+      "ref": "turn21view1"
+    },
+    {
+      "id": "renfe-s102112",
+      "publisher": "Renfe of America",
+      "title": "Ficha S102 / S112",
+      "url": "https://renfeofamerica.com/es/es/renfe-world-wide/flota-de-trenes/s-102-112",
+      "date": null,
+      "ref": "turn31view3"
+    },
+    {
+      "id": "renfe-s594",
+      "publisher": "Renfe of America",
+      "title": "Ficha S594",
+      "url": "https://renfeofamerica.com/es/es/renfe-world-wide/flota-de-trenes/r-594",
+      "date": null,
+      "ref": "turn54view1"
+    },
+    {
+      "id": "renfe-s592",
+      "publisher": "Renfe of America",
+      "title": "Ficha S592 / S592.2",
+      "url": "https://renfeofamerica.com/es/es/renfe-world-wide/flota-de-trenes/r-592",
+      "date": null,
+      "ref": "turn54view2"
+    },
+    {
+      "id": "nertus-s447",
+      "publisher": "Nertus (mantenedor Renfe-Siemens)",
+      "title": "S447 mantenidos",
+      "url": "https://www.nertus.es/es/node/3",
+      "date": null,
+      "ref": "turn31view4"
+    },
+    {
+      "id": "irvia-s450451",
+      "publisher": "Irvia (mantenedor Renfe-Alstom)",
+      "title": "Mantenimiento S450 / S451",
+      "url": "https://irvia.es/portfolio-posts/s-450-451/",
+      "date": null,
+      "ref": "turn54view4"
+    },
+    {
+      "id": "congreso-440-2005",
+      "publisher": "Congreso, respuesta del Gobierno",
+      "title": "Configuraciones UT440",
+      "url": "https://www.congreso.es/gl/busqueda-de-publicaciones?_publicaciones_id_texto=%28CDD200504140185.CODI.%29&_publicaciones_legislatura=VIII&_publicaciones_mode=mostrarTextoIntegro&_publicaciones_template=PUWTZDTT.fmt&p_p_id=publicaciones&p_p_lifecycle=0&p_p_mode=view&p_p_state=normal",
+      "date": "2005-04-14",
+      "ref": "turn72search4"
+    },
+    {
+      "id": "ffe-2025",
+      "publisher": "Fundación de los Ferrocarriles Españoles",
+      "title": "Anuario ferroviario2025, tabla histórica",
+      "url": "https://vialibre-ffe.com/vldigital/Anuario2025/files/basic-html/page143.html",
+      "date": "2025",
+      "ref": "turn74view0",
+      "note": "Complementario: no acredita asignaciones ni matrícula de cada circulación."
+    },
+    {
+      "id": "ffe-596",
+      "publisher": "Fundación de los Ferrocarriles Españoles",
+      "title": "Ficha técnica596",
+      "url": "https://www.vialibre-ffe.com/ficha_mate.asp?cat=ms01&cod=227",
+      "date": null,
+      "ref": "turn72search0",
+      "note": "Ficha antigua; la página contiene texto ajeno en extracto. Únicamente se usa tabla numérica coherente con Manual Renfe."
+    },
+    {
+      "id": "semaf-s402",
+      "publisher": "SEMAF",
+      "title": "Visita técnica S402 Alpinos",
+      "url": "https://www.semaf.org/informaciones/semaf-visita-y-comprueba-el-nuevo-alpinos-s402/",
+      "date": "2026-06-25",
+      "ref": "turn65search0",
+      "note": "Fuente directa de visita técnica, no certificación de servicio comercial."
+    }
+  ],
+  "records": [
+    {
+      "id": "s100",
+      "series": "100",
+      "name": "AVE Serie 100",
+      "category": "Pasajeros - Alta Velocidad",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1435
+      ],
+      "maxSpeedKmH": [
+        300
+      ],
+      "seatedCapacity": [
+        347
+      ],
+      "totalCapacity": null,
+      "voltage": "25 KV",
+      "powerKw": [
+        8800
+      ],
+      "lengthM": 200.15,
+      "massT": 329.6,
+      "builder": "Alstom",
+      "constructedUnitsReported": 22,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-s100"
+      ],
+      "warnings": [
+        "Plazas diferentes según configuración y fecha: el dataset de 2020 indica 347; la ficha detallada de Renfe indica 329/332. No atribuir 347 a todas las unidades ni a todos los años."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/ave_s100r.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/aves100r_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/aves100r_ficha.html"
+      }
+    },
+    {
+      "id": "s102",
+      "series": "102",
+      "name": "AVE Serie 102",
+      "category": "Pasajeros - Alta Velocidad",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1435
+      ],
+      "maxSpeedKmH": [
+        330
+      ],
+      "seatedCapacity": [
+        334
+      ],
+      "totalCapacity": null,
+      "voltage": "25 KV",
+      "powerKw": [
+        8800
+      ],
+      "lengthM": 200,
+      "massT": 322,
+      "builder": "Talgo - Bombardier",
+      "constructedUnitsReported": 16,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-s102112"
+      ],
+      "warnings": [
+        "El dataset de 2020 indica 334 plazas y una ficha detallada antigua indica 316. La configuración de cada unidad requiere verificación."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/ave_s102.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/aves102_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/aves102_ficha.html"
+      }
+    },
+    {
+      "id": "s112",
+      "series": "112",
+      "name": "AVE Serie 112",
+      "category": "Pasajeros - Alta Velocidad",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1435
+      ],
+      "maxSpeedKmH": [
+        330
+      ],
+      "seatedCapacity": [
+        365
+      ],
+      "totalCapacity": null,
+      "voltage": "25 KV",
+      "powerKw": [
+        8800
+      ],
+      "lengthM": 200,
+      "massT": 322,
+      "builder": "Talgo - Bombardier",
+      "constructedUnitsReported": 30,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-s102112"
+      ],
+      "warnings": [
+        "El dataset de 2020 indica 365 plazas; la ficha detallada antigua indica 353 y el folleto de 2022 indica 348. Estas configuraciones no son intercambiables."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/ave_s102.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/aves102_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/aves102_ficha.html"
+      }
+    },
+    {
+      "id": "s103",
+      "series": "103",
+      "name": "AVE Serie 103",
+      "category": "Pasajeros - Alta Velocidad",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1435
+      ],
+      "maxSpeedKmH": [
+        350
+      ],
+      "seatedCapacity": [
+        405
+      ],
+      "totalCapacity": null,
+      "voltage": "25 KV",
+      "powerKw": [
+        8800
+      ],
+      "lengthM": 200,
+      "massT": 425,
+      "builder": "Siemens",
+      "constructedUnitsReported": 26,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "ffe-2025"
+      ],
+      "warnings": [
+        "La velocidad de diseño de 350 km/h no implica circulación a 350 en todas las líneas. Una ficha antigua indica 404/405 plazas; el anuario de 2025 indica 422 según configuración."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/ave_s103.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/aves103_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/aves103_ficha.html"
+      }
+    },
+    {
+      "id": "s112M",
+      "series": "112M",
+      "name": "AVLO Serie 112 M",
+      "category": "Pasajeros - Alta Velocidad",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1435
+      ],
+      "maxSpeedKmH": [
+        300
+      ],
+      "seatedCapacity": [
+        438
+      ],
+      "totalCapacity": null,
+      "voltage": "25 KV",
+      "powerKw": [
+        8800
+      ],
+      "lengthM": 200,
+      "massT": 322,
+      "builder": "Talgo - Bombardier",
+      "constructedUnitsReported": 3,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-futuro"
+      ],
+      "warnings": [
+        "112 Mes una reformaAvlo de la 112, no una flota adicional. El dataset de 2020 indica 3 unidades; una página posterior indica 5."
+      ],
+      "legacyLinks": {
+        "photo": null,
+        "video": null,
+        "technical": null
+      }
+    },
+    {
+      "id": "s120",
+      "series": "120",
+      "name": "Alvia Serie 120",
+      "category": "Pasajeros - Larga distancia",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1435,
+        1668
+      ],
+      "maxSpeedKmH": [
+        250,
+        220
+      ],
+      "seatedCapacity": [
+        238
+      ],
+      "totalCapacity": null,
+      "voltage": "25 KV - 3 KV",
+      "powerKw": [
+        4400
+      ],
+      "lengthM": 107.36,
+      "massT": 247,
+      "builder": "CAF - Alstom",
+      "constructedUnitsReported": 28,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/alvia_s120.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/alvias120_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/alvias120_ficha.html"
+      }
+    },
+    {
+      "id": "s130",
+      "series": "130",
+      "name": "Alvia Serie 130",
+      "category": "Pasajeros - Larga distancia",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1435,
+        1668
+      ],
+      "maxSpeedKmH": [
+        250,
+        220
+      ],
+      "seatedCapacity": [
+        299
+      ],
+      "totalCapacity": null,
+      "voltage": "25 KV - 3 KV",
+      "powerKw": [
+        4800
+      ],
+      "lengthM": 184.16,
+      "massT": 312,
+      "builder": "Talgo - Bombardier",
+      "constructedUnitsReported": 45,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-s730"
+      ],
+      "warnings": [
+        "Las 45 composiciones construidas incluyen transformaciones a 730. No inicializar 45 S 130 más 15 S 730 como unidades adicionales. La ficha mezcla 200/220 km/h en red convencional: la autorización depende del tramo."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/alvia_s130.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/alvias130_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/alvias130_ficha.html"
+      }
+    },
+    {
+      "id": "s730",
+      "series": "730",
+      "name": "Alvia Serie 730 (híbrido)",
+      "category": "Pasajeros - Larga distancia",
+      "traction": "dual",
+      "gaugeMm": [
+        1435,
+        1668
+      ],
+      "maxSpeedKmH": [
+        250,
+        220,
+        180
+      ],
+      "seatedCapacity": [
+        262
+      ],
+      "totalCapacity": null,
+      "voltage": "25 KV - 3 KV",
+      "powerKw": [
+        4800,
+        4000,
+        3600
+      ],
+      "lengthM": 186,
+      "massT": 384,
+      "builder": "Talgo - Bombardier",
+      "constructedUnitsReported": 13,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-s730"
+      ],
+      "warnings": [
+        "El dataset de 2020 indica 262 plazas; la misma ficha detallada mezcla 264 y 262. Depende de la reforma. Velocidades:250 enUIC,220 en ibérico electrificado y 180 en modo diésel."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/alvia_s730.html",
+        "video": null,
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/alvias730_ficha.html"
+      }
+    },
+    {
+      "id": "s104",
+      "series": "104",
+      "name": "Avant Serie 104",
+      "category": "Pasajeros - Media distancia - Alta Velocidad",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1435
+      ],
+      "maxSpeedKmH": [
+        250
+      ],
+      "seatedCapacity": [
+        237
+      ],
+      "totalCapacity": null,
+      "voltage": "25 KV",
+      "powerKw": [
+        4000
+      ],
+      "lengthM": 107.1,
+      "massT": 221.5,
+      "builder": "CAF - Alstom",
+      "constructedUnitsReported": 20,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/avant_s104.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/avant104_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/avant104_ficha.html"
+      }
+    },
+    {
+      "id": "s114",
+      "series": "114",
+      "name": "Avant Serie 114",
+      "category": "Pasajeros - Media distancia - Alta Velocidad",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1435
+      ],
+      "maxSpeedKmH": [
+        250
+      ],
+      "seatedCapacity": [
+        238
+      ],
+      "totalCapacity": null,
+      "voltage": "25 KV",
+      "powerKw": [
+        4000
+      ],
+      "lengthM": 105.52,
+      "massT": 228.8,
+      "builder": "CAF - Alstom",
+      "constructedUnitsReported": 13,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/avant_s114.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/avant114_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/avant114_ficha.html"
+      }
+    },
+    {
+      "id": "s121",
+      "series": "121",
+      "name": "Avant Serie 121",
+      "category": "Pasajeros - Media distancia - Alta Velocidad",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1435,
+        1668
+      ],
+      "maxSpeedKmH": [
+        250,
+        220
+      ],
+      "seatedCapacity": [
+        280
+      ],
+      "totalCapacity": null,
+      "voltage": "25 KV - 3 KV",
+      "powerKw": [
+        4000,
+        2500
+      ],
+      "lengthM": 107.36,
+      "massT": 251.3,
+      "builder": "CAF - Alstom",
+      "constructedUnitsReported": 29,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-s120"
+      ],
+      "warnings": [
+        "El dataset de 2020 indica 282 plazas y la ficha de Renfe indica 281 incluyendo 1 PMR."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/avant_s121.html",
+        "video": null,
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/avant121_ficha.html"
+      },
+      "pmrCapacity": 1
+    },
+    {
+      "id": "s448",
+      "series": "448",
+      "name": "Media Distancia R-448",
+      "category": "Pasajeros - Media distancia",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        160
+      ],
+      "seatedCapacity": [
+        238
+      ],
+      "totalCapacity": null,
+      "voltage": "3 KV",
+      "powerKw": [
+        1160
+      ],
+      "lengthM": 78.53,
+      "massT": 151,
+      "builder": "CAF - Alstom",
+      "constructedUnitsReported": 31,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/md_448.html",
+        "video": null,
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/md448_ficha.html"
+      }
+    },
+    {
+      "id": "s449",
+      "series": "449",
+      "name": "Media Distancia R-449",
+      "category": "Pasajeros - Media distancia",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        160
+      ],
+      "seatedCapacity": [
+        257
+      ],
+      "totalCapacity": null,
+      "voltage": "3 KV",
+      "powerKw": [
+        2400
+      ],
+      "lengthM": 98.97,
+      "massT": 172.2,
+      "builder": "CAF - Alstom",
+      "constructedUnitsReported": 57,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-s449"
+      ],
+      "warnings": [
+        "El dataset indica 257 asientos; la ficha mezcla 258 más 1 PMR y 260. La preparación para una reforma futura aUIC no significa ancho variable ni autorización actual para 200 km/h."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/md_449.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/md449_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/md449_ficha.html"
+      }
+    },
+    {
+      "id": "s470",
+      "series": "470",
+      "name": "Media Distancia R-470",
+      "category": "Pasajeros - Media distancia",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        140
+      ],
+      "seatedCapacity": [
+        221
+      ],
+      "totalCapacity": null,
+      "voltage": "3 KV",
+      "powerKw": [
+        1160
+      ],
+      "lengthM": 79.59,
+      "massT": 156,
+      "builder": "CAF - Alstom - Bombardier",
+      "constructedUnitsReported": 57,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/md_470.html",
+        "video": null,
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/md470_ficha.html"
+      }
+    },
+    {
+      "id": "s592_md",
+      "series": "592",
+      "name": "Media Distancia R-592",
+      "category": "Pasajeros - Media distancia",
+      "traction": "diésel",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        120,
+        140
+      ],
+      "seatedCapacity": [
+        228
+      ],
+      "totalCapacity": null,
+      "voltage": null,
+      "powerKw": [
+        840,
+        1000
+      ],
+      "lengthM": 70.21,
+      "massT": 131,
+      "builder": "Macosa - Alstom",
+      "constructedUnitsReported": 45,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-s592"
+      ],
+      "warnings": [
+        "El dataset mezcla 120/140 km/h de 592 y 592.2. La subserie 592.2 reformada alcanza 140."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/md_592.html",
+        "video": null,
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/md592_ficha.html"
+      }
+    },
+    {
+      "id": "s592_cercanias",
+      "series": "592",
+      "name": "Media Distancia R-592",
+      "category": "Pasajeros - Cercanías",
+      "traction": "diésel",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        120
+      ],
+      "seatedCapacity": [
+        200
+      ],
+      "totalCapacity": null,
+      "voltage": null,
+      "powerKw": [
+        1000
+      ],
+      "lengthM": 70.21,
+      "massT": 131,
+      "builder": "TCR Valladolid",
+      "constructedUnitsReported": 23,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/md_592.html",
+        "video": null,
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/md592_ficha.html"
+      }
+    },
+    {
+      "id": "s594",
+      "series": "594",
+      "name": "Media Distancia R-594",
+      "category": "Pasajeros - Media distancia",
+      "traction": "diésel",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        160
+      ],
+      "seatedCapacity": [
+        123,
+        105
+      ],
+      "totalCapacity": null,
+      "voltage": null,
+      "powerKw": [
+        1200
+      ],
+      "lengthM": 47.74,
+      "massT": 90.47,
+      "builder": "CAF - Bombardier",
+      "constructedUnitsReported": 23,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-s594"
+      ],
+      "warnings": [
+        "El dataset indica 123/105 asientos; la ficha indica 126 más 1 PMR y una lista indica 124. Cambia con la remodelación. Dos unidades 594.2 experimentaron bogiesBRAVA: no convertir toda la serie a ancho variable."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/md_594.html",
+        "video": null,
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/md594_ficha.html"
+      }
+    },
+    {
+      "id": "s598",
+      "series": "598",
+      "name": "Media Distancia R-598",
+      "category": "Pasajeros - Media distancia",
+      "traction": "diésel",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        160
+      ],
+      "seatedCapacity": [
+        169
+      ],
+      "totalCapacity": null,
+      "voltage": null,
+      "powerKw": [
+        1352
+      ],
+      "lengthM": 75.93,
+      "massT": 151.8,
+      "builder": "CAF",
+      "constructedUnitsReported": 21,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-s598"
+      ],
+      "warnings": [
+        "El dataset indica 169 asientos; la tabla técnica indica 188 más 1 PMR, un texto 189 más 1 y una lista 186. No es un valor universal de la serie."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/md_598.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/md598_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/md598_ficha.html"
+      }
+    },
+    {
+      "id": "s599",
+      "series": "599",
+      "name": "Media Distancia R-599",
+      "category": "Pasajeros - Media distancia",
+      "traction": "diésel",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        160
+      ],
+      "seatedCapacity": [
+        181
+      ],
+      "totalCapacity": null,
+      "voltage": null,
+      "powerKw": [
+        1400
+      ],
+      "lengthM": 75.98,
+      "massT": 157,
+      "builder": "CAF",
+      "constructedUnitsReported": 50,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [
+        "El dataset indica 181 asientos. Otras fichas antiguas indican 184 más 1 PMR. Mantener la procedencia y verificar la configuración actual."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/md_599.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/md599_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/md599_ficha.html"
+      }
+    },
+    {
+      "id": "s462",
+      "series": "462",
+      "name": "Civia Serie 462",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        120
+      ],
+      "seatedCapacity": [
+        126
+      ],
+      "totalCapacity": null,
+      "voltage": "3 KV",
+      "powerKw": [
+        1270
+      ],
+      "lengthM": 44.8,
+      "massT": 80,
+      "builder": "CAF - Siemens - Alstom - Bombardier",
+      "constructedUnitsReported": 14,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [
+        "Variante modular de 2 coches del catálogo de 2020. No hay verificación aquí de unidades independientes activas en 2022."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/civia.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/civia_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/civia_ficha.html"
+      }
+    },
+    {
+      "id": "s463",
+      "series": "463",
+      "name": "Civia Serie 463",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        120
+      ],
+      "seatedCapacity": [
+        184
+      ],
+      "totalCapacity": null,
+      "voltage": "3 KV",
+      "powerKw": [
+        1400
+      ],
+      "lengthM": 65.55,
+      "massT": 105.8,
+      "builder": "CAF - Siemens - Alstom",
+      "constructedUnitsReported": 83,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/civia.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/civia_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/civia_ficha.html"
+      }
+    },
+    {
+      "id": "s464",
+      "series": "464",
+      "name": "Civia Serie 464",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        120
+      ],
+      "seatedCapacity": [
+        223
+      ],
+      "totalCapacity": null,
+      "voltage": "3 KV",
+      "powerKw": [
+        2100
+      ],
+      "lengthM": 80.3,
+      "massT": 131.5,
+      "builder": "CAF - Siemens - Alstom",
+      "constructedUnitsReported": 80,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/civia.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/civia_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/civia_ficha.html"
+      }
+    },
+    {
+      "id": "s465",
+      "series": "465",
+      "name": "Civia Serie 465",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        120
+      ],
+      "seatedCapacity": [
+        277
+      ],
+      "totalCapacity": 748,
+      "voltage": "3 KV",
+      "powerKw": [
+        2200
+      ],
+      "lengthM": 98.05,
+      "massT": 157.3,
+      "builder": "CAF - Siemens - Alstom",
+      "constructedUnitsReported": 60,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-civia-2026"
+      ],
+      "warnings": [
+        "Renfe, agosto de 2026:277 asientos y 748 plazas totales para Valencia. Una ficha de rodajes antigua indica 997 con otro criterio de viajeros de pie."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/civia.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/civia_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/civia_ficha.html"
+      }
+    },
+    {
+      "id": "s442",
+      "series": "442",
+      "name": "Cercanías 442",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1000
+      ],
+      "maxSpeedKmH": [
+        60
+      ],
+      "seatedCapacity": [
+        88
+      ],
+      "totalCapacity": null,
+      "voltage": "1,5 KV",
+      "powerKw": [
+        620
+      ],
+      "lengthM": 36.14,
+      "massT": 63,
+      "builder": "MTM - Brown Boveri - Schlieren",
+      "constructedUnitsReported": 6,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/cercanias442.html",
+        "video": null,
+        "technical": null
+      }
+    },
+    {
+      "id": "s446",
+      "series": "446",
+      "name": "Cercanías 446",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        100
+      ],
+      "seatedCapacity": [
+        202
+      ],
+      "totalCapacity": 759,
+      "voltage": "3 KV",
+      "powerKw": [
+        2400
+      ],
+      "lengthM": 75.99,
+      "massT": 166.6,
+      "builder": "MTM - CAF - GEE - Macosa - WESA",
+      "constructedUnitsReported": 170,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "renfe-s446"
+      ],
+      "warnings": [
+        "El dataset llama asíncronos a los motores; la ficha detallada confirma corriente continua. No copiar ese campo. Capacidad total declarada 759;202 asientos sin estrapontines y 204 con ellos."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/cercanias446.html",
+        "video": null,
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/cercanias446_ficha.html"
+      }
+    },
+    {
+      "id": "s447",
+      "series": "447",
+      "name": "Cercanías 447",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        120
+      ],
+      "seatedCapacity": [
+        234
+      ],
+      "totalCapacity": 702,
+      "voltage": "3 KV",
+      "powerKw": [
+        2400
+      ],
+      "lengthM": 75.99,
+      "massT": 162.5,
+      "builder": "CAF - Alstom - Siemens - ABB - Adtranz",
+      "constructedUnitsReported": 183,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "nertus-s447"
+      ],
+      "warnings": [
+        "Nertus documenta la variante de 234 asientos más 468 viajeros de pie. No confundir 702 plazas totales con 234 asientos."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/cercanias447.html",
+        "video": null,
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/cercanias447_ficha.html"
+      }
+    },
+    {
+      "id": "s450",
+      "series": "450",
+      "name": "Cercanías 450",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        140
+      ],
+      "seatedCapacity": [
+        1008
+      ],
+      "totalCapacity": 2020,
+      "voltage": "3 KV",
+      "powerKw": [
+        2960
+      ],
+      "lengthM": 159.4,
+      "massT": 350.8,
+      "builder": "CAF - Alstom",
+      "constructedUnitsReported": 24,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "irvia-s450451"
+      ],
+      "warnings": [
+        "Irvia indica 1008 asientos más 1012 viajeros de pie:2020 plazas totales bajo el criterio de 6 viajeros por metro cuadrado."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/cercanias450.html",
+        "video": null,
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/cercanias450_ficha.html"
+      }
+    },
+    {
+      "id": "s451",
+      "series": "451",
+      "name": "Cercanías 451",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1668
+      ],
+      "maxSpeedKmH": [
+        140
+      ],
+      "seatedCapacity": [
+        498
+      ],
+      "totalCapacity": 992,
+      "voltage": "3 KV",
+      "powerKw": [
+        1480
+      ],
+      "lengthM": 80.58,
+      "massT": 177.6,
+      "builder": "CAF - Alstom",
+      "constructedUnitsReported": 12,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020",
+        "irvia-s450451"
+      ],
+      "warnings": [
+        "Irvia indica 498 asientos más 494 viajeros de pie:992 plazas totales bajo el criterio de 6 viajeros por metro cuadrado."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/cercanias450.html",
+        "video": null,
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/cercanias450_ficha.html"
+      }
+    },
+    {
+      "id": "s2400",
+      "series": "2400",
+      "name": "Feve - Serie UTDE-2400",
+      "category": "Pasajeros - Cercanías - Media distancia",
+      "traction": "diésel",
+      "gaugeMm": [
+        1000
+      ],
+      "maxSpeedKmH": [
+        80
+      ],
+      "seatedCapacity": [
+        64
+      ],
+      "totalCapacity": null,
+      "voltage": null,
+      "powerKw": [
+        537
+      ],
+      "lengthM": 34.3,
+      "massT": 67.75,
+      "builder": "MTM",
+      "constructedUnitsReported": 8,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/feve_2400.html",
+        "video": null,
+        "technical": null
+      }
+    },
+    {
+      "id": "s2600",
+      "series": "2600",
+      "name": "Feve - Serie UTDH-2600",
+      "category": "Pasajeros - Cercanías",
+      "traction": "diésel",
+      "gaugeMm": [
+        1000
+      ],
+      "maxSpeedKmH": [
+        80
+      ],
+      "seatedCapacity": [
+        99
+      ],
+      "totalCapacity": null,
+      "voltage": null,
+      "powerKw": [
+        166
+      ],
+      "lengthM": 35.29,
+      "massT": 53.46,
+      "builder": "Sunsundegui - CAF",
+      "constructedUnitsReported": 12,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/feve_2600.html",
+        "video": null,
+        "technical": null
+      }
+    },
+    {
+      "id": "s2700",
+      "series": "2700",
+      "name": "Feve - Serie UTDH-2700",
+      "category": "Pasajeros - Cercanías - Media distancia",
+      "traction": "diésel",
+      "gaugeMm": [
+        1000
+      ],
+      "maxSpeedKmH": [
+        100
+      ],
+      "seatedCapacity": [
+        80
+      ],
+      "totalCapacity": null,
+      "voltage": null,
+      "powerKw": [
+        390
+      ],
+      "lengthM": 35,
+      "massT": 66.85,
+      "builder": "Sunsundegui - CAF",
+      "constructedUnitsReported": 17,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/feve_2700.html",
+        "video": null,
+        "technical": null
+      }
+    },
+    {
+      "id": "s2900",
+      "series": "2900",
+      "name": "Feve - Serie UTDH-2900",
+      "category": "Pasajeros - Cercanías",
+      "traction": "diésel",
+      "gaugeMm": [
+        1000
+      ],
+      "maxSpeedKmH": [
+        100
+      ],
+      "seatedCapacity": [
+        30
+      ],
+      "totalCapacity": null,
+      "voltage": null,
+      "powerKw": [
+        390
+      ],
+      "lengthM": 17,
+      "massT": 33.78,
+      "builder": "Sunsundegui - CAF",
+      "constructedUnitsReported": 12,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/feve_2900.html",
+        "video": null,
+        "technical": null
+      }
+    },
+    {
+      "id": "s3300",
+      "series": "3300",
+      "name": "Feve - Serie UTE 3300",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1000
+      ],
+      "maxSpeedKmH": [
+        100
+      ],
+      "seatedCapacity": [
+        72
+      ],
+      "totalCapacity": null,
+      "voltage": "1,5 KV",
+      "powerKw": [
+        660
+      ],
+      "lengthM": 45.72,
+      "massT": 56.6,
+      "builder": "Sunsundegui - CAF",
+      "constructedUnitsReported": 12,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/feve_3300.html",
+        "video": null,
+        "technical": null
+      }
+    },
+    {
+      "id": "s3500",
+      "series": "3500",
+      "name": "Feve - Serie UTE 3500",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1000
+      ],
+      "maxSpeedKmH": [
+        80
+      ],
+      "seatedCapacity": [
+        72
+      ],
+      "totalCapacity": null,
+      "voltage": "1,5 KV",
+      "powerKw": [
+        660
+      ],
+      "lengthM": 45.72,
+      "massT": 56.6,
+      "builder": "Sunsundegui - CAF",
+      "constructedUnitsReported": 9,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/feve_3500.html",
+        "video": null,
+        "technical": null
+      }
+    },
+    {
+      "id": "s3600",
+      "series": "3600",
+      "name": "Feve - Serie UTE 3600",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1000
+      ],
+      "maxSpeedKmH": [
+        100
+      ],
+      "seatedCapacity": [
+        99
+      ],
+      "totalCapacity": null,
+      "voltage": "1,5 KV",
+      "powerKw": [
+        420
+      ],
+      "lengthM": 35.3,
+      "massT": 56.5,
+      "builder": "Sunsundegui - Siemens",
+      "constructedUnitsReported": 21,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/feve_3600.html",
+        "video": null,
+        "technical": null
+      }
+    },
+    {
+      "id": "s3800",
+      "series": "3800",
+      "name": "Feve - Serie UTE 3800",
+      "category": "Pasajeros - Cercanías",
+      "traction": "eléctrica",
+      "gaugeMm": [
+        1000
+      ],
+      "maxSpeedKmH": [
+        100
+      ],
+      "seatedCapacity": [
+        134
+      ],
+      "totalCapacity": null,
+      "voltage": "1,5 KV",
+      "powerKw": [
+        588
+      ],
+      "lengthM": 32,
+      "massT": 54,
+      "builder": "CAF",
+      "constructedUnitsReported": 16,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/feve_3800.html",
+        "video": null,
+        "technical": null
+      }
+    },
+    {
+      "id": "strenhotel",
+      "series": null,
+      "name": "Trenhotel",
+      "category": "Pasajeros - Larga distancia",
+      "traction": "remolcada",
+      "gaugeMm": [
+        1435,
+        1668
+      ],
+      "maxSpeedKmH": [
+        220
+      ],
+      "seatedCapacity": [],
+      "totalCapacity": null,
+      "voltage": "3 KV - 1,5 KV",
+      "powerKw": [],
+      "lengthM": 260.92,
+      "massT": 359,
+      "builder": "Talgo - Renfe",
+      "constructedUnitsReported": 10,
+      "constructedUnitsDate": "2020-04-01",
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "status": "Ficha técnica histórica. Actividad y dotación al inicio de la campaña requieren un registro adicional.",
+      "sources": [
+        "renfe-fichas-2020"
+      ],
+      "warnings": [
+        "La presencia en el dataset de 2020 no acredita servicio en 2022. No asignar servicios regularesTrenhotel al comienzo de la campaña."
+      ],
+      "legacyLinks": {
+        "photo": "http://www.renfe.com/viajeros/nuestros_trenes/trenhotel.html",
+        "video": "http://www.renfe.com/viajeros/nuestros_trenes/trenhotel_video.html",
+        "technical": "http://www.renfe.com/viajeros/nuestros_trenes/trenhotel_ficha.html"
+      }
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": null,
+      "seatedCapacity": [
+        507
+      ],
+      "maxSpeedKmH": [
+        330
+      ],
+      "gaugeMm": [
+        1435
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": "Talgo",
+      "warnings": [
+        "Las 4 variantes suman 30 trenes, no 30 cada una. Pedido firmado en 2016/17 y primer servicio el 21 de mayo de 2024. La nota publica 12 coches; las cabezas motrices se contabilizan aparte."
+      ],
+      "id": "s106_ave_uic",
+      "series": "106",
+      "name": "S106 AVE · ancho fijo",
+      "category": "Alta velocidad",
+      "traction": "eléctrica",
+      "firmOrderUnits": 10,
+      "status": "Primer servicio comercial el 21 de mayo de 2024.",
+      "sources": [
+        "renfe-s106-2024",
+        "talgo-av"
+      ],
+      "firstService": "2024-05-21"
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": null,
+      "seatedCapacity": [
+        507
+      ],
+      "maxSpeedKmH": [
+        330
+      ],
+      "gaugeMm": [
+        1435,
+        1668
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": "Talgo",
+      "warnings": [
+        "Las 4 variantes suman 30 trenes, no 30 cada una. Pedido firmado en 2016/17 y primer servicio el 21 de mayo de 2024. La nota publica 12 coches; las cabezas motrices se contabilizan aparte."
+      ],
+      "id": "s106_ave_rd",
+      "series": "106",
+      "name": "S106 AVE · rodadura desplazable",
+      "category": "Alta velocidad",
+      "traction": "eléctrica",
+      "firmOrderUnits": 10,
+      "status": "Primer servicio comercial el 21 de mayo de 2024.",
+      "sources": [
+        "renfe-s106-2024",
+        "talgo-av"
+      ],
+      "firstService": "2024-05-21"
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": null,
+      "seatedCapacity": [
+        581
+      ],
+      "maxSpeedKmH": [
+        330
+      ],
+      "gaugeMm": [
+        1435
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": "Talgo",
+      "warnings": [
+        "Las 4 variantes suman 30 trenes, no 30 cada una. Pedido firmado en 2016/17 y primer servicio el 21 de mayo de 2024. La nota publica 12 coches; las cabezas motrices se contabilizan aparte."
+      ],
+      "id": "s106_avlo_uic",
+      "series": "106",
+      "name": "S106 Avlo · ancho fijo",
+      "category": "Alta velocidad",
+      "traction": "eléctrica",
+      "firmOrderUnits": 5,
+      "status": "Primer servicio comercial el 21 de mayo de 2024.",
+      "sources": [
+        "renfe-s106-2024",
+        "talgo-av"
+      ],
+      "firstService": "2024-05-21"
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": null,
+      "seatedCapacity": [
+        581
+      ],
+      "maxSpeedKmH": [
+        330
+      ],
+      "gaugeMm": [
+        1435,
+        1668
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": "Talgo",
+      "warnings": [
+        "Las 4 variantes suman 30 trenes, no 30 cada una. Pedido firmado en 2016/17 y primer servicio el 21 de mayo de 2024. La nota publica 12 coches; las cabezas motrices se contabilizan aparte."
+      ],
+      "id": "s106_avlo_rd",
+      "series": "106",
+      "name": "S106 Avlo · rodadura desplazable",
+      "category": "Alta velocidad",
+      "traction": "eléctrica",
+      "firmOrderUnits": 5,
+      "status": "Primer servicio comercial el 21 de mayo de 2024.",
+      "sources": [
+        "renfe-s106-2024",
+        "talgo-av"
+      ],
+      "firstService": "2024-05-21"
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": null,
+      "seatedCapacity": [
+        405
+      ],
+      "maxSpeedKmH": [
+        330
+      ],
+      "gaugeMm": [
+        1435,
+        1668
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": "Talgo",
+      "warnings": [
+        "26 cabezas motrices permiten crear 13 trenes.14 cabezas opcionales no equivalen a 14 trenes. Las ramas transformadas ya usadas con locomotora forman parte del mismo programa."
+      ],
+      "id": "s107_autopropulsado",
+      "series": "107",
+      "name": "S107 · cabezas motrices Avril",
+      "category": "Alta velocidad",
+      "traction": "eléctrica",
+      "firmOrderUnits": 13,
+      "optionalOrderUnits": 6,
+      "status": "Programa contratado; entrada comercial no verificada al 6 de octubre de 2026.",
+      "sources": [
+        "talgo-av",
+        "renfe-futuro"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": 900,
+      "seatedCapacity": [
+        245
+      ],
+      "maxSpeedKmH": [],
+      "gaugeMm": [
+        1668
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": 100,
+      "massT": null,
+      "builder": "Alstom",
+      "warnings": [
+        "El fabricante anuncia más de 900 pasajeros; la nota de Málaga indica hasta 900. Incluye viajeros de pie. Velocidad y tensión exactas pendientes en las fuentes seleccionadas."
+      ],
+      "id": "s452_alstom",
+      "series": "452",
+      "name": "S452 · Coradia Stream HC",
+      "category": "Cercanías",
+      "traction": "eléctrica",
+      "firmOrderUnits": 201,
+      "carCount": 6,
+      "status": "Fabricación y homologación. La planificación para Málaga comienza en 2028. No hay aquí recepción general confirmada para 2026.",
+      "sources": [
+        "renfe-s452-2026",
+        "alstom-s452-2023"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": 912,
+      "seatedCapacity": [],
+      "maxSpeedKmH": [
+        140
+      ],
+      "gaugeMm": [
+        1668
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": 100,
+      "massT": null,
+      "builder": "Stadler",
+      "warnings": [
+        "912/1884 plazas incluyen viajeros de pie. Número de asientos pendiente. En abril se preveían 9 T 100 y 8 T 200 durante 2026: no son actas ni matrículas de unidades entregadas."
+      ],
+      "id": "s453_t100",
+      "series": "453",
+      "name": "S453 · Stadler T100",
+      "category": "Cercanías",
+      "traction": "eléctrica",
+      "carCount": 4,
+      "firmOrderUnits": 24,
+      "status": "Incorporación progresiva en Madrid confirmada por Renfe en septiembre de 2026.",
+      "sources": [
+        "renfe-stadler-2026-plan",
+        "renfe-stadler-2026-servicio",
+        "renfe-futuro"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": 1884,
+      "seatedCapacity": [],
+      "maxSpeedKmH": [
+        140
+      ],
+      "gaugeMm": [
+        1668
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": 200,
+      "massT": null,
+      "builder": "Stadler",
+      "warnings": [
+        "912/1884 plazas incluyen viajeros de pie. Número de asientos pendiente. En abril se preveían 9 T 100 y 8 T 200 durante 2026: no son actas ni matrículas de unidades entregadas."
+      ],
+      "id": "s453_t200",
+      "series": "453",
+      "name": "S453 · Stadler T200",
+      "category": "Cercanías",
+      "traction": "eléctrica",
+      "carCount": 8,
+      "firmOrderUnits": 55,
+      "status": "Incorporación progresiva en Madrid confirmada por Renfe en septiembre de 2026.",
+      "sources": [
+        "renfe-stadler-2026-plan",
+        "renfe-stadler-2026-servicio",
+        "renfe-futuro"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": 500,
+      "seatedCapacity": [],
+      "maxSpeedKmH": [],
+      "gaugeMm": [],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": "CAF",
+      "warnings": [
+        "CAF anuncia más de 500 pasajeros:500 es un umbral, no una capacidad exacta. Ancho, velocidad y asientos no verificados en las fuentes seleccionadas."
+      ],
+      "id": "s460_caf",
+      "series": "460",
+      "name": "S460 · CAF Cercanías",
+      "category": "Cercanías",
+      "traction": "eléctrica",
+      "carCount": 4,
+      "firmOrderUnits": 29,
+      "optionalOrderUnits": 9,
+      "status": "Contrato de 2023. Serie confirmada en la memoriaRenfe 2024; recepción comercial pendiente de verificación.",
+      "sources": [
+        "caf-cercanias-2023",
+        "renfe-rse-2024"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": 264,
+      "seatedCapacity": [],
+      "maxSpeedKmH": [
+        200
+      ],
+      "gaugeMm": [
+        1668
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": "CAF",
+      "warnings": [
+        "Hasta 264 pasajeros publicados para la serie. La capacidad básica exacta no se especifica.61 ibéricos más 9 UIC sumaban 70 adquiridos al 17 de junio de 2026. Bitensión no significa cambio automático de ancho."
+      ],
+      "id": "s480_basico_ib",
+      "series": "480",
+      "name": "S480 · CAF básico ibérico",
+      "variant": "básico",
+      "category": "Media distancia",
+      "traction": "eléctrica con batería de última milla",
+      "firmOrderUnits": 15,
+      "status": "Certificación en junio de 2026; incorporación estimada desde 2027.",
+      "sources": [
+        "moncloa-s480-2026"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": 264,
+      "seatedCapacity": [],
+      "maxSpeedKmH": [
+        200
+      ],
+      "gaugeMm": [
+        1668
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": "CAF",
+      "warnings": [
+        "Hasta 264 pasajeros publicados para la serie. La capacidad básica exacta no se especifica.61 ibéricos más 9 UIC sumaban 70 adquiridos al 17 de junio de 2026. Bitensión no significa cambio automático de ancho."
+      ],
+      "id": "s480_ampliado_ib",
+      "series": "480",
+      "name": "S480 · CAF ampliado ibérico",
+      "variant": "ampliado",
+      "category": "Media distancia",
+      "traction": "eléctrica con batería de última milla",
+      "firmOrderUnits": 46,
+      "status": "Certificación en junio de 2026; incorporación estimada desde 2027.",
+      "sources": [
+        "moncloa-s480-2026"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": 264,
+      "seatedCapacity": [],
+      "maxSpeedKmH": [
+        200
+      ],
+      "gaugeMm": [
+        1435
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": "CAF",
+      "warnings": [
+        "Hasta 264 pasajeros publicados para la serie. La capacidad básica exacta no se especifica.61 ibéricos más 9 UIC sumaban 70 adquiridos al 17 de junio de 2026. Bitensión no significa cambio automático de ancho."
+      ],
+      "id": "s480_ampliado_uic",
+      "series": "480",
+      "name": "S480 · CAF ampliado UIC",
+      "variant": "ampliado",
+      "category": "Media distancia",
+      "traction": "eléctrica con batería de última milla",
+      "firmOrderUnits": 9,
+      "status": "Certificación en junio de 2026; incorporación estimada desde 2027.",
+      "sources": [
+        "moncloa-s480-2026"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": null,
+      "seatedCapacity": [],
+      "maxSpeedKmH": [
+        100
+      ],
+      "gaugeMm": [
+        1000
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": "CAF",
+      "warnings": [
+        "Pedido base de 31 trenesRAM:26 eléctricos y 5 duales. La opción de 7 permite ampliar hasta 38. La numeración definitiva de cada variante requiere validación. Composiciones de 2 o 3 coches."
+      ],
+      "id": "caf_am_electrico",
+      "series": null,
+      "name": "CAF· ancho métrico eléctrico",
+      "category": "Ancho métrico",
+      "traction": "eléctrica con batería de última milla",
+      "firmOrderUnits": 26,
+      "carCount": null,
+      "status": "Pedido de 2020; entrada comercial pendiente de confirmación.",
+      "sources": [
+        "renfe-futuro",
+        "mpt-am-2024"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": 200,
+      "seatedCapacity": [],
+      "maxSpeedKmH": [
+        100
+      ],
+      "gaugeMm": [
+        1000
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": "CAF",
+      "warnings": [
+        "Más de 200 plazas en configuración dual:200 es un umbral, no capacidad exacta. Las opciones no ejercidas no generan entregas."
+      ],
+      "id": "caf_am_dual",
+      "series": null,
+      "name": "CAF· ancho métrico dual",
+      "category": "Ancho métrico",
+      "traction": "dual",
+      "firmOrderUnits": 5,
+      "status": "Pedido de 2020. La nota de 2024 preveía pruebas en el primer semestre de 2026.",
+      "sources": [
+        "renfe-futuro",
+        "mpt-am-2024"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": null,
+      "seatedCapacity": [],
+      "maxSpeedKmH": [],
+      "gaugeMm": [
+        1000
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": "CAF",
+      "warnings": [
+        "SeisAlpinos se suman aparte de los 31 trenesRAM. No asignarlos a la red ibérica ni considerar laC-9 reabierta por disponer de trenes. Asientos y velocidad específicos no verificados."
+      ],
+      "id": "s402_alpino",
+      "series": "402",
+      "name": "S402 · CAF Alpino C-9",
+      "category": "Cercanías métrico alpino",
+      "traction": "eléctrica",
+      "firmOrderUnits": 6,
+      "status": "Visita técnica deSEMAF en junio de 2026. El servicio comercial no queda acreditado por esa visita.",
+      "sources": [
+        "renfe-futuro",
+        "semaf-s402"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": null,
+      "seatedCapacity": [
+        140,
+        148,
+        296
+      ],
+      "maxSpeedKmH": [],
+      "gaugeMm": [
+        1668
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": null,
+      "warnings": [
+        "Datos de 2005:440 Mde 3 coches ofrece 296 asientos;440 Pde 2 coches 148 y 440 Jde 2 coches 140. No trasladar las dotaciones de 2005 a 2022."
+      ],
+      "id": "s440",
+      "series": "440",
+      "name": "S440 / 440R",
+      "category": "Regional y Cercanías histórico",
+      "traction": "eléctrica",
+      "status": "Configuraciones históricas documentadas. Dotación operativa en 2022 pendiente.",
+      "sources": [
+        "congreso-440-2005"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": null,
+      "seatedCapacity": [
+        56
+      ],
+      "maxSpeedKmH": [],
+      "gaugeMm": [
+        1668
+      ],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": null,
+      "warnings": [
+        "El manual explica 22 automotores creados: no es la cantidad operativa actual. Velocidad y potencia no verificadas por fuente oficial en esta entrega."
+      ],
+      "id": "s596",
+      "series": "596",
+      "name": "S596 · Tamagochi",
+      "category": "Regional diésel ligero",
+      "traction": "diésel",
+      "carCount": 1,
+      "status": "Serie incluida en el manual oficialRenfe 2024. Dotación operativa en 2022 pendiente.",
+      "sources": [
+        "renfe-manual-2024"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": null,
+      "seatedCapacity": [
+        171
+      ],
+      "maxSpeedKmH": [],
+      "gaugeMm": [],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": null,
+      "warnings": [
+        "Proyecto de 12 M€ y 10 meses previstos por unidad: no equivale a fecha real de terminación. Reforma prevista para 171 asientos más 2 PMR. No considerarlos operativos en enero de 2022."
+      ],
+      "id": "s490_reformado",
+      "series": "490",
+      "name": "S490 · Alaris reformado para MD",
+      "category": "Media distancia",
+      "traction": "eléctrica",
+      "pmrCapacity": 2,
+      "status": "Remodelación anunciada el 19 de mayo de 2022. Entrada comercial posterior no acreditada.",
+      "sources": [
+        "renfe-s490-2022"
+      ]
+    },
+    {
+      "operationalUnits2022": null,
+      "operationalUnits2026": null,
+      "constructedUnitsReported": null,
+      "totalCapacity": null,
+      "seatedCapacity": [],
+      "maxSpeedKmH": [
+        200
+      ],
+      "gaugeMm": [],
+      "powerKw": [],
+      "voltage": null,
+      "lengthM": null,
+      "massT": null,
+      "builder": null,
+      "warnings": [
+        "La locomotora no aporta asientos. La capacidad depende de la composición remolcada y no debe inventarse un número fijo."
+      ],
+      "id": "l334",
+      "series": "334",
+      "name": "Locomotora 334 + composición Talgo",
+      "category": "Larga distancia remolcada",
+      "traction": "diésel-eléctrica",
+      "status": "Descripción oficial de Renfe para remolcar trenesTalgo. Dotación en 2022 pendiente.",
+      "sources": [
+        "renfe-manual-2024"
+      ]
+    }
+  ],
+  "unresolvedCoverage": [
+    "Locomotoras 252/319/333 de Viajeros y turísticos: faltan fichas individuales verificadas en una fuente actual del operador. El Anuario FFE 2025 permite continuar la investigación.",
+    "Ramas Talgo IV / V / VI / VII y coches de trenes turísticos: no equivalen a una serie autopropulsada ni cuentan como asientos de locomotora.",
+    "Serie 462: variante histórica del catálogo; actividad independiente en 2022 sin acreditar.",
+    "Las nuevas series métricas 412/413/714 tienen documentación de planificación OSP, pero el anexo no se ha podido descargar por el límite de tamaño de la herramienta web.",
+    "No hay aquí actas de entrega por unidad ni identificaciones diarias del material."
+  ]
+}

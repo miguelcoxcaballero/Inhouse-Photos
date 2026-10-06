@@ -1,0 +1,312 @@
+{
+  "retrieved": "2026-10-06",
+  "scope": "Dos muestras oficiales de horario. No es el horario completo nacional ni garantiza vigencia futura.",
+  "samples": [
+    {
+      "id": "cadiz-c1a-2022",
+      "network": "cadiz",
+      "line": "C1a",
+      "validFrom": "2022-10-26",
+      "validUntil": null,
+      "temporalStatus": "historical2022",
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Horarios/pdf/horarios-cadiz-renfe-tranvia.pdf",
+      "calendar": {
+        "weekdays": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "excludePublicHolidays": true,
+        "excludeUniversityNonTeachingDays": true,
+        "exceptionDates": null,
+        "note": "El PDF no enumera todas las fechas académicas; no convertir a calendario anual completo sin ese calendario."
+      },
+      "stops": [
+        {
+          "stationId": 51416,
+          "name": "Universidad de Cádiz",
+          "lat": 36.5307956,
+          "lon": -6.2040894
+        },
+        {
+          "stationId": 51415,
+          "name": "Las Aletas",
+          "lat": 36.544106,
+          "lon": -6.198661
+        }
+      ],
+      "trips": [
+        {
+          "from": 51416,
+          "to": 51415,
+          "times": [
+            "08:33",
+            "08:36"
+          ],
+          "trainNumber": null,
+          "rollingStockSeries": null
+        },
+        {
+          "from": 51416,
+          "to": 51415,
+          "times": [
+            "09:31",
+            "09:34"
+          ],
+          "trainNumber": null,
+          "rollingStockSeries": null
+        },
+        {
+          "from": 51416,
+          "to": 51415,
+          "times": [
+            "14:15",
+            "14:18"
+          ],
+          "trainNumber": null,
+          "rollingStockSeries": null
+        },
+        {
+          "from": 51416,
+          "to": 51415,
+          "times": [
+            "15:12",
+            "15:15"
+          ],
+          "trainNumber": null,
+          "rollingStockSeries": null
+        },
+        {
+          "from": 51416,
+          "to": 51415,
+          "times": [
+            "18:30",
+            "18:33"
+          ],
+          "trainNumber": null,
+          "rollingStockSeries": null
+        },
+        {
+          "from": 51416,
+          "to": 51415,
+          "times": [
+            "19:30",
+            "19:33"
+          ],
+          "trainNumber": null,
+          "rollingStockSeries": null
+        },
+        {
+          "from": 51415,
+          "to": 51416,
+          "times": [
+            "08:15",
+            "08:18"
+          ],
+          "trainNumber": null,
+          "rollingStockSeries": null
+        },
+        {
+          "from": 51415,
+          "to": 51416,
+          "times": [
+            "09:25",
+            "09:28"
+          ],
+          "trainNumber": null,
+          "rollingStockSeries": null
+        },
+        {
+          "from": 51415,
+          "to": 51416,
+          "times": [
+            "14:03",
+            "14:06"
+          ],
+          "trainNumber": null,
+          "rollingStockSeries": null
+        },
+        {
+          "from": 51415,
+          "to": 51416,
+          "times": [
+            "15:05",
+            "15:08"
+          ],
+          "trainNumber": null,
+          "rollingStockSeries": null
+        },
+        {
+          "from": 51415,
+          "to": 51416,
+          "times": [
+            "18:23",
+            "18:26"
+          ],
+          "trainNumber": null,
+          "rollingStockSeries": null
+        },
+        {
+          "from": 51415,
+          "to": 51416,
+          "times": [
+            "19:23",
+            "19:26"
+          ],
+          "trainNumber": null,
+          "rollingStockSeries": null
+        }
+      ],
+      "note": "No hay números comerciales ni serie asignada en la tabla. Horas verificadas como pares origen/destino en PDF, con duración3min."
+    },
+    {
+      "id": "bilbao-c5-2026",
+      "network": "bilbao",
+      "line": "C5",
+      "validFrom": "2026-05-06",
+      "validUntil": null,
+      "temporalStatus": "publishedAtOpening2026",
+      "source": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/05/nueva-linea-c5-karrantza-enkarterri-mas-mejor-conectados",
+      "activationSource": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/04/nueva-linea-c5-karrantza-aranguren-6-mayo",
+      "gauge": "metric",
+      "traction": "electric",
+      "rollingStockSeries": "436",
+      "stops": [
+        5497,
+        5493,
+        5489,
+        5487,
+        5484,
+        5473
+      ],
+      "stopNames": [
+        "Karrantza",
+        "Villaverde de Trucíos",
+        "Artzentales",
+        "Traslaviña",
+        "Mimetiz",
+        "Aranguren"
+      ],
+      "departures": [
+        {
+          "from": 5497,
+          "to": 5473,
+          "departure": "08:30",
+          "calendar": "workdays",
+          "arrival": null,
+          "intermediateTimes": null,
+          "trainNumber": null
+        },
+        {
+          "from": 5497,
+          "to": 5473,
+          "departure": "11:35",
+          "calendar": "workdays",
+          "arrival": null,
+          "intermediateTimes": null,
+          "trainNumber": null
+        },
+        {
+          "from": 5497,
+          "to": 5473,
+          "departure": "13:15",
+          "calendar": "daily",
+          "arrival": null,
+          "intermediateTimes": null,
+          "trainNumber": null
+        },
+        {
+          "from": 5497,
+          "to": 5473,
+          "departure": "17:27",
+          "calendar": "workdays",
+          "arrival": null,
+          "intermediateTimes": null,
+          "trainNumber": null
+        },
+        {
+          "from": 5497,
+          "to": 5473,
+          "departure": "19:07",
+          "calendar": "workdays",
+          "arrival": null,
+          "intermediateTimes": null,
+          "trainNumber": null
+        },
+        {
+          "from": 5473,
+          "to": 5497,
+          "departure": "07:35",
+          "calendar": "workdays",
+          "arrival": null,
+          "intermediateTimes": null,
+          "trainNumber": null
+        },
+        {
+          "from": 5473,
+          "to": 5497,
+          "departure": "10:45",
+          "calendar": "workdays",
+          "arrival": null,
+          "intermediateTimes": null,
+          "trainNumber": null
+        },
+        {
+          "from": 5473,
+          "to": 5497,
+          "departure": "12:26",
+          "calendar": "daily",
+          "arrival": null,
+          "intermediateTimes": null,
+          "trainNumber": null
+        },
+        {
+          "from": 5473,
+          "to": 5497,
+          "departure": "16:30",
+          "calendar": "workdays",
+          "arrival": null,
+          "intermediateTimes": null,
+          "trainNumber": null
+        },
+        {
+          "from": 5473,
+          "to": 5497,
+          "departure": "18:18",
+          "calendar": "workdays",
+          "arrival": null,
+          "intermediateTimes": null,
+          "trainNumber": null
+        }
+      ],
+      "calendars": {
+        "workdays": {
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "excludePublicHolidays": true,
+          "exceptionDates": null
+        },
+        "daily": {
+          "weekdays": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "excludePublicHolidays": false
+        }
+      },
+      "note": "Renfe solo publica horas de salida en esta noticia. No rellenar horas intermedias, llegada ni duración como datos reales. Series436verificada paraC4/C5 en noticia de activación, no identificación de unidad física."
+    }
+  ]
+}

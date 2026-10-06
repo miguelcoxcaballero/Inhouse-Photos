@@ -1,0 +1,15 @@
+Ampliación de datos ferroviarios: 63 líneas de Cercanías del inventario oficial de extremos consultado en octubre de2026.
+
+Se recuperaron60 trazados continuos sobre vías OSM existentes, pasando por todos los puntos intermedios suministrados. SevillaC4 recorre sus cuatro puntos intermedios y vuelve a SantaJusta: longitud geodésica estimada20,1km. Las líneas regionales adicionales de Cataluña no se incluyeron en esta tanda de63.
+
+Los caminos faltantes se conservan con status unavailable. RodaliesR3 no tiene continuidad compatible en el extracto OSM consultado. MadridC9 no tiene vía cercana a Cotos en este extracto; esto no acredita el cierre actual del servicio. Murcia/AlicanteC2 no tiene continuidad compatible cerca deLorca/Águilas. No se añadieron líneas rectas para rellenar esos vacíos.
+
+Los ajustes en las áreas de estación admiten vías paralelas dentro de aproximadamente220m de las coordenadas oficiales, para evitar rodeos causados por elegir una plataforma concreta. Algunos extremos tienen distancias mayores que quedan recogidas en snaps.offsetMetres: MálagaC1/C2 aproximadamente730m enCentroAlameda y ValènciaC2 aproximadamente440m. Estos extremos deben mostrarse como cobertura aproximada en la interfaz.
+
+Los caminos no sustituyen un esquema de explotación, un horario oficial ni un inventario certificado de infraestructura. La fuente OSM distribuida por el espejo es una instantánea con commit2026-04-06, cuya fecha de extracción no está documentada. Algunas coordenadas de estaciones provienen de catálogos oficiales antiguos (legacy=true en los snaps).
+
+lengthKm es longitud geodésica estimada (Haversine). EnCercanías se calcula con los vértices OSM originales antes de simplificar el dibujo; en las54 rutas estratégicas con el trazado simplificado a18m. planarKm conserva la longitud plana anterior para auditoría. La longitud geográfica no equivale necesariamente al kilometrado oficial de explotación.
+
+Contexto oficial de las discontinuidades: Adif publica obras de duplicación/remodelación Parets–LaGarriga con interrupción desde7 deoctubre de2025 (https://www.adif.es/w/parets-valles-la-garriga-r3-rodalies). Renfe documentó autobuses por obrasC9 hasta5 deabril de2026 (https://grupo.renfe.com/es/gl/sala-de-prensa/noticias/2025/09/pat-c9-madrid-obras), mientras que la página de productoC9 vuelve a publicar horarios ferroviarios (https://www.renfe.com/es/es/cercanias/cercanias-madrid/ofertas-mas-populares/linea-C9-zona-verde). No se deduce una situación actual deC9 únicamente de la ausencia cartográfica enel extracto.
+
+Licencia de la geometría ferroviaria y los datos derivados: ODbL1.0, ©OpenStreetMap contributors. VerLICENSE-OSM.txt ysource-manifest.json.

@@ -1,0 +1,59 @@
+CATÁLOGO DE MATERIAL RENFE PARA IBERIA FERROVIARIA
+Consulta: 6 de octubre de 2026.
+
+Entregables
+1. renfe_fichas_2020_raw.json: los 38 registros originales del dataset de Renfe Data, con todos sus campos. El dataset se publicó en abril de 2020 bajo CC BY 4.0. Contiene 37 registros de viajeros y uno de mercancías. No es un inventario de todas las unidades activas en 2022.
+2. renfe_flota_catalogo_v2.json: 56 registros normalizados de series, variantes y programas. Añade S106 (4 variantes), S107 autopropulsado, S452, S453 T100/T200, S460, S480 (3 variantes), nuevos CAF de ancho métrico, Alpino S402, S440, S596, S490 reformado y locomotora S334. Incluye 30 referencias y advertencias por ficha.
+
+Uso recomendado en el juego
+- Mostrar una ficha por serie o variante. Matrículas y asignaciones diarias no están verificadas aquí. Si el juego genera identificadores de unidad, debe decir que son de la partida.
+- Separar asientos de capacidad total con viajeros de pie. Por ejemplo, Renfe anuncia 277 asientos y 748 plazas totales en el Civia 465 para Valencia en agosto de 2026. La ficha histórica describe otra densidad de viajeros de pie y llega a 997. No hay contradicción mecánica automática: difiere el criterio de capacidad o la configuración.
+- Los valores desconocidos son null o listas vacías. No sustituirlos por cifras aparentemente exactas. Se pueden usar parámetros de simulación adicionales, identificados como tales.
+- Las velocidades de diseño no son las velocidades de cada recorrido. La vía, señalización, parada, gálibo y autorización del vehículo deben limitar el servicio.
+- Unidades construidas no son unidades operativas. No usar constructedUnitsReported para crear sin más la flota de enero de 2022.
+- Una opción contractual no se entrega hasta ser ejercida. Una previsión de entrega no acredita recepción, homologación ni servicio comercial.
+
+Actualizaciones que requieren corregir la primera versión
+1. S453 Stadler: la nota oficial de septiembre de 2026 confirma incorporación y unidades ya en servicio en Madrid. La nota de abril preveía 9 T100 y 8 T200 durante el año, pero no es un acta de todas las entregas. El pedido total es 79. Las 912/1884 plazas incluyen viajeros de pie.
+2. S480 CAF Media Distancia: Moncloa anunció el 17 de junio de 2026 que ya se han adquirido 70, no solo los 60 documentados en 2023. Son 61 de ancho ibérico (15 básicos, 46 ampliados) y 9 ampliados UIC. La incorporación se estima desde 2027, empezando por la red valenciana. Añadir una ampliación posterior de 10, conservando la cronología del pedido base y la opción de 32 sin duplicarlos. La fecha exacta del acto contractual de esos 10 adicionales no se ha obtenido aquí.
+3. S106: 10 AVE fijos, 10 AVE de rodadura desplazable, 5 Avlo fijos y 5 Avlo de rodadura desplazable suman los 30. Renfe anuncia 507/581 plazas y el primer servicio fue el 21 de mayo de 2024. La ficha antigua de futuro decía 521 y debe ceder ante el anuncio de puesta en circulación.
+4. S107: 26 cabezas motrices forman 13 trenes completos. Las ramas transformadas usadas previamente remolcadas pertenecen al mismo programa. No crear dos flotas al sumar coches reformados y futuras motrices. Talgo publica capacidad de 405 y máximo 330 km/h. La entrada comercial del tren autopropulsado no queda confirmada en estas fuentes al corte.
+5. S490: Renfe anunció en mayo de 2022 una remodelación para 171 asientos y 2 plazas PMR, con 12 M€ y diez meses previstos por unidad. Ese anuncio no prueba terminación ni servicio comercial en 2023/2026. Debe comenzar como material a deshibernar o programa de reforma, con el plazo del juego claramente simulado.
+
+Series incluidas en la base oficial, además de las nuevas
+Alta velocidad y ancho variable: 100, 102, 103, 104, 112, 112M Avlo, 114, 120, 121, 130, 730.
+Media Distancia: 448, 449, 470, 592 (MD), 592 (Cercanías), 594, 598, 599.
+Cercanías eléctrico: Civia 462, 463, 464, 465; 442 alpino; 446, 447, 450, 451.
+Ancho métrico, nomenclatura histórica FEVE: 2400, 2600, 2700, 2900, 3300, 3500, 3600, 3800.
+Trenhotel figura en el dataset, pero no debe suponerse que presta servicios regulares al comienzo de 2022.
+
+Discrepancias relevantes de las propias fuentes oficiales
+S100: 347 en dataset; 329/332 en la ficha descriptiva antigua.
+S102: 334 en dataset; 316 en ficha antigua.
+S112: 365 en dataset; 353 en ficha antigua; 348 en folleto del 30 aniversario publicado en 2022.
+S103: 404/405 en ficha antigua; 422 en anuario FFE 2025.
+S121: 282 en dataset; 280 asientos y una PMR en ficha técnica.
+S449: 257 en dataset; la ficha mezcla 258+1 PMR y 260.
+S594: 123/105 en dataset; otras configuraciones 126+1 PMR y 124 en ficha.
+S598: 169 en dataset; la ficha mezcla 186 y 188+1 PMR.
+S599: 181 en dataset; una configuración antigua aparece como 184+1 PMR.
+S446: el dataset llama asíncronos a los motores, pero la ficha detallada dice corriente continua. Se ha omitido ese campo de la normalización.
+No existe un único valor universal de asientos por serie en todas las fechas y reformas. Para el detalle del juego se debe escoger una configuración fechada y mantenerla visible.
+
+Lo que todavía falta para poder afirmar «todos y cada uno»
+- Matrículas de cada unidad física, bajas, reservas, reformas y recepción en cada fecha.
+- Asignación de serie y composición de cada circulación diaria. Un horario público no acredita qué matrícula realiza ese tren.
+- Completar locomotoras de Viajeros 252, 319, 333 y ramas Talgo IV/V/VI/VII, además de composiciones turísticas. La ficha de una locomotora no aporta asientos.
+- Verificar configuración independiente de Civia 462 al inicio. La existencia de su ficha histórica no garantiza unidades de dos coches activas en 2022.
+- Validar numeración y cantidades finales de nuevas variantes métricas (412/413/714): hay anexos oficiales de planificación, pero su gran PDF no fue descargable con la herramienta web.
+
+Fuentes principales
+Dataset y licencia: https://data.renfe.com/dataset/fichas-nuestros-trenes/resource/4877096a-160f-4fb2-925d-d261b51a065f
+JSON oficial: https://data.renfe.com/datastore/dump/4877096a-160f-4fb2-925d-d261b51a065f?format=json
+S453 en servicio: https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/09/renfe-realiza-ajustes-trenes-stadler
+S480, 70 adquiridos: https://www.lamoncloa.gob.es/serviciosdeprensa/notasprensa/transportes-movilidad-sostenible/paginas/2026/170626-nuevos-trenes-renfe.aspx
+S106, variantes y estreno: https://www.renfe.com/es/es/grupo-renfe/comunicacion/renfe-al-dia/sala-de-prensa/renfe-pone-circulacion-s106-incremento-14400-plazas-para-servicios-avlo-circulan-madrid-aragon-cataluna-comunitat-valenciana-murcia
+S107, fabricante: https://www.talgo.com/es/alta-velocidad
+S490, reforma: https://www.renfe.com/es/es/grupo-renfe/comunicacion/renfe-al-dia/sala-de-prensa/renfe-realizara-la-remodelacion-de-trenes-de-la-serie-490
+
+Esta investigación no ha modificado archivos del juego. Las fuentes y sus campos se entregan para revisión e integración por el agente principal.

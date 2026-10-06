@@ -1,0 +1,207 @@
+{
+ "meta": {
+  "snapshot": "2026-10-06",
+  "days": {
+   "L": "20261014",
+   "S": "20261017",
+   "D": "20261018"
+  },
+  "sources": [
+   {
+    "name": "Renfe Data · GTFS Cercanías (fomento_transit.zip)",
+    "url": "https://ssl.renfe.com/ftransit/Fichero_CER_FOMENTO/fomento_transit.zip",
+    "license": "CC BY 4.0"
+   },
+   {
+    "name": "Renfe Data · GTFS AV/LD/MD (google_transit.zip)",
+    "url": "https://ssl.renfe.com/gtransit/Fichero_AV_LD/google_transit.zip",
+    "license": "CC BY 4.0"
+   },
+   {
+    "name": "Copia diaria pública elguardagujas/renfe-gtfs-archive",
+    "url": "https://github.com/elguardagujas/renfe-gtfs-archive"
+   }
+  ],
+  "counts": {
+   "L": 6631,
+   "S": 5169,
+   "D": 5257
+  },
+  "geometry": {
+   "osm": 2048,
+   "shape": 369,
+   "straight": 201,
+   "road": 122
+  }
+ },
+ "stations": 1503,
+ "lines": 85,
+ "patterns": 1581,
+ "timings": 2847,
+ "edges": 2740,
+ "routes": 288,
+ "autoRoutes": 165,
+ "unmatchedTop": [
+  [
+   "x-barcelona--lleida",
+   30
+  ],
+  [
+   "x-vinaros--valencia",
+   30
+  ],
+  [
+   "x-alicante--villena",
+   29
+  ],
+  [
+   "x-calatayud--zaragoza",
+   28
+  ],
+  [
+   "x-madrid--segovia",
+   27
+  ],
+  [
+   "x-cadiz--jaen",
+   27
+  ],
+  [
+   "x-alcoi--valencia",
+   25
+  ],
+  [
+   "x-barcelona--reus",
+   25
+  ],
+  [
+   "x-malaga--sevilla",
+   24
+  ],
+  [
+   "x-madrid--puertollano",
+   23
+  ],
+  [
+   "x-medina-del-campo--valladolid",
+   23
+  ],
+  [
+   "x-barcelona--zaragoza",
+   20
+  ],
+  [
+   "x-barcelona--tortosa",
+   20
+  ],
+  [
+   "x-cordoba--cordoba",
+   19
+  ],
+  [
+   "x-requena-utiel--valencia",
+   18
+  ],
+  [
+   "x-granada--madrid",
+   17
+  ],
+  [
+   "x-madrid--requena-utiel",
+   17
+  ],
+  [
+   "x-cordoba--villarrubia-de-cordoba",
+   17
+  ],
+  [
+   "x-medina-del-campo--palencia",
+   17
+  ],
+  [
+   "x-calatayud--madrid",
+   16
+  ],
+  [
+   "x-tarragona--tarragona",
+   16
+  ],
+  [
+   "x-badajoz--caceres",
+   16
+  ],
+  [
+   "x-jaen--madrid",
+   16
+  ],
+  [
+   "x-irun--madrid",
+   15
+  ],
+  [
+   "x-cordoba--palma-del-rio",
+   14
+  ],
+  [
+   "x-lleida--cervera",
+   14
+  ],
+  [
+   "x-madrid--pamplona",
+   13
+  ],
+  [
+   "x-lleida--zaragoza",
+   13
+  ],
+  [
+   "x-malaga--el-chorro-caminito-del-rey",
+   13
+  ],
+  [
+   "x-lleida--terrassa-estacio-del-nord",
+   13
+  ],
+  [
+   "x-villa-del-rio--palma-del-rio",
+   11
+  ],
+  [
+   "x-madrid--illescas",
+   11
+  ],
+  [
+   "x-madrid--baides",
+   11
+  ],
+  [
+   "x-palencia--valladolid",
+   11
+  ],
+  [
+   "x-bilbao--miranda-de-ebro",
+   10
+  ],
+  [
+   "x-gijon--madrid",
+   10
+  ],
+  [
+   "x-portbou--cerbere",
+   10
+  ],
+  [
+   "x-madrid--santander",
+   9
+  ],
+  [
+   "x-salamanca--segovia",
+   9
+  ],
+  [
+   "x-huesca--madrid",
+   8
+  ]
+ ],
+ "bytes": 1441093
+}

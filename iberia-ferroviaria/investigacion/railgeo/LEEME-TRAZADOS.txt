@@ -1,0 +1,15 @@
+DATOS FERROVIARIOS RECUPERADOS EL2026-10-06
+
+railways-iberia-compact.json: fondo cartográfico ligero (3,4MB), 34.575 segmentos y102.895vértices. Esquema: properties[] tiene atributos comunes; lines[] contiene [indiceDeAtributos,coordenadas]. Coordenadas en longitud/latitud WGS84 de OSM. Solo vías railway=rail sin service; no metro ni tranvía. Se simplificaron los trazados a18m. Incluye Portugal y áreas limítrofes de Francia por los tiles seleccionados; no es un inventario certificado de activos Adif.
+
+railways-iberia-osm.geojson: mismo fondo con atributos explícitos, para GIS y redistribución de la base derivada.
+
+route-paths.json: 54caminos recuperados de56servicios originales de la campaña. El estado osm_path significa camino calculado sobre vías OSM reales, no itinerario validado por Renfe. Cada snap identifica estación oficial o aproximación urbana. No se trazaron líneas de relleno en discontinuidades; Murcia–Lorca y Murcia–Almería quedan unavailable por ausencia de continuidad ferroviaria compatible en el snapshot. Obras de esas rutas deberán dibujarse conceptualmente y etiquetarse como tales.
+
+routing-graph.json: grafo sin simplificar para futuras rutas. nodes[] son coordenadas y edges[] son [nodoInicial,nodoFinal,longitudCentimetros,indiceDeAtributos]. Cada arista se almacena una vez y es bidireccional para la cartografía. No modela enclavamientos, sentidos autorizados ni horarios de circulación.
+
+Método de caminos: A* por capas a través de todas las áreas de paradas intermedias; ancho estricto1435/1668/1000cuando consta; velocidad ponderada para AV; aristas existentes de vías principales y cruces físicos. Las áreas de estación admiten varias vías paralelas para evitar rodeos debidos a elegir una plataforma concreta. MadridAtocha/Chamartín, BarcelonaSants, CampTarragona/Tarragona, GuadalajaraYebes/Guadalajara, SegoviaGuiomar/Segovia, Girona, FigueresVilafant/Figueres, CuencaFernandoZóbel, ZaragozaDelicias, LleidaPirineus, ValladolidCampoGrande, Medina, Burgos, Palencia, León, Ourense, CiudadReal, Puertollano, Córdoba, Sevilla, Málaga, Albacete, Alicante, València, Antequera, Murcia, Cartagena yLorca usan coordenadas del catálogo de estaciones oficial de Renfe (work/cercanias/renfe-stations-official.json). El resto sigue usando aproximaciones urbanas claramente identificadas.
+
+La fecha verificable es el commit del espejo,2026-04-06; no consta fecha exacta de extracción OSM. Es una base estática2026 que no certifica el estado de red en2022 ni futuras aperturas. Los atributos de ancho pueden cambiar durante la campaña. Los kilómetros del informe son geométricos aproximados y no se deben usar como horarios oficiales.
+
+Fuentes oficiales adicionales investigadas, no descargadas ni usadas como geometría: IGN IGR-RT07/2026 (CC-BY4.0; catálogo nacionalhttps://centrodedescargas.cnig.es/CentroDescargas/catalogo.do?Serie=REDTR); WFShttps://servicios.idee.es/wfs-inspire/transportes; red Adifhttps://www.adif.es/sobre-adif/red-ferroviaria/mapa. La descarga directa de la red oficial estaba bloqueada en el entorno. No se utilizó el gist de servicios de2018, porque sus trazados solo conectan estaciones con rectas.

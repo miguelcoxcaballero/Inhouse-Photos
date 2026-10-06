@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import * as E from './dist/engine.js';
+import * as O from './dist/operations.js';
+import * as G from './dist/gtfs.js';
+import {REAL_STATIONS,COMMUTER_NETWORKS,REAL_TRAIN_CATALOGUE,REAL_DEPARTURES} from './dist/assets/realdata.js';
+import {RAIL_PATHS} from './dist/assets/railways.js';
+const s=E.initialState();s.started=true;E.decide(s,'inaugural',0);O.ensureOps(s);
+assert.equal(COMMUTER_NETWORKS.length,15);assert.equal(COMMUTER_NETWORKS.reduce((n,g)=>n+g.lines.filter(l=>l.type==='commuter').length,0),63);assert.equal(REAL_TRAIN_CATALOGUE.length,56);
+for(const group of COMMUTER_NETWORKS)for(const line of group.lines){assert(REAL_STATIONS.some(s=>s.id===line.fromStation));assert(REAL_STATIONS.some(s=>s.id===line.toStation));for(const id of line.viaStationIds)assert(E.initialState().routes.length&&REAL_STATIONS.some(s=>s.id===id));}
+assert.equal(Object.keys(RAIL_PATHS).length,114);assert(RAIL_PATHS['c-sevilla-c4'].coordinates.length>20);assert(RAIL_PATHS['madrid-valladolid'].lengthKm>170&&RAIL_PATHS['madrid-valladolid'].lengthKm<190);
+const plan=O.servicePlan(s),bounds=O.dayBounds(plan);O.startDay(s);assert.equal(s.ops.minute,bounds.first);assert.throws(()=>O.endDay(s),/último tren/);assert.throws(()=>E.configureRoute(s,'murcia-cartagena','f2',2,8),/jornada/);assert.throws(()=>E.closeRoute(s,s.routes[0].id),/jornada/);
+while(!O.moveClock(s,30)){};O.endDay(s);const after=s.cash;assert.throws(()=>O.endDay(s));assert.equal(s.cash,after);O.nextDay(s);assert.equal(s.ops.day,2);assert.equal(s.month,0);
+s.ops.day=31;O.startDay(s);while(!O.moveClock(s,180)){}O.endDay(s);O.nextDay(s);assert.equal(s.month,1);assert.equal(s.ops.day,1);
+assert(O.daylight(s,720).light>O.daylight(s,180).light);assert.equal(O.clockText(3000),'02:00 +2');assert.throws(()=>E.validateSave({...s,ops:{...s.ops,day:100}}),/Jornada/);
+const line=COMMUTER_NETWORKS.find(n=>n.id==='bilbao').lines.find(l=>l.code==='C5');assert.equal(line.activationDate,'2026-05-06');const r={unlock:52,availableFrom:line.activationDate};s.month=52;s.ops.day=5;assert.equal(E.isUnlocked(s,r),false);s.ops.day=6;assert.equal(E.isUnlocked(s,r),true);
+async function* chunks(){yield 'id,name\r';yield '\n1,"Cádiz, Universidad"\n2,"A';yield ' ""B""\nC"\n';}const rows=[];for await(const row of G.csvRecords(chunks()))rows.push(row);assert.equal(rows[0].name,'Cádiz, Universidad');assert.equal(rows[1].name,'A "B"\nC');
+assert.equal(G.gtfsMinutes('25:08:00'),1508);assert(Number.isNaN(G.gtfsMinutes('01:80:00')));
+const fake={version:1,name:'fixture',dateStart:'20220101',dateEnd:'20220131',stops:{a:{name:'A',lat:40,lon:-3},b:{name:'B',lat:41,lon:-2},c:{name:'C',lat:42,lon:-1}},routes:{r:{name:'R',color:'#ffaa00'}},trips:{t:{id:'t',route:'r',service:'s',times:[[1,'a',360,360],[2,'b',null,null],[3,'c',420,420]],frequencies:[{start:360,end:480,headway:10,exact:true}]}},calendar:[{service_id:'s',monday:'1',tuesday:'1',wednesday:'1',thursday:'1',friday:'1',saturday:'1',sunday:'1',start_date:'20220101',end_date:'20220131'}],exceptions:[['s','20220102',2]],shapes:{}};
+const trips=G.scheduleFor(fake,'2022-01-01');assert.equal(trips.length,12);assert.equal(trips[0].times.length,3);assert.equal(trips.at(-1).dep,470);assert.equal(G.scheduleFor(fake,'2022-01-02').length,0);const combined=G.combineFeeds(fake,{...fake,name:'other'});assert.equal(G.scheduleFor(combined,'2022-01-01').length,24);assert.equal(new Set(G.scheduleFor(combined,'2022-01-01').map(t=>t.id)).size,24);
+assert.equal(REAL_DEPARTURES.filter(t=>t.route==='sevilla-C4').length,20);assert(REAL_DEPARTURES.filter(t=>t.route==='sevilla-C4').every(t=>t.times.length===6));assert(REAL_DEPARTURES.filter(t=>t.route==='bilbao-C5').every(t=>t.arrival===null));
+console.log('✓15núcleos,63ramales,114trazados y56fichas; IDs de estaciones canónicos.\n✓Jornada completa, cierre único, bloqueo de cambios en circulación y cierre de mes.\n✓Luz estacional, guardado de jornada y fecha exacta de aperturaC5.\n✓CSV incremental, medianoche+2, calendarios/excepciones y frecuencias exactas.\n✓Feeds independientes y muestras oficiales sin inventar llegadas.');

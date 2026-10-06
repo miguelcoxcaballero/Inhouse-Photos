@@ -1,0 +1,632 @@
+{
+  "retrieved": "2026-10-06",
+  "scope": "Inventariode denominaciones comercialespublicadasconsultadoen2026; nocontiene todos loshorariosni todos lositinerariosGTFS.No representa1enero2022.",
+  "publisher": "FuentesprimariasRenfe yGeneralitatdeCatalunya",
+  "nuclei": [
+    {
+      "id": "asturias",
+      "name": "Asturias",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C2",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C3",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C4",
+          "gauge": "metric",
+          "traction": null
+        },
+        {
+          "code": "C5",
+          "gauge": "metric",
+          "traction": null
+        },
+        {
+          "code": "C5a",
+          "gauge": "metric",
+          "traction": null
+        },
+        {
+          "code": "C6",
+          "gauge": "metric",
+          "traction": null
+        },
+        {
+          "code": "C7",
+          "gauge": "metric",
+          "traction": null
+        },
+        {
+          "code": "C8",
+          "gauge": "metric",
+          "traction": null
+        }
+      ],
+      "sourceIds": [
+        "asturias"
+      ],
+      "snapshotEdition": "2026-01"
+    },
+    {
+      "id": "rodalies",
+      "name": "Rodalies Catalunya",
+      "subNetworks": [
+        {
+          "name": "Barcelona",
+          "codes": [
+            "R1",
+            "R2",
+            "R2Nord",
+            "R2Sud",
+            "R3",
+            "R4",
+            "R7",
+            "R8"
+          ]
+        },
+        {
+          "name": "Girona",
+          "codes": [
+            "RG1"
+          ]
+        },
+        {
+          "name": "Camp de Tarragona",
+          "codes": [
+            "RT1",
+            "RT2"
+          ]
+        },
+        {
+          "name": "Lleida",
+          "codes": [
+            "RL3",
+            "RL4"
+          ]
+        }
+      ],
+      "lines": [
+        {
+          "code": "R1",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "R2",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "R2Nord",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "R2Sud",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "R3",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "R4",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "R7",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "R8",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "RG1",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "RT1",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "RT2",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "RL3",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "RL4",
+          "gauge": "iberian",
+          "traction": null
+        }
+      ],
+      "regionalCodes": [
+        "R11",
+        "R13",
+        "R14",
+        "R15",
+        "R16",
+        "R17"
+      ],
+      "sourceIds": [
+        "rodalies",
+        "rodaliesBarcelona",
+        "rodaliesRegional",
+        "rodaliesTimes"
+      ],
+      "note": "Rodalies Catalunya agrupada como un núcleo en listado corporativo Renfe; tiene cuatro ámbitos de rodalia y además servicios regionales. La denominación R12 histórica está sustituida por RL3/RL4 en el catálogo actual; no trasladar este inventario directamente a2022."
+    },
+    {
+      "id": "bilbao",
+      "name": "Bilbao",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C2",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C3",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C4",
+          "gauge": "metric",
+          "traction": "electric"
+        },
+        {
+          "code": "C5",
+          "gauge": "metric",
+          "traction": "electric"
+        }
+      ],
+      "sourceIds": [
+        "bilbao",
+        "bilbaoC5",
+        "bilbaoC5Activation"
+      ],
+      "snapshotEdition": "2026-01 + C5 2026-05-06",
+      "note": "Plano enero2026 soloC1–C4; C5 comenzó6mayo2026, no existíaC5como servicio en2022."
+    },
+    {
+      "id": "cadiz",
+      "name": "Cádiz",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C1a",
+          "gauge": "iberian",
+          "traction": null
+        }
+      ],
+      "associatedServices": [
+        {
+          "code": "T1",
+          "name": "Trambahía",
+          "type": "tram-train",
+          "gauge": "iberian"
+        }
+      ],
+      "sourceIds": [
+        "cadiz"
+      ],
+      "snapshotEdition": "2025-04"
+    },
+    {
+      "id": "cantabria",
+      "name": "Cantabria",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C2",
+          "gauge": "metric",
+          "traction": null
+        },
+        {
+          "code": "C3",
+          "gauge": "metric",
+          "traction": null
+        }
+      ],
+      "sourceIds": [
+        "cantabria",
+        "cantabriaC3"
+      ],
+      "snapshotEdition": "2023-04 + aviso2026-09-14",
+      "note": "Aviso14sept2026 restablece tramoAstillero–Orejo en tren desde17sept2026; lahomepageantigua aún indicaautobús."
+    },
+    {
+      "id": "cartagena",
+      "name": "Cartagena",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "metric",
+          "traction": null
+        }
+      ],
+      "sourceIds": [
+        "cartagena"
+      ],
+      "snapshotEdition": "2025-09",
+      "endpoints": [
+        "Cartagena",
+        "Los Nietos"
+      ]
+    },
+    {
+      "id": "ferrol",
+      "name": "Ferrol",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "metric",
+          "traction": null
+        }
+      ],
+      "sourceIds": [
+        "ferrol"
+      ],
+      "snapshotEdition": "2025-04",
+      "endpoints": [
+        "Ferrol",
+        "Ortigueira"
+      ]
+    },
+    {
+      "id": "leon",
+      "name": "León",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "metric",
+          "traction": null
+        }
+      ],
+      "sourceIds": [
+        "leon"
+      ],
+      "snapshotEdition": "2025-01-20",
+      "endpoints": [
+        "León",
+        "Guardo Apeadero"
+      ],
+      "note": "Planoindicaautobúslanzadera León–AsunciónUniversidad; la operación ferroviaria parte deAsunciónUniversidad."
+    },
+    {
+      "id": "madrid",
+      "name": "Madrid",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C2",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C3",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C4a",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C4b",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C5",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C7",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C8a",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C8b",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C9",
+          "gauge": "metric",
+          "traction": null
+        },
+        {
+          "code": "C10",
+          "gauge": "iberian",
+          "traction": null
+        }
+      ],
+      "associatedServices": [
+        {
+          "code": "CIVIS",
+          "type": "limited-stop-pattern",
+          "note": "Patróncomercialdeservicio, no línea adicional."
+        }
+      ],
+      "sourceIds": [
+        "madrid"
+      ],
+      "snapshotEdition": "2025-01",
+      "note": "C4a/b yC8a/b son denominacionesde ramas; no contarCIVIScomootralínea."
+    },
+    {
+      "id": "malaga",
+      "name": "Málaga",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C2",
+          "gauge": "iberian",
+          "traction": null
+        }
+      ],
+      "sourceIds": [
+        "malaga"
+      ],
+      "snapshotEdition": "2025-04"
+    },
+    {
+      "id": "murciaAlicante",
+      "name": "Murcia/Alicante",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C2",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C3",
+          "gauge": "iberian",
+          "traction": null
+        }
+      ],
+      "sourceIds": [
+        "murciaAlicante",
+        "murciaAlicanteC2"
+      ],
+      "snapshotEdition": "2025-08",
+      "note": "C2apareceenplanoperoestáinterrumpida porobras, conplanalternativoporcarretera. Existencialíneanogarantizatrencirculando."
+    },
+    {
+      "id": "sanSebastian",
+      "name": "San Sebastián",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "iberian",
+          "traction": null
+        }
+      ],
+      "sourceIds": [
+        "sanSebastian"
+      ],
+      "snapshotEdition": "Revisión2026-04-21",
+      "endpoints": [
+        "Irún",
+        "Brínkola"
+      ]
+    },
+    {
+      "id": "sevilla",
+      "name": "Sevilla",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C2",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C3",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C4",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C5",
+          "gauge": "iberian",
+          "traction": null
+        }
+      ],
+      "sourceIds": [
+        "sevilla"
+      ],
+      "snapshotEdition": "2025"
+    },
+    {
+      "id": "valencia",
+      "name": "València",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C2",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C3",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C5",
+          "gauge": "iberian",
+          "traction": null
+        },
+        {
+          "code": "C6",
+          "gauge": "iberian",
+          "traction": null
+        }
+      ],
+      "sourceIds": [
+        "valencia"
+      ],
+      "snapshotEdition": "2025-06",
+      "note": "C4noapareceenplanocorrienteconsultado. No afirmarcerrada definitivamentesinfuente."
+    },
+    {
+      "id": "zaragoza",
+      "name": "Zaragoza",
+      "lines": [
+        {
+          "code": "C1",
+          "gauge": "iberian",
+          "traction": null
+        }
+      ],
+      "sourceIds": [
+        "zaragoza"
+      ],
+      "snapshotEdition": "2025-08",
+      "endpoints": [
+        "Casetas",
+        "Zaragoza Miraflores"
+      ]
+    }
+  ],
+  "sourceUrls": {
+    "all": "https://grupo.renfe.com/es/es/sociedades/viajeros/cercanias",
+    "asturias": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf",
+    "rodalies": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+    "rodaliesBarcelona": "https://rodalies.gencat.cat/ca/sobre-rodalies/linies-i-estacions/servei_rodalia_barcelona/",
+    "rodaliesRegional": "https://rodalies.gencat.cat/ca/sobre-rodalies/linies-i-estacions/servei_regionals/",
+    "rodaliesTimes": "https://rodalies.gencat.cat/ca/horaris/tots-els-horaris/",
+    "bilbao": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-bilbao-enero-2026.pdf",
+    "bilbaoC5": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/05/nueva-linea-c5-karrantza-enkarterri-mas-mejor-conectados",
+    "bilbaoC5Activation": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/04/nueva-linea-c5-karrantza-aranguren-6-mayo",
+    "cadiz": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_cadiz_cercanias_abril2025-b.pdf",
+    "cantabria": "https://www.renfe.com/content/dam/renfe/es/Comunicaci%C3%B3n-y-renfe-al-dia/sala-de-prensa/Local-Delegacion-Noroeste/PDF-y-otros/Mapa%20zonas%20tarifa%20%C3%BAnica%20Cantabria.pdf",
+    "cantabriaC3": "https://grupo.renfe.com/es/es/sala-de-prensa/avisos/2026/septiembre/renfe-modificara-horarios-c3-r3-santander-Lierganes-y-bilbao",
+    "cartagena": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-cartagena-sep2025.pdf",
+    "ferrol": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_ferrol_cercanias_abril_2025.pdf",
+    "leon": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/feve/leon_guardo_20_01_2025.pdf",
+    "madrid": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Madrid_Cercanias.pdf",
+    "malaga": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_malaga_abril_2025.pdf",
+    "murciaAlicante": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_murcia_alicante_agosto_2025.pdf",
+    "murciaAlicanteC2": "https://www.renfe.com/es/es/cercanias/cercanias-murcia-alicante/horarios-cercanias-murcia-alicante",
+    "sanSebastian": "https://www.renfe.com/es/es/cercanias/cercanias-san-sebastian/atencion-al-cliente/carta-servicios",
+    "sevilla": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Sevilla_Cercanias.pdf",
+    "valencia": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Valencia_Cercanias_junio_2025.pdf",
+    "zaragoza": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_zaragoza_agosto_2025.pdf",
+    "gtfsCercanias": "https://data.renfe.com/dataset/horarios-cercanias",
+    "gtfsAVLDMD": "https://data.renfe.com/dataset/horarios-de-alta-velocidad-larga-distancia-y-media-distancia",
+    "stationCatalog": "https://data.renfe.com/dataset/estaciones-listado-completo",
+    "gtfsStandard": "https://gtfs.org/es/documentation/schedule/reference/",
+    "metricRegional": "https://www.renfe.com/es/gl/cercanias/cercanias-am/mapas"
+  },
+  "count": {
+    "corporateNuclei": 15,
+    "commuterCommercialCodes": 63,
+    "associatedTramTrainCodes": 1,
+    "catalanRegionalCodes": 6
+  },
+  "metricRegionalServices": [
+    {
+      "code": "R1",
+      "endpoints": [
+        "Ferrol",
+        "Oviedo",
+        "Gijón"
+      ]
+    },
+    {
+      "code": "R2",
+      "endpoints": [
+        "Oviedo",
+        "Santander"
+      ]
+    },
+    {
+      "code": "R3",
+      "endpoints": [
+        "Santander",
+        "Bilbao"
+      ]
+    },
+    {
+      "code": "R4",
+      "endpoints": [
+        "León",
+        "Bilbao"
+      ]
+    }
+  ],
+  "metricRegionalSource": "metricRegional",
+  "licenseNote": "El inventario propio contiene datos fácticos y enlaces. CC BY4.0verificadaenelcatálogoRenfeparaGTFS yestaciones; no atribuimosesa licenciaalosmapasPDFsinconfirmación."
+}

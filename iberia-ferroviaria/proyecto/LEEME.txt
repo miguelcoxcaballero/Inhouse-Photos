@@ -1,0 +1,47 @@
+IBERIA FERROVIARIA — VERSIÓN JUGABLE 0.3
+Actualización: 6 de octubre de 2026.
+
+PARA JUGAR
+Abre outputs/Iberia-Ferroviaria.html con Chrome, Edge o Firefox actualizados. Funciona sin Internet y sin instalar nada; solo los enlaces a fuentes necesitan conexión.
+Pulsa «Asumir la dirección» y resuelve la primera decisión. «Solo mirar el horario real» abre el mapa en modo observación, sin campaña.
+
+UN DÍA, UN TURNO
+Cada jornada empieza con la salida del primer tren y termina con la llegada del último (normalmente entre las 04:30 y la 01:30 del día siguiente). En la preparación ajustas líneas, material y tarifas; durante la jornada el reloj avanza (1×, 3×, 10× o 30×) y los trenes recorren sus trazados; al final lees el parte del día y pasas a la siguiente. La tesorería se liquida al cerrar el mes. «Delegar mes» avanza sin jugar cada día.
+Incidencias: averías, fallos de infraestructura, intrusiones en la vía y meteorología según la estación. Puedes movilizar un equipo de intervención, organizar un plan por carretera o esperar. La pausa automática se puede desactivar en Jornada.
+
+TODOS LOS TRENES REALES
+El juego incluye el horario oficial de Renfe (GTFS de Cercanías/Rodalies y de AV/LD/MD publicado el 6 de octubre de 2026) para tres días tipo: laborable (6.631 circulaciones), sábado (5.169) y domingo o festivo (5.257). Están todos los núcleos de Cercanías (Madrid, Rodalies de Catalunya, València, Bilbao, Asturias, Sevilla, Málaga, Cádiz, Murcia/Alicante, Cantabria, San Sebastián, Zaragoza, Cartagena, Ferrol y León), todas sus líneas y todos los productos AVE, AVLO, Avant, Alvia, Intercity, Euromed, Media Distancia, Regional, Regional Exprés, Proximidad y Trencelta, con su número de tren, paradas y horas. También los autobuses que Renfe publica como servicio alternativo por obras.
+En la campaña, cada relación abierta ofrece las circulaciones reales que tú decidas (de una a todas las del horario), repartidas a lo largo del día y por sentido. La capa «Horario real» del mapa muestra todas las circulaciones publicadas, independientemente de la campaña. En «Horarios» puedes consultar el panel de salidas de cualquier estación.
+Los festivos nacionales usan el horario de domingo; los autonómicos y locales no se modelan. Es el horario de 2026: la campaña lo usa como base desde 2022, sin reconstruir la oferta histórica de cada año. El GTFS no publica el material asignado ni la matrícula.
+
+MAPA
+Arrastra para moverte; rueda, botones o pinza para ampliar (hasta ver cada estación). Las líneas siguen trazados reales: shapes del GTFS de Cercanías y caminos calculados sobre la red OSM para AV/LD/MD, según ancho y velocidad. Un 3,4 % del trazado (vía estrecha fuera del extracto OSM y Francia) se dibuja como enlace aproximado discontinuo.
+La luz sigue la altura del sol calculada para la fecha, la hora oficial y la longitud: el ocaso avanza de este a oeste. De noche se encienden ciudades, estaciones y faros de los trenes.
+Pulsa una vía para gestionar su línea, un tren para seguirlo con sus paradas, una estación para ver su panel de salidas o una obra para visitarla. En la capa «Obras», al acercarte se ven el tramo terminado, las traviesas, los hitos de cada fase y el frente de obra.
+Relieve y ríos son una ilustración esquemática.
+
+GUARDADO
+Guardado automático en el navegador. Exporta la partida (.json) desde «Guardar» para conservarla. Las partidas de la versión 0.2 se pueden importar: se añaden las nuevas relaciones del horario oficial.
+
+PROYECTO EDITABLE (proyecto/)
+dist/schedule.js: horario oficial en tiempo de ejecución, tramos y posición de los trenes.
+dist/network.js: relaciones jugables (56 corredores de campaña + 232 líneas y relaciones del horario oficial).
+dist/operations.js: jornadas por turnos, incidencias, sol y fases de obra.
+dist/engine.js: economía mensual, flota, compras, obras y validación de partidas.
+dist/map-v3.js: mapa ilustrado, luz, red, trenes, estaciones y obras.
+dist/app.js, dist/index.html, dist/style-v3.css: interfaz.
+dist/story.js, dist/data.js, dist/gtfs.js: campaña, catálogo y fuentes, importador GTFS.
+dist/assets/timetable.js: horario procesado (generado). dist/assets/fonts: Fraunces, Figtree e IBM Plex Mono (SIL OFL).
+tools/build_timetable.py: regenera el horario a partir de los ZIP GTFS (Python 3 con numpy).
+Comandos desde proyecto/: «npm run timetable» regenera el horario; «npm run build» genera ../outputs/Iberia-Ferroviaria.html; «npm test» ejecuta test.mjs, v2-test.mjs y v3-test.mjs; «node ui-v3-test.mjs <ruta a playwright>» hace el recorrido de interfaz y guarda capturas en investigacion/verificacion-v0.3.
+
+DATOS Y ALCANCE
+Hechos con fuente: horarios y paradas (GTFS Renfe), estaciones, vías OSM, proyectos de infraestructura, contratos de material y fichas técnicas.
+Ficción de campaña: escasez inicial, cierres de 2022 y personajes (Pedro Sancho, Raquel Sanz y Óscar del Puente son caricaturas originales con nombres y diálogos inventados).
+Simulación: demanda, tarifas medias, cuentas, unidades necesarias (estimadas con el pico de trenes simultáneos del horario), incidencias, obras y todo 2027–2050.
+
+LICENCIAS
+Horarios: Renfe Data, CC BY 4.0 (https://data.renfe.com). Copia de los ZIP: investigacion/gtfs/, obtenidos del archivo público https://github.com/elguardagujas/renfe-gtfs-archive (el servidor ssl.renfe.com no era accesible desde el entorno de trabajo).
+Vías: © OpenStreetMap contributors, ODbL 1.0 (LICENSE-OSM.txt). España y Portugal: georgique/world-geojson, GPL-3.0 (LICENSE-GEODATA.txt). Otros contornos: Natural Earth, dominio público.
+Tipografías: SIL Open Font License 1.1 (dist/assets/fonts).
+Las marcas identifican operadores y fabricantes. No es un producto oficial de Renfe, Adif ni Alsa.

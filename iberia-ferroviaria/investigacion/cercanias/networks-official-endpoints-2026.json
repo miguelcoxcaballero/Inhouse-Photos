@@ -1,0 +1,4720 @@
+{
+  "retrieved": "2026-10-06",
+  "scope": "Current published commercial line inventory, not a complete daily timetable and not a reconstruction of 1 January 2022. 15 corporate nuclei, 63 commuter line/branch codes, 6 Catalan regional codes and one associated tram-train. Every commuter endpoint matched to an official Renfe station record.",
+  "license": "Factual compilation with source URLs. Underlying station catalogues: CC BY 4.0; do not infer PDF artwork license.",
+  "counts": {
+    "networks": 15,
+    "commuterLines": 63,
+    "regionalLines": 6,
+    "associatedTramTrain": 1
+  },
+  "sources": {
+    "all": "https://grupo.renfe.com/es/es/sociedades/viajeros/cercanias",
+    "asturias": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf",
+    "rodalies": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+    "rodaliesBarcelona": "https://rodalies.gencat.cat/ca/sobre-rodalies/linies-i-estacions/servei_rodalia_barcelona/",
+    "rodaliesRegional": "https://rodalies.gencat.cat/ca/sobre-rodalies/linies-i-estacions/servei_regionals/",
+    "rodaliesTimes": "https://rodalies.gencat.cat/ca/horaris/tots-els-horaris/",
+    "bilbao": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-bilbao-enero-2026.pdf",
+    "bilbaoC5": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/05/nueva-linea-c5-karrantza-enkarterri-mas-mejor-conectados",
+    "bilbaoC5Activation": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/04/nueva-linea-c5-karrantza-aranguren-6-mayo",
+    "cadiz": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_cadiz_cercanias_abril2025-b.pdf",
+    "cantabria": "https://www.renfe.com/content/dam/renfe/es/Comunicaci%C3%B3n-y-renfe-al-dia/sala-de-prensa/Local-Delegacion-Noroeste/PDF-y-otros/Mapa%20zonas%20tarifa%20%C3%BAnica%20Cantabria.pdf",
+    "cantabriaC3": "https://grupo.renfe.com/es/es/sala-de-prensa/avisos/2026/septiembre/renfe-modificara-horarios-c3-r3-santander-Lierganes-y-bilbao",
+    "cartagena": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-cartagena-sep2025.pdf",
+    "ferrol": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_ferrol_cercanias_abril_2025.pdf",
+    "leon": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/feve/leon_guardo_20_01_2025.pdf",
+    "madrid": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Madrid_Cercanias.pdf",
+    "malaga": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_malaga_abril_2025.pdf",
+    "murciaAlicante": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_murcia_alicante_agosto_2025.pdf",
+    "murciaAlicanteC2": "https://www.renfe.com/es/es/cercanias/cercanias-murcia-alicante/horarios-cercanias-murcia-alicante",
+    "sanSebastian": "https://www.renfe.com/es/es/cercanias/cercanias-san-sebastian/atencion-al-cliente/carta-servicios",
+    "sevilla": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Sevilla_Cercanias.pdf",
+    "valencia": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Valencia_Cercanias_junio_2025.pdf",
+    "zaragoza": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_zaragoza_agosto_2025.pdf",
+    "gtfsCercanias": "https://data.renfe.com/dataset/horarios-cercanias",
+    "gtfsAVLDMD": "https://data.renfe.com/dataset/horarios-de-alta-velocidad-larga-distancia-y-media-distancia",
+    "stationCatalog": "https://data.renfe.com/dataset/estaciones-listado-completo",
+    "gtfsStandard": "https://gtfs.org/es/documentation/schedule/reference/",
+    "metricRegional": "https://www.renfe.com/es/gl/cercanias/cercanias-am/mapas",
+    "madridCRTM": "https://www.crtm.es/tu-transporte-publico/cercanias-renfe/lineas"
+  },
+  "networks": [
+    {
+      "id": "asturias",
+      "name": "Asturias",
+      "lon": -5.854838,
+      "lat": 43.3663577,
+      "centerStationId": 15211,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf"
+      ],
+      "snapshotEdition": "2026-01",
+      "note": null,
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Gijón-Sanz Crespo – Puente de Los Fierros",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Gijón-Sanz Crespo",
+          "to": "Puente de Los Fierros",
+          "via": [
+            "Oviedo"
+          ],
+          "fromStationId": 15410,
+          "toStationId": 15118,
+          "viaStationIds": [
+            15211
+          ],
+          "stationIds": [
+            15410,
+            15211,
+            15118
+          ],
+          "fromStation": {
+            "id": "15410",
+            "code": 15410,
+            "name": "GIJÓN-SANZ CRESPO",
+            "lat": 43.5377329,
+            "lon": -5.6758089,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "15118",
+            "code": 15118,
+            "name": "PUENTE DE LOS FIERROS",
+            "lat": 43.0715986,
+            "lon": -5.769465,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Oviedo",
+              "station": {
+                "id": "15211",
+                "code": 15211,
+                "name": "OVIEDO",
+                "lat": 43.3663577,
+                "lon": -5.854838,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf",
+          "snapshotEdition": "2026-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C2",
+          "name": "C2 · Oviedo – El Entrego",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Oviedo",
+          "to": "El Entrego",
+          "via": [],
+          "fromStationId": 15211,
+          "toStationId": 16011,
+          "viaStationIds": [],
+          "stationIds": [
+            15211,
+            16011
+          ],
+          "fromStation": {
+            "id": "15211",
+            "code": 15211,
+            "name": "OVIEDO",
+            "lat": 43.3663577,
+            "lon": -5.854838,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "16011",
+            "code": 16011,
+            "name": "EL ENTREGO",
+            "lat": 43.287207,
+            "lon": -5.644622,
+            "source": "https://data.renfe.com/datastore/dump/6b73014a-e5bd-4b0e-b17b-1f8abe47a90f?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf",
+          "snapshotEdition": "2026-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C3",
+          "name": "C3 · Llamaquique – San Juan de Nieva",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Llamaquique",
+          "to": "San Juan de Nieva",
+          "via": [],
+          "fromStationId": 15218,
+          "toStationId": 16405,
+          "viaStationIds": [],
+          "stationIds": [
+            15218,
+            16405
+          ],
+          "fromStation": {
+            "id": "15218",
+            "code": 15218,
+            "name": "LLAMAQUIQUE",
+            "lat": 43.3588282,
+            "lon": -5.8573201,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "16405",
+            "code": 16405,
+            "name": "SAN JUAN DE NIEVA",
+            "lat": 43.587884,
+            "lon": -5.93136,
+            "source": "https://data.renfe.com/datastore/dump/6b73014a-e5bd-4b0e-b17b-1f8abe47a90f?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf",
+          "snapshotEdition": "2026-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C4",
+          "name": "C4 · Gijón-Sanz Crespo – Cudillero",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Gijón-Sanz Crespo",
+          "to": "Cudillero",
+          "via": [
+            "Avilés",
+            "Pravia"
+          ],
+          "fromStationId": 15410,
+          "toStationId": 5245,
+          "viaStationIds": [
+            16403,
+            5325
+          ],
+          "stationIds": [
+            15410,
+            16403,
+            5325,
+            5245
+          ],
+          "fromStation": {
+            "id": "15410",
+            "code": 15410,
+            "name": "GIJÓN-SANZ CRESPO",
+            "lat": 43.5377329,
+            "lon": -5.6758089,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "05245",
+            "code": 5245,
+            "name": "CUDILLERO",
+            "lat": 43.5509259,
+            "lon": -6.1519305,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Avilés",
+              "station": {
+                "id": "16403",
+                "code": 16403,
+                "name": "AVILÉS",
+                "lat": 43.561339,
+                "lon": -5.9228329,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Pravia",
+              "station": {
+                "id": "05325",
+                "code": 5325,
+                "name": "PRAVIA",
+                "lat": 43.4908983,
+                "lon": -6.1105373,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf",
+          "snapshotEdition": "2026-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C5",
+          "name": "C5 · Gijón-Sanz Crespo – Laviana",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Gijón-Sanz Crespo",
+          "to": "Laviana",
+          "via": [
+            "El Berrón"
+          ],
+          "fromStationId": 15410,
+          "toStationId": 5443,
+          "viaStationIds": [
+            5509
+          ],
+          "stationIds": [
+            15410,
+            5509,
+            5443
+          ],
+          "fromStation": {
+            "id": "15410",
+            "code": 15410,
+            "name": "GIJÓN-SANZ CRESPO",
+            "lat": 43.5377329,
+            "lon": -5.6758089,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "05443",
+            "code": 5443,
+            "name": "LAVIANA",
+            "lat": 43.250796,
+            "lon": -5.564669,
+            "source": "https://data.renfe.com/datastore/dump/4de015e6-987c-43ae-9350-8bf941ef66c7?format=json",
+            "dataModified": "2021-03-09",
+            "legacy": true
+          },
+          "viaStations": [
+            {
+              "name": "El Berrón",
+              "station": {
+                "id": "05509",
+                "code": 5509,
+                "name": "EL BERRÓN",
+                "lat": 43.3827383,
+                "lon": -5.7026774,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf",
+          "snapshotEdition": "2026-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C5a",
+          "name": "C5a · Gijón-Sanz Crespo – Oviedo",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Gijón-Sanz Crespo",
+          "to": "Oviedo",
+          "via": [
+            "El Berrón"
+          ],
+          "fromStationId": 15410,
+          "toStationId": 15211,
+          "viaStationIds": [
+            5509
+          ],
+          "stationIds": [
+            15410,
+            5509,
+            15211
+          ],
+          "fromStation": {
+            "id": "15410",
+            "code": 15410,
+            "name": "GIJÓN-SANZ CRESPO",
+            "lat": 43.5377329,
+            "lon": -5.6758089,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "15211",
+            "code": 15211,
+            "name": "OVIEDO",
+            "lat": 43.3663577,
+            "lon": -5.854838,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "El Berrón",
+              "station": {
+                "id": "05509",
+                "code": 5509,
+                "name": "EL BERRÓN",
+                "lat": 43.3827383,
+                "lon": -5.7026774,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf",
+          "snapshotEdition": "2026-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C6",
+          "name": "C6 · Oviedo – Infiesto Apeadero",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Oviedo",
+          "to": "Infiesto Apeadero",
+          "via": [
+            "El Berrón",
+            "Nava"
+          ],
+          "fromStationId": 15211,
+          "toStationId": 5534,
+          "viaStationIds": [
+            5509,
+            5523
+          ],
+          "stationIds": [
+            15211,
+            5509,
+            5523,
+            5534
+          ],
+          "fromStation": {
+            "id": "15211",
+            "code": 15211,
+            "name": "OVIEDO",
+            "lat": 43.3663577,
+            "lon": -5.854838,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "05534",
+            "code": 5534,
+            "name": "INFIESTO APEADERO",
+            "lat": 43.3440407,
+            "lon": -5.3606414,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "El Berrón",
+              "station": {
+                "id": "05509",
+                "code": 5509,
+                "name": "EL BERRÓN",
+                "lat": 43.3827383,
+                "lon": -5.7026774,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Nava",
+              "station": {
+                "id": "05523",
+                "code": 5523,
+                "name": "NAVA",
+                "lat": 43.3611878,
+                "lon": -5.5090986,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf",
+          "snapshotEdition": "2026-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C7",
+          "name": "C7 · San Esteban – Oviedo",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "San Esteban",
+          "to": "Oviedo",
+          "via": [
+            "Pravia",
+            "Trubia"
+          ],
+          "fromStationId": 5329,
+          "toStationId": 15211,
+          "viaStationIds": [
+            5325,
+            5311
+          ],
+          "stationIds": [
+            5329,
+            5325,
+            5311,
+            15211
+          ],
+          "fromStation": {
+            "id": "05329",
+            "code": 5329,
+            "name": "SAN ESTEBAN",
+            "lat": 43.552084,
+            "lon": -6.087238,
+            "source": "https://data.renfe.com/datastore/dump/4de015e6-987c-43ae-9350-8bf941ef66c7?format=json",
+            "dataModified": "2021-03-09",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "15211",
+            "code": 15211,
+            "name": "OVIEDO",
+            "lat": 43.3663577,
+            "lon": -5.854838,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Pravia",
+              "station": {
+                "id": "05325",
+                "code": 5325,
+                "name": "PRAVIA",
+                "lat": 43.4908983,
+                "lon": -6.1105373,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Trubia",
+              "station": {
+                "id": "05311",
+                "code": 5311,
+                "name": "TRUBIA",
+                "lat": 43.34857,
+                "lon": -5.9677756,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf",
+          "snapshotEdition": "2026-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C8",
+          "name": "C8 · Baiña – Collanzo",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Baiña",
+          "to": "Collanzo",
+          "via": [
+            "Moreda de Aller"
+          ],
+          "fromStationId": 5361,
+          "toStationId": 5389,
+          "viaStationIds": [
+            5379
+          ],
+          "stationIds": [
+            5361,
+            5379,
+            5389
+          ],
+          "fromStation": {
+            "id": "05361",
+            "code": 5361,
+            "name": "BAIÑA",
+            "lat": 43.274489,
+            "lon": -5.828259,
+            "source": "https://data.renfe.com/datastore/dump/4de015e6-987c-43ae-9350-8bf941ef66c7?format=json",
+            "dataModified": "2021-03-09",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "05389",
+            "code": 5389,
+            "name": "COLLANZO",
+            "lat": 43.124085,
+            "lon": -5.56619,
+            "source": "https://data.renfe.com/datastore/dump/4de015e6-987c-43ae-9350-8bf941ef66c7?format=json",
+            "dataModified": "2021-03-09",
+            "legacy": true
+          },
+          "viaStations": [
+            {
+              "name": "Moreda de Aller",
+              "station": {
+                "id": "05379",
+                "code": 5379,
+                "name": "MOREDA DE ALLER",
+                "lat": 43.171343,
+                "lon": -5.742092,
+                "source": "https://data.renfe.com/datastore/dump/4de015e6-987c-43ae-9350-8bf941ef66c7?format=json",
+                "dataModified": "2021-03-09",
+                "legacy": true
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Asturias_Cercanias_enero2026.pdf",
+          "snapshotEdition": "2026-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    },
+    {
+      "id": "rodalies",
+      "name": "Rodalies Catalunya",
+      "lon": 2.14101688,
+      "lat": 41.3798632,
+      "centerStationId": 71801,
+      "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+      "sources": [
+        "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+        "https://rodalies.gencat.cat/ca/sobre-rodalies/linies-i-estacions/servei_rodalia_barcelona/",
+        "https://rodalies.gencat.cat/ca/sobre-rodalies/linies-i-estacions/servei_regionals/",
+        "https://rodalies.gencat.cat/ca/horaris/tots-els-horaris/"
+      ],
+      "snapshotEdition": "Consulted 2026-10-06",
+      "note": "Rodalies Catalunya agrupada como un núcleo en listado corporativo Renfe; tiene cuatro ámbitos de rodalia y además servicios regionales. La denominación R12 histórica está sustituida por RL3/RL4 en el catálogo actual; no trasladar este inventario directamente a2022.",
+      "subNetworks": [
+        {
+          "name": "Barcelona",
+          "codes": [
+            "R1",
+            "R2",
+            "R2Nord",
+            "R2Sud",
+            "R3",
+            "R4",
+            "R7",
+            "R8"
+          ]
+        },
+        {
+          "name": "Girona",
+          "codes": [
+            "RG1"
+          ]
+        },
+        {
+          "name": "Camp de Tarragona",
+          "codes": [
+            "RT1",
+            "RT2"
+          ]
+        },
+        {
+          "name": "Lleida",
+          "codes": [
+            "RL3",
+            "RL4"
+          ]
+        }
+      ],
+      "lines": [
+        {
+          "code": "R1",
+          "name": "R1 · Molins de Rei – Maçanet-Massanes",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Molins de Rei",
+          "to": "Maçanet-Massanes",
+          "via": [
+            "Mataró"
+          ],
+          "fromStationId": 72300,
+          "toStationId": 79200,
+          "viaStationIds": [
+            79500
+          ],
+          "stationIds": [
+            72300,
+            79500,
+            79200
+          ],
+          "fromStation": {
+            "id": "72300",
+            "code": 72300,
+            "name": "MOLINS DE REI",
+            "lat": 41.4106681,
+            "lon": 2.0200844,
+            "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "79200",
+            "code": 79200,
+            "name": "MAÇANET-MASSANES",
+            "lat": 41.7724212,
+            "lon": 2.67385865,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Mataró",
+              "station": {
+                "id": "79500",
+                "code": 79500,
+                "name": "MATARO",
+                "lat": 41.533679,
+                "lon": 2.4454458,
+                "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "R2",
+          "name": "R2 · Castelldefels – Granollers Centre",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Castelldefels",
+          "to": "Granollers Centre",
+          "via": [],
+          "fromStationId": 71705,
+          "toStationId": 79100,
+          "viaStationIds": [],
+          "stationIds": [
+            71705,
+            79100
+          ],
+          "fromStation": {
+            "id": "71705",
+            "code": 71705,
+            "name": "CASTELLDEFELS",
+            "lat": 41.2787584,
+            "lon": 1.9786173,
+            "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "79100",
+            "code": 79100,
+            "name": "GRANOLLERS-CENTRE",
+            "lat": 41.5997447,
+            "lon": 2.29126962,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "R2Nord",
+          "name": "R2Nord · Aeroport – Maçanet-Massanes",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Aeroport",
+          "to": "Maçanet-Massanes",
+          "via": [
+            "Granollers Centre"
+          ],
+          "fromStationId": 72400,
+          "toStationId": 79200,
+          "viaStationIds": [
+            79100
+          ],
+          "stationIds": [
+            72400,
+            79100,
+            79200
+          ],
+          "fromStation": {
+            "id": "72400",
+            "code": 72400,
+            "name": "AEROPORT",
+            "lat": 41.3038736,
+            "lon": 2.0724734,
+            "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "79200",
+            "code": 79200,
+            "name": "MAÇANET-MASSANES",
+            "lat": 41.7724212,
+            "lon": 2.67385865,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Granollers Centre",
+              "station": {
+                "id": "79100",
+                "code": 79100,
+                "name": "GRANOLLERS-CENTRE",
+                "lat": 41.5997447,
+                "lon": 2.29126962,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "R2Sud",
+          "name": "R2Sud · Barcelona Estació de França – Sant Vicenç de Calders",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Barcelona Estació de França",
+          "to": "Sant Vicenç de Calders",
+          "via": [
+            "Vilanova i la Geltrú"
+          ],
+          "fromStationId": 79400,
+          "toStationId": 71600,
+          "viaStationIds": [
+            71700
+          ],
+          "stationIds": [
+            79400,
+            71700,
+            71600
+          ],
+          "fromStation": {
+            "id": "79400",
+            "code": 79400,
+            "name": "BARCELONA ESTACIÓ DE FRANÇA",
+            "lat": 41.3844866,
+            "lon": 2.18534785,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "71600",
+            "code": 71600,
+            "name": "SANT VICENÇ DE CALDERS",
+            "lat": 41.1862102,
+            "lon": 1.52480358,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Vilanova i la Geltrú",
+              "station": {
+                "id": "71700",
+                "code": 71700,
+                "name": "VILANOVA I LA GELTRÚ",
+                "lat": 41.2203207,
+                "lon": 1.73077249,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "R3",
+          "name": "R3 · L'Hospitalet de Llobregat – Puigcerdà",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "L'Hospitalet de Llobregat",
+          "to": "Puigcerdà",
+          "via": [
+            "Vic"
+          ],
+          "fromStationId": 72305,
+          "toStationId": 77309,
+          "viaStationIds": [
+            77109
+          ],
+          "stationIds": [
+            72305,
+            77109,
+            77309
+          ],
+          "fromStation": {
+            "id": "72305",
+            "code": 72305,
+            "name": "L'HOSPITALET DE LLOBREGAT",
+            "lat": 41.364207,
+            "lon": 2.09866,
+            "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "77309",
+            "code": 77309,
+            "name": "PUIGCERDA",
+            "lat": 42.429518,
+            "lon": 1.9246499,
+            "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [
+            {
+              "name": "Vic",
+              "station": {
+                "id": "77109",
+                "code": 77109,
+                "name": "VIC",
+                "lat": 41.9310634,
+                "lon": 2.2489051,
+                "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "R4",
+          "name": "R4 · Sant Vicenç de Calders – Manresa",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Sant Vicenç de Calders",
+          "to": "Manresa",
+          "via": [
+            "Vilafranca del Penedès"
+          ],
+          "fromStationId": 71600,
+          "toStationId": 78600,
+          "viaStationIds": [
+            72204
+          ],
+          "stationIds": [
+            71600,
+            72204,
+            78600
+          ],
+          "fromStation": {
+            "id": "71600",
+            "code": 71600,
+            "name": "SANT VICENÇ DE CALDERS",
+            "lat": 41.1862102,
+            "lon": 1.52480358,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "78600",
+            "code": 78600,
+            "name": "MANRESA",
+            "lat": 41.7203921,
+            "lon": 1.82648564,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Vilafranca del Penedès",
+              "station": {
+                "id": "72204",
+                "code": 72204,
+                "name": "VILAFRANCA DEL PENEDES",
+                "lat": 41.3422231,
+                "lon": 1.7067992,
+                "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "R7",
+          "name": "R7 · Barcelona Fabra i Puig – Cerdanyola Universitat",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Barcelona Fabra i Puig",
+          "to": "Cerdanyola Universitat",
+          "via": [],
+          "fromStationId": 78802,
+          "toStationId": 72503,
+          "viaStationIds": [],
+          "stationIds": [
+            78802,
+            72503
+          ],
+          "fromStation": {
+            "id": "78802",
+            "code": 78802,
+            "name": "SANT ANDREU ARENAL",
+            "lat": 41.4317406,
+            "lon": 2.1824497,
+            "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "72503",
+            "code": 72503,
+            "name": "CERDANYOLA UNIVERSITAT",
+            "lat": 41.4960945,
+            "lon": 2.1150336,
+            "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops.",
+          "note": "Fabra i Puig corresponds to historical station name Sant Andreu Arenal, code 78802. Check temporary works changes against GTFS before claiming daily operation."
+        },
+        {
+          "code": "R8",
+          "name": "R8 · Martorell Central – Granollers Centre",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Martorell Central",
+          "to": "Granollers Centre",
+          "via": [],
+          "fromStationId": 72209,
+          "toStationId": 79100,
+          "viaStationIds": [],
+          "stationIds": [
+            72209,
+            79100
+          ],
+          "fromStation": {
+            "id": "72209",
+            "code": 72209,
+            "name": "MARTORELL",
+            "lat": 41.4794339,
+            "lon": 1.9266805,
+            "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "79100",
+            "code": 79100,
+            "name": "GRANOLLERS-CENTRE",
+            "lat": 41.5997447,
+            "lon": 2.29126962,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "RG1",
+          "name": "RG1 · L'Hospitalet de Llobregat – Portbou",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "L'Hospitalet de Llobregat",
+          "to": "Portbou",
+          "via": [
+            "Mataró",
+            "Girona",
+            "Figueres"
+          ],
+          "fromStationId": 72305,
+          "toStationId": 79315,
+          "viaStationIds": [
+            79500,
+            79300,
+            79309
+          ],
+          "stationIds": [
+            72305,
+            79500,
+            79300,
+            79309,
+            79315
+          ],
+          "fromStation": {
+            "id": "72305",
+            "code": 72305,
+            "name": "L'HOSPITALET DE LLOBREGAT",
+            "lat": 41.364207,
+            "lon": 2.09866,
+            "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "79315",
+            "code": 79315,
+            "name": "PORTBOU",
+            "lat": 42.4245908,
+            "lon": 3.15801841,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Mataró",
+              "station": {
+                "id": "79500",
+                "code": 79500,
+                "name": "MATARO",
+                "lat": 41.533679,
+                "lon": 2.4454458,
+                "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            },
+            {
+              "name": "Girona",
+              "station": {
+                "id": "79300",
+                "code": 79300,
+                "name": "GIRONA",
+                "lat": 41.9793629,
+                "lon": 2.81693689,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Figueres",
+              "station": {
+                "id": "79309",
+                "code": 79309,
+                "name": "FIGUERES",
+                "lat": 42.2651134,
+                "lon": 2.96880074,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "RT1",
+          "name": "RT1 · Tarragona – La Plana-Picamoixons",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Tarragona",
+          "to": "La Plana-Picamoixons",
+          "via": [
+            "Reus"
+          ],
+          "fromStationId": 71500,
+          "toStationId": 73100,
+          "viaStationIds": [
+            71400
+          ],
+          "stationIds": [
+            71500,
+            71400,
+            73100
+          ],
+          "fromStation": {
+            "id": "71500",
+            "code": 71500,
+            "name": "TARRAGONA",
+            "lat": 41.1115636,
+            "lon": 1.25322776,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "73100",
+            "code": 73100,
+            "name": "LA PLANA-PICAMOIXONS",
+            "lat": 41.3061987,
+            "lon": 1.19488293,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Reus",
+              "station": {
+                "id": "71400",
+                "code": 71400,
+                "name": "REUS",
+                "lat": 41.1605229,
+                "lon": 1.10008978,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops.",
+          "note": "Timetable page gives La Plana-Picamoixons; regional catalogue also gives Tarragona–Reus. Planned endpoint is not a guarantee every train runs the full route."
+        },
+        {
+          "code": "RT2",
+          "name": "RT2 · L'Arboç – Salou-Port Aventura",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "L'Arboç",
+          "to": "Salou-Port Aventura",
+          "via": [
+            "Tarragona"
+          ],
+          "fromStationId": 72202,
+          "toStationId": 65411,
+          "viaStationIds": [
+            71500
+          ],
+          "stationIds": [
+            72202,
+            71500,
+            65411
+          ],
+          "fromStation": {
+            "id": "72202",
+            "code": 72202,
+            "name": "L'ARBOÇ",
+            "lat": 41.2738229,
+            "lon": 1.6001033,
+            "source": "https://data.renfe.com/datastore/dump/e3969f12-aff2-468e-9b82-a65a6dd1a0d3?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "65411",
+            "code": 65411,
+            "name": "SALOU-PORT AVENTURA",
+            "lat": 41.0884798,
+            "lon": 1.14605195,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Tarragona",
+              "station": {
+                "id": "71500",
+                "code": 71500,
+                "name": "TARRAGONA",
+                "lat": 41.1115636,
+                "lon": 1.25322776,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops.",
+          "note": "Current map/timetable endpoint Salou-Port Aventura; older regional catalogue lists L'Hospitalet de l'Infant."
+        },
+        {
+          "code": "RL3",
+          "name": "RL3 · Cervera – Lleida-Pirineus",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Cervera",
+          "to": "Lleida-Pirineus",
+          "via": [],
+          "fromStationId": 78500,
+          "toStationId": 78400,
+          "viaStationIds": [],
+          "stationIds": [
+            78500,
+            78400
+          ],
+          "fromStation": {
+            "id": "78500",
+            "code": 78500,
+            "name": "CERVERA",
+            "lat": 41.673611,
+            "lon": 1.274773,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "78400",
+            "code": 78400,
+            "name": "LLEIDA-PIRINEUS",
+            "lat": 41.62013,
+            "lon": 0.63365328,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "RL4",
+          "name": "RL4 · Terrassa Estació del Nord – Lleida-Pirineus",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Terrassa Estació del Nord",
+          "to": "Lleida-Pirineus",
+          "via": [
+            "Manresa"
+          ],
+          "fromStationId": 78700,
+          "toStationId": 78400,
+          "viaStationIds": [
+            78600
+          ],
+          "stationIds": [
+            78700,
+            78600,
+            78400
+          ],
+          "fromStation": {
+            "id": "78700",
+            "code": 78700,
+            "name": "TERRASSA ESTACIÓ DEL NORD",
+            "lat": 41.5697825,
+            "lon": 2.01435428,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "78400",
+            "code": 78400,
+            "name": "LLEIDA-PIRINEUS",
+            "lat": 41.62013,
+            "lon": 0.63365328,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Manresa",
+              "station": {
+                "id": "78600",
+                "code": 78600,
+                "name": "MANRESA",
+                "lat": 41.7203921,
+                "lon": 1.82648564,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "regionalLines": [
+        {
+          "code": "R11",
+          "name": "R11 · Barcelona Sants – Portbou",
+          "type": "regional",
+          "gauge": "iberian",
+          "from": "Barcelona Sants",
+          "to": "Portbou",
+          "via": [
+            "Granollers Centre",
+            "Girona"
+          ],
+          "fromStationId": 71801,
+          "toStationId": 79315,
+          "viaStationIds": [
+            79100,
+            79300
+          ],
+          "stationIds": [
+            71801,
+            79100,
+            79300,
+            79315
+          ],
+          "fromStation": {
+            "id": "71801",
+            "code": 71801,
+            "name": "BARCELONA-SANTS",
+            "lat": 41.3798632,
+            "lon": 2.14101688,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "79315",
+            "code": 79315,
+            "name": "PORTBOU",
+            "lat": 42.4245908,
+            "lon": 3.15801841,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Granollers Centre",
+              "station": {
+                "id": "79100",
+                "code": 79100,
+                "name": "GRANOLLERS-CENTRE",
+                "lat": 41.5997447,
+                "lon": 2.29126962,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Girona",
+              "station": {
+                "id": "79300",
+                "code": 79300,
+                "name": "GIRONA",
+                "lat": 41.9793629,
+                "lon": 2.81693689,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "R13",
+          "name": "R13 · Barcelona Estació de França – Lleida-Pirineus",
+          "type": "regional",
+          "gauge": "iberian",
+          "from": "Barcelona Estació de França",
+          "to": "Lleida-Pirineus",
+          "via": [
+            "Valls"
+          ],
+          "fromStationId": 79400,
+          "toStationId": 78400,
+          "viaStationIds": [
+            76004
+          ],
+          "stationIds": [
+            79400,
+            76004,
+            78400
+          ],
+          "fromStation": {
+            "id": "79400",
+            "code": 79400,
+            "name": "BARCELONA ESTACIÓ DE FRANÇA",
+            "lat": 41.3844866,
+            "lon": 2.18534785,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "78400",
+            "code": 78400,
+            "name": "LLEIDA-PIRINEUS",
+            "lat": 41.62013,
+            "lon": 0.63365328,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Valls",
+              "station": {
+                "id": "76004",
+                "code": 76004,
+                "name": "VALLS",
+                "lat": 41.2896079,
+                "lon": 1.25865179,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "R14",
+          "name": "R14 · Barcelona Estació de França – Lleida-Pirineus",
+          "type": "regional",
+          "gauge": "iberian",
+          "from": "Barcelona Estació de França",
+          "to": "Lleida-Pirineus",
+          "via": [
+            "Tarragona",
+            "Reus"
+          ],
+          "fromStationId": 79400,
+          "toStationId": 78400,
+          "viaStationIds": [
+            71500,
+            71400
+          ],
+          "stationIds": [
+            79400,
+            71500,
+            71400,
+            78400
+          ],
+          "fromStation": {
+            "id": "79400",
+            "code": 79400,
+            "name": "BARCELONA ESTACIÓ DE FRANÇA",
+            "lat": 41.3844866,
+            "lon": 2.18534785,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "78400",
+            "code": 78400,
+            "name": "LLEIDA-PIRINEUS",
+            "lat": 41.62013,
+            "lon": 0.63365328,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Tarragona",
+              "station": {
+                "id": "71500",
+                "code": 71500,
+                "name": "TARRAGONA",
+                "lat": 41.1115636,
+                "lon": 1.25322776,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Reus",
+              "station": {
+                "id": "71400",
+                "code": 71400,
+                "name": "REUS",
+                "lat": 41.1605229,
+                "lon": 1.10008978,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "R15",
+          "name": "R15 · Barcelona Estació de França – Riba-roja d'Ebre",
+          "type": "regional",
+          "gauge": "iberian",
+          "from": "Barcelona Estació de França",
+          "to": "Riba-roja d'Ebre",
+          "via": [
+            "Reus"
+          ],
+          "fromStationId": 79400,
+          "toStationId": 71209,
+          "viaStationIds": [
+            71400
+          ],
+          "stationIds": [
+            79400,
+            71400,
+            71209
+          ],
+          "fromStation": {
+            "id": "79400",
+            "code": 79400,
+            "name": "BARCELONA ESTACIÓ DE FRANÇA",
+            "lat": 41.3844866,
+            "lon": 2.18534785,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "71209",
+            "code": 71209,
+            "name": "RIBA-ROJA D'EBRE",
+            "lat": 41.2485594,
+            "lon": 0.48103178,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Reus",
+              "station": {
+                "id": "71400",
+                "code": 71400,
+                "name": "REUS",
+                "lat": 41.1605229,
+                "lon": 1.10008978,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "R16",
+          "name": "R16 · Barcelona Estació de França – Ulldecona",
+          "type": "regional",
+          "gauge": "iberian",
+          "from": "Barcelona Estació de França",
+          "to": "Ulldecona",
+          "via": [
+            "Tarragona"
+          ],
+          "fromStationId": 79400,
+          "toStationId": 65314,
+          "viaStationIds": [
+            71500
+          ],
+          "stationIds": [
+            79400,
+            71500,
+            65314
+          ],
+          "fromStation": {
+            "id": "79400",
+            "code": 79400,
+            "name": "BARCELONA ESTACIÓ DE FRANÇA",
+            "lat": 41.3844866,
+            "lon": 2.18534785,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "65314",
+            "code": 65314,
+            "name": "ULLDECONA-ALCANAR-LA SÉNIA",
+            "lat": 40.5959267,
+            "lon": 0.44927448,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Tarragona",
+              "station": {
+                "id": "71500",
+                "code": 71500,
+                "name": "TARRAGONA",
+                "lat": 41.1115636,
+                "lon": 1.25322776,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops.",
+          "branches": [
+            {
+              "to": "Tortosa",
+              "toStation": {
+                "id": "65400",
+                "code": 65400,
+                "name": "TORTOSA",
+                "lat": 40.807333,
+                "lon": 0.5230136,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              },
+              "toStationId": 65400
+            },
+            {
+              "to": "Ulldecona",
+              "toStation": {
+                "id": "65314",
+                "code": 65314,
+                "name": "ULLDECONA-ALCANAR-LA SÉNIA",
+                "lat": 40.5959267,
+                "lon": 0.44927448,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              },
+              "toStationId": 65314
+            }
+          ],
+          "note": "Two terminal branches. A service to Ulldecona must not be forced to call at the Tortosa branch."
+        },
+        {
+          "code": "R17",
+          "name": "R17 · Barcelona Estació de França – Salou-Port Aventura",
+          "type": "regional",
+          "gauge": "iberian",
+          "from": "Barcelona Estació de França",
+          "to": "Salou-Port Aventura",
+          "via": [],
+          "fromStationId": 79400,
+          "toStationId": 65411,
+          "viaStationIds": [],
+          "stationIds": [
+            79400,
+            65411
+          ],
+          "fromStation": {
+            "id": "79400",
+            "code": 79400,
+            "name": "BARCELONA ESTACIÓ DE FRANÇA",
+            "lat": 41.3844866,
+            "lon": 2.18534785,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "65411",
+            "code": 65411,
+            "name": "SALOU-PORT AVENTURA",
+            "lat": 41.0884798,
+            "lon": 1.14605195,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://rodalies.gencat.cat/es/sobre-rodalies/que-son-rodalies-de-catalunya/",
+          "snapshotEdition": "Consulted 2026-10-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "associatedServices": []
+    },
+    {
+      "id": "bilbao",
+      "name": "Bilbao",
+      "lon": -2.9285592,
+      "lat": 43.2601304,
+      "centerStationId": 13200,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-bilbao-enero-2026.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-bilbao-enero-2026.pdf",
+        "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/05/nueva-linea-c5-karrantza-enkarterri-mas-mejor-conectados",
+        "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/04/nueva-linea-c5-karrantza-aranguren-6-mayo"
+      ],
+      "snapshotEdition": "2026-01 + C5 2026-05-06",
+      "note": "Plano enero2026 soloC1–C4; C5 comenzó6mayo2026, no existíaC5como servicio en2022.",
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Bilbao Abando – Santurtzi",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Bilbao Abando",
+          "to": "Santurtzi",
+          "via": [],
+          "fromStationId": 13200,
+          "toStationId": 13405,
+          "viaStationIds": [],
+          "stationIds": [
+            13200,
+            13405
+          ],
+          "fromStation": {
+            "id": "13200",
+            "code": 13200,
+            "name": "BILBAO-INTERMOD. ABANDO INDALECIO PRIETO",
+            "lat": 43.2601304,
+            "lon": -2.9285592,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "13405",
+            "code": 13405,
+            "name": "SANTURTZI",
+            "lat": 43.328755,
+            "lon": -3.030183,
+            "source": "https://data.renfe.com/datastore/dump/3254a1ed-a2b7-4fd1-9e9e-23eefe35f162?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-bilbao-enero-2026.pdf",
+          "snapshotEdition": "2026-01 + C5 2026-05-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C2",
+          "name": "C2 · Bilbao Abando – Muskiz",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Bilbao Abando",
+          "to": "Muskiz",
+          "via": [],
+          "fromStationId": 13200,
+          "toStationId": 13506,
+          "viaStationIds": [],
+          "stationIds": [
+            13200,
+            13506
+          ],
+          "fromStation": {
+            "id": "13200",
+            "code": 13200,
+            "name": "BILBAO-INTERMOD. ABANDO INDALECIO PRIETO",
+            "lat": 43.2601304,
+            "lon": -2.9285592,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "13506",
+            "code": 13506,
+            "name": "MUSKIZ",
+            "lat": 43.321406,
+            "lon": -3.112384,
+            "source": "https://data.renfe.com/datastore/dump/3254a1ed-a2b7-4fd1-9e9e-23eefe35f162?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-bilbao-enero-2026.pdf",
+          "snapshotEdition": "2026-01 + C5 2026-05-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C3",
+          "name": "C3 · Bilbao Abando – Orduña",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Bilbao Abando",
+          "to": "Orduña",
+          "via": [],
+          "fromStationId": 13200,
+          "toStationId": 13100,
+          "viaStationIds": [],
+          "stationIds": [
+            13200,
+            13100
+          ],
+          "fromStation": {
+            "id": "13200",
+            "code": 13200,
+            "name": "BILBAO-INTERMOD. ABANDO INDALECIO PRIETO",
+            "lat": 43.2601304,
+            "lon": -2.9285592,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "13100",
+            "code": 13100,
+            "name": "ORDUÑA",
+            "lat": 42.994624,
+            "lon": -3.015809,
+            "source": "https://data.renfe.com/datastore/dump/3254a1ed-a2b7-4fd1-9e9e-23eefe35f162?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-bilbao-enero-2026.pdf",
+          "snapshotEdition": "2026-01 + C5 2026-05-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C4",
+          "name": "C4 · Bilbao La Concordia – La Calzada",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Bilbao La Concordia",
+          "to": "La Calzada",
+          "via": [
+            "Balmaseda"
+          ],
+          "fromStationId": 5451,
+          "toStationId": 5485,
+          "viaStationIds": [
+            5483
+          ],
+          "stationIds": [
+            5451,
+            5483,
+            5485
+          ],
+          "fromStation": {
+            "id": "05451",
+            "code": 5451,
+            "name": "BILBAO LA CONCORDIA",
+            "lat": 43.2601901,
+            "lon": -2.9263839,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "05485",
+            "code": 5485,
+            "name": "LA CALZADA",
+            "lat": 43.190141,
+            "lon": -3.19737,
+            "source": "https://data.renfe.com/datastore/dump/4de015e6-987c-43ae-9350-8bf941ef66c7?format=json",
+            "dataModified": "2021-03-09",
+            "legacy": true
+          },
+          "viaStations": [
+            {
+              "name": "Balmaseda",
+              "station": {
+                "id": "05483",
+                "code": 5483,
+                "name": "BALMASEDA",
+                "lat": 43.1963551,
+                "lon": -3.1899562,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-bilbao-enero-2026.pdf",
+          "snapshotEdition": "2026-01 + C5 2026-05-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C5",
+          "name": "C5 · Aranguren – Karrantza",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Aranguren",
+          "to": "Karrantza",
+          "via": [
+            "Mimetiz",
+            "Traslaviña",
+            "Artzentales",
+            "Villaverde de Trucios"
+          ],
+          "fromStationId": 5473,
+          "toStationId": 5497,
+          "viaStationIds": [
+            5484,
+            5487,
+            5489,
+            5493
+          ],
+          "stationIds": [
+            5473,
+            5484,
+            5487,
+            5489,
+            5493,
+            5497
+          ],
+          "fromStation": {
+            "id": "05473",
+            "code": 5473,
+            "name": "ARANGUREN",
+            "lat": 43.2104561,
+            "lon": -3.108399,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "05497",
+            "code": 5497,
+            "name": "KARRANTZA",
+            "lat": 43.238854,
+            "lon": -3.357827,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Mimetiz",
+              "station": {
+                "id": "05484",
+                "code": 5484,
+                "name": "MIMETIZ",
+                "lat": 43.2158138,
+                "lon": -3.1312555,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Traslaviña",
+              "station": {
+                "id": "05487",
+                "code": 5487,
+                "name": "TRASLAVIÑA",
+                "lat": 43.23329,
+                "lon": -3.198304,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Artzentales",
+              "station": {
+                "id": "05489",
+                "code": 5489,
+                "name": "ARTZENTALES",
+                "lat": 43.2355083,
+                "lon": -3.2133583,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Villaverde de Trucios",
+              "station": {
+                "id": "05493",
+                "code": 5493,
+                "name": "VILLAVERDE DE TRUCIOS",
+                "lat": 43.24128,
+                "lon": -3.25054,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/05/nueva-linea-c5-karrantza-enkarterri-mas-mejor-conectados",
+          "snapshotEdition": "2026-01 + C5 2026-05-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": "bilbao-c5-2026",
+          "timetableStatus": "Ten verified departures; arrival and intermediate times not published in source, calendars lack holiday exception dates.",
+          "availableFrom": "2026-05-06"
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    },
+    {
+      "id": "cadiz",
+      "name": "Cádiz",
+      "lon": -6.2879716,
+      "lat": 36.528935,
+      "centerStationId": 51405,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_cadiz_cercanias_abril2025-b.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_cadiz_cercanias_abril2025-b.pdf"
+      ],
+      "snapshotEdition": "2025-04",
+      "note": null,
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Cádiz – Aeropuerto de Jerez",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Cádiz",
+          "to": "Aeropuerto de Jerez",
+          "via": [],
+          "fromStationId": 51405,
+          "toStationId": 51205,
+          "viaStationIds": [],
+          "stationIds": [
+            51405,
+            51205
+          ],
+          "fromStation": {
+            "id": "51405",
+            "code": 51405,
+            "name": "CÁDIZ",
+            "lat": 36.528935,
+            "lon": -6.2879716,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "51205",
+            "code": 51205,
+            "name": "AEROPUERTO DE JEREZ",
+            "lat": 36.7515886,
+            "lon": -6.0659384,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_cadiz_cercanias_abril2025-b.pdf",
+          "snapshotEdition": "2025-04",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C1a",
+          "name": "C1a · Universidad de Cádiz – Las Aletas",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Universidad de Cádiz",
+          "to": "Las Aletas",
+          "via": [],
+          "fromStationId": 51416,
+          "toStationId": 51415,
+          "viaStationIds": [],
+          "stationIds": [
+            51416,
+            51415
+          ],
+          "fromStation": {
+            "id": "51416",
+            "code": 51416,
+            "name": "UNIVERSIDAD DE CADIZ",
+            "lat": 36.5307956,
+            "lon": -6.2040894,
+            "source": "https://data.renfe.com/datastore/dump/2c3afbbd-30f6-41b1-815a-6ef452457f92?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "51415",
+            "code": 51415,
+            "name": "LAS ALETAS",
+            "lat": 36.544106,
+            "lon": -6.198661,
+            "source": "https://data.renfe.com/datastore/dump/2c3afbbd-30f6-41b1-815a-6ef452457f92?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_cadiz_cercanias_abril2025-b.pdf",
+          "snapshotEdition": "2025-04",
+          "routeGeometry": null,
+          "timetableSnapshotId": "cadiz-c1a-2022",
+          "timetableStatus": "Twelve complete endpoint trips from timetable valid from 2022-10-26. Only academic working days; holiday and nonteaching dates unspecified."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": [
+        {
+          "code": "T1",
+          "name": "T1 · Cádiz – Pelagatos",
+          "type": "tram-train",
+          "gauge": "iberian",
+          "from": "Cádiz",
+          "to": "Pelagatos",
+          "via": [
+            "Río Arillo"
+          ],
+          "fromStationId": 51405,
+          "toStationId": null,
+          "viaStationIds": [
+            null
+          ],
+          "stationIds": [
+            51405
+          ],
+          "fromStation": {
+            "id": "51405",
+            "code": 51405,
+            "name": "CÁDIZ",
+            "lat": 36.528935,
+            "lon": -6.2879716,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": null,
+          "viaStations": [
+            {
+              "name": "Río Arillo",
+              "station": null
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_cadiz_cercanias_abril2025-b.pdf",
+          "snapshotEdition": "2025-04",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops.",
+          "note": "Associated tram-train; Pelagatos and Río Arillo are absent from supplied Renfe station catalogues and not assigned fabricated IDs or coordinates."
+        }
+      ]
+    },
+    {
+      "id": "cantabria",
+      "name": "Cantabria",
+      "lon": -3.8109529,
+      "lat": 43.4583981,
+      "centerStationId": 14223,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Comunicaci%C3%B3n-y-renfe-al-dia/sala-de-prensa/Local-Delegacion-Noroeste/PDF-y-otros/Mapa%20zonas%20tarifa%20%C3%BAnica%20Cantabria.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Comunicaci%C3%B3n-y-renfe-al-dia/sala-de-prensa/Local-Delegacion-Noroeste/PDF-y-otros/Mapa%20zonas%20tarifa%20%C3%BAnica%20Cantabria.pdf",
+        "https://grupo.renfe.com/es/es/sala-de-prensa/avisos/2026/septiembre/renfe-modificara-horarios-c3-r3-santander-Lierganes-y-bilbao"
+      ],
+      "snapshotEdition": "2023-04 + aviso2026-09-14",
+      "note": "Aviso14sept2026 restablece tramoAstillero–Orejo en tren desde17sept2026; lahomepageantigua aún indicaautobús.",
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Santander – Reinosa",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Santander",
+          "to": "Reinosa",
+          "via": [],
+          "fromStationId": 14223,
+          "toStationId": 14202,
+          "viaStationIds": [],
+          "stationIds": [
+            14223,
+            14202
+          ],
+          "fromStation": {
+            "id": "14223",
+            "code": 14223,
+            "name": "SANTANDER",
+            "lat": 43.4583981,
+            "lon": -3.8109529,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "14202",
+            "code": 14202,
+            "name": "REINOSA",
+            "lat": 42.9944991,
+            "lon": -4.1409454,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Comunicaci%C3%B3n-y-renfe-al-dia/sala-de-prensa/Local-Delegacion-Noroeste/PDF-y-otros/Mapa%20zonas%20tarifa%20%C3%BAnica%20Cantabria.pdf",
+          "snapshotEdition": "2023-04 + aviso2026-09-14",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C2",
+          "name": "C2 · Santander – Cabezón de la Sal",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Santander",
+          "to": "Cabezón de la Sal",
+          "via": [],
+          "fromStationId": 14223,
+          "toStationId": 5637,
+          "viaStationIds": [],
+          "stationIds": [
+            14223,
+            5637
+          ],
+          "fromStation": {
+            "id": "14223",
+            "code": 14223,
+            "name": "SANTANDER",
+            "lat": 43.4583981,
+            "lon": -3.8109529,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "05637",
+            "code": 5637,
+            "name": "CABEZÓN DE LA SAL",
+            "lat": 43.3079038,
+            "lon": -4.2319437,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Comunicaci%C3%B3n-y-renfe-al-dia/sala-de-prensa/Local-Delegacion-Noroeste/PDF-y-otros/Mapa%20zonas%20tarifa%20%C3%BAnica%20Cantabria.pdf",
+          "snapshotEdition": "2023-04 + aviso2026-09-14",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C3",
+          "name": "C3 · Santander – Liérganes",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Santander",
+          "to": "Liérganes",
+          "via": [],
+          "fromStationId": 14223,
+          "toStationId": 5671,
+          "viaStationIds": [],
+          "stationIds": [
+            14223,
+            5671
+          ],
+          "fromStation": {
+            "id": "14223",
+            "code": 14223,
+            "name": "SANTANDER",
+            "lat": 43.4583981,
+            "lon": -3.8109529,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "05671",
+            "code": 5671,
+            "name": "LIERGANES",
+            "lat": 43.344991,
+            "lon": -3.742572,
+            "source": "https://data.renfe.com/datastore/dump/4de015e6-987c-43ae-9350-8bf941ef66c7?format=json",
+            "dataModified": "2021-03-09",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Comunicaci%C3%B3n-y-renfe-al-dia/sala-de-prensa/Local-Delegacion-Noroeste/PDF-y-otros/Mapa%20zonas%20tarifa%20%C3%BAnica%20Cantabria.pdf",
+          "snapshotEdition": "2023-04 + aviso2026-09-14",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    },
+    {
+      "id": "cartagena",
+      "name": "Cartagena",
+      "lon": -0.977029,
+      "lat": 37.603575,
+      "centerStationId": 5951,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-cartagena-sep2025.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-cartagena-sep2025.pdf"
+      ],
+      "snapshotEdition": "2025-09",
+      "note": null,
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Cartagena AM – Los Nietos",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Cartagena AM",
+          "to": "Los Nietos",
+          "via": [],
+          "fromStationId": 5951,
+          "toStationId": 5977,
+          "viaStationIds": [],
+          "stationIds": [
+            5951,
+            5977
+          ],
+          "fromStation": {
+            "id": "05951",
+            "code": 5951,
+            "name": "CARTAGENA-PLAZA BASTARRECHE",
+            "lat": 37.603575,
+            "lon": -0.977029,
+            "source": "https://data.renfe.com/datastore/dump/4de015e6-987c-43ae-9350-8bf941ef66c7?format=json",
+            "dataModified": "2021-03-09",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "05977",
+            "code": 5977,
+            "name": "LOS NIETOS",
+            "lat": 37.651839,
+            "lon": -0.796983,
+            "source": "https://data.renfe.com/datastore/dump/4de015e6-987c-43ae-9350-8bf941ef66c7?format=json",
+            "dataModified": "2021-03-09",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/plano-cercanias-cartagena-sep2025.pdf",
+          "snapshotEdition": "2025-09",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    },
+    {
+      "id": "ferrol",
+      "name": "Ferrol",
+      "lon": -8.2310664,
+      "lat": 43.4880467,
+      "centerStationId": 21010,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_ferrol_cercanias_abril_2025.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_ferrol_cercanias_abril_2025.pdf"
+      ],
+      "snapshotEdition": "2025-04",
+      "note": null,
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Ferrol – Ortigueira",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Ferrol",
+          "to": "Ortigueira",
+          "via": [],
+          "fromStationId": 21010,
+          "toStationId": 5139,
+          "viaStationIds": [],
+          "stationIds": [
+            21010,
+            5139
+          ],
+          "fromStation": {
+            "id": "21010",
+            "code": 21010,
+            "name": "FERROL",
+            "lat": 43.4880467,
+            "lon": -8.2310664,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "05139",
+            "code": 5139,
+            "name": "ORTIGUEIRA",
+            "lat": 43.6862217,
+            "lon": -7.8495738,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_ferrol_cercanias_abril_2025.pdf",
+          "snapshotEdition": "2025-04",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    },
+    {
+      "id": "leon",
+      "name": "León",
+      "lon": -5.5660988,
+      "lat": 42.6160983,
+      "centerStationId": 5803,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/feve/leon_guardo_20_01_2025.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/feve/leon_guardo_20_01_2025.pdf"
+      ],
+      "snapshotEdition": "2025-01-20",
+      "note": "Planoindicaautobúslanzadera León–AsunciónUniversidad; la operación ferroviaria parte deAsunciónUniversidad.",
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Asunción-Universidad – Guardo Apeadero",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Asunción-Universidad",
+          "to": "Guardo Apeadero",
+          "via": [
+            "San Feliz",
+            "Matallana",
+            "Boñar",
+            "Cistierna"
+          ],
+          "fromStationId": 5803,
+          "toStationId": 5753,
+          "viaStationIds": [
+            5776,
+            5770,
+            5766,
+            5761
+          ],
+          "stationIds": [
+            5803,
+            5776,
+            5770,
+            5766,
+            5761,
+            5753
+          ],
+          "fromStation": {
+            "id": "05803",
+            "code": 5803,
+            "name": "LA ASUNCIÓN UNIVERSIDAD",
+            "lat": 42.6160983,
+            "lon": -5.5660988,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "05753",
+            "code": 5753,
+            "name": "GUARDO APEADERO",
+            "lat": 42.7877378,
+            "lon": -4.845133,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "San Feliz",
+              "station": {
+                "id": "05776",
+                "code": 5776,
+                "name": "SAN FELIZ",
+                "lat": 42.6823112,
+                "lon": -5.5379086,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Matallana",
+              "station": {
+                "id": "05770",
+                "code": 5770,
+                "name": "MATALLANA",
+                "lat": 42.841149,
+                "lon": -5.5218718,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Boñar",
+              "station": {
+                "id": "05766",
+                "code": 5766,
+                "name": "BOÑAR",
+                "lat": 42.8627875,
+                "lon": -5.3285261,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Cistierna",
+              "station": {
+                "id": "05761",
+                "code": 5761,
+                "name": "CISTIERNA",
+                "lat": 42.80316,
+                "lon": -5.1307925,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/feve/leon_guardo_20_01_2025.pdf",
+          "snapshotEdition": "2025-01-20",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops.",
+          "note": "Nominal line León–Guardo Apeadero. Rail starts at Asunción-Universidad; León Padre Isla–Asunción is bus shuttle in published map."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    },
+    {
+      "id": "madrid",
+      "name": "Madrid",
+      "lon": -3.6894391,
+      "lat": 40.4066191,
+      "centerStationId": 18000,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Madrid_Cercanias.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Madrid_Cercanias.pdf"
+      ],
+      "snapshotEdition": "2025-01",
+      "note": "C4a/b yC8a/b son denominacionesde ramas; no contarCIVIScomootralínea.",
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Madrid Chamartín-Clara Campoamor – Aeropuerto T4",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Madrid Chamartín-Clara Campoamor",
+          "to": "Aeropuerto T4",
+          "via": [],
+          "fromStationId": 17000,
+          "toStationId": 98305,
+          "viaStationIds": [],
+          "stationIds": [
+            17000,
+            98305
+          ],
+          "fromStation": {
+            "id": "17000",
+            "code": 17000,
+            "name": "MADRID-CHAMARTÍN-CLARA CAMPOAMOR",
+            "lat": 40.4711789,
+            "lon": -3.6829524,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "98305",
+            "code": 98305,
+            "name": "AEROPUERTO T-4",
+            "lat": 40.491691,
+            "lon": -3.593988,
+            "source": "https://data.renfe.com/datastore/dump/daa68d9b-77cf-4024-890f-285d31184c5a?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.crtm.es/tu-transporte-publico/cercanias-renfe/lineas",
+          "snapshotEdition": "2025-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C2",
+          "name": "C2 · Guadalajara – Madrid Chamartín-Clara Campoamor",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Guadalajara",
+          "to": "Madrid Chamartín-Clara Campoamor",
+          "via": [
+            "Alcalá de Henares",
+            "Madrid Atocha Cercanías"
+          ],
+          "fromStationId": 70200,
+          "toStationId": 17000,
+          "viaStationIds": [
+            70103,
+            18000
+          ],
+          "stationIds": [
+            70200,
+            70103,
+            18000,
+            17000
+          ],
+          "fromStation": {
+            "id": "70200",
+            "code": 70200,
+            "name": "GUADALAJARA",
+            "lat": 40.6441928,
+            "lon": -3.1822602,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "17000",
+            "code": 17000,
+            "name": "MADRID-CHAMARTÍN-CLARA CAMPOAMOR",
+            "lat": 40.4711789,
+            "lon": -3.6829524,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Alcalá de Henares",
+              "station": {
+                "id": "70103",
+                "code": 70103,
+                "name": "ALCALÁ DE HENARES",
+                "lat": 40.4890814,
+                "lon": -3.3662457,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Madrid Atocha Cercanías",
+              "station": {
+                "id": "18000",
+                "code": 18000,
+                "name": "MADRID-ATOCHA CERCANÍAS",
+                "lat": 40.4066191,
+                "lon": -3.6894391,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.crtm.es/tu-transporte-publico/cercanias-renfe/lineas",
+          "snapshotEdition": "2025-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C3",
+          "name": "C3 · Aranjuez – Madrid Chamartín-Clara Campoamor",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Aranjuez",
+          "to": "Madrid Chamartín-Clara Campoamor",
+          "via": [
+            "Madrid Atocha Cercanías",
+            "Madrid Sol"
+          ],
+          "fromStationId": 60200,
+          "toStationId": 17000,
+          "viaStationIds": [
+            18000,
+            18101
+          ],
+          "stationIds": [
+            60200,
+            18000,
+            18101,
+            17000
+          ],
+          "fromStation": {
+            "id": "60200",
+            "code": 60200,
+            "name": "ARANJUEZ",
+            "lat": 40.0350257,
+            "lon": -3.6182534,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "17000",
+            "code": 17000,
+            "name": "MADRID-CHAMARTÍN-CLARA CAMPOAMOR",
+            "lat": 40.4711789,
+            "lon": -3.6829524,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Madrid Atocha Cercanías",
+              "station": {
+                "id": "18000",
+                "code": 18000,
+                "name": "MADRID-ATOCHA CERCANÍAS",
+                "lat": 40.4066191,
+                "lon": -3.6894391,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Madrid Sol",
+              "station": {
+                "id": "18101",
+                "code": 18101,
+                "name": "SOL",
+                "lat": 40.416856,
+                "lon": -3.702904,
+                "source": "https://data.renfe.com/datastore/dump/daa68d9b-77cf-4024-890f-285d31184c5a?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            }
+          ],
+          "source": "https://www.crtm.es/tu-transporte-publico/cercanias-renfe/lineas",
+          "snapshotEdition": "2025-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C4a",
+          "name": "C4a · Parla – Alcobendas-San Sebastián de Los Reyes",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Parla",
+          "to": "Alcobendas-San Sebastián de Los Reyes",
+          "via": [
+            "Madrid Atocha Cercanías",
+            "Madrid Sol",
+            "Madrid Chamartín-Clara Campoamor",
+            "Cantoblanco Universidad"
+          ],
+          "fromStationId": 37012,
+          "toStationId": 19003,
+          "viaStationIds": [
+            18000,
+            18101,
+            17000,
+            17009
+          ],
+          "stationIds": [
+            37012,
+            18000,
+            18101,
+            17000,
+            17009,
+            19003
+          ],
+          "fromStation": {
+            "id": "37012",
+            "code": 37012,
+            "name": "PARLA",
+            "lat": 40.241032,
+            "lon": -3.769312,
+            "source": "https://data.renfe.com/datastore/dump/daa68d9b-77cf-4024-890f-285d31184c5a?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "19003",
+            "code": 19003,
+            "name": "ALCOBENDAS SAN SEBASTIAN DE LOS REYES",
+            "lat": 40.546744,
+            "lon": -3.635149,
+            "source": "https://data.renfe.com/datastore/dump/daa68d9b-77cf-4024-890f-285d31184c5a?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [
+            {
+              "name": "Madrid Atocha Cercanías",
+              "station": {
+                "id": "18000",
+                "code": 18000,
+                "name": "MADRID-ATOCHA CERCANÍAS",
+                "lat": 40.4066191,
+                "lon": -3.6894391,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Madrid Sol",
+              "station": {
+                "id": "18101",
+                "code": 18101,
+                "name": "SOL",
+                "lat": 40.416856,
+                "lon": -3.702904,
+                "source": "https://data.renfe.com/datastore/dump/daa68d9b-77cf-4024-890f-285d31184c5a?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            },
+            {
+              "name": "Madrid Chamartín-Clara Campoamor",
+              "station": {
+                "id": "17000",
+                "code": 17000,
+                "name": "MADRID-CHAMARTÍN-CLARA CAMPOAMOR",
+                "lat": 40.4711789,
+                "lon": -3.6829524,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Cantoblanco Universidad",
+              "station": {
+                "id": "17009",
+                "code": 17009,
+                "name": "UNIVERSIDAD-CANTOBLANCO",
+                "lat": 40.543818,
+                "lon": -3.700217,
+                "source": "https://data.renfe.com/datastore/dump/daa68d9b-77cf-4024-890f-285d31184c5a?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            }
+          ],
+          "source": "https://www.crtm.es/tu-transporte-publico/cercanias-renfe/lineas",
+          "snapshotEdition": "2025-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C4b",
+          "name": "C4b · Parla – Colmenar Viejo",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Parla",
+          "to": "Colmenar Viejo",
+          "via": [
+            "Madrid Atocha Cercanías",
+            "Madrid Sol",
+            "Madrid Chamartín-Clara Campoamor",
+            "Cantoblanco Universidad"
+          ],
+          "fromStationId": 37012,
+          "toStationId": 17005,
+          "viaStationIds": [
+            18000,
+            18101,
+            17000,
+            17009
+          ],
+          "stationIds": [
+            37012,
+            18000,
+            18101,
+            17000,
+            17009,
+            17005
+          ],
+          "fromStation": {
+            "id": "37012",
+            "code": 37012,
+            "name": "PARLA",
+            "lat": 40.241032,
+            "lon": -3.769312,
+            "source": "https://data.renfe.com/datastore/dump/daa68d9b-77cf-4024-890f-285d31184c5a?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "17005",
+            "code": 17005,
+            "name": "COLMENAR VIEJO",
+            "lat": 40.645211,
+            "lon": -3.776617,
+            "source": "https://data.renfe.com/datastore/dump/daa68d9b-77cf-4024-890f-285d31184c5a?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [
+            {
+              "name": "Madrid Atocha Cercanías",
+              "station": {
+                "id": "18000",
+                "code": 18000,
+                "name": "MADRID-ATOCHA CERCANÍAS",
+                "lat": 40.4066191,
+                "lon": -3.6894391,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Madrid Sol",
+              "station": {
+                "id": "18101",
+                "code": 18101,
+                "name": "SOL",
+                "lat": 40.416856,
+                "lon": -3.702904,
+                "source": "https://data.renfe.com/datastore/dump/daa68d9b-77cf-4024-890f-285d31184c5a?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            },
+            {
+              "name": "Madrid Chamartín-Clara Campoamor",
+              "station": {
+                "id": "17000",
+                "code": 17000,
+                "name": "MADRID-CHAMARTÍN-CLARA CAMPOAMOR",
+                "lat": 40.4711789,
+                "lon": -3.6829524,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Cantoblanco Universidad",
+              "station": {
+                "id": "17009",
+                "code": 17009,
+                "name": "UNIVERSIDAD-CANTOBLANCO",
+                "lat": 40.543818,
+                "lon": -3.700217,
+                "source": "https://data.renfe.com/datastore/dump/daa68d9b-77cf-4024-890f-285d31184c5a?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            }
+          ],
+          "source": "https://www.crtm.es/tu-transporte-publico/cercanias-renfe/lineas",
+          "snapshotEdition": "2025-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C5",
+          "name": "C5 · Móstoles-El Soto – Humanes",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Móstoles-El Soto",
+          "to": "Humanes",
+          "via": [
+            "Madrid Atocha Cercanías",
+            "Fuenlabrada"
+          ],
+          "fromStationId": 35607,
+          "toStationId": 35012,
+          "viaStationIds": [
+            18000,
+            35002
+          ],
+          "stationIds": [
+            35607,
+            18000,
+            35002,
+            35012
+          ],
+          "fromStation": {
+            "id": "35607",
+            "code": 35607,
+            "name": "MOSTOLES-EL SOTO",
+            "lat": 40.330971,
+            "lon": -3.882441,
+            "source": "https://data.renfe.com/datastore/dump/daa68d9b-77cf-4024-890f-285d31184c5a?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "35012",
+            "code": 35012,
+            "name": "HUMANES",
+            "lat": 40.2558101,
+            "lon": -3.8287055,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Madrid Atocha Cercanías",
+              "station": {
+                "id": "18000",
+                "code": 18000,
+                "name": "MADRID-ATOCHA CERCANÍAS",
+                "lat": 40.4066191,
+                "lon": -3.6894391,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Fuenlabrada",
+              "station": {
+                "id": "35002",
+                "code": 35002,
+                "name": "FUENLABRADA",
+                "lat": 40.2833784,
+                "lon": -3.7994429,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.crtm.es/tu-transporte-publico/cercanias-renfe/lineas",
+          "snapshotEdition": "2025-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C7",
+          "name": "C7 · Alcalá de Henares – Madrid Príncipe Pío",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Alcalá de Henares",
+          "to": "Madrid Príncipe Pío",
+          "via": [
+            "Madrid Atocha Cercanías",
+            "Madrid Chamartín-Clara Campoamor"
+          ],
+          "fromStationId": 70103,
+          "toStationId": 10000,
+          "viaStationIds": [
+            18000,
+            17000
+          ],
+          "stationIds": [
+            70103,
+            18000,
+            17000,
+            10000
+          ],
+          "fromStation": {
+            "id": "70103",
+            "code": 70103,
+            "name": "ALCALÁ DE HENARES",
+            "lat": 40.4890814,
+            "lon": -3.3662457,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "10000",
+            "code": 10000,
+            "name": "MADRID-PRÍNCIPE PÍO",
+            "lat": 40.4214895,
+            "lon": -3.7189689,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Madrid Atocha Cercanías",
+              "station": {
+                "id": "18000",
+                "code": 18000,
+                "name": "MADRID-ATOCHA CERCANÍAS",
+                "lat": 40.4066191,
+                "lon": -3.6894391,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Madrid Chamartín-Clara Campoamor",
+              "station": {
+                "id": "17000",
+                "code": 17000,
+                "name": "MADRID-CHAMARTÍN-CLARA CAMPOAMOR",
+                "lat": 40.4711789,
+                "lon": -3.6829524,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.crtm.es/tu-transporte-publico/cercanias-renfe/lineas",
+          "snapshotEdition": "2025-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C8a",
+          "name": "C8a · Madrid Atocha Cercanías – Santa María de La Alameda",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Madrid Atocha Cercanías",
+          "to": "Santa María de La Alameda",
+          "via": [
+            "Madrid Chamartín-Clara Campoamor",
+            "Villalba de Guadarrama",
+            "El Escorial"
+          ],
+          "fromStationId": 18000,
+          "toStationId": 10206,
+          "viaStationIds": [
+            17000,
+            10200,
+            10203
+          ],
+          "stationIds": [
+            18000,
+            17000,
+            10200,
+            10203,
+            10206
+          ],
+          "fromStation": {
+            "id": "18000",
+            "code": 18000,
+            "name": "MADRID-ATOCHA CERCANÍAS",
+            "lat": 40.4066191,
+            "lon": -3.6894391,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "10206",
+            "code": 10206,
+            "name": "SANTA MARÍA DE LA ALAMEDA-PEGUERINOS",
+            "lat": 40.569001,
+            "lon": -4.2691255,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Madrid Chamartín-Clara Campoamor",
+              "station": {
+                "id": "17000",
+                "code": 17000,
+                "name": "MADRID-CHAMARTÍN-CLARA CAMPOAMOR",
+                "lat": 40.4711789,
+                "lon": -3.6829524,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Villalba de Guadarrama",
+              "station": {
+                "id": "10200",
+                "code": 10200,
+                "name": "VILLALBA DE GUADARRAMA",
+                "lat": 40.6264893,
+                "lon": -4.0080301,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "El Escorial",
+              "station": {
+                "id": "10203",
+                "code": 10203,
+                "name": "EL ESCORIAL",
+                "lat": 40.5853675,
+                "lon": -4.1324053,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.crtm.es/tu-transporte-publico/cercanias-renfe/lineas",
+          "snapshotEdition": "2025-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C8b",
+          "name": "C8b · Guadalajara – Cercedilla",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Guadalajara",
+          "to": "Cercedilla",
+          "via": [
+            "Alcalá de Henares",
+            "Madrid Atocha Cercanías",
+            "Madrid Chamartín-Clara Campoamor",
+            "Villalba de Guadarrama"
+          ],
+          "fromStationId": 70200,
+          "toStationId": 12006,
+          "viaStationIds": [
+            70103,
+            18000,
+            17000,
+            10200
+          ],
+          "stationIds": [
+            70200,
+            70103,
+            18000,
+            17000,
+            10200,
+            12006
+          ],
+          "fromStation": {
+            "id": "70200",
+            "code": 70200,
+            "name": "GUADALAJARA",
+            "lat": 40.6441928,
+            "lon": -3.1822602,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "12006",
+            "code": 12006,
+            "name": "CERCEDILLA",
+            "lat": 40.7376129,
+            "lon": -4.0662985,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Alcalá de Henares",
+              "station": {
+                "id": "70103",
+                "code": 70103,
+                "name": "ALCALÁ DE HENARES",
+                "lat": 40.4890814,
+                "lon": -3.3662457,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Madrid Atocha Cercanías",
+              "station": {
+                "id": "18000",
+                "code": 18000,
+                "name": "MADRID-ATOCHA CERCANÍAS",
+                "lat": 40.4066191,
+                "lon": -3.6894391,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Madrid Chamartín-Clara Campoamor",
+              "station": {
+                "id": "17000",
+                "code": 17000,
+                "name": "MADRID-CHAMARTÍN-CLARA CAMPOAMOR",
+                "lat": 40.4711789,
+                "lon": -3.6829524,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Villalba de Guadarrama",
+              "station": {
+                "id": "10200",
+                "code": 10200,
+                "name": "VILLALBA DE GUADARRAMA",
+                "lat": 40.6264893,
+                "lon": -4.0080301,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.crtm.es/tu-transporte-publico/cercanias-renfe/lineas",
+          "snapshotEdition": "2025-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C9",
+          "name": "C9 · Cercedilla – Los Cotos",
+          "type": "commuter",
+          "gauge": "metric",
+          "from": "Cercedilla",
+          "to": "Los Cotos",
+          "via": [],
+          "fromStationId": 12006,
+          "toStationId": 12023,
+          "viaStationIds": [],
+          "stationIds": [
+            12006,
+            12023
+          ],
+          "fromStation": {
+            "id": "12006",
+            "code": 12006,
+            "name": "CERCEDILLA",
+            "lat": 40.7376129,
+            "lon": -4.0662985,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "12023",
+            "code": 12023,
+            "name": "LOS COTOS",
+            "lat": 40.8223419,
+            "lon": -3.9644961,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://www.crtm.es/tu-transporte-publico/cercanias-renfe/lineas",
+          "snapshotEdition": "2025-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops.",
+          "note": "Metric gauge; Cercedilla station is shared with Iberian gauge. Match metric railway topology, never Iberian tracks."
+        },
+        {
+          "code": "C10",
+          "name": "C10 · Villalba de Guadarrama – Madrid Chamartín-Clara Campoamor",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Villalba de Guadarrama",
+          "to": "Madrid Chamartín-Clara Campoamor",
+          "via": [
+            "Madrid Príncipe Pío",
+            "Madrid Atocha Cercanías",
+            "Madrid Recoletos"
+          ],
+          "fromStationId": 10200,
+          "toStationId": 17000,
+          "viaStationIds": [
+            10000,
+            18000,
+            18001
+          ],
+          "stationIds": [
+            10200,
+            10000,
+            18000,
+            18001,
+            17000
+          ],
+          "fromStation": {
+            "id": "10200",
+            "code": 10200,
+            "name": "VILLALBA DE GUADARRAMA",
+            "lat": 40.6264893,
+            "lon": -4.0080301,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "17000",
+            "code": 17000,
+            "name": "MADRID-CHAMARTÍN-CLARA CAMPOAMOR",
+            "lat": 40.4711789,
+            "lon": -3.6829524,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Madrid Príncipe Pío",
+              "station": {
+                "id": "10000",
+                "code": 10000,
+                "name": "MADRID-PRÍNCIPE PÍO",
+                "lat": 40.4214895,
+                "lon": -3.7189689,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Madrid Atocha Cercanías",
+              "station": {
+                "id": "18000",
+                "code": 18000,
+                "name": "MADRID-ATOCHA CERCANÍAS",
+                "lat": 40.4066191,
+                "lon": -3.6894391,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Madrid Recoletos",
+              "station": {
+                "id": "18001",
+                "code": 18001,
+                "name": "MADRID-RECOLETOS",
+                "lat": 40.4233731,
+                "lon": -3.690931,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.crtm.es/tu-transporte-publico/cercanias-renfe/lineas",
+          "snapshotEdition": "2025-01",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    },
+    {
+      "id": "malaga",
+      "name": "Málaga",
+      "lon": -4.420019,
+      "lat": 36.71965,
+      "centerStationId": 54517,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_malaga_abril_2025.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_malaga_abril_2025.pdf"
+      ],
+      "snapshotEdition": "2025-04",
+      "note": null,
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Málaga-Centro Alameda – Fuengirola",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Málaga-Centro Alameda",
+          "to": "Fuengirola",
+          "via": [],
+          "fromStationId": 54517,
+          "toStationId": 54516,
+          "viaStationIds": [],
+          "stationIds": [
+            54517,
+            54516
+          ],
+          "fromStation": {
+            "id": "54517",
+            "code": 54517,
+            "name": "MALAGA-CENTRO ALAMEDA",
+            "lat": 36.71965,
+            "lon": -4.420019,
+            "source": "https://data.renfe.com/datastore/dump/4b651d25-3fed-4f6a-be4d-18352d7e2aea?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "54516",
+            "code": 54516,
+            "name": "FUENGIROLA",
+            "lat": 36.546263,
+            "lon": -4.6203322,
+            "source": "https://data.renfe.com/datastore/dump/4b651d25-3fed-4f6a-be4d-18352d7e2aea?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_malaga_abril_2025.pdf",
+          "snapshotEdition": "2025-04",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C2",
+          "name": "C2 · Málaga-Centro Alameda – Álora",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Málaga-Centro Alameda",
+          "to": "Álora",
+          "via": [],
+          "fromStationId": 54517,
+          "toStationId": 54405,
+          "viaStationIds": [],
+          "stationIds": [
+            54517,
+            54405
+          ],
+          "fromStation": {
+            "id": "54517",
+            "code": 54517,
+            "name": "MALAGA-CENTRO ALAMEDA",
+            "lat": 36.71965,
+            "lon": -4.420019,
+            "source": "https://data.renfe.com/datastore/dump/4b651d25-3fed-4f6a-be4d-18352d7e2aea?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "toStation": {
+            "id": "54405",
+            "code": 54405,
+            "name": "ÁLORA",
+            "lat": 36.8198747,
+            "lon": -4.6996105,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_malaga_abril_2025.pdf",
+          "snapshotEdition": "2025-04",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    },
+    {
+      "id": "murciaAlicante",
+      "name": "Murcia/Alicante",
+      "lon": -1.131508,
+      "lat": 37.9748243,
+      "centerStationId": 61200,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_murcia_alicante_agosto_2025.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_murcia_alicante_agosto_2025.pdf",
+        "https://www.renfe.com/es/es/cercanias/cercanias-murcia-alicante/horarios-cercanias-murcia-alicante"
+      ],
+      "snapshotEdition": "2025-08",
+      "note": "C2apareceenplanoperoestáinterrumpida porobras, conplanalternativoporcarretera. Existencialíneanogarantizatrencirculando.",
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Murcia del Carmen – Alacant/Alicante Terminal",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Murcia del Carmen",
+          "to": "Alacant/Alicante Terminal",
+          "via": [],
+          "fromStationId": 61200,
+          "toStationId": 60911,
+          "viaStationIds": [],
+          "stationIds": [
+            61200,
+            60911
+          ],
+          "fromStation": {
+            "id": "61200",
+            "code": 61200,
+            "name": "MURCIA DEL CARMEN",
+            "lat": 37.9748243,
+            "lon": -1.131508,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "60911",
+            "code": 60911,
+            "name": "ALICANTE/ALACANT-TERMINAL",
+            "lat": 38.3447127,
+            "lon": -0.4955241,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_murcia_alicante_agosto_2025.pdf",
+          "snapshotEdition": "2025-08",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C2",
+          "name": "C2 · Murcia del Carmen – Águilas",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Murcia del Carmen",
+          "to": "Águilas",
+          "via": [
+            "Lorca Sutullena"
+          ],
+          "fromStationId": 61200,
+          "toStationId": 7004,
+          "viaStationIds": [
+            6006
+          ],
+          "stationIds": [
+            61200,
+            6006,
+            7004
+          ],
+          "fromStation": {
+            "id": "61200",
+            "code": 61200,
+            "name": "MURCIA DEL CARMEN",
+            "lat": 37.9748243,
+            "lon": -1.131508,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "07004",
+            "code": 7004,
+            "name": "ÁGUILAS",
+            "lat": 37.409865,
+            "lon": -1.5725342,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Lorca Sutullena",
+              "station": {
+                "id": "06006",
+                "code": 6006,
+                "name": "LORCA-SUTULLENA",
+                "lat": 37.6721129,
+                "lon": -1.6962305,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_murcia_alicante_agosto_2025.pdf",
+          "snapshotEdition": "2025-08",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops.",
+          "operatingRestriction": "Published line remains in network map; replacement bus due infrastructure works in timetable page consulted October 2026.",
+          "restrictionSource": "https://www.renfe.com/es/es/cercanias/cercanias-murcia-alicante/horarios-cercanias-murcia-alicante"
+        },
+        {
+          "code": "C3",
+          "name": "C3 · Alacant/Alicante Terminal – Sant Vicent Centre",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Alacant/Alicante Terminal",
+          "to": "Sant Vicent Centre",
+          "via": [],
+          "fromStationId": 60911,
+          "toStationId": 60913,
+          "viaStationIds": [],
+          "stationIds": [
+            60911,
+            60913
+          ],
+          "fromStation": {
+            "id": "60911",
+            "code": 60911,
+            "name": "ALICANTE/ALACANT-TERMINAL",
+            "lat": 38.3447127,
+            "lon": -0.4955241,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "60913",
+            "code": 60913,
+            "name": "SANT VICENT CENTRE",
+            "lat": 38.3946533,
+            "lon": -0.5287247,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_murcia_alicante_agosto_2025.pdf",
+          "snapshotEdition": "2025-08",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    },
+    {
+      "id": "sanSebastian",
+      "name": "San Sebastián",
+      "lon": -1.8012519,
+      "lat": 43.3395365,
+      "centerStationId": 11600,
+      "source": "https://www.renfe.com/es/es/cercanias/cercanias-san-sebastian/atencion-al-cliente/carta-servicios",
+      "sources": [
+        "https://www.renfe.com/es/es/cercanias/cercanias-san-sebastian/atencion-al-cliente/carta-servicios"
+      ],
+      "snapshotEdition": "Revisión2026-04-21",
+      "note": null,
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Irún – Brínkola",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Irún",
+          "to": "Brínkola",
+          "via": [],
+          "fromStationId": 11600,
+          "toStationId": 11305,
+          "viaStationIds": [],
+          "stationIds": [
+            11600,
+            11305
+          ],
+          "fromStation": {
+            "id": "11600",
+            "code": 11600,
+            "name": "IRUN",
+            "lat": 43.3395365,
+            "lon": -1.8012519,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "11305",
+            "code": 11305,
+            "name": "BRINKOLA",
+            "lat": 43.0189865,
+            "lon": -2.3346811,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/es/es/cercanias/cercanias-san-sebastian/atencion-al-cliente/carta-servicios",
+          "snapshotEdition": "Revisión2026-04-21",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    },
+    {
+      "id": "sevilla",
+      "name": "Sevilla",
+      "lon": -5.9749269,
+      "lat": 37.3924955,
+      "centerStationId": 51003,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Sevilla_Cercanias.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Sevilla_Cercanias.pdf"
+      ],
+      "snapshotEdition": "2025",
+      "note": null,
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Lora del Río – Lebrija",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Lora del Río",
+          "to": "Lebrija",
+          "via": [
+            "Sevilla-Santa Justa",
+            "Utrera"
+          ],
+          "fromStationId": 50600,
+          "toStationId": 51203,
+          "viaStationIds": [
+            51003,
+            51200
+          ],
+          "stationIds": [
+            50600,
+            51003,
+            51200,
+            51203
+          ],
+          "fromStation": {
+            "id": "50600",
+            "code": 50600,
+            "name": "LORA DEL RÍO",
+            "lat": 37.6613212,
+            "lon": -5.5295514,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "51203",
+            "code": 51203,
+            "name": "LEBRIJA",
+            "lat": 36.9116378,
+            "lon": -6.0948487,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Sevilla-Santa Justa",
+              "station": {
+                "id": "51003",
+                "code": 51003,
+                "name": "SEVILLA-SANTA JUSTA",
+                "lat": 37.3924955,
+                "lon": -5.9749269,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Utrera",
+              "station": {
+                "id": "51200",
+                "code": 51200,
+                "name": "UTRERA",
+                "lat": 37.1848178,
+                "lon": -5.7907537,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Sevilla_Cercanias.pdf",
+          "snapshotEdition": "2025",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C2",
+          "name": "C2 · Sevilla-Santa Justa – Cartuja",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Sevilla-Santa Justa",
+          "to": "Cartuja",
+          "via": [],
+          "fromStationId": 51003,
+          "toStationId": 51050,
+          "viaStationIds": [],
+          "stationIds": [
+            51003,
+            51050
+          ],
+          "fromStation": {
+            "id": "51003",
+            "code": 51003,
+            "name": "SEVILLA-SANTA JUSTA",
+            "lat": 37.3924955,
+            "lon": -5.9749269,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "51050",
+            "code": 51050,
+            "name": "CARTUJA",
+            "lat": 37.407502,
+            "lon": -6.010021,
+            "source": "https://data.renfe.com/datastore/dump/ac3b4229-1c69-412f-a6de-29df913ece92?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Sevilla_Cercanias.pdf",
+          "snapshotEdition": "2025",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C3",
+          "name": "C3 · Sevilla-Santa Justa – Cazalla-Constantina",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Sevilla-Santa Justa",
+          "to": "Cazalla-Constantina",
+          "via": [],
+          "fromStationId": 51003,
+          "toStationId": 40113,
+          "viaStationIds": [],
+          "stationIds": [
+            51003,
+            40113
+          ],
+          "fromStation": {
+            "id": "51003",
+            "code": 51003,
+            "name": "SEVILLA-SANTA JUSTA",
+            "lat": 37.3924955,
+            "lon": -5.9749269,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "40113",
+            "code": 40113,
+            "name": "CAZALLA-CONSTANTINA",
+            "lat": 37.9328637,
+            "lon": -5.704433,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Sevilla_Cercanias.pdf",
+          "snapshotEdition": "2025",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C4",
+          "name": "C4 · Sevilla-Santa Justa – Sevilla-Santa Justa",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Sevilla-Santa Justa",
+          "to": "Sevilla-Santa Justa",
+          "via": [
+            "Palacio de Congresos",
+            "Padre Pío Palmete",
+            "Virgen del Rocío",
+            "San Bernardo"
+          ],
+          "fromStationId": 51003,
+          "toStationId": 51003,
+          "viaStationIds": [
+            51009,
+            51010,
+            51110,
+            51100
+          ],
+          "stationIds": [
+            51003,
+            51009,
+            51010,
+            51110,
+            51100,
+            51003
+          ],
+          "fromStation": {
+            "id": "51003",
+            "code": 51003,
+            "name": "SEVILLA-SANTA JUSTA",
+            "lat": 37.3924955,
+            "lon": -5.9749269,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "51003",
+            "code": 51003,
+            "name": "SEVILLA-SANTA JUSTA",
+            "lat": 37.3924955,
+            "lon": -5.9749269,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Palacio de Congresos",
+              "station": {
+                "id": "51009",
+                "code": 51009,
+                "name": "PALACIO DE CONGRESOS",
+                "lat": 37.403741,
+                "lon": -5.936357,
+                "source": "https://data.renfe.com/datastore/dump/ac3b4229-1c69-412f-a6de-29df913ece92?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            },
+            {
+              "name": "Padre Pío Palmete",
+              "station": {
+                "id": "51010",
+                "code": 51010,
+                "name": "PADRE PIO-PALMETE",
+                "lat": 37.370836,
+                "lon": -5.939391,
+                "source": "https://data.renfe.com/datastore/dump/ac3b4229-1c69-412f-a6de-29df913ece92?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            },
+            {
+              "name": "Virgen del Rocío",
+              "station": {
+                "id": "51110",
+                "code": 51110,
+                "name": "VIRGEN DEL ROCÍO",
+                "lat": 37.3628091,
+                "lon": -5.9760105,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "San Bernardo",
+              "station": {
+                "id": "51100",
+                "code": 51100,
+                "name": "SAN BERNARDO",
+                "lat": 37.3777778,
+                "lon": -5.9796142,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Sevilla_Cercanias.pdf",
+          "snapshotEdition": "2025",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops.",
+          "circular": true,
+          "note": "Circular line: route through every supplied waypoint and return to Santa Justa; never create a zero-length route."
+        },
+        {
+          "code": "C5",
+          "name": "C5 · Benacazón – Dos Hermanas",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Benacazón",
+          "to": "Dos Hermanas",
+          "via": [
+            "Sevilla-Santa Justa",
+            "Jardines de Hércules"
+          ],
+          "fromStationId": 43005,
+          "toStationId": 51103,
+          "viaStationIds": [
+            51003,
+            51113
+          ],
+          "stationIds": [
+            43005,
+            51003,
+            51113,
+            51103
+          ],
+          "fromStation": {
+            "id": "43005",
+            "code": 43005,
+            "name": "BENACAZÓN",
+            "lat": 37.3568512,
+            "lon": -6.2082011,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "51103",
+            "code": 51103,
+            "name": "DOS HERMANAS",
+            "lat": 37.2872259,
+            "lon": -5.9235322,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Sevilla-Santa Justa",
+              "station": {
+                "id": "51003",
+                "code": 51003,
+                "name": "SEVILLA-SANTA JUSTA",
+                "lat": 37.3924955,
+                "lon": -5.9749269,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Jardines de Hércules",
+              "station": {
+                "id": "51113",
+                "code": 51113,
+                "name": "JARDINES DE HERCULES",
+                "lat": 37.332922,
+                "lon": -5.96409,
+                "source": "https://data.renfe.com/datastore/dump/ac3b4229-1c69-412f-a6de-29df913ece92?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Sevilla_Cercanias.pdf",
+          "snapshotEdition": "2025",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    },
+    {
+      "id": "valencia",
+      "name": "València",
+      "lon": -0.3772239,
+      "lat": 39.4669305,
+      "centerStationId": 65000,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Valencia_Cercanias_junio_2025.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Valencia_Cercanias_junio_2025.pdf"
+      ],
+      "snapshotEdition": "2025-06",
+      "note": "C4noapareceenplanocorrienteconsultado. No afirmarcerrada definitivamentesinfuente.",
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · València Estació del Nord – Gandia",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "València Estació del Nord",
+          "to": "Gandia",
+          "via": [],
+          "fromStationId": 65000,
+          "toStationId": 69110,
+          "viaStationIds": [],
+          "stationIds": [
+            65000,
+            69110
+          ],
+          "fromStation": {
+            "id": "65000",
+            "code": 65000,
+            "name": "VALÈNCIA-ESTACIÓ DEL NORD",
+            "lat": 39.4669305,
+            "lon": -0.3772239,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "69110",
+            "code": 69110,
+            "name": "GANDIA",
+            "lat": 38.9703239,
+            "lon": -0.1799097,
+            "source": "https://data.renfe.com/datastore/dump/0b1caf38-e6a9-4965-a94d-9a24c5a4ae84?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Valencia_Cercanias_junio_2025.pdf",
+          "snapshotEdition": "2025-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C2",
+          "name": "C2 · València Estació del Nord – Moixent/Mogente",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "València Estació del Nord",
+          "to": "Moixent/Mogente",
+          "via": [
+            "Xàtiva"
+          ],
+          "fromStationId": 65000,
+          "toStationId": 64003,
+          "viaStationIds": [
+            64100
+          ],
+          "stationIds": [
+            65000,
+            64100,
+            64003
+          ],
+          "fromStation": {
+            "id": "65000",
+            "code": 65000,
+            "name": "VALÈNCIA-ESTACIÓ DEL NORD",
+            "lat": 39.4669305,
+            "lon": -0.3772239,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "64003",
+            "code": 64003,
+            "name": "MOIXENT",
+            "lat": 38.8758648,
+            "lon": -0.7573129,
+            "source": "https://data.renfe.com/datastore/dump/0b1caf38-e6a9-4965-a94d-9a24c5a4ae84?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [
+            {
+              "name": "Xàtiva",
+              "station": {
+                "id": "64100",
+                "code": 64100,
+                "name": "XÀTIVA",
+                "lat": 38.992148,
+                "lon": -0.5245402,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Valencia_Cercanias_junio_2025.pdf",
+          "snapshotEdition": "2025-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C3",
+          "name": "C3 · València Estació del Nord – Utiel",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "València Estació del Nord",
+          "to": "Utiel",
+          "via": [
+            "València Sant Isidre"
+          ],
+          "fromStationId": 65000,
+          "toStationId": 66200,
+          "viaStationIds": [
+            66212
+          ],
+          "stationIds": [
+            65000,
+            66212,
+            66200
+          ],
+          "fromStation": {
+            "id": "65000",
+            "code": 65000,
+            "name": "VALÈNCIA-ESTACIÓ DEL NORD",
+            "lat": 39.4669305,
+            "lon": -0.3772239,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "66200",
+            "code": 66200,
+            "name": "UTIEL",
+            "lat": 39.5713077,
+            "lon": -1.2031789,
+            "source": "https://data.renfe.com/datastore/dump/0b1caf38-e6a9-4965-a94d-9a24c5a4ae84?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [
+            {
+              "name": "València Sant Isidre",
+              "station": {
+                "id": "66212",
+                "code": 66212,
+                "name": "VALENCIA SANT ISIDRE",
+                "lat": 39.4527445,
+                "lon": -0.4058084,
+                "source": "https://data.renfe.com/datastore/dump/0b1caf38-e6a9-4965-a94d-9a24c5a4ae84?format=json",
+                "dataModified": "2019-11-20",
+                "legacy": true
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Valencia_Cercanias_junio_2025.pdf",
+          "snapshotEdition": "2025-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C5",
+          "name": "C5 · València Estació del Nord – Caudiel",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "València Estació del Nord",
+          "to": "Caudiel",
+          "via": [],
+          "fromStationId": 65000,
+          "toStationId": 67211,
+          "viaStationIds": [],
+          "stationIds": [
+            65000,
+            67211
+          ],
+          "fromStation": {
+            "id": "65000",
+            "code": 65000,
+            "name": "VALÈNCIA-ESTACIÓ DEL NORD",
+            "lat": 39.4669305,
+            "lon": -0.3772239,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "67211",
+            "code": 67211,
+            "name": "CAUDIEL",
+            "lat": 39.94733,
+            "lon": -0.572027,
+            "source": "https://data.renfe.com/datastore/dump/0b1caf38-e6a9-4965-a94d-9a24c5a4ae84?format=json",
+            "dataModified": "2019-11-20",
+            "legacy": true
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Valencia_Cercanias_junio_2025.pdf",
+          "snapshotEdition": "2025-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        },
+        {
+          "code": "C6",
+          "name": "C6 · València Estació del Nord – Castelló de La Plana",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "València Estació del Nord",
+          "to": "Castelló de La Plana",
+          "via": [],
+          "fromStationId": 65000,
+          "toStationId": 65300,
+          "viaStationIds": [],
+          "stationIds": [
+            65000,
+            65300
+          ],
+          "fromStation": {
+            "id": "65000",
+            "code": 65000,
+            "name": "VALÈNCIA-ESTACIÓ DEL NORD",
+            "lat": 39.4669305,
+            "lon": -0.3772239,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "65300",
+            "code": 65300,
+            "name": "CASTELLÓ DE LA PLANA",
+            "lat": 39.9884736,
+            "lon": -0.0523456,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/Mapa_Valencia_Cercanias_junio_2025.pdf",
+          "snapshotEdition": "2025-06",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    },
+    {
+      "id": "zaragoza",
+      "name": "Zaragoza",
+      "lon": -0.9112693,
+      "lat": 41.6586576,
+      "centerStationId": 4040,
+      "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_zaragoza_agosto_2025.pdf",
+      "sources": [
+        "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_zaragoza_agosto_2025.pdf"
+      ],
+      "snapshotEdition": "2025-08",
+      "note": null,
+      "subNetworks": null,
+      "lines": [
+        {
+          "code": "C1",
+          "name": "C1 · Casetas – Zaragoza Miraflores",
+          "type": "commuter",
+          "gauge": "iberian",
+          "from": "Casetas",
+          "to": "Zaragoza Miraflores",
+          "via": [
+            "Utebo",
+            "Zaragoza Delicias",
+            "Zaragoza Portillo",
+            "Zaragoza Goya"
+          ],
+          "fromStationId": 70800,
+          "toStationId": 71100,
+          "viaStationIds": [
+            70801,
+            4040,
+            70806,
+            70807
+          ],
+          "stationIds": [
+            70800,
+            70801,
+            4040,
+            70806,
+            70807,
+            71100
+          ],
+          "fromStation": {
+            "id": "70800",
+            "code": 70800,
+            "name": "CASETAS",
+            "lat": 41.7226479,
+            "lon": -1.0201916,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "toStation": {
+            "id": "71100",
+            "code": 71100,
+            "name": "ZARAGOZA-MIRAFLORES",
+            "lat": 41.6334311,
+            "lon": -0.8681653,
+            "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+            "dataModified": "2026-10-02",
+            "legacy": false
+          },
+          "viaStations": [
+            {
+              "name": "Utebo",
+              "station": {
+                "id": "70801",
+                "code": 70801,
+                "name": "UTEBO",
+                "lat": 41.7108644,
+                "lon": -0.9985828,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Zaragoza Delicias",
+              "station": {
+                "id": "04040",
+                "code": 4040,
+                "name": "ZARAGOZA DELICIAS",
+                "lat": 41.6586576,
+                "lon": -0.9112693,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Zaragoza Portillo",
+              "station": {
+                "id": "70806",
+                "code": 70806,
+                "name": "ZARAGOZA-PORTILLO",
+                "lat": 41.6527361,
+                "lon": -0.8958759,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            },
+            {
+              "name": "Zaragoza Goya",
+              "station": {
+                "id": "70807",
+                "code": 70807,
+                "name": "ZARAGOZA-GOYA",
+                "lat": 41.6438779,
+                "lon": -0.8912574,
+                "source": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json",
+                "dataModified": "2026-10-02",
+                "legacy": false
+              }
+            }
+          ],
+          "source": "https://www.renfe.com/content/dam/renfe/es/Viajeros/Secciones/Cercanias/Mapas/2025/mapa_zaragoza_agosto_2025.pdf",
+          "snapshotEdition": "2025-08",
+          "routeGeometry": null,
+          "timetableSnapshotId": null,
+          "timetableStatus": "No complete official timetable embedded for this line; use official GTFS import. Endpoint and waypoint data are planning references, not all scheduled stops."
+        }
+      ],
+      "regionalLines": [],
+      "associatedServices": []
+    }
+  ],
+  "stationCatalogueNotes": [
+    "1009 unique stations in current Renfe complete catalogue; supplement with 13 legacy tables for missing Cercanías and FEVE stops. Combined deduplicated station set has 1494 records.",
+    "Renfe station numeric codes are not GTFS stop_id; reconcile imported stops by ID mapping/name and geographic evidence.",
+    "Intermediate waypoints select logical route branch and must not be presented as full stopping pattern.",
+    "Route geometry remains null because source diagrams are schematic. Use imported GTFS shapes or verified OSM railway topology with gauge matching.",
+    "Service train numbers, rolling stock series and physical unit identities are absent from the station catalogue; never invent them.",
+    "Some legacy coordinates are wrong in the original data. Prefer current 2026 catalogue on the same numeric ID and preserve source age."
+  ],
+  "temporalNotes": [
+    "Bilbao C5 commenced on 2026-05-06: exclude from starting 2022 network unless a future unlock.",
+    "Current Rodalies RL3/RL4 and station names must not be backdated to 2022 without historical records.",
+    "Asturias map January 2026: C5a Gijón–Oviedo via El Berrón; C7 San Esteban–Oviedo. Older OSP contracts used a wider C7 denomination.",
+    "Infrastructure interruptions and alternative bus arrangements vary daily; the commercial map is not the operating timetable."
+  ]
+}

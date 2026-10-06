@@ -1,0 +1,62 @@
+IBERIA FERROVIARIA — VERSIÓN JUGABLE 0.2
+Actualización e investigación: 6 de octubre de 2026.
+
+PARA JUGAR
+Abre Iberia-Ferroviaria-v0.2.html con Chrome o Edge actualizado. La campaña funciona sin Internet y sin instalar paquetes. Los enlaces de fuentes y las descargas oficiales requieren conexión.
+Pulsa «Asumir la dirección», elige tu primera política y recupera servicios desde «Red y servicios» o «Cercanías y estaciones».
+Configura flota, tarifa, salidas y horario. La flota debe cubrir las circulaciones y ser compatible con la vía.
+«Comenzar jornada» inicia el día desde la primera salida. Puedes pausar, acelerar, atender incidencias y terminar con «Hasta el último tren». El cierre espera la última llegada, aunque sea pasada medianoche. Después prepara la siguiente jornada.
+La tesorería mensual se liquida una sola vez al cambiar de mes. Las intervenciones y penalizaciones se descuentan directamente. «Delegar mes» permite avanzar sin jugar cada día.
+El objetivo es superar cinco capítulos y cerrar diciembre de 2050 con una red útil y una empresa solvente.
+
+MAPA Y MENÚS
+Arrastra el mapa y usa la rueda, +/− o el gesto de pinza para ampliar. Selecciona un servicio para gestionarlo. «Obras» permite acercarse a un proyecto y observar sus etapas y progreso de juego.
+La luz cambia con la hora; ciudades y trenes se iluminan de noche. Movimientos, luz estacional y etapas de obra son representaciones simplificadas.
+Menús: circulación diaria, Cercanías, horarios documentados, atlas de material, campaña, servicios, talleres, compras, infraestructura, finanzas, fuentes y guardados.
+
+HORARIOS OFICIALES
+«Horarios reales» incluye 42 muestras publicadas: 12 de Cádiz C1a, 20 de Sevilla C4 y 10 salidas de Bilbao C5. Conservan fecha y alcance. Sus calendarios no reconstruyen todas las excepciones festivas; Bilbao no aporta las llegadas en la fuente utilizada.
+Para consultar los horarios completos, descarga el ZIP GTFS oficial desde los enlaces del menú e impórtalo sin descomprimir. Puedes cargar Cercanías y AV/LD/MD; varios archivos pueden coexistir. Cargar de nuevo el mismo nombre sustituye ese archivo.
+Elige una fecha válida. Calendarios, excepciones, paradas, recorridos shapes y frecuencias se leen del GTFS. La tabla muestra hasta 150 coincidencias; el filtro consulta todos los viajes cargados. Las frecuencias aproximadas se identifican y las paradas sin hora conservan el dato ausente.
+El observador tiene su propia fecha y reloj, independientes de la campaña. Un GTFS actual no reconstruye 2022. Los horarios son una referencia documental; el plan del jugador sigue siendo simulado.
+Los ZIP completos oficiales no están incluidos: su descarga quedó bloqueada en este entorno. El importador se verificó con archivos de prueba, incluyendo medianoche, calendarios, frecuencias y varios archivos; no se verificó aquí la importación completa del GTFS oficial de mayor tamaño.
+Límites: 80 MB comprimidos, 420 MB por tabla, 650 MB descomprimidos, 100 entradas y 2,5 millones de filas por tabla. ZIP almacenado o deflate, sin cifrado. Los archivos grandes requieren memoria y tiempo.
+
+GUARDADO
+Guardado automático en el navegador. Usa «Guardar partida» > «Exportar partida (.json)» antes de mover el HTML, cambiar de navegador o borrar datos. Puedes volver a importar el JSON.
+Los GTFS se conservan por separado mediante IndexedDB cuando el navegador lo permite. No forman parte del JSON: conserva los ZIP originales. Si no hay espacio, se pueden utilizar durante la sesión y cargar de nuevo después.
+No se necesita cuenta ni se envían partidas a un servidor.
+
+DATOS Y ALCANCE
+Campaña alternativa 2022–2050 con decisiones, compras, entregas por lotes, reformas, asignación de flota, competencia con Alsa y otros operadores, obras y enlaces nuevos.
+15 núcleos y 63 líneas o ramas de Cercanías/Rodalies/ancho métrico, con extremos documentados y cambios posteriores a 2022 señalados. 1.494 identificadores de estación resueltos combinan catálogos oficiales de distintas fechas; no son un censo activo en una única fecha.
+56 fichas de series, variantes y programas. El atlas conserva configuraciones y lagunas. No equivale a 56 trenes físicos ni a un inventario de matrículas o asignaciones diarias.
+56 relaciones estratégicas y 63 definiciones de Cercanías. Hay 114 recorridos continuos sobre geometría OSM; cinco definiciones carecen de continuidad en la extracción. Esa ausencia no demuestra cierre. Los enlaces nuevos son propuestas conceptuales.
+La cartografía contiene 34.575 segmentos simplificados de un extracto OSM de abril de 2026. Es una base geográfica real, no una reconstrucción de 2022 ni una certificación de itinerarios, anchos, electrificación o distancias comerciales. Consulta las notas de cada recorrido.
+Venta masiva de flota y cierre generalizado inicial: ficción narrativa. Presupuestos, demanda, precios, disponibilidad de compra, producción, incidencias, obras y entregas mensuales: parámetros de juego.
+Los grandes pedidos y proyectos identificados tienen fuentes. No se afirma incluir todos los contratos nacionales ni todas las recepciones reales. Un anuncio no garantiza apertura. 2027–2050 es contrafactual.
+Es un juego estratégico 2D con ilustración original; no una recreación 3D comercial de Tropico.
+
+PROYECTO EDITABLE
+dist/story.js: campaña y decisiones.
+dist/data.js: modelos comprables, relaciones, contratos, proyectos y fuentes.
+dist/engine.js: economía mensual y reglas.
+dist/operations.js: planificación, reloj y cierre de jornadas.
+dist/gtfs.js: ZIP/CSV, calendarios, frecuencias y almacenamiento.
+dist/map-v2.js: mapa, movimiento e iluminación.
+dist/app.js y dist/style*.css: interfaz.
+dist/assets: cartografía, registros e ilustraciones.
+build.mjs: genera outputs/Iberia-Ferroviaria.html autónomo.
+test.mjs y v2-test.mjs: pruebas del motor, campaña, jornadas y datos/importador.
+«npm run build» genera; «npm test» verifica. Solo necesitas Node.js moderno; no hay dependencias npm de ejecución. Pruebas con Node 24 y capturas con Chrome.
+investigacion/: extractos y manifiestos de fuentes.
+
+CRÉDITOS Y LICENCIAS
+Ilustraciones y caricaturas originales generadas para este proyecto. Nombres y diálogos ficticios: Pedro Sancho, Raquel Sanz y Óscar del Puente. El jugador ocupa la dirección de Renfe.
+Vías: © OpenStreetMap contributors, ODbL 1.0; ver LICENSE-OSM.txt y SOURCES-CARTOGRAFIA.json. El conjunto derivado se incluye editable en dist/assets/railways.js y los extractos. La licencia de los datos es distinta de la del software que los distribuyó.
+España y Portugal: georgique/world-geojson, GPL-3.0; LICENSE-GEODATA.txt. Otros contornos: Natural Earth / johan/world.geo.json, dominio público.
+Datos Renfe: fuentes y condiciones en los registros. Fichas técnicas y GTFS bajo CC BY 4.0 donde así consta en el portal. Enlaces en el Archivo histórico y extractos.
+Las marcas identifican operadores y fabricantes. No es un producto oficial de Renfe, Adif, Alsa ni de los fabricantes.
+
+PUBLICACIÓN
+No hay despliegue web confirmado: la conexión HTTPS al repositorio quedó bloqueada. El HTML autónomo es la entrega jugable.

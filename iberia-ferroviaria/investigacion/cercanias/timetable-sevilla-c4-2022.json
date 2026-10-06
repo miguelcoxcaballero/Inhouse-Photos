@@ -1,0 +1,566 @@
+{
+  "retrieved": "2026-10-06",
+  "id": "sevilla-c4-summer-2022",
+  "network": "sevilla",
+  "line": "C4",
+  "validFrom": "2022-07-03",
+  "validUntil": "2022-09-11",
+  "temporalStatus": "historical2022",
+  "source": "https://www.renfe.com/content/dam/renfe/es/Comunicaci%C3%B3n-y-renfe-al-dia/sala-de-prensa/Local-Delegacion-Sur/PDF-y-otros/c2-c3-c4-c5-sevilla-verano.pdf",
+  "calendar": {
+    "weekdays": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "exceptionDates": [],
+    "note": "C4 table has no weekday/holiday exception symbol; PDF date range bounds validity. Do not apply to dates outside this summer period."
+  },
+  "circular": true,
+  "gauge": "iberian",
+  "stopSequence": [
+    51003,
+    51009,
+    51010,
+    51110,
+    51100,
+    51003
+  ],
+  "stops": [
+    {
+      "sequence": 1,
+      "stationId": 51003,
+      "name": "SEVILLA-SANTA JUSTA",
+      "lat": 37.3924955,
+      "lon": -5.9749269,
+      "coordinateSource": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json"
+    },
+    {
+      "sequence": 2,
+      "stationId": 51009,
+      "name": "PALACIO DE CONGRESOS",
+      "lat": 37.403741,
+      "lon": -5.936357,
+      "coordinateSource": "https://data.renfe.com/datastore/dump/ac3b4229-1c69-412f-a6de-29df913ece92?format=json"
+    },
+    {
+      "sequence": 3,
+      "stationId": 51010,
+      "name": "PADRE PIO-PALMETE",
+      "lat": 37.370836,
+      "lon": -5.939391,
+      "coordinateSource": "https://data.renfe.com/datastore/dump/ac3b4229-1c69-412f-a6de-29df913ece92?format=json"
+    },
+    {
+      "sequence": 4,
+      "stationId": 51110,
+      "name": "VIRGEN DEL ROCÍO",
+      "lat": 37.3628091,
+      "lon": -5.9760105,
+      "coordinateSource": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json"
+    },
+    {
+      "sequence": 5,
+      "stationId": 51100,
+      "name": "SAN BERNARDO",
+      "lat": 37.3777778,
+      "lon": -5.9796142,
+      "coordinateSource": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json"
+    },
+    {
+      "sequence": 6,
+      "stationId": 51003,
+      "name": "SEVILLA-SANTA JUSTA",
+      "lat": 37.3924955,
+      "lon": -5.9749269,
+      "coordinateSource": "https://data.renfe.com/datastore/dump/783e0626-6fa8-4ac7-a880-fa53144654ff?format=json"
+    }
+  ],
+  "trips": [
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-01",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "06:52",
+        "06:59",
+        "07:04",
+        "07:17",
+        "07:20",
+        "07:23"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-02",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "07:27",
+        "07:34",
+        "07:39",
+        "07:46",
+        "07:49",
+        "07:52"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-03",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "07:57",
+        "08:04",
+        "08:09",
+        "08:18",
+        "08:21",
+        "08:25"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-04",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "08:27",
+        "08:34",
+        "08:39",
+        "08:49",
+        "08:52",
+        "08:55"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-05",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "08:57",
+        "09:04",
+        "09:09",
+        "09:20",
+        "09:23",
+        "09:26"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-06",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "09:29",
+        "09:36",
+        "09:41",
+        "09:48",
+        "09:51",
+        "09:54"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-07",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "09:57",
+        "10:04",
+        "10:09",
+        "10:18",
+        "10:22",
+        "10:25"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-08",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "12:57",
+        "13:04",
+        "13:09",
+        "13:18",
+        "13:21",
+        "13:24"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-09",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "13:27",
+        "13:34",
+        "13:39",
+        "13:46",
+        "13:49",
+        "13:52"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-10",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "13:57",
+        "14:03",
+        "14:07",
+        "14:19",
+        "14:22",
+        "14:25"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-11",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "14:27",
+        "14:34",
+        "14:39",
+        "14:46",
+        "14:49",
+        "14:52"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-12",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "14:55",
+        "15:02",
+        "15:07",
+        "15:14",
+        "15:17",
+        "15:20"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-13",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "15:30",
+        "15:37",
+        "15:42",
+        "15:49",
+        "15:52",
+        "15:55"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-14",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "15:57",
+        "16:04",
+        "16:09",
+        "16:18",
+        "16:21",
+        "16:24"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-15",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "18:58",
+        "19:05",
+        "19:10",
+        "19:18",
+        "19:21",
+        "19:24"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-16",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "19:27",
+        "19:34",
+        "19:39",
+        "19:46",
+        "19:49",
+        "19:52"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-17",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "19:57",
+        "20:04",
+        "20:09",
+        "20:16",
+        "20:19",
+        "20:22"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-18",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "20:27",
+        "20:34",
+        "20:39",
+        "20:46",
+        "20:49",
+        "20:52"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-19",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "20:57",
+        "21:04",
+        "21:09",
+        "21:16",
+        "21:19",
+        "21:22"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    },
+    {
+      "snapshotTripId": "sevilla-c4-summer2022-20",
+      "from": 51003,
+      "to": 51003,
+      "times": [
+        "21:27",
+        "21:34",
+        "21:39",
+        "21:46",
+        "21:49",
+        "21:52"
+      ],
+      "stopSequence": [
+        51003,
+        51009,
+        51010,
+        51110,
+        51100,
+        51003
+      ],
+      "trainNumber": null,
+      "rollingStockSeries": null,
+      "publishedTimeMeaning": "One time per station in printed table; separate intermediate arrival/departure times are not provided."
+    }
+  ],
+  "note": "20 complete circular runs with 6 published station times each. Trip IDs are technical snapshot identifiers invented for storage, not official train numbers. Coordinate data is 2026/legacy supplement; timetable itself is explicitly summer 2022."
+}
