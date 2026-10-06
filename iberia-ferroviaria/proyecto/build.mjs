@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(root, 'dist');
 const order = ['assets/geography.js', 'assets/realdata.js', 'assets/railways.js', 'assets/timetable.js', 'data.js', 'story.js', 'schedule.js', 'network.js',
-  'engine.js', 'operations.js', 'gtfs.js', 'map-v3.js', 'train-art.js', 'train3d.js', 'city-art.js', 'music.js','voice.js', 'app.js'];
+  'engine.js', 'operations.js', 'gtfs.js', 'map-v3.js', 'train-art.js', 'train3d.js', 'city-art.js', 'music.js', 'assets/voices.js', 'voice.js', 'app.js'];
 
 function bundle(file) {
   let text = fs.readFileSync(path.join(dist, file), 'utf8');

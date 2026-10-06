@@ -6,6 +6,7 @@
   "scripts": {
     "build": "node build.mjs",
     "test": "node test.mjs && node v2-test.mjs && node v3-test.mjs",
-    "timetable": "python3 tools/build_timetable.py"
+    "timetable": "python3 tools/build_timetable.py",
+    "voices": "node tools/voice_lines.mjs > ../investigacion/voces/frases.json && python3 tools/build_voices.py"
   }
 }

@@ -1,10 +1,12 @@
-// Voces de los personajes: síntesis de voz del sistema (Web Speech API), sin ficheros ni conexión obligatoria.
-// Cada personaje tiene su voz preferida, tono, velocidad, muletillas de entonación y una cortinilla sonora.
+// Voces de los personajes. Primero, voces neuronales pregrabadas (Kokoro-82M, assets/voices.js, una por frase);
+// si falta alguna frase, la síntesis de voz del sistema (Web Speech API). Cada personaje tiene su ritmo y su cortinilla.
+import {CLIPS} from './assets/voices.js';
 
 export const CAST = {
-  president: {gender: 'm', pitch: .72, rate: .86, swing: .10, pause: 420, sting: 'fanfare', label: 'solemne y grandilocuente'},
-  minister: {gender: 'f', pitch: 1.28, rate: 1.06, swing: .14, pause: 160, sting: 'ding', label: 'optimismo de rueda de prensa'},
-  successor: {gender: 'm', pitch: 1.04, rate: 1.24, swing: .08, pause: 90, sting: 'tweet', label: 'a la velocidad de un tuit'},
+  // valores cercanos a 1: las voces del sistema suenan robóticas si se fuerza mucho el tono
+  president: {gender: 'm', pitch: .93, rate: .93, swing: .03, pause: 380, sting: 'fanfare', label: 'solemne y pausado'},
+  minister: {gender: 'f', pitch: 1.05, rate: 1.03, swing: .04, pause: 160, sting: 'ding', label: 'optimismo de rueda de prensa'},
+  successor: {gender: 'm', pitch: 1.0, rate: 1.12, swing: .03, pause: 90, sting: 'tweet', label: 'a la velocidad de un tuit'},
 };
 
 const FEMALE = /elvira|helena|laura|m[oó]nica|paulina|luc[ií]a|elena|abril|dalia|ximena|sabina|marisol|esperanza|estrella|irene|triana|vera|lola|carmen|paloma|female|mujer|google español/i;
@@ -28,6 +30,13 @@ export function speechText(text) {
     .replace(/\s+/g, ' ').trim();
 }
 
+/** Identificador estable de una frase de un personaje (FNV-1a), compartido con tools/voice_lines.mjs. */
+export function clipId(person, sentence) {
+  let h = 0x811c9dc5;
+  for (const ch of person + '|' + speechText(sentence)) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(36);
+}
+
 /** Trocea en frases para dar entonación propia a cada una y resaltar el subtítulo. */
 export function sentences(text) {
   return (String(text).match(/[^.!?…]+[.!?…]*(\s+|$)/g) || [String(text)]).map(s => s.trim()).filter(Boolean);
@@ -36,7 +45,7 @@ export function sentences(text) {
 function score(v) {
   let s = 0;
   if (/^es[-_]ES/i.test(v.lang)) s += 40; else if (/^es/i.test(v.lang)) s += 22;
-  if (/natural|neural|online|premium|enhanced|mejorad/i.test(v.name)) s += 30;
+  if (/natural|neural|online|premium|enhanced|mejorad|siri/i.test(v.name)) s += 60;
   if (/google/i.test(v.name)) s += 14;
   if (/microsoft/i.test(v.name)) s += 6;
   if (v.localService === false) s += 4;
@@ -46,13 +55,14 @@ function score(v) {
 export class Voices {
   constructor(music) {
     this.music = music; this.synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
-    this.voices = []; this.token = 0; this.speaking = null; this.listeners = new Set();
+    this.voices = []; this.token = 0; this.speaking = null; this.listeners = new Set(); this.source = null; this.buffers = new Map(); this.log = [];
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem('iberia-voz') || '{}'); } catch {}
     this.enabled = saved.enabled ?? true; this.volume = saved.volume ?? 1;
     if (this.synth) { this.load(); this.synth.addEventListener?.('voiceschanged', () => this.load()); }
   }
-  get available() { return !!this.synth && this.voices.length > 0; }
+  get neural() { return Object.keys(CLIPS).length > 0; }
+  get available() { return this.neural || (!!this.synth && this.voices.length > 0); }
   load() { this.voices = (this.synth.getVoices() || []).filter(v => /^es/i.test(v.lang)).sort((a, b) => score(b) - score(a)); this.emit(); }
   save() { try { localStorage.setItem('iberia-voz', JSON.stringify({enabled: this.enabled, volume: this.volume})); } catch {} }
   on(fn) { this.listeners.add(fn); }
@@ -69,6 +79,7 @@ export class Voices {
   stop() {
     this.token++;
     if (this.synth) this.synth.cancel();
+    if (this.source) { try { this.source.onended = null; this.source.stop(); } catch {} this.source = null; }
     if (this.speaking) { this.speaking.onend?.(); this.speaking = null; }
     this.duck(false); this.emit();
   }
@@ -98,15 +109,28 @@ export class Voices {
     [880, 1109, 1319].forEach((f, i) => tone(f, t + i * .1, .5, 'triangle', .8)); // «ding» de megafonía
     return 520;
   }
+  /** Decodifica (una vez) el MP3 de una frase. */
+  buffer(id) {
+    if (!this.buffers.has(id)) {
+      const bin = atob(CLIPS[id]), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      this.buffers.set(id, this.music.ctx.decodeAudioData(bytes.buffer));
+    }
+    return this.buffers.get(id);
+  }
   /**
    * Lee un texto con la voz del personaje.
    * onSentence(i) se llama al empezar cada frase (para el subtítulo); onend al terminar o al cortar.
    */
   speak(person, text, {onSentence, onend, sting = true} = {}) {
     this.stop();
-    if (!this.enabled || !this.synth) { onend?.(); return false; }
-    if (!this.voices.length) this.load();
-    const c = CAST[person] || CAST.minister, voice = this.voiceFor(person), parts = sentences(text), token = ++this.token;
+    const parts = sentences(text), ids = parts.map(p => clipId(person, p));
+    this.music?.init?.();
+    const neural = !!this.music?.ctx && ids.every(id => CLIPS[id]);
+    if (!this.enabled || (!neural && !this.synth)) { onend?.(); return false; }
+    if (!neural && !this.voices.length) this.load();
+    const c = CAST[person] || CAST.minister, voice = neural ? null : this.voiceFor(person), token = ++this.token;
+    if (neural) ids.forEach(id => this.buffer(id).catch(() => {}));
     this.speaking = {person, onend}; this.duck(true); this.emit();
     const finish = () => { if (token !== this.token) return; this.speaking = null; this.duck(false); this.emit(); onend?.(); };
     const say = i => {
@@ -115,12 +139,27 @@ export class Voices {
       onSentence?.(i);
       const raw = parts[i], line = speechText(raw);
       if (!line) return say(i + 1);
+      this.log.push(line); if (this.log.length > 60) this.log.shift();
+      if (neural) {
+        const ctx = this.music.ctx;
+        this.buffer(ids[i]).then(buf => {
+          if (token !== this.token) return;
+          const src = ctx.createBufferSource(), g = ctx.createGain(); src.buffer = buf; g.gain.value = this.volume;
+          src.connect(g); g.connect(ctx.destination); this.source = src;
+          let done = false;
+          const go = () => { if (done) return; done = true; clearTimeout(guard); if (this.source === src) this.source = null; setTimeout(() => say(i + 1), c.pause); };
+          const guard = setTimeout(go, buf.duration * 1000 + 1500); // por si el contexto de audio está suspendido
+          src.onended = go;
+          src.start();
+        }).catch(() => setTimeout(() => say(i + 1), 50));
+        return;
+      }
       const u = new SpeechSynthesisUtterance(line);
       if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = 'es-ES';
       // entonación burlesca: exclamaciones más agudas, preguntas que suben, frases largas algo más rápidas
-      const exclaim = /!/.test(raw), ask = /\?/.test(raw), long = line.length > 120;
-      u.pitch = Math.max(0, Math.min(2, c.pitch + (exclaim ? c.swing * 1.6 : 0) + (ask ? c.swing : 0) + (i % 2 ? -c.swing / 2 : c.swing / 3)));
-      u.rate = Math.max(.5, Math.min(2, c.rate * (long ? 1.05 : 1) * (person === 'president' && i === parts.length - 1 ? .9 : 1)));
+      const exclaim = /!/.test(raw), ask = /\?/.test(raw);
+      u.pitch = Math.max(0, Math.min(2, c.pitch + (exclaim ? c.swing : 0) + (ask ? c.swing / 2 : 0)));
+      u.rate = Math.max(.5, Math.min(2, c.rate * (person === 'president' && i === parts.length - 1 ? .95 : 1)));
       u.volume = this.volume;
       // vigilante: algunos navegadores no emiten «end» (o no tienen voces); el diálogo sigue igualmente
       let done = false;

@@ -149,7 +149,8 @@ console.log(ok.slice(-1).map(x => '✓ ' + x).join('\n'));
 
 // 10. Voces y diálogos: cada personaje tiene voz, y todo el texto hablado es pronunciable.
 {
-  const {CAST, speechText, sentences} = await import('./dist/voice.js');
+  const {CAST, speechText, sentences, clipId} = await import('./dist/voice.js');
+  const {CLIPS} = await import('./dist/assets/voices.js');
   const {CHARACTERS, CHAPTERS, DECISIONS} = await import('./dist/story.js');
   assert.deepEqual(Object.keys(CAST).sort(), Object.keys(CHARACTERS).sort());
   assert.equal(speechText('Cuesta 4 M€ a 10× ❗ «hoy»'), 'Cuesta 4 millones de euros a 10 por hoy');
@@ -159,7 +160,8 @@ console.log(ok.slice(-1).map(x => '✓ ' + x).join('\n'));
     assert(CAST[who], who);
     const parts = sentences(text).map(speechText);
     assert(parts.length >= 2 && parts.every(p => p.length > 1 && !/[€×«»❗<>]/.test(p)), text);
+    for (const x of sentences(text)) assert(CLIPS[clipId(who, x)], 'falta la voz grabada de: ' + x + ' (npm run voices)');
   }
   assert(!/Cercan[ií]as y Rodalies a la Alta/.test(await (await import('node:fs')).promises.readFile(new URL('./dist/app.js', import.meta.url), 'utf8')));
-  console.log(`✓ Voces: ${Object.keys(CAST).length} personajes con voz propia y ${lines.length} diálogos pronunciables frase a frase.`);
+  console.log(`✓ Voces: ${Object.keys(CAST).length} personajes con voz propia y ${lines.length} diálogos pronunciables y grabados frase a frase (${Object.keys(CLIPS).length} clips).`);
 }
