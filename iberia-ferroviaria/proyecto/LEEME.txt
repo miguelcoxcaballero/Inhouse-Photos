@@ -40,7 +40,7 @@ En modo automático la música cambia según lo que haces y la hora del día (pi
 
 LOS PERSONAJES HABLAN
 Pedro Sancho, Raquel Sanz y Óscar del Puente leen en voz alta sus diálogos (tutorial, decisiones y capítulos), con la frase en curso resaltada. Cada uno tiene su propia interpretación burlesca: el presidente, solemne y lento, con fanfarria de inauguración; la ministra, con optimismo de rueda de prensa y «ding» de megafonía; el ministro, a la velocidad de un tuit, con pío de notificación. La música baja mientras hablan.
-Las voces se generaron con Supertonic 2, un modelo de voz multilingüe reciente con español, y van dentro del juego (funcionan sin conexión). Cada frase irónica tiene dirección de voz (tools/voice_direction.json): pausa antes del remate y remate más lento. Además, cada trozo se generó cinco veces y se quedó la toma con más entonación (medida con el tono fundamental), para evitar lecturas planas. Pedro Sancho tiene voz grave y pausada; Raquel Sanz, voz clara de rueda de prensa; Óscar del Puente, voz ágil y rápida. Si se añade un diálogo nuevo sin regenerar las voces, ese diálogo se lee con la voz en español del sistema. El botón 🔊 repite o detiene; «Música» → «Silenciar personajes» las apaga.
+Las voces van dentro del juego (funcionan sin conexión) y se sintetizan con XTTS-v2 a partir de grabaciones reales de hablantes de castellano de España: Pedro Sancho a partir de «dave» (grabaciones publicadas en CC0 para crear voces sintéticas); Raquel Sanz y Óscar del Puente a partir de voces de estudio sin identidad real, elegidas porque pronuncian con distinción (la «z» castellana), comprobada con un reconocedor de fonemas (tools/voice_accent.py). Ninguna imita a las personas parodiadas. Cada frase irónica tiene dirección de voz (tools/voice_direction.json): pausa antes del remate; cada toma se comprueba y, si sale con artefactos, se repite. Si se añade un diálogo nuevo sin regenerar las voces, ese diálogo se lee con la voz en español del sistema. El botón 🔊 repite o detiene; «Música» → «Silenciar personajes» las apaga.
 Los diálogos se han reescrito en tono irónico y castizo. Las fechas e hitos reales (Pajares, S106, abonos, iryo, gálibo) siguen siendo correctos; el resto es sátira de ficción.
 
 GUARDADO
@@ -56,7 +56,7 @@ dist/map-v3.js: mapa ilustrado, luz, red, trenes, estaciones y obras.
 dist/app.js, dist/index.html, dist/style-v3.css: interfaz.
 dist/train3d.js: modelos 3D procedurales por familia (three.js), miniaturas y visor.
 dist/voice.js: voces de los personajes (clips neuronales, respaldo con la voz del sistema, cortinillas y subtítulos). dist/assets/voices.js: clips MP3 generados.
-tools/voice_lines.mjs, tools/voice_direction.json y tools/build_voices.py: regeneran las voces (Supertonic 2 con sherpa-onnx; frases, tomas elegidas y MP3 en investigacion/voces).
+tools/voice_lines.mjs, tools/voice_direction.json y tools/build_voices.py: regeneran las voces (XTTS-v2 con coqui-tts; frases, tomas y MP3 en investigacion/voces; referencias y créditos en investigacion/voces/referencias/REFERENCIAS.txt). tools/voice_accent.py mide si un audio suena a castellano de España.
 dist/music.js: banda sonora (12 piezas, sintetizadores Web Audio, arreglos y reproductor); dist/render-music.html la exporta a WAV.
 dist/train-art.js: ilustraciones laterales (alternativa sin WebGL) por serie (perfil del morro, rodadura, pantógrafo o diésel, puertas, pisos y librea).
 dist/story.js, dist/data.js, dist/gtfs.js: campaña, catálogo y fuentes, importador GTFS.
@@ -74,6 +74,6 @@ Horarios: Renfe Data, CC BY 4.0 (https://data.renfe.com). Copia de los ZIP: inve
 Vías: © OpenStreetMap contributors, ODbL 1.0 (LICENSE-OSM.txt). España y Portugal: georgique/world-geojson, GPL-3.0 (LICENSE-GEODATA.txt). Otros contornos: Natural Earth, dominio público.
 Tipografías: SIL Open Font License 1.1 (dist/assets/fonts).
 three.js r159: MIT (dist/assets/LICENSE-three.txt).
-Voces: sintetizadas con Supertonic 2 (Supertone Inc.; modelo bajo licencia OpenRAIL-M, código MIT), distribuido por sherpa-onnx. Son voces sintéticas de estilos genéricos; no imitan a ninguna persona real.
+Voces: sintetizadas con XTTS-v2 (Coqui, Coqui Public Model License 1.0: solo uso no comercial, lo que se aplica a estos audios) a partir de grabaciones de «dave» (NabuCasa/voice-datasets, CC0) y de voces de estudio de XTTS. Son voces sintéticas; no imitan a ninguna persona real.
 Banda sonora: composición original para este proyecto.
 Las marcas identifican operadores y fabricantes. No es un producto oficial de Renfe, Adif ni Alsa.

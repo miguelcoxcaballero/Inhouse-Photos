@@ -1,4 +1,4 @@
-// Voces de los personajes. Primero, voces pregrabadas (Supertonic 2, assets/voices.js, una por frase);
+// Voces de los personajes. Primero, voces pregrabadas (XTTS-v2, assets/voices.js, una por frase);
 // si falta alguna frase, la síntesis de voz del sistema (Web Speech API). Cada personaje tiene su ritmo y su cortinilla.
 import {CLIPS} from './assets/voices.js';
 
