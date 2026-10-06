@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  WINDOWS_VERSION: '3.1.98'
-  WINDOWS_TAG: server-v3.1.98
+  WINDOWS_VERSION: '3.1.99'
+  WINDOWS_TAG: server-v3.1.99
   RUNTIME_VERSION: '3.1.97'
   RUNTIME_TAG: server-runtime-v3.1.97-r2
   RUNTIME_PACKAGE: Inhouse-Photos-Server-Runtime-3.1.97.zip
@@ -167,7 +167,7 @@ jobs:
           if ($releaseExitCode -eq 0) {
             if (-not ($draft | ConvertFrom-Json).isDraft) { throw 'Refusing to overwrite a published Windows release' }
           } else {
-            gh release create $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Inhouse Photos $env:WINDOWS_VERSION para Windows" --draft --notes-file desktop/RELEASE-3.1.98.md
+            gh release create $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Inhouse Photos $env:WINDOWS_VERSION para Windows" --draft --notes-file desktop/RELEASE-3.1.99.md
             if ($LASTEXITCODE -ne 0) { throw 'Could not create the release draft' }
           }
           gh release upload $env:WINDOWS_TAG --repo $env:GITHUB_REPOSITORY --clobber desktop/dist/Inhouse-Photos-Server-Setup.exe desktop/dist/Inhouse-Photos-Server-Full-Setup.exe desktop/dist/Inhouse-Photos-Server.exe desktop/dist/SHA256SUMS.txt desktop/dist/windows-release-verification.json windows-server-update.json

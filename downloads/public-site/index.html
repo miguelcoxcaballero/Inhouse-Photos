@@ -4,36 +4,134 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f6f3ee" />
-    <meta name="description" content="Inhouse Photos: tus recuerdos, en tu propio servidor. Descarga las aplicaciones y conecta tus dispositivos." />
+    <meta name="description" content="Inhouse Photos es una galería para Android que guarda una copia de cada foto en tu propio ordenador con Windows." />
     <link rel="icon" href="./mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./style.css" />
     <script src="./downloads.js" defer></script>
-    <title>Inhouse Photos — Tus fotos, a tu manera</title>
+    <title>Inhouse Photos — Tus fotos, en casa</title>
   </head>
   <body>
     <a class="skip" href="#main">Ir al contenido</a>
-    <header class="site-header">
-      <div class="shell nav">
-        <a class="brand" href="#inicio" aria-label="Inhouse Photos, inicio"><img src="./mark.svg" alt="" /> <span>inhouse <strong>photos</strong></span></a>
-        <nav aria-label="Principal"><a href="#como-funciona">Cómo funciona</a><a href="#descargar">Descargar</a><a href="#conectar">Conectar</a><a href="#ayuda">Ayuda</a></nav>
-        <a class="nav-app" href="#conectar">Conectar mi servidor <span aria-hidden="true">↗</span></a>
+    <header class="masthead">
+      <div class="shell masthead-row">
+        <a class="brand" href="./" aria-label="Inhouse Photos, inicio"><img src="./mark.svg" alt="" width="24" height="24" /><span>inhouse <strong>photos</strong></span></a>
+        <nav class="masthead-nav" aria-label="Principal"><a href="#descargar">Descargar</a><a class="optional" href="#conectar">Conectar</a><a href="https://github.com/miguelcoxcaballero/Inhouse-Photos">GitHub</a></nav>
       </div>
     </header>
 
     <main id="main">
-      <section class="hero shell" id="inicio">
-        <div class="hero-copy"><span class="eyebrow"><span class="live-dot"></span> FOTOS BAJO TU CONTROL</span><h1>Toda tu vida, <em>en casa.</em></h1><p class="lead">Una galería para cada día. Una copia de seguridad que vive en tu propio ordenador. Sin tener que elegir entre comodidad y control.</p><div class="hero-actions"><a class="button primary" href="#descargar">Descargar Inhouse Photos <span aria-hidden="true">↗</span></a><a class="text-link" href="#como-funciona">Ver cómo funciona <span aria-hidden="true">↓</span></a></div><p class="hero-note">Android y Windows · iPhone desde el navegador</p></div>
-        <div class="hero-art" aria-label="Vista conceptual de una galería fotográfica"><div class="gallery-art"><div class="art-top"><span class="art-mark"><img src="./mark.svg" alt="" /> inhouse photos</span><span>● ● ●</span></div><div class="art-title">Tus momentos</div><div class="art-grid"><span class="tile a"></span><span class="tile b"></span><span class="tile c"></span><span class="tile d"></span><span class="tile e"></span><span class="tile f"></span><span class="tile g"></span><span class="tile h"></span><span class="tile i"></span></div><div class="art-bottom"><span>Fotografías</span><span>Álbumes</span><span>Biblioteca</span></div></div><div class="art-caption">Una sola biblioteca, en todos tus dispositivos.</div></div>
+      <section class="shell intro" aria-labelledby="titulo">
+        <div class="intro-text">
+          <h1 id="titulo">Tus fotos se quedan en casa.</h1>
+          <p class="lede">Una galería para Android que guarda una copia de cada foto en tu propio ordenador con Windows.</p>
+        </div>
+
+        <div class="downloads" id="descargar">
+          <h2 class="label">Descargar</h2>
+          <ul class="download-list">
+            <li class="download">
+              <span class="download-platform">Android</span>
+              <div class="download-body">
+                <h3>App de fotos</h3>
+                <p class="download-meta"><small data-download-version="android">Android 8 o posterior · ARM64 · Versión 3.1.101</small><br /><a data-download-checksum="android" href="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.101-backup-menu/SHA256SUMS.txt" class="quiet-link">Comprobar SHA-256</a></p>
+              </div>
+              <a data-download="android" data-version="3.1.101" href="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.101-backup-menu/Inhouse-Photos.apk" download class="button"><svg class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 17h12" /></svg>Descargar APK</a>
+            </li>
+            <li class="download">
+              <span class="download-platform">Windows</span>
+              <div class="download-body">
+                <h3>Servidor</h3>
+                <p>Programa y motor de fotos en un solo instalador. Si ya tienes biblioteca, la conserva.</p>
+                <p class="download-meta"><small data-download-version="windows">Windows 10 y 11 · Versión 3.1.98 · Instalación completa</small><br /><a data-download-checksum="windows" href="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.98/SHA256SUMS.txt" class="quiet-link">Comprobar SHA-256</a></p>
+              </div>
+              <a data-download="windows" data-version="3.1.98" href="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.98/Inhouse-Photos-Server-Full-Setup.exe" download class="button"><svg class="button-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 17h12" /></svg>Descargar instalador</a>
+            </li>
+            <li class="download download-note">
+              <span class="download-platform">iPhone</span>
+              <div class="download-body"><p>Abre tu servidor en Safari y elige «Añadir a pantalla de inicio».</p></div>
+            </li>
+          </ul>
+        </div>
+
+        <figure class="device">
+          <figcaption class="device-caption" id="demo-caption">La pantalla de copia de la app. Prueba el interruptor.</figcaption>
+          <input class="demo-switch" id="demo-backup" type="checkbox" role="switch" checked aria-label="Copia de seguridad, demostración" aria-describedby="demo-caption" />
+          <div class="phone" aria-hidden="true">
+            <div class="status-bar"><span>10:24</span><svg viewBox="0 0 34 12"><path d="M2 5.5a8 8 0 0 1 11 0M4.3 7.8a4.8 4.8 0 0 1 6.4 0" /><circle cx="7.5" cy="10" r="1" /><rect x="18" y="2.5" width="13" height="7" rx="1.6" /><rect class="fill" x="19.5" y="4" width="8" height="4" rx=".6" /></svg></div>
+            <div class="app-bar">
+              <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg>
+              <span>Copia de seguridad</span>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" /></svg>
+            </div>
+
+            <label class="switch-card" for="demo-backup">
+              <span class="switch-icon"><svg class="on" viewBox="0 0 24 24"><path d="M7 18.5a4.5 4.5 0 0 1-.6-8.96 6 6 0 0 1 11.4 1.04 3.96 3.96 0 0 1-.3 7.92z" /><path d="M12 16v-5m-2.2 2.2L12 11l2.2 2.2" /></svg><svg class="off" viewBox="0 0 24 24"><path d="M9.2 6.1A6 6 0 0 1 17.8 10.6a3.96 3.96 0 0 1 2.4 6.9M16 18.5H7a4.5 4.5 0 0 1-.6-8.96" /><path d="M4 4l16 16" /></svg></span>
+              <span class="switch-text"><strong>Copia de seguridad</strong><span class="swap"><span class="on">Activada</span><span class="off">Desactivada</span></span></span>
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+
+            <div class="hero">
+              <div class="rising">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+              <div class="cloud-bob">
+                <span class="cloud-pulse"></span>
+                <div class="cloud">
+                  <svg class="cloud-ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" /></svg>
+                  <span class="cloud-disc">
+                    <svg class="on" viewBox="0 0 24 24"><path d="M7 18.5a4.5 4.5 0 0 1-.6-8.96 6 6 0 0 1 11.4 1.04 3.96 3.96 0 0 1-.3 7.92z" /><path d="M12 16v-5m-2.2 2.2L12 11l2.2 2.2" /></svg>
+                    <svg class="off" viewBox="0 0 24 24"><path d="M9.2 6.1A6 6 0 0 1 17.8 10.6a3.96 3.96 0 0 1 2.4 6.9M16 18.5H7a4.5 4.5 0 0 1-.6-8.96" /><path d="M4 4l16 16" /></svg>
+                  </span>
+                </div>
+              </div>
+              <p class="hero-title swap"><span class="on">Subiendo 3 archivos</span><span class="off">Copia desactivada</span></p>
+              <p class="hero-sub swap"><span class="on">4,2 MB/s</span><span class="off">248 fotos y vídeos esperando</span></p>
+            </div>
+
+            <div class="stage">
+              <p><span><strong>92 %</strong> respaldado</span><span>Total 3.118</span></p>
+              <span class="stage-bar"><span></span><span></span></span>
+              <p class="stage-legend"><span><i></i>Respaldados 2.870</span><span><i></i>Pendientes 248</span></p>
+            </div>
+
+            <ul class="tiles">
+              <li><svg viewBox="0 0 24 24"><rect x="7" y="3" width="14" height="14" rx="2" /><path d="M3 7v12a2 2 0 0 0 2 2h12M9 14l3-3 2 2 2.5-2.5L19 13" /></svg><span><strong>Álbumes</strong>Reciente (Todos)</span></li>
+              <li><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M8 12h.01M12 12h.01M16 12h.01" /></svg><span><strong>Pendientes</strong>248 fotos y vídeos por subir</span></li>
+              <li><svg viewBox="0 0 24 24"><path d="M12 15V4m0 0-4.5 4.5M12 4l4.5 4.5M5 20h14" /></svg><span><strong>Subidas en curso</strong><span class="swap"><span class="on">IMG_2041.jpg · 64 %</span><span class="off">Ninguna en este momento</span></span></span></li>
+            </ul>
+          </div>
+        </figure>
       </section>
 
-      <section class="chapter" id="como-funciona"><div class="shell"><div class="section-heading"><span class="eyebrow">LO ESENCIAL</span><h2>Más sencillo de lo que parece.</h2><p>El ordenador guarda los originales. La app te acompaña. Tú decides qué se sube y cómo.</p></div><div class="steps"><article><span class="step-number">01</span><h3>Prepara tu espacio</h3><p>Instala el servidor en un PC con Windows y elige el disco donde quieres guardar tu biblioteca. Si ya usas Inhouse Photos, puedes seleccionar tu instalación actual.</p></article><article><span class="step-number">02</span><h3>Conecta tu teléfono</h3><p>Escanea el QR del gestor y confirma el mismo código en el móvil y en el PC. Si lo prefieres, también puedes introducir la dirección y tu cuenta manualmente.</p></article><article><span class="step-number">03</span><h3>Deja que se cuide sola</h3><p>Las nuevas fotos se copian cuando tú lo permites. Puedes conservar calidad original o ahorrar espacio con compresión en el servidor.</p></article></div></div></section>
+      <section class="shell chapter" id="conectar" aria-labelledby="conectar-titulo">
+        <div class="chapter-head">
+          <h2 id="conectar-titulo">Conectar el móvil</h2>
+          <p>Con el servidor instalado, la app se vincula en un minuto. Sin escribir direcciones.</p>
+        </div>
+        <ol class="steps">
+          <li><span class="step-number">1</span><div><h3>Abre «Conectar móvil»</h3><p>En el gestor de Windows aparece un código QR.</p></div></li>
+          <li><span class="step-number">2</span><div><h3>Escanéalo con la app</h3><p>Caduca a los tres minutos y solo sirve una vez.</p></div></li>
+          <li><span class="step-number">3</span><div><h3>Comprueba el código</h3><p>Si es el mismo en el móvil y en el ordenador, acepta.</p></div></li>
+        </ol>
+      </section>
 
-      <section class="downloads-section shell" id="descargar"><div class="section-heading"><span class="eyebrow">DESCARGAS</span><h2>Empieza en el dispositivo que quieras.</h2></div><div class="download-grid"><article class="download-card"><div class="card-head"><span class="platform-icon" aria-hidden="true">◫</span><span class="platform-label">TELÉFONO</span></div><h3>Inhouse Photos<br />para Android</h3><p>Galería, álbumes y copia de seguridad automática. Se actualiza sin perder tus datos.</p><a class="button primary" data-download="android" data-version="3.1.97" href="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.97-unified/Inhouse-Photos.apk" download>Descargar APK <span aria-hidden="true">↓</span></a><small data-download-version="android">Android 8 o posterior · ARM64 · Versión 3.1.97</small></article><article class="download-card"><div class="card-head"><span class="platform-icon" aria-hidden="true">▣</span><span class="platform-label">ORDENADOR</span></div><h3>Servidor para<br />Windows</h3><p>El programa y el motor de fotos, juntos en un solo instalador. Actualiza y verifica tu biblioteca vinculada antes de terminar. Tus fotos, cuentas y discos se conservan.</p><a class="button outline" data-download="windows" data-version="3.1.98" href="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.98/Inhouse-Photos-Server-Full-Setup.exe" download>Descargar instalación completa <span aria-hidden="true">↓</span></a><small data-download-version="windows">Windows 10 y 11 · Versión 3.1.98 · Instalación completa</small><small><a data-download-checksum="windows" href="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v3.1.98/SHA256SUMS.txt">Verificar instalador ↗</a></small></article></div><p class="download-aside"><a href="https://fotos.miguelcoxcaballero.com/descargas/servidor/">Ver el estado USB del servidor en directo →</a></p><p class="download-aside">¿Ya tienes biblioteca? Instala sobre la versión anterior con la misma cuenta de Windows. El instalador conserva fotos, cuentas y discos; prepara el motor y comprueba la biblioteca vinculada antes de terminar. Si Inhouse Photos está abierto, sal solo del programa desde su icono junto al reloj y pulsa «Reintentar». Al actualizar el motor puede haber una pausa breve en el acceso.</p><p class="download-aside">¿Usas iPhone? Abre en Safari la dirección HTTPS de tu propio servidor y añádela a la pantalla de inicio. iOS no permite una copia automática continua desde una web.</p></section>
-
-<section class="connect-section" id="conectar"><div class="shell connect-grid"><div><span class="eyebrow">CONECTAR</span><h2>Tu servidor. Tus dispositivos.</h2><p>En el gestor de Windows, abre «Conectar móvil» y muestra un QR temporal. Escanéalo con la cámara o con la app. Comprueba que el código coincide y acepta la vinculación en los dos dispositivos.</p><div class="connection-steps"><span>01 <strong>Abre el QR en el PC</strong></span><span>02 <strong>Escanéalo con el móvil</strong></span><span>03 <strong>Confirma en ambos</strong></span></div><p class="fine-print">El QR no contiene tu contraseña. Caduca en tres minutos y solo puede usarse una vez. La dirección y el inicio de sesión manual siguen disponibles.</p></div><div class="connect-note"><span class="note-line"></span><strong>Antes de empezar</strong><ul><li>El ordenador debe permanecer encendido.</li><li>Tu servidor necesita acceso HTTPS desde Internet para conectarte fuera de casa.</li><li>Solo aprueba una solicitud si reconoces el teléfono y el código coincide.</li></ul><a href="https://github.com/miguelcoxcaballero/Inhouse-Photos#readme" target="_blank" rel="noreferrer">Ver la guía del proyecto <span aria-hidden="true">↗</span></a></div></div></section>
-
-      <section class="help-section shell" id="ayuda"><div class="section-heading"><span class="eyebrow">AYUDA</span><h2>Las respuestas importantes.</h2></div><div class="faq"><details><summary>¿Mis fotos están en la nube?</summary><p>Se almacenan en el ordenador y discos que elijas. Puedes acceder por Internet si configuras una dirección HTTPS; eso no mueve tu biblioteca a un servicio ajeno.</p></details><details><summary>¿Qué ocurre si apago el ordenador?</summary><p>La copia y el acceso remoto se reanudarán cuando vuelva a encenderse. Las fotos que ya están en el teléfono siguen ahí.</p></details><details><summary>¿Puedo conservar mis fotos sin compresión?</summary><p>Sí. En la app puedes elegir calidad original o ahorro de espacio. La opción solo afecta a nuevas subidas y no modifica las fotos ya guardadas.</p></details><details><summary>¿Necesito desinstalar mi servidor actual?</summary><p>No. El gestor de Windows está diseñado para detectar la biblioteca existente. Antes de aceptar cualquier migración, comprueba que reconoce la ruta y las unidades correctas.</p></details></div></section>
+      <section class="shell chapter" aria-labelledby="saber-titulo">
+        <div class="chapter-head">
+          <h2 id="saber-titulo">Antes de instalar</h2>
+        </div>
+        <dl class="facts">
+          <div><dt>Dónde están las fotos</dt><dd>En tu ordenador y en los discos que elijas. Para verlas fuera de casa, el servidor necesita una dirección HTTPS.</dd></div>
+          <div><dt>Si apagas el ordenador</dt><dd>La copia se detiene y continúa al encenderlo. Las fotos del móvil siguen en el móvil.</dd></div>
+          <div><dt>Calidad</dt><dd>Original o ahorro de espacio. El cambio solo afecta a lo que subas a partir de entonces.</dd></div>
+          <div><dt>Si ya tienes un servidor</dt><dd>No hace falta desinstalarlo. El gestor reconoce tu biblioteca y conserva fotos y cuentas.</dd></div>
+        </dl>
+      </section>
     </main>
-    <footer class="site-footer"><div class="shell footer-grid"><div class="brand"><img src="./mark.svg" alt="" /> <span>inhouse <strong>photos</strong></span></div><p>Una mejor forma de volver a tus recuerdos.</p><div><a href="https://github.com/miguelcoxcaballero/Inhouse-Photos">Código fuente</a><a href="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases">Versiones</a><a href="./privacidad/">Privacidad</a><a data-download-checksum="android" href="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.97-unified/SHA256SUMS.txt">Verificar descarga</a></div><small>© 2026 Inhouse Photos. Tus datos siguen siendo tuyos.</small></div></footer>
+
+    <footer class="shell colophon">
+      <a class="brand" href="./"><img src="./mark.svg" alt="" width="24" height="24" /><span>inhouse <strong>photos</strong></span></a>
+      <p>Código abierto. Tus fotos no pasan por esta web.</p>
+      <nav aria-label="Pie"><a href="https://github.com/miguelcoxcaballero/Inhouse-Photos">Código</a><a href="https://github.com/miguelcoxcaballero/Inhouse-Photos/releases">Versiones</a><a href="https://fotos.miguelcoxcaballero.com/descargas/servidor/">Conexión USB</a><a href="./privacidad/">Privacidad</a></nav>
+    </footer>
   </body>
 </html>
