@@ -105,37 +105,33 @@ export const MODELS = [
  {id:'s130',name:'S130 · Alvia',maker:'Talgo / Bombardier',category:'Intercity',gauge:'variable',power:'electric',speed:250,seats:299,price:20,lead:28,year:2022,energy:.62,desc:'Ancho variable: enlaza red estándar e ibérica. No circula sin catenaria.'},
  {id:'s599',name:'S599 · Regional',maker:'CAF',category:'Regional diésel',gauge:'iberian',power:'diesel',speed:160,seats:184,price:6.5,lead:20,year:2022,energy:1.25,desc:'Para líneas de ancho ibérico sin electrificar. Precio y producción son de simulación.'},
  {id:'s449',name:'S449 · Media Distancia',maker:'CAF',category:'Media Distancia',gauge:'iberian',power:'electric',speed:160,seats:260,price:8,lead:22,year:2022,energy:.45,desc:'Modelo de juego en ancho ibérico. Requiere electrificación.'},
- {id:'civia',name:'Civia · Cercanías',maker:'Alstom / CAF',category:'Cercanías',gauge:'iberian',power:'electric',speed:120,seats:500,price:7,lead:20,year:2022,energy:.4,desc:'Capacidad de juego con plazas sentadas y de pie. Ideal para recorridos cortos.'},
  {id:'metric',name:'Regional RAM',maker:'Parque de ancho métrico',category:'Ancho métrico',gauge:'metric',power:'diesel',speed:100,seats:150,price:5,lead:24,year:2022,energy:.8,desc:'Representación simplificada de la flota heredada de vía estrecha.'},
  {id:'s106f',name:'S106 · Avril UIC',maker:'Talgo',category:'Alta velocidad',gauge:'uic',power:'electric',speed:300,seats:507,price:29,lead:36,year:2024,energy:.62,desc:'Versión de ancho fijo. La versión variable se compra por separado.'},
  {id:'s106v',name:'S106 · Avril variable',maker:'Talgo',category:'Alta velocidad',gauge:'variable',power:'electric',speed:300,seats:507,price:31,lead:38,year:2024,energy:.65,desc:'Modelo simplificado de rodadura desplazable. Las líneas limitan su velocidad.'},
  {id:'s107',name:'S107 · Talgo transformado',maker:'Talgo',category:'Alta velocidad',gauge:'variable',power:'electric',speed:300,seats:400,price:19,lead:30,year:2027,energy:.66,desc:'Capacidad y disponibilidad comercial en el juego son supuestos. Programa real de 13 composiciones.'},
- {id:'s452',name:'S452 · Coradia Stream',maker:'Alstom',category:'Cercanías',gauge:'iberian',power:'electric',speed:140,seats:900,price:9,lead:30,year:2027,energy:.46,desc:'201 unidades contratadas entre pedido base y ampliación. Entregas de campaña estimadas.'},
- {id:'s453',name:'S453 · Stadler T100',maker:'Stadler',category:'Cercanías',gauge:'iberian',power:'electric',speed:140,seats:912,price:11,lead:28,year:2026,energy:.5,desc:'100 metros. La mayor capacidad incluye viajeros de pie.'},
- {id:'s453long',name:'S453 · Stadler T200',maker:'Stadler',category:'Cercanías',gauge:'iberian',power:'electric',speed:140,seats:1884,price:17,lead:30,year:2026,energy:.72,desc:'200 metros. Se simplifica la longitud útil de andén en esta versión.'},
  {id:'s480',name:'S480 · CAF MD',maker:'CAF',category:'Media Distancia',gauge:'iberian',power:'electric',speed:200,seats:264,price:8.5,lead:28,year:2027,energy:.4,desc:'Batería de última milla: no habilita líneas diésel completas. Ancho ibérico en la simulación.'},
- {id:'s460',name:'S460 · CAF Cercanías',maker:'CAF',category:'Cercanías',gauge:'iberian',power:'electric',speed:140,seats:550,price:7.5,lead:26,year:2027,energy:.4,desc:'Familia del contrato de 29 unidades. Capacidad simplificada para balance.'},
  {id:'s401',name:'CAF RAM · Nueva generación',maker:'CAF',category:'Ancho métrico',gauge:'metric',power:'hybrid',speed:100,seats:180,price:6,lead:28,year:2027,energy:.45,desc:'El juego agrupa versiones eléctricas e híbridas; reparto técnico no modelado por subserie.'},
  {id:'future',name:'AV 2030 · Nueva generación',maker:'Licitación abierta · hipotético',category:'Alta velocidad',gauge:'uic',power:'electric',speed:350,seats:500,price:34,lead:40,year:2026,energy:.42,desc:'Plataforma ficticia inspirada en la licitación de 2026. Sin fabricante adjudicado atribuido.'}
 ];
 SOURCES.push(...REAL_DATA_SOURCES.filter(s=>!SOURCES.some(x=>x.url===s.url)));
 MODELS.push({id:'s480uic',name:'S480 · CAF MD UIC',maker:'CAF',category:'Media Distancia',gauge:'uic',power:'electric',speed:200,seats:264,price:8.5,lead:28,year:2027,energy:.4,desc:'Variante UIC documentada en2026. Batería de última milla; plazos de juego, no entrega certificada.'});
 SOURCES.push(...REAL_DATA_SOURCES.filter(s=>!SOURCES.some(x=>x.url===s.url)));
+// v0.4+: el material de Cercanías queda como registro documental; no se explota ni se compra en el juego.
 export const MODEL=Object.fromEntries(MODELS.map(m=>[m.id,m]));
 export const HISTORICAL_ORDERS = [
  {id:'h106f',name:'S106 · ancho fijo',model:'s106f',qty:15,signed:-60,start:28,span:18,source:'s106types',note:'Pedido previo a 2022. Inicio real de servicio 21-05-2024; reparto mensual del juego simulado.'},
  {id:'h106v',name:'S106 · ancho variable',model:'s106v',qty:15,signed:-60,start:28,span:18,source:'s106types',note:'Segundo grupo del mismo contrato de 30. No son 30 adicionales.'},
  {id:'h107',name:'Transformación S107',model:'s107',qty:13,signed:-8,start:64,span:24,source:'s107',note:'13 composiciones, no 26 trenes. Calendario de juego estimado; homologación no confirmada aquí.'},
- {id:'h452',name:'Alstom · pedido base',model:'s452',qty:152,signed:-10,start:62,span:42,source:'alstom',note:'Firmado en 2021. Calendario de recepción posterior a 2026 es simulado.'},
- {id:'h452plus',name:'Alstom · ampliación',model:'s452',qty:49,signed:11,start:92,span:18,source:'alstom',note:'Diciembre de 2022. 152 + 49 = 201 unidades.'},
- {id:'h453short',name:'Stadler · 100 metros',model:'s453',qty:24,signed:-10,start:56,span:24,source:'stadler',note:'Plan de abril de 2026: 9 T100 durante 2026. Reparto del juego aproximado, no acta de entrega.'},
- {id:'h453long',name:'Stadler · 200 metros base',model:'s453long',qty:35,signed:-10,start:56,span:28,source:'stadler',note:'Parte del pedido base de 59 de 2021.'},
- {id:'h453plus',name:'Stadler · ampliación T200',model:'s453long',qty:20,signed:11,start:78,span:20,source:'stadler',note:'Ampliación de 2022: total Stadler de 79. Reparto temporal simulado.'},
+ {id:'h452',name:'Alstom · pedido base',model:null,qty:152,signed:-10,start:62,span:42,source:'alstom',note:'Firmado en 2021. Calendario de recepción posterior a 2026 es simulado.'},
+ {id:'h452plus',name:'Alstom · ampliación',model:null,qty:49,signed:11,start:92,span:18,source:'alstom',note:'Diciembre de 2022. 152 + 49 = 201 unidades.'},
+ {id:'h453short',name:'Stadler · 100 metros',model:null,qty:24,signed:-10,start:56,span:24,source:'stadler',note:'Plan de abril de 2026: 9 T100 durante 2026. Reparto del juego aproximado, no acta de entrega.'},
+ {id:'h453long',name:'Stadler · 200 metros base',model:null,qty:35,signed:-10,start:56,span:28,source:'stadler',note:'Parte del pedido base de 59 de 2021.'},
+ {id:'h453plus',name:'Stadler · ampliación T200',model:null,qty:20,signed:11,start:78,span:20,source:'stadler',note:'Ampliación de 2022: total Stadler de 79. Reparto temporal simulado.'},
  {id:'h480',name:'CAF · Media Distancia base',model:'s480',qty:28,signed:9,start:65,span:24,source:'md',note:'Octubre de 2022. Fecha de entrada de campaña hipotética.'},
  {id:'h480plus',name:'CAF · ampliación MD',model:'s480',qty:32,signed:17,start:83,span:24,source:'mdplus',note:'Junio de 2023. Total del programa: 60.'},
  {id:'h480updateib',name:'CAF MD · actualización ibérica2026',model:'s480',qty:1,signed:53,start:76,span:12,source:'md70',note:'Ajuste documental al anuncio17-06-2026:61ibéricas en total, frente a60registros iniciales. No es fecha acreditada de firma.'},
  {id:'h480updateuic',name:'CAF MD · actualización UIC2026',model:'s480uic',qty:9,signed:53,start:78,span:12,source:'md70',note:'9UIC del programa publicado de70. Recepciones de juego estimadas; no se duplican los60contratos previos.'},
- {id:'h460',name:'CAF · Cercanías básicos',model:'s460',qty:29,signed:14,start:68,span:30,source:'caf29',note:'Marzo de 2023. Fecha de entrega de campaña estimada.'},
+ {id:'h460',name:'CAF · Cercanías básicos',model:null,qty:29,signed:14,start:68,span:30,source:'caf29',note:'Marzo de 2023. Fecha de entrega de campaña estimada.'},
  {id:'h401',name:'CAF · ancho métrico',model:'s401',qty:31,signed:-18,start:62,span:30,source:'gauge',note:'Contrato de 2020 afectado por definición de gálibo. Versiones agrupadas en el juego.'},
  {id:'halpine',name:'CAF · 6 alpinos para C9',model:null,qty:6,signed:-18,start:62,span:18,source:'fleetplan',note:'Registro documental. Red alpina fuera del mapa operativo de esta versión.'},
  {id:'hloco1',name:'Stadler · Euro6000 ibéricas',model:null,qty:12,signed:1,start:12,span:18,source:'loco1',note:'Registro documental de mercancías. No se convierte una locomotora en tren de pasajeros.'},

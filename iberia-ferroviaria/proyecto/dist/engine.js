@@ -152,6 +152,9 @@ function migrate(s){
  if(legacy)s.version=2;
  if(s.version!==2)return s;
  s.routes=s.routes.filter(r=>ROUTE_DEF[r.id]||r.custom);s.stations||={};s.requests||=[];
+ // Material de Cercanías de partidas antiguas: se retira del parque y de las líneas que lo usaban.
+ const gone=new Set(s.fleet.filter(f=>!MODEL[f.model]).map(f=>f.id));if(gone.size){s.fleet=s.fleet.filter(f=>!gone.has(f.id));for(const r of s.routes)if(gone.has(r.fleet)){r.active=false;r.fleet=null;r.units=0;}}
+ s.orders=s.orders.filter(o=>MODEL[o.model]);s.refits=s.refits.filter(r=>MODEL[r.model]);
  const known=new Set(s.routes.map(r=>r.id));
  for(const r of s.routes){const def=ROUTE_DEF[r.id];if(!def)continue;for(const k of ['real','baseFrequency','peak','minutes','net','code','color','products','stations','generated','name'])if(def[k]!==undefined)r[k]=def[k];else delete r[k];
   // Solo las partidas v0.2 se adaptan al horario oficial; en una partida actual, unidades incoherentes se rechazan.

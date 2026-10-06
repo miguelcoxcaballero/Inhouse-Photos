@@ -1,0 +1,7 @@
+<!doctype html><meta charset="utf-8"><title>Modelos 3D</title><style>body{margin:8px;background:#f2ead8;font:13px sans-serif;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}img{width:100%}</style>
+<script src="assets/three.min.js"></script><script type="module">
+import {trainThumb} from './train3d.js';
+const keys = (new URLSearchParams(location.search).get('k') || '112,130,106,106avlo,103,100,114,120,449,599,594,592,2700,2900,334,future,730,480').split(',');
+document.body.innerHTML = keys.map(k => `<div><b>${k}</b>${trainThumb(k)}</div>`).join('');
+window.done = true;
+</script>

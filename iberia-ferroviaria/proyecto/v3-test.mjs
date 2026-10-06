@@ -133,3 +133,16 @@ console.log(ok.map(x => '✓ ' + x).join('\n'));
   ok.push('Ciudades: mejora de estación y petición atendida con recompensa.');
 }
 console.log(ok.slice(-1).map(x => '✓ ' + x).join('\n'));
+// 9. Banda sonora: al menos diez piezas completas en ambos estilos.
+{
+  const {SONGS, validate, arrange} = await import('./dist/music.js');
+  assert(SONGS.length >= 10);
+  assert(new Set(SONGS.map(s => s.family)).size === 2);
+  for (const s of SONGS) {
+    validate(s);
+    const {events, length} = arrange(s);
+    assert(events.length > 300 && length > 80, s.title);
+    assert(events.every(e => e.t >= -0.05 && e.t < length && Number.isFinite(e.midi) && e.vel > 0 && e.vel <= 1), s.title);
+  }
+  console.log(`✓ Banda sonora: ${SONGS.length} piezas originales (${SONGS.filter(s => s.family === 'estacion').length} «Estación», ${SONGS.filter(s => s.family === 'red').length} «Red»), compases y eventos válidos.`);
+}

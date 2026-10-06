@@ -9,6 +9,8 @@ import {kindLabel, networkName} from './network.js';
 import {RailMap} from './map-v3.js';
 import {trainArt, artKey} from './train-art.js';
 import {citySkyline} from './city-art.js';
+import {trainThumb, mountViewers} from './train3d.js';
+import {Soundtrack, SONGS, STYLE_LABEL, FAMILY_LABEL} from './music.js';
 import {REAL_TRAIN_CATALOGUE, COMMUTER_NETWORKS} from './assets/realdata.js';
 
 const $ = id => document.getElementById(id);
@@ -29,6 +31,7 @@ const ICONS = {
   finance: '<path d="M4 19h16M7 16V10M12 16V6M17 16v-4"/>',
   story: '<path d="M5 4h10l4 4v12H5zM15 4v4h4M8 12h8M8 15.5h6"/>',
   archive: '<rect x="4" y="5" width="16" height="4" rx="1"/><path d="M5.5 9v10h13V9M10 12.5h4"/>',
+  music: '<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
   save: '<path d="M5 5h11l3 3v11H5zM8 5v5h7V5M8 19v-5h8v5"/>',
   help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.9M12 16.6v.4"/>',
 };
@@ -71,6 +74,42 @@ const map = new RailMap($('map'), {
   getCities: () => mapCities(),
   getPopups: () => popups,
 });
+
+// ------------------------------------------------------------ banda sonora
+function musicMood() {
+  if (!state.started || state.ops.phase !== 'running') return 'estacion';
+  return O.daylight(state, state.ops.minute).night > .55 ? 'night' : 'day';
+}
+const music = new Soundtrack(musicMood);
+function renderMusicButton() {
+  const b = $('musicBtn'); if (!b) return;
+  b.innerHTML = `${icon('music')}<span>${music.enabled ? 'Música' : 'Silencio'}</span>`;
+  b.title = music.current ? `Sonando: ${music.current.song.title}` : music.enabled ? 'Banda sonora' : 'Música apagada';
+  b.classList.toggle('on', !!music.current);
+  if ($('modal').open && $('modal').querySelector('.tracks')) musicDialog(true);
+}
+music.on(renderMusicButton);
+document.addEventListener('pointerdown', () => { if (music.enabled && !music.current) music.start(); }, {once: true});
+let lastMood = null;
+function checkMusicMood() {
+  if (!music.current || music.mode !== 'auto') return;
+  const mood = musicMood(), fam = mood === 'estacion' ? 'estacion' : 'red';
+  if (music.current.song.family !== fam) music.next();
+  else if (mood !== lastMood && fam === 'red' && (mood === 'night') !== (music.current.song.mood === 'night') && music.position > 25) music.next();
+  lastMood = mood;
+}
+function musicDialog(refresh = false) {
+  const cur = music.current?.song.id;
+  const list = fam => SONGS.filter(x => x.family === fam).map(x => `<button class="track ${x.id === cur ? 'on' : ''}" data-action="music-play" data-id="${x.id}"><span class="no">${String(SONGS.indexOf(x) + 1).padStart(2, '0')}</span><span><b>${esc(x.title)}</b><em>${STYLE_LABEL[x.style]} · ${x.bpm} ppm${x.mood === 'night' ? ' · noche' : ''}</em></span><span class="eq">${x.id === cur ? '<i></i><i></i><i></i>' : '▶'}</span></button>`).join('');
+  const html = `<div class="content"><div class="kicker">Banda sonora original</div><h1>Música de Iberia Ferroviaria</h1><p>Doce piezas compuestas para el juego y tocadas en directo por tu navegador. En modo automático suenan las de «Estación» mientras preparas el día y las de «Red» durante la jornada; de noche, las nocturnas.</p>
+  <div class="tracks"><h3>${FAMILY_LABEL.estacion}</h3>${list('estacion')}<h3>${FAMILY_LABEL.red}</h3>${list('red')}</div>
+  <div class="toolbar"><button class="btn ${music.enabled ? '' : 'primary'}" data-action="music-toggle">${music.enabled ? 'Apagar música' : 'Encender música'}</button><button class="btn" data-action="music-next" ${music.enabled ? '' : 'disabled'}>Siguiente pieza</button>
+  <label style="margin:0">Modo</label><select id="musicMode"><option value="auto" ${music.mode === 'auto' ? 'selected' : ''}>Automático según el momento</option><option value="list" ${music.mode === 'list' ? 'selected' : ''}>Toda la lista</option><option value="repeat" ${music.mode === 'repeat' ? 'selected' : ''}>Repetir pieza</option></select></div>
+  <label for="musicVolume">Volumen</label><input id="musicVolume" type="range" min="0" max="1" step="0.05" value="${music.volume}">
+  <div class="actions"><button class="btn primary" data-action="close-modal">Cerrar</button></div></div>`;
+  if (refresh) { const sc = $('modal').querySelector('.content')?.scrollTop || 0; $('modal').innerHTML = `<div class="modal single">${html}</div>`; $('modal').querySelector('.content').scrollTop = sc; }
+  else showModal(html, 'single');
+}
 
 // ------------------------------------------------------------ utilidades de UI
 function toast(text) { $('toast').textContent = text; $('toast').classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.remove('show'), 4200); }
@@ -347,7 +386,7 @@ function frame(t) {
       if (observerMinute >= 1560) pause();
     } else pause();
   }
-  if (t - lastTimeline > 120) { lastTimeline = t; renderClock(); drawTimeline(); renderCoach(); }
+  if (t - lastTimeline > 120) { lastTimeline = t; renderClock(); drawTimeline(); renderCoach(); checkMusicMood(); }
   if (t - lastPanel > 1000) {
     lastPanel = t;
     if (playing && screen === 'ops') renderDrawer();
@@ -431,7 +470,8 @@ function renderClock() {
 function renderNav() {
   const pending = state.ops.incidents.filter(x => state.ops.minute >= x.at && !state.ops.resolved.includes(x.trip)).length;
   $('navigation').innerHTML = Object.entries(PAGES).map(([k, name]) => `<button class="${screen === k ? 'active' : ''}" data-action="navigate" data-screen="${k}" aria-label="${name}" ${screen === k ? 'aria-current="page"' : ''}>${icon(k)}<span>${name}</span>${k === 'ops' && pending ? `<span class="badge">${pending}</span>` : ''}</button>`).join('') +
-    `<div class="spacer"></div><button data-action="save-dialog" aria-label="Guardar partida">${icon('save')}<span>Guardar</span></button><button data-action="help" aria-label="Cómo jugar">${icon('help')}<span>Ayuda</span></button>`;
+    `<div class="spacer"></div><button id="musicBtn" class="music-btn" data-action="music" aria-label="Banda sonora"></button><button data-action="save-dialog" aria-label="Guardar partida">${icon('save')}<span>Guardar</span></button><button data-action="help" aria-label="Cómo jugar">${icon('help')}<span>Ayuda</span></button>`;
+  renderMusicButton();
 }
 function renderMission() {
   const c = CHAPTERS[state.chapter];
@@ -632,14 +672,14 @@ function fleetPage() {
     body += `<dl class="figures"><div><dt>Unidades</dt><dd>${n(total)}</dd></div><div><dt>Asignadas</dt><dd>${n(total - free)}</dd></div><div><dt>Libres</dt><dd>${n(free)}</dd></div><div><dt>En taller</dt><dd>${n(state.refits.filter(r => !r.done).reduce((v, r) => v + r.qty, 0))}</dd></div></dl>
     <table><thead><tr><th style="width:150px"></th><th>Material</th><th class="num">Parque</th><th class="num">Libres</th><th>Estado</th></tr></thead><tbody>${state.fleet.filter(f => f.qty > 0).map(f => {
       const m = MODEL[f.model];
-      return `<tr class="clickable" data-action="fleet-detail" data-id="${f.id}"><td>${trainArt(f.model)}</td><td><strong>${esc(m.name)}</strong><small>${esc(f.origin)} · desde ${f.born} · ${GAUGES[m.gauge]} · ${POWERS[m.power] || m.power}</small></td><td class="num">${f.qty}</td><td class="num">${E.available(state, f)}</td><td style="min-width:120px"><div class="bar ${f.condition < 50 ? '' : 'green'}"><span style="width:${f.condition}%"></span></div><small>${n(f.condition)} %</small></td></tr>`;
+      return `<tr class="clickable" data-action="fleet-detail" data-id="${f.id}"><td>${trainThumb(f.model)}</td><td><strong>${esc(m.name)}</strong><small>${esc(f.origin)} · desde ${f.born} · ${GAUGES[m.gauge]} · ${POWERS[m.power] || m.power}</small></td><td class="num">${f.qty}</td><td class="num">${E.available(state, f)}</td><td style="min-width:120px"><div class="bar ${f.condition < 50 ? '' : 'green'}"><span style="width:${f.condition}%"></span></div><small>${n(f.condition)} %</small></td></tr>`;
     }).join('')}</tbody></table><p class="note">Las unidades asignadas a una línea no pueden venderse ni entrar en taller. Libéralas reduciendo salidas o suspendiendo el servicio. Las unidades necesarias se calculan con el pico de trenes simultáneos del horario oficial.</p>`;
   } else if (ui.fleetTab === 'workshop') {
     body += state.refits.length ? `<div class="rows">${state.refits.map(r => `<div><span class="status ${r.done ? 'on' : 'works'}"></span><div><h3>${esc(MODEL[r.model].name)} · ${r.qty} unidades</h3><p>${r.done ? 'Reforma completada' : 'Salida prevista: ' + E.dateOf(r.due)}</p></div><span></span></div>`).join('')}</div>` : '<div class="empty">No hay trenes en reforma. Elige un lote con unidades libres en Parque.</div>';
     body += '<p class="note">Una reforma cuesta el 12 % del precio base y dura 5 meses. Devuelve el estado al 98 % conservando la edad del vehículo.</p>';
   } else {
     const records = REAL_TRAIN_CATALOGUE.filter(t => !ui.trainQuery || [t.series, t.name, t.category, t.builder].join(' ').toLowerCase().includes(ui.trainQuery.toLowerCase()));
-    body += `<div class="toolbar"><input type="search" id="trainSearch" placeholder="Serie, fabricante o familia" value="${esc(ui.trainQuery)}"></div><table><thead><tr><th style="width:150px"></th><th>Serie</th><th>Familia</th><th class="num">Velocidad</th><th class="num">Plazas</th></tr></thead><tbody>${records.map(t => `<tr class="clickable" data-action="train-record" data-id="${t.id}"><td>${trainArt(t.series || t.id)}</td><td><strong>${esc(t.series || t.name)}</strong><small>${esc(t.name || '')}</small></td><td>${esc(t.category || '')}<small>${esc(t.builder || '')}</small></td><td class="num">${t.maxSpeedKmH?.length ? t.maxSpeedKmH.join('/') + ' km/h' : '—'}</td><td class="num">${t.seatedCapacity?.length ? t.seatedCapacity.join('/') : '—'}</td></tr>`).join('')}</tbody></table><p class="note">Fichas documentales de series y programas (Renfe Data 2020 y fuentes posteriores). No equivalen a unidades físicas ni a asignaciones diarias.</p>`;
+    body += `<div class="toolbar"><input type="search" id="trainSearch" placeholder="Serie, fabricante o familia" value="${esc(ui.trainQuery)}"></div><table><thead><tr><th style="width:150px"></th><th>Serie</th><th>Familia</th><th class="num">Velocidad</th><th class="num">Plazas</th></tr></thead><tbody>${records.map(t => `<tr class="clickable" data-action="train-record" data-id="${t.id}"><td>${trainThumb(t.series || t.id)}</td><td><strong>${esc(t.series || t.name)}</strong><small>${esc(t.name || '')}</small></td><td>${esc(t.category || '')}<small>${esc(t.builder || '')}</small></td><td class="num">${t.maxSpeedKmH?.length ? t.maxSpeedKmH.join('/') + ' km/h' : '—'}</td><td class="num">${t.seatedCapacity?.length ? t.seatedCapacity.join('/') : '—'}</td></tr>`).join('')}</tbody></table><p class="note">Fichas documentales de series y programas (Renfe Data 2020 y fuentes posteriores). No equivalen a unidades físicas ni a asignaciones diarias.</p>`;
   }
   return [header('Flota y talleres', 'Los trenes que hacen posible la red.'), body];
 }
@@ -650,7 +690,7 @@ function marketPage() {
   if (ui.marketTab === 'catalogue') {
     body += `<div class="catalogue">${MODELS.map(m => {
       const unlocked = E.yearOf(state) >= m.year, q = E.purchaseQuote(state, m.id, 1);
-      return `<div>${trainArt(m.id)}<div><h3>${esc(m.name)}</h3><p>${esc(m.desc)}</p><div class="specline"><span><b>${m.speed}</b> km/h</span><span><b>${n(m.seats)}</b> plazas*</span><span>${GAUGES[m.gauge]}</span><span>${POWERS[m.power] || m.power}</span><span>plazo base <b>${m.lead}</b> meses</span><span>${esc(m.maker)}</span></div></div>
+      return `<div>${trainThumb(m.id)}<div><h3>${esc(m.name)}</h3><p>${esc(m.desc)}</p><div class="specline"><span><b>${m.speed}</b> km/h</span><span><b>${n(m.seats)}</b> plazas*</span><span>${GAUGES[m.gauge]}</span><span>${POWERS[m.power] || m.power}</span><span>plazo base <b>${m.lead}</b> meses</span><span>${esc(m.maker)}</span></div></div>
       <div style="text-align:right"><strong style="font:600 20px var(--serif)">${money(q.total)}</strong><br><button class="btn small ${unlocked ? 'primary' : ''}" data-action="purchase" data-id="${m.id}" ${!unlocked || state.ended ? 'disabled' : ''}>${unlocked ? 'Encargar' : 'Desde ' + m.year}</button></div></div>`;
     }).join('')}</div><p class="note">* Capacidad de simulación; en Cercanías incluye plazas de pie. Precios y plazos son parámetros del juego; anticipo del 30 % y saldo a la entrega de cada lote.</p>`;
   } else if (ui.marketTab === 'orders') {
@@ -749,6 +789,7 @@ function renderInspector() {
   el.classList.remove('hidden');
   el.querySelector('.body').scrollTop = scroll;
   if (inspect.type === 'route') updatePreview();
+  if (inspect.type === 'train') mountViewers(el);
 }
 function hourHistogram(trips, minute) {
   const hours = new Array(24).fill(0);
@@ -810,7 +851,7 @@ function trainInspector() {
   }
   const pos = t.trip ? S.position(t.trip, minute, t.delay || 0) : null;
   const where = !pos ? (minute < t.dep ? 'Sale a las ' + clock(t.dep + (t.delay || 0)) : 'Ha llegado a destino') : pos.stopped ? 'Detenido en ' + S.STATIONS[t.trip.stations[pos.at]].name : 'Hacia ' + S.STATIONS[t.trip.stations[pos.next]].name;
-  const body = `<p>${trainArt(tripArtKey(t, r))}</p>
+  const body = `<div class="train3d" data-train3d="${tripArtKey(t, r)}"></div>
   <dl class="figures"><div><dt>Estado</dt><dd style="font-size:17px">${esc(where)}</dd></div><div><dt>Retraso</dt><dd class="${t.delay > 5 ? 'neg' : 'pos'}">${t.delay ? '+' + t.delay + ' min' : 'En hora'}</dd></div></dl>
   <p class="small">${esc(t.model || (t.bus ? 'Autobús de sustitución' : 'Material no publicado en el GTFS'))}${r ? ' · ' + esc(routeName(r)) : ''}</p>
   <div class="toolbar"><button class="btn small ${map.follow ? 'primary' : ''}" data-action="follow">${map.follow ? 'Siguiendo al tren' : 'Seguir en el mapa'}</button>${r ? `<button class="btn small" data-action="route" data-id="${r.id}">Gestionar la línea</button>` : ''}</div>
@@ -853,7 +894,7 @@ function workInspector() {
 }
 
 // ------------------------------------------------------------ ventanas modales
-function showModal(html, cls = '') { pause(); $('modal').innerHTML = `<div class="modal ${cls}">${html}</div>`; if (!$('modal').open) $('modal').showModal(); }
+function showModal(html, cls = '') { pause(); $('modal').innerHTML = `<div class="modal ${cls}">${html}</div>`; if (!$('modal').open) $('modal').showModal(); mountViewers($('modal')); }
 function closeModal() { if ($('modal').open) $('modal').close(); }
 function intro() {
   showModal(`<div class="art hero-art"></div><div class="content"><div class="kicker">Campaña · 2022–2050</div><h1>El próximo tren lo decides tú.</h1><p>Enero de 2022. España vuelve a moverse. Asumes la dirección de una Renfe que necesita recuperar servicios, renovar sus trenes y volver a ganarse al viajero.</p><p>Por la red circulan <b>los trenes reales</b>: ${n(S.META.counts.L)} circulaciones de un día laborable del horario oficial, de Cercanías y Rodalies a la Alta Velocidad. Cada jornada empieza con el primer tren y termina con el último.</p><div class="actions">${saved ? '<button class="btn primary" data-action="continue">Continuar partida</button>' : ''}<button class="btn ${saved ? '' : 'primary'}" data-action="begin">Asumir la dirección</button><button class="btn ghost" data-action="observe">Solo mirar el horario real</button></div><p class="note">Historia alternativa: la escasez inicial y los cierres son ficción; los horarios, estaciones, proyectos y contratos tienen fuente. Se guarda en este navegador.</p></div>`);
@@ -876,7 +917,7 @@ function dayReport() {
 function fleetDetail(id) {
   const f = state.fleet.find(f => f.id === id), m = MODEL[f.model], free = E.available(state, f);
   const used = state.routes.filter(r => r.active && r.fleet === f.id);
-  showModal(`<div class="content"><div class="kicker">Lote de material</div><h1>${esc(m.name)}</h1>${trainArt(f.model)}<dl class="figures"><div><dt>Unidades</dt><dd>${f.qty}</dd></div><div><dt>Libres</dt><dd>${free}</dd></div><div><dt>Estado</dt><dd>${n(f.condition)} %</dd></div></dl>
+  showModal(`<div class="content"><div class="kicker">Lote de material</div><h1>${esc(m.name)}</h1><div class="train3d" data-train3d="${f.model}"></div><dl class="figures"><div><dt>Unidades</dt><dd>${f.qty}</dd></div><div><dt>Libres</dt><dd>${free}</dd></div><div><dt>Estado</dt><dd>${n(f.condition)} %</dd></div></dl>
   <p class="small">${used.length ? 'Asignado a: ' + used.map(r => esc(routeName(r)) + ' (' + r.units + ')').join(', ') : 'Sin asignar.'}</p>
   <label for="fleetQty">Unidades libres a gestionar</label><input id="fleetQty" type="number" min="1" max="${free}" value="${Math.min(2, free)}">
   <p class="callout">Reforma: ${money(m.price * .12)} por unidad · 5 meses. Venta: unos ${money(m.price * .23 * f.condition / 100)} por unidad.</p>
@@ -884,7 +925,7 @@ function fleetDetail(id) {
 }
 function purchaseDialog(id) {
   const m = MODEL[id];
-  showModal(`<div class="content"><div class="kicker">Nuevo pedido</div><h1>${esc(m.name)}</h1>${trainArt(id)}<p>${esc(m.desc)}</p><label for="buyQty">Unidades (1–30)</label><input id="buyQty" type="number" min="1" max="30" value="4" data-model="${id}"><div id="purchaseQuote"></div><div class="actions"><button class="btn primary" data-action="confirm-buy" data-id="${id}">Firmar pedido</button><button class="btn" data-action="close-modal">Cancelar</button></div><p class="note">Entregas de hasta 2 unidades por mes; puede haber un retraso de 2 a 6 meses.</p></div>`, 'single');
+  showModal(`<div class="content"><div class="kicker">Nuevo pedido</div><h1>${esc(m.name)}</h1><div class="train3d" data-train3d="${id}"></div><p>${esc(m.desc)}</p><label for="buyQty">Unidades (1–30)</label><input id="buyQty" type="number" min="1" max="30" value="4" data-model="${id}"><div id="purchaseQuote"></div><div class="actions"><button class="btn primary" data-action="confirm-buy" data-id="${id}">Firmar pedido</button><button class="btn" data-action="close-modal">Cancelar</button></div><p class="note">Entregas de hasta 2 unidades por mes; puede haber un retraso de 2 a 6 meses.</p></div>`, 'single');
   updateQuote();
 }
 function updateQuote() {
@@ -912,7 +953,7 @@ function help() {
 function trainRecord(id) {
   const t = REAL_TRAIN_CATALOGUE.find(x => x.id === id); if (!t) return;
   const rows = [['Categoría', t.category], ['Fabricante', t.builder], ['Velocidad máxima', t.maxSpeedKmH?.join(' / ') + ' km/h'], ['Plazas sentadas', t.seatedCapacity?.join(' / ')], ['Tracción', t.traction], ['Longitud', t.lengthM ? t.lengthM + ' m' : null], ['Unidades construidas (fuente)', t.constructedUnitsReported], ['Estado documental', t.status]];
-  showModal(`<div class="content"><div class="kicker">Ficha de serie</div><h1>${esc(t.name || t.series)}</h1>${trainArt(t.series || t.id)}<table><tbody>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v !== undefined && v !== null && !String(v).startsWith('undefined') ? esc(v) : '<span class="muted">No verificado</span>'}</td></tr>`).join('')}</tbody></table><p class="note">${(t.sources || []).map(s => typeof s === 'string' ? `<a href="${esc(s)}" target="_blank" rel="noopener noreferrer">Fuente</a>` : `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Fuente')}</a>`).join(' · ')}</p><div class="actions"><button class="btn" data-action="close-modal">Cerrar</button></div></div>`, 'single');
+  showModal(`<div class="content"><div class="kicker">Ficha de serie</div><h1>${esc(t.name || t.series)}</h1><div class="train3d" data-train3d="${esc(t.series || t.id)}"></div><table><tbody>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v !== undefined && v !== null && !String(v).startsWith('undefined') ? esc(v) : '<span class="muted">No verificado</span>'}</td></tr>`).join('')}</tbody></table><p class="note">${(t.sources || []).map(s => typeof s === 'string' ? `<a href="${esc(s)}" target="_blank" rel="noopener noreferrer">Fuente</a>` : `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title || 'Fuente')}</a>`).join(' · ')}</p><div class="actions"><button class="btn" data-action="close-modal">Cerrar</button></div></div>`, 'single');
 }
 function realTripModal(id) { inspect = {type: 'train', id}; map.selectedTrain = id; screen = null; if (layer !== 'real' && !plan().some(t => t.id === id)) setLayer('real'); render(); }
 
@@ -966,6 +1007,10 @@ document.addEventListener('click', event => {
     case 'open-route': { const r = routeById(id); act(() => setService(r, Math.max(1, Math.round(E.maxFrequency(r) * .4))), 'Conexión abierta: ' + routeName(r) + '.'); break; }
     case 'request': { const q = (state.requests || []).find(q => q.id === id); if (q) act(() => doRequest(q)); break; }
     case 'station-up': act(() => E.upgradeStation(state, id), 'Estación mejorada.'); celebrate(id, 'Estación mejorada', E.STATION_LEVELS[state.stations?.[id] || 0]); break;
+    case 'music': musicDialog(); break;
+    case 'music-play': { const song = SONGS.find(x => x.id === id); if (song) { if (music.mode === 'auto') music.setMode('list'); music.play(song); } break; }
+    case 'music-toggle': music.toggle(); break;
+    case 'music-next': music.next(); break;
     case 'tutorial-next': tutorialNext(); break;
     case 'tutorial-skip': endTutorial(); break;
     case 'tutorial-start': closeModal(); startTutorial(); break;
@@ -1017,6 +1062,7 @@ document.addEventListener('submit', event => {
 document.addEventListener('input', event => {
   const t = event.target;
   if (['routeFleet', 'frequency', 'fare'].includes(t.id)) updatePreview();
+  if (t.id === 'musicVolume') music.setVolume(+t.value);
   if (t.id === 'routeSearch') { ui.routeQuery = t.value; renderDrawer(); }
   if (t.id === 'ttStation') { ui.ttStation = t.value; ui.ttStationId = undefined; renderDrawer(); }
   if (t.id === 'trainSearch') { ui.trainQuery = t.value; renderDrawer(); }
@@ -1030,6 +1076,7 @@ document.addEventListener('change', async event => {
   if (t.id === 'ttHour') { ui.ttHour = +t.value; renderDrawer(); }
   if (t.id === 'dayPriority' && state.ops.phase === 'planning') { state.ops.priority = t.value; autosave(); render(); }
   if (t.id === 'autoPause') ui.autoPause = t.checked;
+  if (t.id === 'musicMode') music.setMode(t.value);
   if (t.id === 'maintenance') act(() => { E.ensurePlaying(state); state.maintenance = E.clamp(+t.value, .6, 1.5); });
   if (t.id === 'referenceDate') { referenceDate = t.value; renderDrawer(); }
   if (t.id === 'importSave' && t.files[0]) {
@@ -1065,9 +1112,9 @@ document.addEventListener('keydown', event => {
 $('modal').addEventListener('cancel', event => { if (E.pendingDecision(state) || !state.started) event.preventDefault(); });
 
 // API de lectura para verificación automatizada y accesibilidad.
-window.railwayGame = {snapshot: () => JSON.parse(JSON.stringify(state)), engine: E, operations: O, schedule: S, map, navigate, setLayer, selectRoute,
+window.railwayGame = {music, snapshot: () => JSON.parse(JSON.stringify(state)), engine: E, operations: O, schedule: S, map, navigate, setLayer, selectRoute,
   plan: () => plan().map(t => ({id: t.id, route: t.route, dep: t.dep, arrival: t.arrival, delay: t.delay, real: t.real})), minute: currentMinute, play, pause, finishDay,
   state: () => state, render, pick, setMinute: m => { if (state.ops.phase === 'running') state.ops.minute = m; else observerMinute = m; render(); }};
 
-render(); intro(); requestAnimationFrame(frame);
+render(); renderMusicButton(); intro(); requestAnimationFrame(frame);
 G.loadFeed().then(feed => { if (feed) { referenceFeed = feed; referenceDate = G.dateISO(feed.dateStart); } }).catch(() => {});

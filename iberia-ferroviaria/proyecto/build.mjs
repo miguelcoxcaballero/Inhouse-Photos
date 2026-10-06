@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(root, 'dist');
 const order = ['assets/geography.js', 'assets/realdata.js', 'assets/railways.js', 'assets/timetable.js', 'data.js', 'story.js', 'schedule.js', 'network.js',
-  'engine.js', 'operations.js', 'gtfs.js', 'map-v3.js', 'train-art.js', 'city-art.js', 'app.js'];
+  'engine.js', 'operations.js', 'gtfs.js', 'map-v3.js', 'train-art.js', 'train3d.js', 'city-art.js', 'music.js', 'app.js'];
 
 function bundle(file) {
   let text = fs.readFileSync(path.join(dist, file), 'utf8');
@@ -32,6 +32,7 @@ css = css.replace(/url\('assets\/([^']+)'\)/g, (_, asset) => {
   return `url('data:${mime[asset.split('.').pop()]};base64,${data}')`;
 });
 html = html.replace('<link rel="stylesheet" href="style-v3.css">', () => '<style>' + css + '</style>')
+  .replace('<script src="assets/three.min.js"></script>', () => '<script>' + fs.readFileSync(path.join(dist, 'assets/three.min.js'), 'utf8').replaceAll('</script', '<\\/script') + '</script>')
   .replace('<script type="module" src="app.js"></script>', () => '<script>\n(() => {\n' + code.replaceAll('</script', '<\\/script') + '\n})();\n</script>')
   .replace('</body>', () => '<script type="text/plain" id="geodata-license">' + fs.readFileSync(path.join(root, 'LICENSE-GEODATA.txt'), 'utf8').replaceAll('</script', '<\\/script') + '</script></body>');
 fs.mkdirSync(path.join(root, '../outputs'), {recursive: true});

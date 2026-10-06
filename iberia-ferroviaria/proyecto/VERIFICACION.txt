@@ -1,3 +1,8 @@
+VERIFICACIÓN V0.5 — 6 DE OCTUBRE DE 2026
+Pasan test.mjs, v2-test.mjs (catálogo de 34 fichas sin Cercanías), v3-test.mjs (incluye la banda sonora: 12 piezas, 6 «Estación» y 6 «Red», compases y eventos válidos) y ui-v3-test.mjs con WebGL por software (SwiftShader): tutorial, menú de Madrid, música sonando tras el primer clic, reproductor, visor 3D del S112, compras con miniaturas 3D, jornada, paneles, obra, noche y móvil, sin errores de JavaScript.
+Las 12 piezas se renderizaron sin conexión (OfflineAudioContext, dist/render-music.html) y se midieron con ffmpeg: sin saturación tras normalizar y estructura por secciones visible en el espectrograma. No se ha hecho una escucha humana dentro del entorno de trabajo.
+Los modelos 3D se revisaron en capturas (miniaturas y visor); son aproximaciones procedurales, no se han contrastado con planos.
+
 VERIFICACIÓN V0.4 — 6 DE OCTUBRE DE 2026
 Pasan test.mjs, v2-test.mjs, v3-test.mjs (horario AV/LD/MD sin Cercanías, peticiones y estaciones) y ui-v3-test.mjs (tutorial, menú de ciudad con +/−, jornada, paneles, obra, noche y móvil) sin errores de JavaScript. La campaña automatizada completa los cinco capítulos en 2050 atendiendo peticiones y mejorando estaciones.
 Las cifras de la sección siguiente corresponden a la v0.3 (con Cercanías).
