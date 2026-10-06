@@ -56,6 +56,31 @@ def expressiveness(x, sr):
     return float(np.std(st))
 
 
+def perform(x, sr, expand, register=0.0, stretch=1.0):
+    """Interpretación con Praat (PSOLA): amplía el rango melódico alrededor de la mediana (expand > 1),
+    desplaza el registro (semitonos) y alarga el trozo (stretch > 1, para los remates)."""
+    import numpy as np, parselmouth
+    from parselmouth.praat import call
+    snd = parselmouth.Sound(x.astype(np.float64), sampling_frequency=sr)
+    man = call(snd, 'To Manipulation', 0.01, 70, 450)
+    tier = call(man, 'Extract pitch tier')
+    n = int(call(tier, 'Get number of points'))
+    if n >= 3:
+        pts = [(call(tier, 'Get time from index', i), call(tier, 'Get value at index', i)) for i in range(1, n + 1)]
+        med = float(np.median([f for _, f in pts]))
+        call(tier, 'Remove points between', 0, snd.duration + 1)
+        for t, f in pts:
+            st = 12 * np.log2(f / med) * expand + register
+            call(tier, 'Add point', t, med * 2 ** (st / 12))
+        call([tier, man], 'Replace pitch tier')
+    if abs(stretch - 1) > 0.01:
+        dur = call(man, 'Extract duration tier')
+        call(dur, 'Add point', 0, stretch)
+        call([dur, man], 'Replace duration tier')
+    out = call(man, 'Get resynthesis (overlap-add)')
+    return np.array(out.values[0], dtype=np.float32)
+
+
 def best_take(so, tts, text, sid, speed):
     import numpy as np
     takes = []
