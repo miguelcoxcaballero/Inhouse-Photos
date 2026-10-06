@@ -146,3 +146,20 @@ console.log(ok.slice(-1).map(x => '✓ ' + x).join('\n'));
   }
   console.log(`✓ Banda sonora: ${SONGS.length} piezas originales (${SONGS.filter(s => s.family === 'estacion').length} «Estación», ${SONGS.filter(s => s.family === 'red').length} «Red»), compases y eventos válidos.`);
 }
+
+// 10. Voces y diálogos: cada personaje tiene voz, y todo el texto hablado es pronunciable.
+{
+  const {CAST, speechText, sentences} = await import('./dist/voice.js');
+  const {CHARACTERS, CHAPTERS, DECISIONS} = await import('./dist/story.js');
+  assert.deepEqual(Object.keys(CAST).sort(), Object.keys(CHARACTERS).sort());
+  assert.equal(speechText('Cuesta 4 M€ a 10× ❗ «hoy»'), 'Cuesta 4 millones de euros a 10 por hoy');
+  assert.deepEqual(sentences('Hola. ¿Qué tal? ¡Bien!'), ['Hola.', '¿Qué tal?', '¡Bien!']);
+  const lines = [...CHAPTERS.map(c => [c.speaker, c.text]), ...DECISIONS.map(d => [d.person, d.body])];
+  for (const [who, text] of lines) {
+    assert(CAST[who], who);
+    const parts = sentences(text).map(speechText);
+    assert(parts.length >= 2 && parts.every(p => p.length > 1 && !/[€×«»❗<>]/.test(p)), text);
+  }
+  assert(!/Cercan[ií]as y Rodalies a la Alta/.test(await (await import('node:fs')).promises.readFile(new URL('./dist/app.js', import.meta.url), 'utf8')));
+  console.log(`✓ Voces: ${Object.keys(CAST).length} personajes con voz propia y ${lines.length} diálogos pronunciables frase a frase.`);
+}

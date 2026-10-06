@@ -1,5 +1,9 @@
-IBERIA FERROVIARIA — PLAN Y ESTADO V0.5
+IBERIA FERROVIARIA — PLAN Y ESTADO V0.6
 6 de octubre de 2026.
+
+HECHO EN 0.6
+- Voces de los personajes con la síntesis de voz del sistema: interpretación burlesca por personaje, cortinillas, subtítulos resaltados y música atenuada.
+- Diálogos de capítulos, decisiones y tutorial reescritos con ironía y expresiones castizas.
 
 HECHO EN 0.5
 - Modelos 3D de los trenes (three.js): 15 familias (Talgo pato, Velaro, AVRIL, Pendolino, Alvia 120, TGV, MD 449/480, 599, TRD, Camello, ancho métrico, locomotora…) con miniaturas y visor giratorio.
@@ -27,6 +31,7 @@ HECHO EN 0.3
 SIGUIENTES PASOS PROPUESTOS
 - Modelos 3D modelados a mano (glTF) por serie, con interiores, para sustituir la reconstrucción procedural.
 - Grabar la banda sonora con instrumentos reales o muestras.
+- Voces neuronales pregeneradas (p. ej. Kokoro, Apache-2.0) incrustadas como audio, para no depender de las voces del sistema: requiere autorizar en el entorno de trabajo la ejecución del modelo descargado.
 - Horarios históricos: reconstruir 2022–2026 con versiones archivadas del GTFS (el archivo público conserva copias diarias desde marzo de 2026; harían falta otras fuentes para 2022).
 - Asignación de material por circulación y rotaciones (diagramas de turnos) con depósitos reales.
 - Vía estrecha (antigua FEVE) desde OSM railway=narrow_gauge para eliminar los tramos aproximados del norte.

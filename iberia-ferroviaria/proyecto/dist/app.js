@@ -10,6 +10,7 @@ import {RailMap} from './map-v3.js';
 import {trainArt, artKey} from './train-art.js';
 import {citySkyline} from './city-art.js';
 import {trainThumb, mountViewers} from './train3d.js';
+import {Voices, sentences, CAST} from './voice.js';
 import {Soundtrack, SONGS, STYLE_LABEL, FAMILY_LABEL} from './music.js';
 import {REAL_TRAIN_CATALOGUE, COMMUTER_NETWORKS} from './assets/realdata.js';
 
@@ -81,6 +82,21 @@ function musicMood() {
   return O.daylight(state, state.ops.minute).night > .55 ? 'night' : 'day';
 }
 const music = new Soundtrack(musicMood);
+const voices = new Voices(music);
+// ------------------------------------------------------------ voces de los personajes
+/** Texto con cada frase en su propio span, para el subtítulo resaltado mientras se lee. */
+function sayHtml(text) { return sentences(text).map(x => `<span class="say-s">${esc(x)}</span>`).join(' '); }
+function sayButton(person, where) { return `<button class="say-btn" data-action="say" data-person="${person}" data-where="${where}" aria-label="Escuchar a ${esc(CHARACTERS[person]?.name || '')}" title="Escuchar">${voices.speaking?.where === where ? '■' : '🔊'}</button>`; }
+/** Lee el párrafo [data-say] dentro de root con la voz del personaje y resalta cada frase. */
+function speakIn(root, person, where) {
+  const el = root?.querySelector('[data-say]'); if (!el) return;
+  const spans = [...el.querySelectorAll('.say-s')], face = root.querySelector('.portrait');
+  const clear = () => { spans.forEach(x => x.classList.remove('on')); face?.classList.remove('talking'); root.querySelectorAll('.say-btn').forEach(b => b.textContent = '🔊'); };
+  const ok = voices.speak(person, el.dataset.say, {onSentence: i => { spans.forEach((x, j) => x.classList.toggle('on', j === i)); }, onend: clear});
+  if (!ok) return;
+  if (voices.speaking) voices.speaking.where = where;
+  face?.classList.add('talking'); root.querySelectorAll('.say-btn').forEach(b => b.textContent = '■');
+}
 function renderMusicButton() {
   const b = $('musicBtn'); if (!b) return;
   b.innerHTML = `${icon('music')}<span>${music.enabled ? 'Música' : 'Silencio'}</span>`;
@@ -106,6 +122,8 @@ function musicDialog(refresh = false) {
   <div class="toolbar"><button class="btn ${music.enabled ? '' : 'primary'}" data-action="music-toggle">${music.enabled ? 'Apagar música' : 'Encender música'}</button><button class="btn" data-action="music-next" ${music.enabled ? '' : 'disabled'}>Siguiente pieza</button>
   <label style="margin:0">Modo</label><select id="musicMode"><option value="auto" ${music.mode === 'auto' ? 'selected' : ''}>Automático según el momento</option><option value="list" ${music.mode === 'list' ? 'selected' : ''}>Toda la lista</option><option value="repeat" ${music.mode === 'repeat' ? 'selected' : ''}>Repetir pieza</option></select></div>
   <label for="musicVolume">Volumen</label><input id="musicVolume" type="range" min="0" max="1" step="0.05" value="${music.volume}">
+  <h3 class="sub">Voces de los personajes</h3><p class="small">${voices.available ? `Leídas con las voces en español de tu sistema (${esc(voices.voices.slice(0, 3).map(v => v.name).join(', '))}${voices.voices.length > 3 ? '…' : ''}). Pedro Sancho: ${CAST.president.label}; Raquel Sanz: ${CAST.minister.label}; Óscar del Puente: ${CAST.successor.label}.` : 'Tu navegador no ofrece voces en español. En Chrome, Edge o Safari, o instalando una voz española en el sistema, los personajes hablarán.'}</p>
+  <div class="toolbar"><button class="btn ${voices.enabled ? '' : 'primary'}" data-action="voice-toggle">${voices.enabled ? 'Silenciar personajes' : 'Activar voces'}</button></div>
   <div class="actions"><button class="btn primary" data-action="close-modal">Cerrar</button></div></div>`;
   if (refresh) { const sc = $('modal').querySelector('.content')?.scrollTop || 0; $('modal').innerHTML = `<div class="modal single">${html}</div>`; $('modal').querySelector('.content').scrollTop = sc; }
   else showModal(html, 'single');
@@ -300,21 +318,21 @@ function cityInspector() {
 // ------------------------------------------------------------ tutorial guiado
 const routeById = id => state.routes.find(r => r.id === id);
 const TUTORIAL = [
-  {title: 'Bienvenida', text: 'Soy Raquel Sanz (personaje ficticio). En unos minutos te enseño a dirigir la red. Puedes saltar el tutorial cuando quieras.', next: true},
-  {title: 'Las ciudades mandan', text: 'Cada círculo es una ciudad. Verde: todas sus conexiones funcionan; ámbar: algunas; gris: ninguna. Pulsa sobre Madrid.', city: 'mad', when: () => inspect?.type === 'city' && inspect.id === 'mad', enter: () => { map.focusAt(-3.7, 40.4, 1.6); }},
-  {title: 'El menú de la ciudad', text: 'Aquí tienes la ciudad, sus conexiones y su estación. En el mapa, las conexiones en servicio se marcan en dorado.', target: '#inspector .city-hero', next: true},
-  {title: 'Más trenes', text: 'Pulsa + en la conexión con València para ofrecer más trenes del horario real.', target: '[data-action=freq-up][data-id=madrid-valencia]', when: () => routeById('madrid-valencia')?.frequency > tut.f0, enter: () => { tut.f0 = routeById('madrid-valencia')?.frequency || 0; }},
-  {title: 'Abre una conexión', text: 'Las conexiones grises están cerradas. Abre la de Salamanca: cuesta 4 M€ y usa trenes libres compatibles.', target: '[data-action=open-route][data-id=madrid-salamanca]', when: () => routeById('madrid-salamanca')?.active},
-  {title: 'Peticiones', text: 'Las ciudades con ❗ te piden algo: abrir una conexión, más trenes, bajar una tarifa o mejorar su estación. Cumplirlas da dinero y reputación. Las tienes aquí, a la izquierda.', target: '#mission .requests', next: true, enter: () => { inspect = null; renderInspector(); }},
-  {title: 'Empieza el día', text: 'Cada jornada empieza con el primer tren real y termina con el último. Pulsa «Comenzar jornada».', target: '[data-action=day-start]', when: () => state.ops.phase === 'running'},
-  {title: 'Más deprisa', text: 'Elige 10× para que el reloj avance más rápido.', target: '.speed', when: () => speedIndex >= 2},
-  {title: 'Viajeros e ingresos', text: 'Cada tren que llega suma viajeros e ingresos: los verás aparecer sobre las ciudades y en «Hoy», arriba.', target: '#resources', when: () => today.trains >= 6},
-  {title: '¡Una avería!', text: 'Ha surgido una incidencia. Pulsa «Decidir» y elige cómo responder.', target: '.alert-pill', when: () => state.ops.resolved.length > 0, enter: () => { if (state.ops.phase === 'running' && !O.injectIncident(state, state.ops.minute)) tutorialNext(); }},
-  {title: 'Momentos del día', text: 'A veces una ciudad tiene un pico de demanda: un partido, un congreso… Si refuerzas a tiempo la conexión indicada ganas una bonificación. Puedes cambiar los trenes en plena jornada.', next: true},
-  {title: 'Fin de la jornada', text: 'Pulsa «Hasta el último tren» para cerrar el día.', target: '[data-action=day-end]', when: () => state.ops.phase === 'review'},
-  {title: 'El parte del día', text: 'Puntualidad, viajeros y resultado del día. Pulsa «Siguiente jornada».', target: '#modal [data-action=day-next]', when: () => state.ops.phase === 'planning'},
-  {title: 'Compra trenes', text: 'Para crecer necesitas más material, y tarda unos dos años en llegar. Abre «Compras».', target: '[data-screen=market]', when: () => screen === 'market'},
-  {title: '¡A dirigir!', text: 'Cumple los objetivos del capítulo para recibir financiación. Acércate con la rueda para ver trenes, estaciones y obras. ¡Buen viaje!', target: '#mission', next: true},
+  {title: 'Bienvenida', text: '¡Hola! Soy Raquel Sanz, ministra de Transportes (de ficción, que conste en acta). Te enseño a dirigir la red en un periquete. Si ya sabes, sáltate el tutorial; yo hago como que no me ofendo.', next: true},
+  {title: 'Las ciudades mandan', text: 'Cada círculo es una ciudad. Verde: todo funciona; ámbar: funciona a la española; gris: ni está ni se le espera. Pulsa sobre Madrid, que aquí todo pasa por Madrid.', city: 'mad', when: () => inspect?.type === 'city' && inspect.id === 'mad', enter: () => { map.focusAt(-3.7, 40.4, 1.6); }},
+  {title: 'El menú de la ciudad', text: 'Aquí tienes la ciudad, sus conexiones y su estación. Lo dorado del mapa son conexiones en servicio; lo demás, promesas electorales.', target: '#inspector .city-hero', next: true},
+  {title: 'Más trenes', text: 'Pulsa + en la conexión con València para poner más trenes del horario real. Los valencianos lo agradecerán, y los madrileños con apartamento en la playa, más.', target: '[data-action=freq-up][data-id=madrid-valencia]', when: () => routeById('madrid-valencia')?.frequency > tut.f0, enter: () => { tut.f0 = routeById('madrid-valencia')?.frequency || 0; }},
+  {title: 'Abre una conexión', text: 'Las conexiones grises están cerradas. Abre la de Salamanca: cuesta 4 M€ y usa trenes libres compatibles. Calderilla, para lo que se estila.', target: '[data-action=open-route][data-id=madrid-salamanca]', when: () => routeById('madrid-salamanca')?.active},
+  {title: 'Peticiones', text: 'Las ciudades con ❗ te piden cosas: más trenes, una conexión, una tarifa más baja o una estación decente. Como los alcaldes, pero sin llamarte a las tantas. Cumplirlas da dinero y reputación. Las tienes a la izquierda.', target: '#mission .requests', next: true, enter: () => { inspect = null; renderInspector(); }},
+  {title: 'Empieza el día', text: 'Cada jornada empieza con el primer tren real y termina con el último. Pulsa «Comenzar jornada». Con el café en la mano, a ser posible.', target: '[data-action=day-start]', when: () => state.ops.phase === 'running'},
+  {title: 'Más deprisa', text: 'Elige 10× para que el reloj vaya más rápido. Ojalá las obras funcionaran igual.', target: '.speed', when: () => speedIndex >= 2},
+  {title: 'Viajeros e ingresos', text: 'Cada tren que llega suma viajeros e ingresos: los verás sobre las ciudades y en «Hoy», arriba. Sí, ese dinero es tuyo. Bueno, de Renfe. Bueno, de Hacienda.', target: '#resources', when: () => today.trains >= 6},
+  {title: '¡Una avería!', text: '¡Una incidencia! Tranquilidad, que esto pasa en las mejores familias. Pulsa «Decidir» y elige cómo responder.', target: '.alert-pill', when: () => state.ops.resolved.length > 0, enter: () => { if (state.ops.phase === 'running' && !O.injectIncident(state, state.ops.minute)) tutorialNext(); }},
+  {title: 'Momentos del día', text: 'A veces una ciudad tiene un pico de demanda: un partido, un congreso, el puente de diciembre… Si refuerzas a tiempo la conexión indicada, te llevas una bonificación. Los trenes se pueden cambiar en plena jornada.', next: true},
+  {title: 'Fin de la jornada', text: 'Pulsa «Hasta el último tren» para cerrar el día. El último en llegar, que apague la luz.', target: '[data-action=day-end]', when: () => state.ops.phase === 'review'},
+  {title: 'El parte del día', text: 'El parte del día: puntualidad, viajeros y resultado. Si sale mal, échale la culpa a la meteorología, que es lo que hacemos todos. Pulsa «Siguiente jornada».', target: '#modal [data-action=day-next]', when: () => state.ops.phase === 'planning'},
+  {title: 'Compra trenes', text: 'Para crecer necesitas más trenes, y tardan unos dos años en llegar: los fabricantes también tienen su ritmo. Abre «Compras».', target: '[data-screen=market]', when: () => screen === 'market'},
+  {title: '¡A dirigir!', text: 'Cumple los objetivos del capítulo para recibir financiación. Acércate con la rueda para ver trenes, estaciones y obras. Y recuerda: si algo sale bien, lo anuncio yo. ¡Buen viaje!', target: '#mission', next: true},
 ];
 let tut = null;
 function startTutorial() { tut = {step: -1, f0: 0}; state.tutorial = {done: false}; tutorialNext(); }
@@ -325,7 +343,7 @@ function tutorialNext() {
   TUTORIAL[tut.step].enter?.();
   renderCoach();
 }
-function endTutorial() { tut = null; state.tutorial = {done: true}; autosave(); $('coach')?.remove(); $('spot')?.remove(); toast('Tutorial completado. Lo puedes repetir desde Ayuda.'); }
+function endTutorial() { if (voices.speaking?.where === 'coach') voices.stop(); tut = null; state.tutorial = {done: true}; autosave(); $('coach')?.remove(); $('spot')?.remove(); toast('Tutorial completado. Lo puedes repetir desde Ayuda.'); }
 function renderCoach() {
   if (!tut) return;
   const step = TUTORIAL[tut.step];
@@ -337,8 +355,8 @@ function renderCoach() {
   }
   const host = $('modal').open ? $('modal') : document.body;
   if (coach.parentNode !== host) { host.appendChild(spot); host.appendChild(coach); }
-  const html = `<div class="portrait p1" aria-hidden="true"></div><div><div class="kicker">Tutorial · ${tut.step + 1}/${TUTORIAL.length}</div><h3>${esc(step.title)}</h3><p>${esc(step.text)}</p><div class="actions">${step.next ? '<button class="btn small primary" data-action="tutorial-next">Siguiente</button>' : '<button class="btn small ghost" data-action="tutorial-next">Omitir paso</button>'}<button class="btn small ghost" data-action="tutorial-skip">Salir</button></div></div>`;
-  if (coach.dataset.step !== String(tut.step)) { coach.innerHTML = html; coach.dataset.step = tut.step; }
+  const html = `<div class="portrait p1" aria-hidden="true"></div><div><div class="kicker">Tutorial · ${tut.step + 1}/${TUTORIAL.length}</div><h3>${esc(step.title)}</h3><p data-say="${esc(step.text)}">${sayHtml(step.text)}</p><div class="actions">${step.next ? '<button class="btn small primary" data-action="tutorial-next">Siguiente</button>' : '<button class="btn small ghost" data-action="tutorial-next">Omitir paso</button>'}<button class="btn small ghost" data-action="tutorial-skip">Salir</button></div></div>`;
+  if (coach.dataset.step !== String(tut.step)) { coach.innerHTML = html; coach.dataset.step = tut.step; coach.querySelector('h3').insertAdjacentHTML('beforeend', sayButton('minister', 'coach')); speakIn(coach, 'minister', 'coach'); }
   let rect = null;
   if (step.city) { const c = CITY[step.city], p = map.screenOf(c.lon, c.lat), cr = $('map').getBoundingClientRect(); rect = {left: cr.left + p[0] - 26, top: cr.top + p[1] - 26, width: 52, height: 52, round: true}; }
   else if (step.target) { const el = (host === $('modal') ? $('modal') : document).querySelector(step.target); if (el && el.offsetParent !== null) { const b = el.getBoundingClientRect(); rect = {left: b.left - 6, top: b.top - 6, width: b.width + 12, height: b.height + 12}; } }
@@ -748,7 +766,7 @@ function storyPage() {
   const c = CHAPTERS[state.chapter], person = CHARACTERS[c.speaker], score = E.finalScore(state);
   const body = `${state.ended ? `<div class="callout"><strong>${state.ending === '2050' ? '31 de diciembre de 2050' : 'Intervención de la compañía'}</strong><br>Tu legado: <b>${score}/100</b>. ${state.routes.filter(r => r.active).length} servicios, ${n(E.dailyTrains(state))} circulaciones diarias, ${n(state.stats.passengers / 1e6, 1)} millones de viajes.</div>` : ''}
   <div class="chapters">${CHAPTERS.map((ch, i) => `<div class="${state.claimed.includes(ch.id) ? 'done' : i === state.chapter ? 'now' : ''}"><strong>${esc(ch.title)}</strong>${ch.years}</div>`).join('')}</div>
-  <div class="story"><div class="portrait p${person.portrait}" role="img" aria-label="${esc(person.name)}"></div><div><div class="kicker" style="color:var(--wine);font-weight:700;font-size:11.5px;letter-spacing:1.4px;text-transform:uppercase">${esc(person.name)} · personaje ficticio</div><h2 class="section" style="margin-top:4px">${esc(c.title)}</h2><p>${esc(c.text)}</p>
+  <div class="story"><div class="portrait p${person.portrait}" role="img" aria-label="${esc(person.name)}"></div><div><div class="kicker" style="color:var(--wine);font-weight:700;font-size:11.5px;letter-spacing:1.4px;text-transform:uppercase">${esc(person.name)} · personaje ficticio</div><h2 class="section" style="margin-top:4px">${esc(c.title)} ${sayButton(c.speaker, 'story')}</h2><p data-say="${esc(c.text)}">${sayHtml(c.text)}</p>
   <ul class="objectives">${c.objectives.map(([k, target, title]) => { const v = E.objectiveValue(state, k); return `<li class="${v >= target ? 'done' : ''}"><i></i><span>${esc(title)}</span><span class="num">${k === 'solvent' ? (v ? '✓' : '—') : n(Math.min(v, target)) + ' / ' + n(target)}</span></li>`; }).join('')}</ul>
   <div class="toolbar"><button class="btn primary" data-action="claim" ${!E.chapterReady(state) || state.ended ? 'disabled' : ''}>${state.claimed.includes(c.id) ? 'Capítulo completado' : 'Reclamar ' + c.reward + ' M€'}</button><button class="btn" data-action="navigate" data-screen="network">Gestionar la red</button></div>
   ${E.yearOf(state) < c.year ? `<p class="callout">Esta etapa comienza en ${c.year}. Puedes preparar sus objetivos mientras tanto.</p>` : ''}</div></div>
@@ -896,13 +914,15 @@ function workInspector() {
 // ------------------------------------------------------------ ventanas modales
 function showModal(html, cls = '') { pause(); $('modal').innerHTML = `<div class="modal ${cls}">${html}</div>`; if (!$('modal').open) $('modal').showModal(); mountViewers($('modal')); }
 function closeModal() { if ($('modal').open) $('modal').close(); }
+$('modal').addEventListener('close', () => { if (!$('modal').open && voices.speaking?.where === 'modal') voices.stop(); });
 function intro() {
-  showModal(`<div class="art hero-art"></div><div class="content"><div class="kicker">Campaña · 2022–2050</div><h1>El próximo tren lo decides tú.</h1><p>Enero de 2022. España vuelve a moverse. Asumes la dirección de una Renfe que necesita recuperar servicios, renovar sus trenes y volver a ganarse al viajero.</p><p>Por la red circulan <b>los trenes reales</b>: ${n(S.META.counts.L)} circulaciones de un día laborable del horario oficial, de Cercanías y Rodalies a la Alta Velocidad. Cada jornada empieza con el primer tren y termina con el último.</p><div class="actions">${saved ? '<button class="btn primary" data-action="continue">Continuar partida</button>' : ''}<button class="btn ${saved ? '' : 'primary'}" data-action="begin">Asumir la dirección</button><button class="btn ghost" data-action="observe">Solo mirar el horario real</button></div><p class="note">Historia alternativa: la escasez inicial y los cierres son ficción; los horarios, estaciones, proyectos y contratos tienen fuente. Se guarda en este navegador.</p></div>`);
+  showModal(`<div class="art hero-art"></div><div class="content"><div class="kicker">Campaña · 2022–2050</div><h1>El próximo tren lo decides tú.</h1><p>Enero de 2022. España vuelve a moverse. Asumes la dirección de una Renfe que necesita recuperar servicios, renovar sus trenes y volver a ganarse al viajero.</p><p>Por la red circulan <b>los trenes reales</b>: ${n(S.META.counts.L)} circulaciones de un día laborable del horario oficial, de la Alta Velocidad a los regionales. Cada jornada empieza con el primer tren y termina con el último.</p><div class="actions">${saved ? '<button class="btn primary" data-action="continue">Continuar partida</button>' : ''}<button class="btn ${saved ? '' : 'primary'}" data-action="begin">Asumir la dirección</button><button class="btn ghost" data-action="observe">Solo mirar el horario real</button></div><p class="note">Historia alternativa: la escasez inicial y los cierres son ficción; los horarios, estaciones, proyectos y contratos tienen fuente. Se guarda en este navegador.</p></div>`);
 }
 function showDecision() {
   const d = E.pendingDecision(state); if (!d) return;
   const person = CHARACTERS[d.person];
-  showModal(`<div class="art portrait p${person.portrait}" role="img" aria-label="${esc(person.name)}"></div><div class="content"><div class="kicker">${esc(E.dateOf(state.month))} · Consejo de dirección</div><h1>${esc(d.title)}</h1><p>${esc(d.body)}</p><p class="small" style="color:var(--gold)">${esc(person.name)} · diálogo ficticio</p>${d.choices.map((c, i) => `<button class="choice" data-action="decision" data-id="${d.id}" data-choice="${i}" ${state.cash < -(c.effects.cash || 0) ? 'disabled' : ''}><strong>${esc(c.label)}</strong><span>${esc(c.detail)}</span></button>`).join('')}<p class="note">${d.source ? sourceLink(d.source, 'Contexto documentado') + ' · decisiones y efectos simulados' : 'Escenario ficticio de la campaña'}</p></div>`);
+  showModal(`<div class="art portrait p${person.portrait}" role="img" aria-label="${esc(person.name)}"></div><div class="content"><div class="kicker">${esc(E.dateOf(state.month))} · Consejo de dirección</div><h1>${esc(d.title)}</h1><p data-say="${esc(d.body)}">${sayHtml(d.body)}</p><p class="small speaker" style="color:var(--gold)">${sayButton(d.person, 'modal')} ${esc(person.name)} · diálogo ficticio</p>${d.choices.map((c, i) => `<button class="choice" data-action="decision" data-id="${d.id}" data-choice="${i}" ${state.cash < -(c.effects.cash || 0) ? 'disabled' : ''}><strong>${esc(c.label)}</strong><span>${esc(c.detail)}</span></button>`).join('')}<p class="note">${d.source ? sourceLink(d.source, 'Contexto documentado') + ' · decisiones y efectos simulados' : 'Escenario ficticio de la campaña'}</p></div>`);
+  speakIn($('modal'), d.person, 'modal');
 }
 function dayReport() {
   const l = state.ops.last; if (!l) return;
@@ -991,7 +1011,7 @@ document.addEventListener('click', event => {
     case 'continue': if (saved) { state = E.validateSave(saved); O.ensureOps(state); state.started = true; closeModal(); netKey = networkKey(); map.dirty = true; render(); if (E.pendingDecision(state)) showDecision(); } break;
     case 'observe': closeModal(); setLayer('real'); observerMinute = 480; play(); break;
     case 'decision': if (act(() => E.decide(state, id, +b.dataset.choice))) { closeModal(); if (E.pendingDecision(state)) showDecision(); else if (!state.tutorial?.done && !tut && state.month === 0) startTutorial(); } break;
-    case 'claim': act(() => E.claimChapter(state), 'Financiación recibida. Tu siguiente etapa está preparada.'); break;
+    case 'claim': act(() => E.claimChapter(state), 'Financiación recibida. Tu siguiente etapa está preparada.'); setTimeout(() => { const st = document.querySelector('.story'); if (st && !state.ended) speakIn(st, CHAPTERS[state.chapter].speaker, 'story'); }, 60); break;
     case 'play': playing ? pause() : play(); break;
     case 'speed': speedIndex = +id; renderDaybar(); break;
     case 'day-start': if (layer === 'real') setLayer('network'); play(); break;
@@ -1010,6 +1030,13 @@ document.addEventListener('click', event => {
     case 'music': musicDialog(); break;
     case 'music-play': { const song = SONGS.find(x => x.id === id); if (song) { if (music.mode === 'auto') music.setMode('list'); music.play(song); } break; }
     case 'music-toggle': music.toggle(); break;
+    case 'voice-toggle': voices.toggle(); musicDialog(true); break;
+    case 'say': {
+      const where = b.dataset.where, root = where === 'coach' ? $('coach') : where === 'modal' ? $('modal') : b.closest('.story');
+      if (voices.speaking?.where === where) voices.stop();
+      else { if (!voices.enabled) voices.toggle(); speakIn(root, b.dataset.person, where); }
+      break;
+    }
     case 'music-next': music.next(); break;
     case 'tutorial-next': tutorialNext(); break;
     case 'tutorial-skip': endTutorial(); break;

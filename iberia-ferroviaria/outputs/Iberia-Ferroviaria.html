@@ -311,6 +311,16 @@ dialog .spot,dialog .coach{position:absolute}
 .track:hover{background:var(--paper-2)}.track.on{background:#f6e4c0}.track .no{font-family:var(--mono);color:var(--ink-3)}.track b{display:block;font-size:15px}.track em{font-style:normal;font-size:12.5px;color:var(--ink-3)}
 .track .eq{display:flex;gap:2px;align-items:flex-end;height:16px;justify-content:center;color:var(--wine)}.track .eq i{width:3px;background:var(--wine);animation:eq .8s infinite ease-in-out}.track .eq i:nth-child(2){animation-delay:.2s}.track .eq i:nth-child(3){animation-delay:.4s}
 @keyframes eq{0%,100%{height:4px}50%{height:16px}}
+
+/* voces de los personajes */
+.say-btn{display:inline-grid;place-items:center;width:30px;height:30px;margin-left:6px;vertical-align:middle;border:0;border-radius:50%;background:var(--paper-2,#efe4cf);color:var(--wine);font-size:14px;cursor:pointer;line-height:1}
+.say-btn:hover{background:#f6e4c0}
+.say-s{transition:background .25s,color .25s;border-radius:4px}
+.say-s.on{background:rgba(214,160,60,.28);color:inherit;box-shadow:0 0 0 2px rgba(214,160,60,.28)}
+.portrait.talking{animation:talk .32s ease-in-out infinite alternate}
+@keyframes talk{from{transform:translateY(0) rotate(-.6deg)}to{transform:translateY(-2px) rotate(.6deg) scale(1.015)}}
+.speaker{display:flex;align-items:center;gap:6px}.speaker .say-btn{margin-left:0}
+@media (prefers-reduced-motion:reduce){.portrait.talking{animation:none}}
 </style></head>
 <body data-sky="day"><div id="game">
 <canvas id="map" aria-label="Mapa de la red ferroviaria de España. Arrastra para mover, usa la rueda o los botones para ampliar. Pulsa una línea, un tren, una estación o una obra." role="img"></canvas>
@@ -550,25 +560,25 @@ const CHARACTERS = {
  successor:{name:'Óscar del Puente',role:'Ministro de Transportes · personaje satírico',portrait:2}
 };
 const CHAPTERS = [
- {id:'recovery',years:'2022–2024',year:2022,title:'Volver a conectar',subtitle:'El país vuelve a moverse. Tus trenes, todavía no.',speaker:'minister',text:'Has asumido la dirección de Renfe en una España que sale de la pandemia. En esta historia alternativa, una desinversión ha dejado servicios suspendidos, trenes apartados y talleres saturados. Las vías siguen ahí. La confianza de los viajeros, no. Recupera catorce servicios, atiende lo que te piden las ciudades, reforma material y prepara el primer pedido sin vaciar la caja.',objectives:[['active',14,'Mantener 14 servicios abiertos'],['requests',2,'Atender 2 peticiones de ciudades'],['refurbished',2,'Reformar 2 unidades'],['purchased',2,'Encargar 2 trenes nuevos']],reward:100},
- {id:'competition',years:'2024–2028',year:2024,title:'El viajero puede elegir',subtitle:'Alsa está donde tú dejaste de estar.',speaker:'president',text:'La carretera compite en flexibilidad; Ouigo e iryo presionan en los grandes corredores. Un billete barato no arregla una conexión perdida. Combina frecuencias, puntualidad y precios para construir una alternativa que la gente elija. Los primeros trenes nuevos llegan: decide dónde serán más útiles.',objectives:[['active',28,'Mantener 28 servicios abiertos'],['trains',500,'Programar 500 circulaciones diarias'],['stations',3,'Mejorar 3 estaciones'],['satisfaction',65,'Alcanzar 65% de satisfacción'],['delivered',4,'Recibir 4 trenes de tus pedidos']],reward:180},
- {id:'mediterranean',years:'2028–2035',year:2028,title:'Unir el Mediterráneo',subtitle:'De Barcelona a Almería, sin eslabones perdidos.',speaker:'successor',text:'La demanda no entiende de anchos de vía. La infraestructura sí. Negocia las obras de La Encina y Murcia–Almería; mantén el servicio mientras llegan los cortes. Abrir un corredor exige coordinar plataforma, electrificación, señalización y trenes compatibles. No basta con cortar una cinta.',objectives:[['mediterranean',2,'Completar La Encina y Murcia–Almería'],['active',40,'Mantener 40 servicios abiertos'],['upgrades',3,'Completar 3 mejoras de servicio']],reward:260},
- {id:'territory',years:'2035–2042',year:2035,title:'Un país, muchas velocidades',subtitle:'También hay vida fuera de las grandes capitales.',speaker:'minister',text:'Tus éxitos han financiado la expansión. Ahora hay una pregunta política: ¿solo crecer donde más se vende? Recupera conexiones regionales, lleva la renovación al norte y crea nuevas líneas. La rentabilidad y el servicio público pueden convivir, pero tendrás que elegir prioridades.',objectives:[['active',55,'Mantener 55 servicios abiertos'],['built',1,'Construir una línea propia'],['projects',4,'Completar 4 proyectos de infraestructura']],reward:350},
- {id:'legacy',years:'2042–2050',year:2042,title:'La red que dejas',subtitle:'Tu legado se mide en viajes, no en anuncios.',speaker:'president',text:'Las decisiones de las últimas décadas dibujan un país distinto. Sustituye los trenes envejecidos, consolida los servicios y deja una compañía solvente. Al cerrar 2050, tu mandato será juzgado por la cobertura, la satisfacción y las cuentas. El futuro ya no viene dado: lo has construido tú.',objectives:[['trains',900,'Superar 900 circulaciones diarias'],['requests',25,'Atender 25 peticiones de ciudades'],['satisfaction',75,'Alcanzar 75% de satisfacción'],['solvent',1,'Mantener patrimonio financiero positivo']],reward:500}
+ {id:'recovery',years:'2022–2024',year:2022,title:'Volver a conectar',subtitle:'El país vuelve a moverse. Tus trenes, todavía no.',speaker:'minister',text:'¡Enhorabuena, presidente de Renfe! Es un cargo precioso: todo el mundo sabe hacerlo mejor que tú. España sale de la pandemia y, en esta historia alternativa, a alguien se le ocurrió ahorrar dejando trenes en vía muerta. Las vías siguen ahí; la paciencia de los viajeros, regular. Recupera catorce servicios, atiende a los alcaldes, que llamarán, créeme, reforma material y encarga trenes nuevos sin vaciar la caja. Yo lo contaré en rueda de prensa como un éxito. Tú encárgate de que lo sea.',objectives:[['active',14,'Mantener 14 servicios abiertos'],['requests',2,'Atender 2 peticiones de ciudades'],['refurbished',2,'Reformar 2 unidades'],['purchased',2,'Encargar 2 trenes nuevos']],reward:100},
+ {id:'competition',years:'2024–2028',year:2024,title:'El viajero puede elegir',subtitle:'Alsa está donde tú dejaste de estar.',speaker:'president',text:'Querido presidente de Renfe: hoy España elige. Elige Ouigo, elige iryo, elige el autobús con un wifi que no funciona. Y yo quiero que elija Renfe, porque Renfe es España, y España, modestamente, soy un poco yo. Combina frecuencias, puntualidad y precios. Llegan los primeros trenes nuevos: decide dónde ponerlos. Si sale bien, lo anuncio yo. Si sale mal, ya sabes dónde está tu despacho.',objectives:[['active',28,'Mantener 28 servicios abiertos'],['trains',500,'Programar 500 circulaciones diarias'],['stations',3,'Mejorar 3 estaciones'],['satisfaction',65,'Alcanzar 65% de satisfacción'],['delivered',4,'Recibir 4 trenes de tus pedidos']],reward:180},
+ {id:'mediterranean',years:'2028–2035',year:2028,title:'Unir el Mediterráneo',subtitle:'De Barcelona a Almería, sin eslabones perdidos. Algún día.',speaker:'successor',text:'Te lo resumo en un tuit: corredor mediterráneo, ya. Bueno, «ya» lo llevamos diciendo treinta años. La demanda no entiende de anchos de vía; la infraestructura, por desgracia, sí. Negocia La Encina y Murcia–Almería, aguanta los cortes con autobuses y no me cortes una cinta antes de que haya catenaria, que luego salen memes. Y si alguien te dice que esto se hace en dos años, bloquéalo.',objectives:[['mediterranean',2,'Completar La Encina y Murcia–Almería'],['active',40,'Mantener 40 servicios abiertos'],['upgrades',3,'Completar 3 mejoras de servicio']],reward:260},
+ {id:'territory',years:'2035–2042',year:2035,title:'Un país, muchas velocidades',subtitle:'También hay vida fuera de las grandes capitales. Y votan.',speaker:'minister',text:'Ha vuelto la España vaciada a los telediarios, así que toca acordarse de ella. ¿Solo vamos a crecer donde más se vende? Pues no, que hay elecciones. Recupera conexiones regionales, lleva la renovación al norte y construye una línea propia. Rentabilidad y servicio público pueden convivir, como los cuñados en Nochebuena: con esfuerzo y sin hablar de política.',objectives:[['active',55,'Mantener 55 servicios abiertos'],['built',1,'Construir una línea propia'],['projects',4,'Completar 4 proyectos de infraestructura']],reward:350},
+ {id:'legacy',years:'2042–2050',year:2042,title:'La red que dejas',subtitle:'Tu legado se mide en viajes, no en anuncios. El mío, en anuncios.',speaker:'president',text:'Llega la hora del legado, que es como llamamos los políticos a la foto final. Sustituye los trenes viejos, consolida los servicios y deja una compañía solvente. En 2050 a ti te juzgarán por la cobertura, la satisfacción y las cuentas. A mí me juzgará la Historia, que ya me la he leído y salgo estupendamente.',objectives:[['trains',900,'Superar 900 circulaciones diarias'],['requests',25,'Atender 25 peticiones de ciudades'],['satisfaction',75,'Alcanzar 75% de satisfacción'],['solvent',1,'Mantener patrimonio financiero positivo']],reward:500}
 ];
 const DECISIONS = [
- {id:'inaugural',at:0,person:'minister',title:'Su primera decisión, presidente',body:'Los ayuntamientos piden recuperar los trenes. Hacienda pide recuperar el dinero. ¿Qué ponemos primero?',historical:false,choices:[{label:'Plan de servicio público',detail:'+120 M€ de apoyo inicial · prioridad a la cobertura',effects:{cash:120,reputation:5},policy:'public'},{label:'Disciplina comercial',detail:'+160 M€ iniciales · prioridad a corredores rentables',effects:{cash:160,reputation:-3},policy:'commercial'}]},
- {id:'energy',at:2,person:'minister',title:'La factura de la energía',body:'La crisis energética de 2022 presiona los costes. En la simulación debes elegir cómo amortiguar el golpe durante doce meses.',source:'energy',choices:[{label:'Contratar cobertura',detail:'−24 M€ ahora · energía más estable durante 12 meses',effects:{cash:-24},flag:'hedge'},{label:'Asumir el mercado',detail:'Sin desembolso · +22% en costes de energía durante 12 meses',effects:{},flag:'energy'}]},
- {id:'discounts',at:8,person:'minister',title:'El regreso a Cercanías',body:'Los abonos gratuitos de Cercanías y Media Distancia arrancan en septiembre de 2022. Aquí puedes reforzar la oferta con una ayuda extraordinaria: habrá más demanda que atender.',source:'passes',choices:[{label:'Reforzar el servicio público',detail:'+65 M€ · +18% de demanda regional durante 18 meses',effects:{cash:65,reputation:4},flag:'passes'},{label:'Concentrar el esfuerzo',detail:'+25 M€ · menor presión operativa',effects:{cash:25,reputation:-2}}]},
- {id:'iryo',at:10,person:'president',title:'Una tercera voz en la estación',body:'En noviembre de 2022 iryo se suma a la competencia. Las rutas principales ya no tienen clientes cautivos. La presión de los otros operadores se incorporará a la demanda.',source:'competition',choices:[{label:'Competir en servicio',detail:'−18 M€ · mejora de reputación de 7 puntos',effects:{cash:-18,reputation:7}},{label:'Proteger la caja',detail:'Sin desembolso · ajusta tus tarifas en cada línea',effects:{}}]},
- {id:'gauge',at:13,person:'minister',title:'El gálibo también cuenta',body:'El problema de definición del gálibo de los nuevos trenes de ancho métrico provoca retrasos en el proyecto. Se detectó durante el diseño: no eran trenes terminados atascados en túneles. ¿Cómo cubrimos la espera?',source:'gauge',choices:[{label:'Extender la vida de la flota',detail:'−16 M€ · +5 de reputación · +8 de estado en trenes antiguos',effects:{cash:-16,reputation:5},flag:'fleetcare'},{label:'Transporte alternativo',detail:'−8 M€ · +1 de reputación',effects:{cash:-8,reputation:1}}]},
- {id:'pajares',at:22,person:'successor',title:'Al otro lado de la montaña',body:'La variante de Pajares se inaugura el 29 de noviembre de 2023. El nuevo itinerario mejora las posibilidades de conexión con Asturias; tu flota sigue siendo el recurso escaso.',source:'pajares',choices:[{label:'Preparar el lanzamiento',detail:'−12 M€ · +5 de reputación',effects:{cash:-12,reputation:5}},{label:'Esperar al nuevo material',detail:'Sin coste · conserva tu margen de maniobra',effects:{}}]},
- {id:'s106',at:28,person:'successor',title:'Por fin, los S106',body:'Los S106 entran en servicio comercial el 21 de mayo de 2024. El contrato era de 30 unidades; no llegaron todas de golpe. El registro de pedidos conserva su procedencia y el juego escalona las entregas.',source:'s106start',choices:[{label:'Campaña de relanzamiento',detail:'−15 M€ · +6 de reputación',effects:{cash:-15,reputation:6}},{label:'Centrarse en la operación',detail:'−6 M€ · revisión de la flota existente',effects:{cash:-6},flag:'fleetcare'}]},
- {id:'futuretender',at:50,person:'successor',title:'La siguiente generación',body:'Renfe anuncia en marzo de 2026 una licitación de 30 trenes de alta velocidad y 10 opcionales. Una licitación no es todavía un pedido adjudicado. El catálogo abre una plataforma futura ficticia, con entregas más largas.',source:'tender',choices:[{label:'Preparar la inversión',detail:'+45 M€ de apoyo de campaña · abre el catálogo de nueva generación',effects:{cash:45}},{label:'Priorizar el parque actual',detail:'+8 de reputación · no obliga a comprar',effects:{reputation:8}}]},
- {id:'climate',at:105,person:'president',title:'Un verano más largo',body:'Evento simulado. Una ola de calor obliga a reforzar el mantenimiento de vía y la información al viajero. El ahorro inmediato podría costar mucha confianza.',choices:[{label:'Activar plan de resiliencia',detail:'−35 M€ · +6 de reputación',effects:{cash:-35,reputation:6}},{label:'Reducir temporalmente la oferta',detail:'−4 de reputación · sin inversión adicional',effects:{reputation:-4}}]},
- {id:'rural',at:164,person:'minister',title:'La España de las conexiones',body:'Evento simulado. Varias comarcas proponen un contrato de servicio público: financiarán parte de la operación a cambio de continuidad. La decisión afectará a las próximas cinco anualidades.',choices:[{label:'Firmar el acuerdo territorial',detail:'+6 M€ al mes durante 60 meses · +3 de reputación',effects:{reputation:3},flag:'rural'},{label:'Preservar flexibilidad',detail:'+25 M€ iniciales · sin compromiso adicional',effects:{cash:25}}]},
- {id:'industry',at:228,person:'successor',title:'La industria está al límite',body:'Evento simulado. La renovación de flotas europeas llena las fábricas. Durante dieciocho meses los nuevos encargos acumularán más espera. Puedes apoyar la capacidad industrial.',choices:[{label:'Reservar capacidad industrial',detail:'−45 M€ · reduce en 6 meses tus siguientes encargos durante 36 meses',effects:{cash:-45},flag:'factory'},{label:'Aceptar la cola',detail:'Sin desembolso · +8 meses en pedidos durante 18 meses',effects:{},flag:'backlog'}]},
- {id:'legacyvote',at:300,person:'president',title:'El último gran mandato',body:'Evento simulado. Quedan cuatro años para el cierre de la campaña. El Parlamento pide una red accesible y unas cuentas claras. ¿Qué comprometes para la recta final?',choices:[{label:'Una red para todos',detail:'−50 M€ · +10 de reputación',effects:{cash:-50,reputation:10}},{label:'Consolidación financiera',detail:'+50 M€ · −3 de reputación',effects:{cash:50,reputation:-3}}]}
+ {id:'inaugural',at:0,person:'minister',title:'Su primera decisión, presidente',body:'Los alcaldes quieren sus trenes de vuelta. Hacienda quiere su dinero de vuelta. Y yo quiero un titular para el telediario de las tres. ¿Qué ponemos primero?',historical:false,choices:[{label:'Plan de servicio público',detail:'+120 M€ de apoyo inicial · prioridad a la cobertura',effects:{cash:120,reputation:5},policy:'public'},{label:'Disciplina comercial',detail:'+160 M€ iniciales · prioridad a corredores rentables',effects:{cash:160,reputation:-3},policy:'commercial'}]},
+ {id:'energy',at:2,person:'minister',title:'La factura de la luz',body:'La factura energética de 2022 trae más ceros que un fichaje de verano. Tienes que decidir cómo amortiguar el golpe durante doce meses. Te adelanto el final: las dos opciones duelen.',source:'energy',choices:[{label:'Contratar cobertura',detail:'−24 M€ ahora · energía más estable durante 12 meses',effects:{cash:-24},flag:'hedge'},{label:'Asumir el mercado',detail:'Sin desembolso · +22% en costes de energía durante 12 meses',effects:{},flag:'energy'}]},
+ {id:'discounts',at:8,person:'minister',title:'Abonos gratis: ¿qué podría salir mal?',body:'Desde septiembre de 2022 los abonos de Cercanías y Media Distancia son gratuitos, y media España ha descubierto que existe el regional. Puedes reforzar la oferta con una ayuda extraordinaria… o encomendarte a la Virgen del Pilar.',source:'passes',choices:[{label:'Reforzar el servicio público',detail:'+65 M€ · +18% de demanda regional durante 18 meses',effects:{cash:65,reputation:4},flag:'passes'},{label:'Concentrar el esfuerzo',detail:'+25 M€ · menor presión operativa',effects:{cash:25,reputation:-2}}]},
+ {id:'iryo',at:10,person:'president',title:'Una tercera voz en la estación',body:'En noviembre de 2022 llega iryo, con trenes rojos y mucha sonrisa. Ya no hay viajeros cautivos, presidente: hay viajeros con una aplicación para comparar precios. Yo, por mi parte, celebro la competencia. En público.',source:'competition',choices:[{label:'Competir en servicio',detail:'−18 M€ · mejora de reputación de 7 puntos',effects:{cash:-18,reputation:7}},{label:'Proteger la caja',detail:'Sin desembolso · ajusta tus tarifas en cada línea',effects:{}}]},
+ {id:'gauge',at:13,person:'minister',title:'El gálibo también cuenta',body:'Pequeño contratiempo con el gálibo de los nuevos trenes de ancho métrico. Que no cunda el pánico: se detectó en el diseño, no hay ningún tren atascado en un túnel, digan lo que digan los memes. Aun así, esto huele a dimisión. Tú, por si acaso, decide rápido: ¿cómo cubrimos la espera?',source:'gauge',choices:[{label:'Extender la vida de la flota',detail:'−16 M€ · +5 de reputación · +8 de estado en trenes antiguos',effects:{cash:-16,reputation:5},flag:'fleetcare'},{label:'Transporte alternativo',detail:'−8 M€ · +1 de reputación',effects:{cash:-8,reputation:1}}]},
+ {id:'pajares',at:22,person:'successor',title:'Al otro lado de la montaña',body:'29 de noviembre de 2023: se abre la variante de Pajares. Casi veinte años de obras y unos cincuenta kilómetros de túneles: una obra española de las de toda la vida. Asturias, por fin, a tiro de tren. Lástima que tu flota siga siendo la que es.',source:'pajares',choices:[{label:'Preparar el lanzamiento',detail:'−12 M€ · +5 de reputación',effects:{cash:-12,reputation:5}},{label:'Esperar al nuevo material',detail:'Sin coste · conserva tu margen de maniobra',effects:{}}]},
+ {id:'s106',at:28,person:'successor',title:'Por fin, los S106',body:'21 de mayo de 2024: el S106 entra en servicio comercial. Treinta unidades contratadas que no llegan todas de golpe, que esto no es un pedido por internet. Ya lo he tuiteado tres veces. ¿Lo celebramos o nos ponemos a trabajar?',source:'s106start',choices:[{label:'Campaña de relanzamiento',detail:'−15 M€ · +6 de reputación',effects:{cash:-15,reputation:6}},{label:'Centrarse en la operación',detail:'−6 M€ · revisión de la flota existente',effects:{cash:-6},flag:'fleetcare'}]},
+ {id:'futuretender',at:50,person:'successor',title:'La siguiente generación',body:'Marzo de 2026: Renfe licita treinta trenes de alta velocidad y diez opcionales. Ojo, licitar no es comprar: es como mirar pisos en el portal inmobiliario un domingo por la tarde. El catálogo abre una plataforma futura de ficción, con entregas largas.',source:'tender',choices:[{label:'Preparar la inversión',detail:'+45 M€ de apoyo de campaña · abre el catálogo de nueva generación',effects:{cash:45}},{label:'Priorizar el parque actual',detail:'+8 de reputación · no obliga a comprar',effects:{reputation:8}}]},
+ {id:'climate',at:105,person:'president',title:'Un verano más largo',body:'Evento simulado. Ola de calor: cuarenta y cinco grados en Córdoba, lo que allí llaman una tarde fresquita. Hay que reforzar el mantenimiento de vía y la información al viajero. Ahorrar ahora puede salir carísimo luego, y luego me toca a mí dar explicaciones.',choices:[{label:'Activar plan de resiliencia',detail:'−35 M€ · +6 de reputación',effects:{cash:-35,reputation:6}},{label:'Reducir temporalmente la oferta',detail:'−4 de reputación · sin inversión adicional',effects:{reputation:-4}}]},
+ {id:'rural',at:164,person:'minister',title:'La España de las conexiones',body:'Evento simulado. Varias comarcas ofrecen pagar parte del servicio a cambio de no quedarse sin tren. Es un contrato a cinco años, que en política es la eternidad.',choices:[{label:'Firmar el acuerdo territorial',detail:'+6 M€ al mes durante 60 meses · +3 de reputación',effects:{reputation:3},flag:'rural'},{label:'Preservar flexibilidad',detail:'+25 M€ iniciales · sin compromiso adicional',effects:{cash:25}}]},
+ {id:'industry',at:228,person:'successor',title:'La industria está al límite',body:'Evento simulado. Toda Europa compra trenes a la vez y las fábricas no dan abasto: dieciocho meses de cola, como en el ambulatorio. Podemos pagar para colarnos, con cierta elegancia.',choices:[{label:'Reservar capacidad industrial',detail:'−45 M€ · reduce en 6 meses tus siguientes encargos durante 36 meses',effects:{cash:-45},flag:'factory'},{label:'Aceptar la cola',detail:'Sin desembolso · +8 meses en pedidos durante 18 meses',effects:{},flag:'backlog'}]},
+ {id:'legacyvote',at:300,person:'president',title:'El último gran mandato',body:'Evento simulado. Quedan cuatro años. El Parlamento pide una red accesible y unas cuentas claras, dos cosas que en mi experiencia rara vez van juntas. ¿Qué comprometes para la recta final?',choices:[{label:'Una red para todos',detail:'−50 M€ · +10 de reputación',effects:{cash:-50,reputation:10}},{label:'Consolidación financiera',detail:'+50 M€ · −3 de reputación',effects:{cash:50,reputation:-3}}]}
 ];
 
 return {CHARACTERS, CHAPTERS, DECISIONS};
@@ -3155,6 +3165,149 @@ class Soundtrack {
 return {midi, chord, SONGS, FAMILY_LABEL, STYLE_LABEL, validate, arrange, makeBus, renderSong, Soundtrack};
 })();
 
+// ---- voice.js
+__m["voice.js"] = (() => {
+// Voces de los personajes: síntesis de voz del sistema (Web Speech API), sin ficheros ni conexión obligatoria.
+// Cada personaje tiene su voz preferida, tono, velocidad, muletillas de entonación y una cortinilla sonora.
+
+const CAST = {
+  president: {gender: 'm', pitch: .72, rate: .86, swing: .10, pause: 420, sting: 'fanfare', label: 'solemne y grandilocuente'},
+  minister: {gender: 'f', pitch: 1.28, rate: 1.06, swing: .14, pause: 160, sting: 'ding', label: 'optimismo de rueda de prensa'},
+  successor: {gender: 'm', pitch: 1.04, rate: 1.24, swing: .08, pause: 90, sting: 'tweet', label: 'a la velocidad de un tuit'},
+};
+
+const FEMALE = /elvira|helena|laura|m[oó]nica|paulina|luc[ií]a|elena|abril|dalia|ximena|sabina|marisol|esperanza|estrella|irene|triana|vera|lola|carmen|paloma|female|mujer|google español/i;
+const MALE = /[aá]lvaro|jorge|pablo|ra[uú]l|juan|diego|enrique|carlos|arnau|dar[ií]o|gerardo|alonso|nil|sa[uú]l|teo|tom[aá]s|male|hombre|andr[eé]s|jos[eé]/i;
+
+/** Convierte el texto de pantalla en texto pronunciable. */
+function speechText(text) {
+  return String(text)
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/(\d+(?:[.,]\d+)?)\s*M€/g, '$1 millones de euros')
+    .replace(/(\d+(?:[.,]\d+)?)\s*€/g, '$1 euros')
+    .replace(/(\d+)\s*×/g, '$1 por')
+    .replace(/\bS(\d{3})\b/g, 'ese $1')
+    .replace(/\bOuigo\b/g, 'Uigo')
+    .replace(/\biryo\b/g, 'íryo')
+    .replace(/\bAVE\b/g, 'Ave')
+    .replace(/\bM€\b/g, 'millones de euros')
+    .replace(/(\p{L})–(\p{L})/gu, '$1, $2')
+    .replace(/[«»"“”]/g, '')
+    .replace(/[\u{1F300}-\u{1FAFF}☀-➿❗️]/gu, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+/** Trocea en frases para dar entonación propia a cada una y resaltar el subtítulo. */
+function sentences(text) {
+  return (String(text).match(/[^.!?…]+[.!?…]*(\s+|$)/g) || [String(text)]).map(s => s.trim()).filter(Boolean);
+}
+
+function score(v) {
+  let s = 0;
+  if (/^es[-_]ES/i.test(v.lang)) s += 40; else if (/^es/i.test(v.lang)) s += 22;
+  if (/natural|neural|online|premium|enhanced|mejorad/i.test(v.name)) s += 30;
+  if (/google/i.test(v.name)) s += 14;
+  if (/microsoft/i.test(v.name)) s += 6;
+  if (v.localService === false) s += 4;
+  return s;
+}
+
+class Voices {
+  constructor(music) {
+    this.music = music; this.synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
+    this.voices = []; this.token = 0; this.speaking = null; this.listeners = new Set();
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('iberia-voz') || '{}'); } catch {}
+    this.enabled = saved.enabled ?? true; this.volume = saved.volume ?? 1;
+    if (this.synth) { this.load(); this.synth.addEventListener?.('voiceschanged', () => this.load()); }
+  }
+  get available() { return !!this.synth && this.voices.length > 0; }
+  load() { this.voices = (this.synth.getVoices() || []).filter(v => /^es/i.test(v.lang)).sort((a, b) => score(b) - score(a)); this.emit(); }
+  save() { try { localStorage.setItem('iberia-voz', JSON.stringify({enabled: this.enabled, volume: this.volume})); } catch {} }
+  on(fn) { this.listeners.add(fn); }
+  emit() { for (const fn of this.listeners) fn(this); }
+  toggle() { this.enabled = !this.enabled; this.save(); if (!this.enabled) this.stop(); this.emit(); }
+  /** Voz del sistema para un personaje: intenta respetar el género y no repetir voz entre personajes. */
+  voiceFor(person) {
+    const c = CAST[person] || CAST.minister, re = c.gender === 'f' ? FEMALE : MALE, other = c.gender === 'f' ? MALE : FEMALE;
+    const fit = this.voices.filter(v => re.test(v.name)), neutral = this.voices.filter(v => !other.test(v.name));
+    const pool = fit.length ? fit : neutral.length ? neutral : this.voices;
+    // el sucesor usa la segunda voz masculina si existe, para distinguirlo del presidente
+    return person === 'successor' && pool.length > 1 ? pool[1] : pool[0] || null;
+  }
+  stop() {
+    this.token++;
+    if (this.synth) this.synth.cancel();
+    if (this.speaking) { this.speaking.onend?.(); this.speaking = null; }
+    this.duck(false); this.emit();
+  }
+  duck(on) {
+    const m = this.music;
+    if (!m?.master || !m.ctx) return;
+    m.master.gain.setTargetAtTime(on ? m.volume * .28 : m.volume, m.ctx.currentTime, .25);
+  }
+  sting(kind) {
+    const m = this.music; if (!m) return 0;
+    m.init?.(); const ctx = m.ctx; if (!ctx) return 0;
+    const out = ctx.createGain(); out.gain.value = .22 * this.volume; out.connect(ctx.destination);
+    const t = ctx.currentTime + .03, tone = (f, at, len, type = 'sine', v = 1) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(v, at + .015); g.gain.exponentialRampToValueAtTime(.001, at + len);
+      o.connect(g); g.connect(out); o.start(at); o.stop(at + len + .05);
+      return o;
+    };
+    if (kind === 'fanfare') { // trompetas de inauguración, algo desafinadas a propósito
+      [[392, 0], [392, .14], [523, .28], [659, .5]].forEach(([f, d], i) => { tone(f, t + d, i === 3 ? .9 : .16, 'sawtooth', .35); tone(f * 1.006, t + d, i === 3 ? .9 : .16, 'square', .12); });
+      return 1300;
+    }
+    if (kind === 'tweet') { // pío de notificación
+      [0, .11].forEach(d => { const o = tone(2400, t + d, .09, 'sine', .7); o.frequency.setValueAtTime(1900, t + d); o.frequency.exponentialRampToValueAtTime(3400, t + d + .07); });
+      return 380;
+    }
+    [880, 1109, 1319].forEach((f, i) => tone(f, t + i * .1, .5, 'triangle', .8)); // «ding» de megafonía
+    return 520;
+  }
+  /**
+   * Lee un texto con la voz del personaje.
+   * onSentence(i) se llama al empezar cada frase (para el subtítulo); onend al terminar o al cortar.
+   */
+  speak(person, text, {onSentence, onend, sting = true} = {}) {
+    this.stop();
+    if (!this.enabled || !this.synth) { onend?.(); return false; }
+    if (!this.voices.length) this.load();
+    const c = CAST[person] || CAST.minister, voice = this.voiceFor(person), parts = sentences(text), token = ++this.token;
+    this.speaking = {person, onend}; this.duck(true); this.emit();
+    const finish = () => { if (token !== this.token) return; this.speaking = null; this.duck(false); this.emit(); onend?.(); };
+    const say = i => {
+      if (token !== this.token) return;
+      if (i >= parts.length) return finish();
+      onSentence?.(i);
+      const raw = parts[i], line = speechText(raw);
+      if (!line) return say(i + 1);
+      const u = new SpeechSynthesisUtterance(line);
+      if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = 'es-ES';
+      // entonación burlesca: exclamaciones más agudas, preguntas que suben, frases largas algo más rápidas
+      const exclaim = /!/.test(raw), ask = /\?/.test(raw), long = line.length > 120;
+      u.pitch = Math.max(0, Math.min(2, c.pitch + (exclaim ? c.swing * 1.6 : 0) + (ask ? c.swing : 0) + (i % 2 ? -c.swing / 2 : c.swing / 3)));
+      u.rate = Math.max(.5, Math.min(2, c.rate * (long ? 1.05 : 1) * (person === 'president' && i === parts.length - 1 ? .9 : 1)));
+      u.volume = this.volume;
+      // vigilante: algunos navegadores no emiten «end» (o no tienen voces); el diálogo sigue igualmente
+      let done = false;
+      const go = delay => { if (done) return; done = true; clearTimeout(guard); setTimeout(() => say(i + 1), delay); };
+      const guard = setTimeout(() => go(0), 2500 + line.length / (13 * u.rate) * 1000);
+      u.onend = () => go(c.pause);
+      u.onerror = () => go(50);
+      this.synth.speak(u);
+    };
+    const wait = sting ? this.sting(c.sting) : 0;
+    setTimeout(() => say(0), wait);
+    return true;
+  }
+}
+
+return {CAST, speechText, sentences, Voices};
+})();
+
 // ---- app.js
 __m["app.js"] = (() => {
 // Iberia Ferroviaria v0.3 — interfaz. Mapa a pantalla completa, jornada por turnos y paneles planos.
@@ -3169,6 +3322,7 @@ const {RailMap} = __m["map-v3.js"];
 const {trainArt, artKey} = __m["train-art.js"];
 const {citySkyline} = __m["city-art.js"];
 const {trainThumb, mountViewers} = __m["train3d.js"];
+const {Voices, sentences, CAST} = __m["voice.js"];
 const {Soundtrack, SONGS, STYLE_LABEL, FAMILY_LABEL} = __m["music.js"];
 const {REAL_TRAIN_CATALOGUE, COMMUTER_NETWORKS} = __m["assets/realdata.js"];
 const $ = id => document.getElementById(id);
@@ -3239,6 +3393,21 @@ function musicMood() {
   return O.daylight(state, state.ops.minute).night > .55 ? 'night' : 'day';
 }
 const music = new Soundtrack(musicMood);
+const voices = new Voices(music);
+// ------------------------------------------------------------ voces de los personajes
+/** Texto con cada frase en su propio span, para el subtítulo resaltado mientras se lee. */
+function sayHtml(text) { return sentences(text).map(x => `<span class="say-s">${esc(x)}</span>`).join(' '); }
+function sayButton(person, where) { return `<button class="say-btn" data-action="say" data-person="${person}" data-where="${where}" aria-label="Escuchar a ${esc(CHARACTERS[person]?.name || '')}" title="Escuchar">${voices.speaking?.where === where ? '■' : '🔊'}</button>`; }
+/** Lee el párrafo [data-say] dentro de root con la voz del personaje y resalta cada frase. */
+function speakIn(root, person, where) {
+  const el = root?.querySelector('[data-say]'); if (!el) return;
+  const spans = [...el.querySelectorAll('.say-s')], face = root.querySelector('.portrait');
+  const clear = () => { spans.forEach(x => x.classList.remove('on')); face?.classList.remove('talking'); root.querySelectorAll('.say-btn').forEach(b => b.textContent = '🔊'); };
+  const ok = voices.speak(person, el.dataset.say, {onSentence: i => { spans.forEach((x, j) => x.classList.toggle('on', j === i)); }, onend: clear});
+  if (!ok) return;
+  if (voices.speaking) voices.speaking.where = where;
+  face?.classList.add('talking'); root.querySelectorAll('.say-btn').forEach(b => b.textContent = '■');
+}
 function renderMusicButton() {
   const b = $('musicBtn'); if (!b) return;
   b.innerHTML = `${icon('music')}<span>${music.enabled ? 'Música' : 'Silencio'}</span>`;
@@ -3264,6 +3433,8 @@ function musicDialog(refresh = false) {
   <div class="toolbar"><button class="btn ${music.enabled ? '' : 'primary'}" data-action="music-toggle">${music.enabled ? 'Apagar música' : 'Encender música'}</button><button class="btn" data-action="music-next" ${music.enabled ? '' : 'disabled'}>Siguiente pieza</button>
   <label style="margin:0">Modo</label><select id="musicMode"><option value="auto" ${music.mode === 'auto' ? 'selected' : ''}>Automático según el momento</option><option value="list" ${music.mode === 'list' ? 'selected' : ''}>Toda la lista</option><option value="repeat" ${music.mode === 'repeat' ? 'selected' : ''}>Repetir pieza</option></select></div>
   <label for="musicVolume">Volumen</label><input id="musicVolume" type="range" min="0" max="1" step="0.05" value="${music.volume}">
+  <h3 class="sub">Voces de los personajes</h3><p class="small">${voices.available ? `Leídas con las voces en español de tu sistema (${esc(voices.voices.slice(0, 3).map(v => v.name).join(', '))}${voices.voices.length > 3 ? '…' : ''}). Pedro Sancho: ${CAST.president.label}; Raquel Sanz: ${CAST.minister.label}; Óscar del Puente: ${CAST.successor.label}.` : 'Tu navegador no ofrece voces en español. En Chrome, Edge o Safari, o instalando una voz española en el sistema, los personajes hablarán.'}</p>
+  <div class="toolbar"><button class="btn ${voices.enabled ? '' : 'primary'}" data-action="voice-toggle">${voices.enabled ? 'Silenciar personajes' : 'Activar voces'}</button></div>
   <div class="actions"><button class="btn primary" data-action="close-modal">Cerrar</button></div></div>`;
   if (refresh) { const sc = $('modal').querySelector('.content')?.scrollTop || 0; $('modal').innerHTML = `<div class="modal single">${html}</div>`; $('modal').querySelector('.content').scrollTop = sc; }
   else showModal(html, 'single');
@@ -3458,21 +3629,21 @@ function cityInspector() {
 // ------------------------------------------------------------ tutorial guiado
 const routeById = id => state.routes.find(r => r.id === id);
 const TUTORIAL = [
-  {title: 'Bienvenida', text: 'Soy Raquel Sanz (personaje ficticio). En unos minutos te enseño a dirigir la red. Puedes saltar el tutorial cuando quieras.', next: true},
-  {title: 'Las ciudades mandan', text: 'Cada círculo es una ciudad. Verde: todas sus conexiones funcionan; ámbar: algunas; gris: ninguna. Pulsa sobre Madrid.', city: 'mad', when: () => inspect?.type === 'city' && inspect.id === 'mad', enter: () => { map.focusAt(-3.7, 40.4, 1.6); }},
-  {title: 'El menú de la ciudad', text: 'Aquí tienes la ciudad, sus conexiones y su estación. En el mapa, las conexiones en servicio se marcan en dorado.', target: '#inspector .city-hero', next: true},
-  {title: 'Más trenes', text: 'Pulsa + en la conexión con València para ofrecer más trenes del horario real.', target: '[data-action=freq-up][data-id=madrid-valencia]', when: () => routeById('madrid-valencia')?.frequency > tut.f0, enter: () => { tut.f0 = routeById('madrid-valencia')?.frequency || 0; }},
-  {title: 'Abre una conexión', text: 'Las conexiones grises están cerradas. Abre la de Salamanca: cuesta 4 M€ y usa trenes libres compatibles.', target: '[data-action=open-route][data-id=madrid-salamanca]', when: () => routeById('madrid-salamanca')?.active},
-  {title: 'Peticiones', text: 'Las ciudades con ❗ te piden algo: abrir una conexión, más trenes, bajar una tarifa o mejorar su estación. Cumplirlas da dinero y reputación. Las tienes aquí, a la izquierda.', target: '#mission .requests', next: true, enter: () => { inspect = null; renderInspector(); }},
-  {title: 'Empieza el día', text: 'Cada jornada empieza con el primer tren real y termina con el último. Pulsa «Comenzar jornada».', target: '[data-action=day-start]', when: () => state.ops.phase === 'running'},
-  {title: 'Más deprisa', text: 'Elige 10× para que el reloj avance más rápido.', target: '.speed', when: () => speedIndex >= 2},
-  {title: 'Viajeros e ingresos', text: 'Cada tren que llega suma viajeros e ingresos: los verás aparecer sobre las ciudades y en «Hoy», arriba.', target: '#resources', when: () => today.trains >= 6},
-  {title: '¡Una avería!', text: 'Ha surgido una incidencia. Pulsa «Decidir» y elige cómo responder.', target: '.alert-pill', when: () => state.ops.resolved.length > 0, enter: () => { if (state.ops.phase === 'running' && !O.injectIncident(state, state.ops.minute)) tutorialNext(); }},
-  {title: 'Momentos del día', text: 'A veces una ciudad tiene un pico de demanda: un partido, un congreso… Si refuerzas a tiempo la conexión indicada ganas una bonificación. Puedes cambiar los trenes en plena jornada.', next: true},
-  {title: 'Fin de la jornada', text: 'Pulsa «Hasta el último tren» para cerrar el día.', target: '[data-action=day-end]', when: () => state.ops.phase === 'review'},
-  {title: 'El parte del día', text: 'Puntualidad, viajeros y resultado del día. Pulsa «Siguiente jornada».', target: '#modal [data-action=day-next]', when: () => state.ops.phase === 'planning'},
-  {title: 'Compra trenes', text: 'Para crecer necesitas más material, y tarda unos dos años en llegar. Abre «Compras».', target: '[data-screen=market]', when: () => screen === 'market'},
-  {title: '¡A dirigir!', text: 'Cumple los objetivos del capítulo para recibir financiación. Acércate con la rueda para ver trenes, estaciones y obras. ¡Buen viaje!', target: '#mission', next: true},
+  {title: 'Bienvenida', text: '¡Hola! Soy Raquel Sanz, ministra de Transportes (de ficción, que conste en acta). Te enseño a dirigir la red en un periquete. Si ya sabes, sáltate el tutorial; yo hago como que no me ofendo.', next: true},
+  {title: 'Las ciudades mandan', text: 'Cada círculo es una ciudad. Verde: todo funciona; ámbar: funciona a la española; gris: ni está ni se le espera. Pulsa sobre Madrid, que aquí todo pasa por Madrid.', city: 'mad', when: () => inspect?.type === 'city' && inspect.id === 'mad', enter: () => { map.focusAt(-3.7, 40.4, 1.6); }},
+  {title: 'El menú de la ciudad', text: 'Aquí tienes la ciudad, sus conexiones y su estación. Lo dorado del mapa son conexiones en servicio; lo demás, promesas electorales.', target: '#inspector .city-hero', next: true},
+  {title: 'Más trenes', text: 'Pulsa + en la conexión con València para poner más trenes del horario real. Los valencianos lo agradecerán, y los madrileños con apartamento en la playa, más.', target: '[data-action=freq-up][data-id=madrid-valencia]', when: () => routeById('madrid-valencia')?.frequency > tut.f0, enter: () => { tut.f0 = routeById('madrid-valencia')?.frequency || 0; }},
+  {title: 'Abre una conexión', text: 'Las conexiones grises están cerradas. Abre la de Salamanca: cuesta 4 M€ y usa trenes libres compatibles. Calderilla, para lo que se estila.', target: '[data-action=open-route][data-id=madrid-salamanca]', when: () => routeById('madrid-salamanca')?.active},
+  {title: 'Peticiones', text: 'Las ciudades con ❗ te piden cosas: más trenes, una conexión, una tarifa más baja o una estación decente. Como los alcaldes, pero sin llamarte a las tantas. Cumplirlas da dinero y reputación. Las tienes a la izquierda.', target: '#mission .requests', next: true, enter: () => { inspect = null; renderInspector(); }},
+  {title: 'Empieza el día', text: 'Cada jornada empieza con el primer tren real y termina con el último. Pulsa «Comenzar jornada». Con el café en la mano, a ser posible.', target: '[data-action=day-start]', when: () => state.ops.phase === 'running'},
+  {title: 'Más deprisa', text: 'Elige 10× para que el reloj vaya más rápido. Ojalá las obras funcionaran igual.', target: '.speed', when: () => speedIndex >= 2},
+  {title: 'Viajeros e ingresos', text: 'Cada tren que llega suma viajeros e ingresos: los verás sobre las ciudades y en «Hoy», arriba. Sí, ese dinero es tuyo. Bueno, de Renfe. Bueno, de Hacienda.', target: '#resources', when: () => today.trains >= 6},
+  {title: '¡Una avería!', text: '¡Una incidencia! Tranquilidad, que esto pasa en las mejores familias. Pulsa «Decidir» y elige cómo responder.', target: '.alert-pill', when: () => state.ops.resolved.length > 0, enter: () => { if (state.ops.phase === 'running' && !O.injectIncident(state, state.ops.minute)) tutorialNext(); }},
+  {title: 'Momentos del día', text: 'A veces una ciudad tiene un pico de demanda: un partido, un congreso, el puente de diciembre… Si refuerzas a tiempo la conexión indicada, te llevas una bonificación. Los trenes se pueden cambiar en plena jornada.', next: true},
+  {title: 'Fin de la jornada', text: 'Pulsa «Hasta el último tren» para cerrar el día. El último en llegar, que apague la luz.', target: '[data-action=day-end]', when: () => state.ops.phase === 'review'},
+  {title: 'El parte del día', text: 'El parte del día: puntualidad, viajeros y resultado. Si sale mal, échale la culpa a la meteorología, que es lo que hacemos todos. Pulsa «Siguiente jornada».', target: '#modal [data-action=day-next]', when: () => state.ops.phase === 'planning'},
+  {title: 'Compra trenes', text: 'Para crecer necesitas más trenes, y tardan unos dos años en llegar: los fabricantes también tienen su ritmo. Abre «Compras».', target: '[data-screen=market]', when: () => screen === 'market'},
+  {title: '¡A dirigir!', text: 'Cumple los objetivos del capítulo para recibir financiación. Acércate con la rueda para ver trenes, estaciones y obras. Y recuerda: si algo sale bien, lo anuncio yo. ¡Buen viaje!', target: '#mission', next: true},
 ];
 let tut = null;
 function startTutorial() { tut = {step: -1, f0: 0}; state.tutorial = {done: false}; tutorialNext(); }
@@ -3483,7 +3654,7 @@ function tutorialNext() {
   TUTORIAL[tut.step].enter?.();
   renderCoach();
 }
-function endTutorial() { tut = null; state.tutorial = {done: true}; autosave(); $('coach')?.remove(); $('spot')?.remove(); toast('Tutorial completado. Lo puedes repetir desde Ayuda.'); }
+function endTutorial() { if (voices.speaking?.where === 'coach') voices.stop(); tut = null; state.tutorial = {done: true}; autosave(); $('coach')?.remove(); $('spot')?.remove(); toast('Tutorial completado. Lo puedes repetir desde Ayuda.'); }
 function renderCoach() {
   if (!tut) return;
   const step = TUTORIAL[tut.step];
@@ -3495,8 +3666,8 @@ function renderCoach() {
   }
   const host = $('modal').open ? $('modal') : document.body;
   if (coach.parentNode !== host) { host.appendChild(spot); host.appendChild(coach); }
-  const html = `<div class="portrait p1" aria-hidden="true"></div><div><div class="kicker">Tutorial · ${tut.step + 1}/${TUTORIAL.length}</div><h3>${esc(step.title)}</h3><p>${esc(step.text)}</p><div class="actions">${step.next ? '<button class="btn small primary" data-action="tutorial-next">Siguiente</button>' : '<button class="btn small ghost" data-action="tutorial-next">Omitir paso</button>'}<button class="btn small ghost" data-action="tutorial-skip">Salir</button></div></div>`;
-  if (coach.dataset.step !== String(tut.step)) { coach.innerHTML = html; coach.dataset.step = tut.step; }
+  const html = `<div class="portrait p1" aria-hidden="true"></div><div><div class="kicker">Tutorial · ${tut.step + 1}/${TUTORIAL.length}</div><h3>${esc(step.title)}</h3><p data-say="${esc(step.text)}">${sayHtml(step.text)}</p><div class="actions">${step.next ? '<button class="btn small primary" data-action="tutorial-next">Siguiente</button>' : '<button class="btn small ghost" data-action="tutorial-next">Omitir paso</button>'}<button class="btn small ghost" data-action="tutorial-skip">Salir</button></div></div>`;
+  if (coach.dataset.step !== String(tut.step)) { coach.innerHTML = html; coach.dataset.step = tut.step; coach.querySelector('h3').insertAdjacentHTML('beforeend', sayButton('minister', 'coach')); speakIn(coach, 'minister', 'coach'); }
   let rect = null;
   if (step.city) { const c = CITY[step.city], p = map.screenOf(c.lon, c.lat), cr = $('map').getBoundingClientRect(); rect = {left: cr.left + p[0] - 26, top: cr.top + p[1] - 26, width: 52, height: 52, round: true}; }
   else if (step.target) { const el = (host === $('modal') ? $('modal') : document).querySelector(step.target); if (el && el.offsetParent !== null) { const b = el.getBoundingClientRect(); rect = {left: b.left - 6, top: b.top - 6, width: b.width + 12, height: b.height + 12}; } }
@@ -3906,7 +4077,7 @@ function storyPage() {
   const c = CHAPTERS[state.chapter], person = CHARACTERS[c.speaker], score = E.finalScore(state);
   const body = `${state.ended ? `<div class="callout"><strong>${state.ending === '2050' ? '31 de diciembre de 2050' : 'Intervención de la compañía'}</strong><br>Tu legado: <b>${score}/100</b>. ${state.routes.filter(r => r.active).length} servicios, ${n(E.dailyTrains(state))} circulaciones diarias, ${n(state.stats.passengers / 1e6, 1)} millones de viajes.</div>` : ''}
   <div class="chapters">${CHAPTERS.map((ch, i) => `<div class="${state.claimed.includes(ch.id) ? 'done' : i === state.chapter ? 'now' : ''}"><strong>${esc(ch.title)}</strong>${ch.years}</div>`).join('')}</div>
-  <div class="story"><div class="portrait p${person.portrait}" role="img" aria-label="${esc(person.name)}"></div><div><div class="kicker" style="color:var(--wine);font-weight:700;font-size:11.5px;letter-spacing:1.4px;text-transform:uppercase">${esc(person.name)} · personaje ficticio</div><h2 class="section" style="margin-top:4px">${esc(c.title)}</h2><p>${esc(c.text)}</p>
+  <div class="story"><div class="portrait p${person.portrait}" role="img" aria-label="${esc(person.name)}"></div><div><div class="kicker" style="color:var(--wine);font-weight:700;font-size:11.5px;letter-spacing:1.4px;text-transform:uppercase">${esc(person.name)} · personaje ficticio</div><h2 class="section" style="margin-top:4px">${esc(c.title)} ${sayButton(c.speaker, 'story')}</h2><p data-say="${esc(c.text)}">${sayHtml(c.text)}</p>
   <ul class="objectives">${c.objectives.map(([k, target, title]) => { const v = E.objectiveValue(state, k); return `<li class="${v >= target ? 'done' : ''}"><i></i><span>${esc(title)}</span><span class="num">${k === 'solvent' ? (v ? '✓' : '—') : n(Math.min(v, target)) + ' / ' + n(target)}</span></li>`; }).join('')}</ul>
   <div class="toolbar"><button class="btn primary" data-action="claim" ${!E.chapterReady(state) || state.ended ? 'disabled' : ''}>${state.claimed.includes(c.id) ? 'Capítulo completado' : 'Reclamar ' + c.reward + ' M€'}</button><button class="btn" data-action="navigate" data-screen="network">Gestionar la red</button></div>
   ${E.yearOf(state) < c.year ? `<p class="callout">Esta etapa comienza en ${c.year}. Puedes preparar sus objetivos mientras tanto.</p>` : ''}</div></div>
@@ -4054,13 +4225,15 @@ function workInspector() {
 // ------------------------------------------------------------ ventanas modales
 function showModal(html, cls = '') { pause(); $('modal').innerHTML = `<div class="modal ${cls}">${html}</div>`; if (!$('modal').open) $('modal').showModal(); mountViewers($('modal')); }
 function closeModal() { if ($('modal').open) $('modal').close(); }
+$('modal').addEventListener('close', () => { if (!$('modal').open && voices.speaking?.where === 'modal') voices.stop(); });
 function intro() {
-  showModal(`<div class="art hero-art"></div><div class="content"><div class="kicker">Campaña · 2022–2050</div><h1>El próximo tren lo decides tú.</h1><p>Enero de 2022. España vuelve a moverse. Asumes la dirección de una Renfe que necesita recuperar servicios, renovar sus trenes y volver a ganarse al viajero.</p><p>Por la red circulan <b>los trenes reales</b>: ${n(S.META.counts.L)} circulaciones de un día laborable del horario oficial, de Cercanías y Rodalies a la Alta Velocidad. Cada jornada empieza con el primer tren y termina con el último.</p><div class="actions">${saved ? '<button class="btn primary" data-action="continue">Continuar partida</button>' : ''}<button class="btn ${saved ? '' : 'primary'}" data-action="begin">Asumir la dirección</button><button class="btn ghost" data-action="observe">Solo mirar el horario real</button></div><p class="note">Historia alternativa: la escasez inicial y los cierres son ficción; los horarios, estaciones, proyectos y contratos tienen fuente. Se guarda en este navegador.</p></div>`);
+  showModal(`<div class="art hero-art"></div><div class="content"><div class="kicker">Campaña · 2022–2050</div><h1>El próximo tren lo decides tú.</h1><p>Enero de 2022. España vuelve a moverse. Asumes la dirección de una Renfe que necesita recuperar servicios, renovar sus trenes y volver a ganarse al viajero.</p><p>Por la red circulan <b>los trenes reales</b>: ${n(S.META.counts.L)} circulaciones de un día laborable del horario oficial, de la Alta Velocidad a los regionales. Cada jornada empieza con el primer tren y termina con el último.</p><div class="actions">${saved ? '<button class="btn primary" data-action="continue">Continuar partida</button>' : ''}<button class="btn ${saved ? '' : 'primary'}" data-action="begin">Asumir la dirección</button><button class="btn ghost" data-action="observe">Solo mirar el horario real</button></div><p class="note">Historia alternativa: la escasez inicial y los cierres son ficción; los horarios, estaciones, proyectos y contratos tienen fuente. Se guarda en este navegador.</p></div>`);
 }
 function showDecision() {
   const d = E.pendingDecision(state); if (!d) return;
   const person = CHARACTERS[d.person];
-  showModal(`<div class="art portrait p${person.portrait}" role="img" aria-label="${esc(person.name)}"></div><div class="content"><div class="kicker">${esc(E.dateOf(state.month))} · Consejo de dirección</div><h1>${esc(d.title)}</h1><p>${esc(d.body)}</p><p class="small" style="color:var(--gold)">${esc(person.name)} · diálogo ficticio</p>${d.choices.map((c, i) => `<button class="choice" data-action="decision" data-id="${d.id}" data-choice="${i}" ${state.cash < -(c.effects.cash || 0) ? 'disabled' : ''}><strong>${esc(c.label)}</strong><span>${esc(c.detail)}</span></button>`).join('')}<p class="note">${d.source ? sourceLink(d.source, 'Contexto documentado') + ' · decisiones y efectos simulados' : 'Escenario ficticio de la campaña'}</p></div>`);
+  showModal(`<div class="art portrait p${person.portrait}" role="img" aria-label="${esc(person.name)}"></div><div class="content"><div class="kicker">${esc(E.dateOf(state.month))} · Consejo de dirección</div><h1>${esc(d.title)}</h1><p data-say="${esc(d.body)}">${sayHtml(d.body)}</p><p class="small speaker" style="color:var(--gold)">${sayButton(d.person, 'modal')} ${esc(person.name)} · diálogo ficticio</p>${d.choices.map((c, i) => `<button class="choice" data-action="decision" data-id="${d.id}" data-choice="${i}" ${state.cash < -(c.effects.cash || 0) ? 'disabled' : ''}><strong>${esc(c.label)}</strong><span>${esc(c.detail)}</span></button>`).join('')}<p class="note">${d.source ? sourceLink(d.source, 'Contexto documentado') + ' · decisiones y efectos simulados' : 'Escenario ficticio de la campaña'}</p></div>`);
+  speakIn($('modal'), d.person, 'modal');
 }
 function dayReport() {
   const l = state.ops.last; if (!l) return;
@@ -4149,7 +4322,7 @@ document.addEventListener('click', event => {
     case 'continue': if (saved) { state = E.validateSave(saved); O.ensureOps(state); state.started = true; closeModal(); netKey = networkKey(); map.dirty = true; render(); if (E.pendingDecision(state)) showDecision(); } break;
     case 'observe': closeModal(); setLayer('real'); observerMinute = 480; play(); break;
     case 'decision': if (act(() => E.decide(state, id, +b.dataset.choice))) { closeModal(); if (E.pendingDecision(state)) showDecision(); else if (!state.tutorial?.done && !tut && state.month === 0) startTutorial(); } break;
-    case 'claim': act(() => E.claimChapter(state), 'Financiación recibida. Tu siguiente etapa está preparada.'); break;
+    case 'claim': act(() => E.claimChapter(state), 'Financiación recibida. Tu siguiente etapa está preparada.'); setTimeout(() => { const st = document.querySelector('.story'); if (st && !state.ended) speakIn(st, CHAPTERS[state.chapter].speaker, 'story'); }, 60); break;
     case 'play': playing ? pause() : play(); break;
     case 'speed': speedIndex = +id; renderDaybar(); break;
     case 'day-start': if (layer === 'real') setLayer('network'); play(); break;
@@ -4168,6 +4341,13 @@ document.addEventListener('click', event => {
     case 'music': musicDialog(); break;
     case 'music-play': { const song = SONGS.find(x => x.id === id); if (song) { if (music.mode === 'auto') music.setMode('list'); music.play(song); } break; }
     case 'music-toggle': music.toggle(); break;
+    case 'voice-toggle': voices.toggle(); musicDialog(true); break;
+    case 'say': {
+      const where = b.dataset.where, root = where === 'coach' ? $('coach') : where === 'modal' ? $('modal') : b.closest('.story');
+      if (voices.speaking?.where === where) voices.stop();
+      else { if (!voices.enabled) voices.toggle(); speakIn(root, b.dataset.person, where); }
+      break;
+    }
     case 'music-next': music.next(); break;
     case 'tutorial-next': tutorialNext(); break;
     case 'tutorial-skip': endTutorial(); break;
