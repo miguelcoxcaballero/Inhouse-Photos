@@ -1,15 +1,16 @@
-# Iberia Ferroviaria · v0.9
+# Iberia Ferroviaria · v1.0
 
-Juego de gestión ferroviaria en español: diriges Renfe de 2022 a 2050 sobre el mapa de España, con **el horario oficial de todos los trenes de Alta Velocidad, Larga y Media Distancia**, ciudades que piden cosas, un tutorial guiado, trenes en 3D, una banda sonora original de 12 piezas con instrumentos reales y personajes satíricos que hablan con voces en castellano de España.
+Juego de gestión ferroviaria en español: diriges Renfe de 2022 a 2050 sobre el mapa de España, con **el horario oficial de todos los trenes de Alta Velocidad, Larga y Media Distancia**, ciudades que piden cosas, un tutorial guiado, trenes en 3D, una banda sonora original de 14 piezas con orquesta, jazz y flamenco muestreados (incluidas una bulería y un pasodoble) y personajes satíricos que hablan con voces en castellano de España.
 
-- **Jugar:** abre [`outputs/Iberia-Ferroviaria.html`](outputs/Iberia-Ferroviaria.html) en un navegador moderno. Funciona sin conexión.
+- **Jugar:** abre [`outputs/Iberia-Ferroviaria.html`](outputs/Iberia-Ferroviaria.html) en un navegador moderno. Funciona sin conexión (lleva dentro todas las muestras de la música).
 - **Instrucciones, datos y licencias:** [`proyecto/LEEME.txt`](proyecto/LEEME.txt).
 - **Estado y próximos pasos:** [`proyecto/PLAN.txt`](proyecto/PLAN.txt) · **Verificación:** [`proyecto/VERIFICACION.txt`](proyecto/VERIFICACION.txt).
 
 ```sh
 cd proyecto
 npm run timetable   # regenera dist/assets/timetable.js desde investigacion/gtfs (Python 3 + numpy)
-npm run build       # genera ../outputs/Iberia-Ferroviaria.html
+npm run samples     # regenera el banco de muestras de la banda sonora (Python 3 + numpy, soundfile, librosa)
+npm run build       # genera ../outputs/Iberia-Ferroviaria.html y la versión web ../outputs/web/
 npm test            # motor, campaña completa, horario oficial y jornadas
 node ui-v3-test.mjs /ruta/a/playwright/index.mjs   # recorrido de interfaz con capturas
 ```

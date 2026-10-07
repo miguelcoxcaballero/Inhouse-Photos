@@ -45,6 +45,8 @@ await page.click('#musicBtn');
 await page.click('[data-action=music-play][data-id=vialibre]');
 assert.equal(await page.evaluate(() => window.railwayGame.music.current.song.id), 'vialibre');
 await page.waitForFunction(() => window.railwayGame.music.current?.ready === true, null, {timeout: 20000});
+await page.waitForTimeout(3000);
+assert.deepEqual(await page.evaluate(() => ({...window.railwayGame.music.substituted})), {}, 'todos los instrumentos suenan con sus muestras');
 await shot(page, '01d-banda-sonora');
 await page.click('[data-action=close-modal]');
 await page.evaluate(() => window.railwayGame.navigate('market'));
@@ -141,6 +143,33 @@ await m.waitForTimeout(900);
 await shot(m, '21-movil-ciudad');
 assert.equal(await m.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 done.push('Móvil 390 × 844 sin desbordamiento horizontal.');
+// Versión web: las muestras se piden al servidor cuando la música las necesita
+{
+  const http = await import('node:http'), fs = await import('node:fs');
+  const webDir = path.join(root, '../outputs/web'), types = {html: 'text/html; charset=utf-8', js: 'text/javascript; charset=utf-8'};
+  const server = http.createServer((req, res) => {
+    const file = path.join(webDir, decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/$/, '/index.html'));
+    if (!file.startsWith(webDir) || !fs.existsSync(file)) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, {'content-type': types[file.split('.').pop()] || 'application/octet-stream'}); fs.createReadStream(file).pipe(res);
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const w = await browser.newPage(), asked = [];
+  w.on('pageerror', e => errors.push('web: ' + e.message));
+  w.on('request', r => { const f = r.url().split('/').pop(); if (f.startsWith('muestras-')) asked.push(f); });
+  await w.goto(`http://127.0.0.1:${server.address().port}/`);
+  await w.waitForTimeout(1500);
+  await w.click('[data-action=begin]');
+  await w.click('.choice >> nth=0');
+  await w.click('[data-action=tutorial-skip]');
+  await w.click('#musicBtn');
+  await w.click('[data-action=music-play][data-id=despenaperros]');
+  await w.waitForFunction(() => window.railwayGame.music.current?.ready === true, null, {timeout: 40000});
+  await w.waitForTimeout(3000);
+  assert.deepEqual(await w.evaluate(() => ({...window.railwayGame.music.substituted})), {}, 'web: todos los instrumentos suenan con sus muestras');
+  assert.deepEqual([...new Set(asked)].sort(), ['muestras-orquesta.js', 'muestras-percusion.js', 'muestras-teclas.js']);
+  await w.close(); server.close();
+  done.push('Versión web: la bulería pide sus muestras al servidor al sonar y todos sus instrumentos suenan con muestras reales.');
+}
 await browser.close();
 assert.deepEqual(errors, []);
 console.log(done.map(x => '✓ ' + x).join('\n'));

@@ -1,5 +1,12 @@
-IBERIA FERROVIARIA — PLAN Y ESTADO V0.9
+IBERIA FERROVIARIA — PLAN Y ESTADO V1.0
 7 de octubre de 2026.
+
+HECHO EN 1.0
+- Banda sonora rehecha con orquesta de verdad: secciones de cuerda (sostenido, spiccato, pizzicato y trémolo) y violín solista con capas piano/forte, maderas, metales, timbales, piano de cola estéreo, Rhodes, saxo, batería multimicrófono y percusión española; 45 instrumentos en tres ficheros de muestras.
+- Motor de audio nuevo: capas dinámicas, sostenidos encadenados, legato, expresión en notas largas, panorama de orquesta, buses por familia con ecualización, sala de concierto y sala pequeña generadas, máster con compresión suave y limitador. Sintetizadores analógicos solo en dos piezas, pregrabados al cargar para no gastar CPU. Render sin conexión unas 10 veces más rápido (programación por tramos).
+- Arreglista nuevo: orquestación por capas según la intensidad de cada parte, cuerdas a cuatro o cinco voces bajo la melodía, contracantos con notas guía, doblajes, maderas en terceras, transiciones con timbal, platillo y arpa, anticipaciones, ritardando final y notas que rozan la melodía omitidas. Melodías intactas (test).
+- Dos piezas españolas nuevas: Despeñaperros (bulería) y Expreso de Andalucía (pasodoble).
+- Mezcla calibrada por pistas en las 14 piezas y versión web con las muestras en ficheros aparte, cargadas al sonar.
 
 HECHO EN 0.9
 - Banda sonora más adulta: tempos un 10–20 % más lentos; fuera marimba, glockenspiel, pandereta, palmas sintéticas, arpegiador y subida de tono; guitarra española, cuerdas, clarinete y trompeta con sordina como voces principales según la sección.
@@ -42,7 +49,7 @@ HECHO EN 0.3
 SIGUIENTES PASOS PROPUESTOS
 - Voces: grabar referencias con actores reales de España (10–15 s por personaje, con permiso) para clonar timbre e interpretación más burlescos.
 - Modelos 3D modelados a mano (glTF) por serie, con interiores, para sustituir la reconstrucción procedural.
-- Grabar la banda sonora con instrumentos reales o muestras.
+- Banda sonora: escucha humana y ajuste fino de la mezcla pieza a pieza; castañuelas grabadas de verdad si aparece una biblioteca libre.
 - Horarios históricos: reconstruir 2022–2026 con versiones archivadas del GTFS (el archivo público conserva copias diarias desde marzo de 2026; harían falta otras fuentes para 2022).
 - Asignación de material por circulación y rotaciones (diagramas de turnos) con depósitos reales.
 - Vía estrecha (antigua FEVE) desde OSM railway=narrow_gauge para eliminar los tramos aproximados del norte.
