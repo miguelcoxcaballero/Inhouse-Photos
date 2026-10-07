@@ -1,5 +1,5 @@
-IBERIA FERROVIARIA — VERSIÓN JUGABLE 0.6
-Actualización: 6 de octubre de 2026.
+IBERIA FERROVIARIA — VERSIÓN JUGABLE 0.7
+Actualización: 7 de octubre de 2026.
 
 PARA JUGAR
 Abre outputs/Iberia-Ferroviaria.html con Chrome, Edge o Firefox actualizados. Funciona sin Internet y sin instalar nada; solo los enlaces a fuentes necesitan conexión.

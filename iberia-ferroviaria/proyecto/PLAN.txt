@@ -1,8 +1,11 @@
-IBERIA FERROVIARIA — PLAN Y ESTADO V0.6
-6 de octubre de 2026.
+IBERIA FERROVIARIA — PLAN Y ESTADO V0.7
+7 de octubre de 2026.
+
+HECHO EN 0.7
+- Voces definitivas: XTTS-v2 con una grabación real de España y voces castellanas verificadas con un medidor de acento; cada toma comprobada.
 
 HECHO EN 0.6
-- Voces pregrabadas con XTTS-v2 a partir de grabaciones reales de España para los 32 diálogos, con dirección de voz (pausas y remates), comprobación automática de cada toma y verificación objetiva del acento; cortinillas, subtítulos resaltados y música atenuada; respaldo con la voz del sistema.
+- Voces pregrabadas para los 32 diálogos con cortinillas, subtítulos resaltados y música atenuada; respaldo con la voz del sistema.
 - Diálogos de capítulos, decisiones y tutorial reescritos con ironía y expresiones castizas.
 
 HECHO EN 0.5
@@ -29,6 +32,7 @@ HECHO EN 0.3
 8. Partidas v0.2 importables.
 
 SIGUIENTES PASOS PROPUESTOS
+- Voces: grabar referencias con actores reales de España (10–15 s por personaje, con permiso) para clonar timbre e interpretación más burlescos.
 - Modelos 3D modelados a mano (glTF) por serie, con interiores, para sustituir la reconstrucción procedural.
 - Grabar la banda sonora con instrumentos reales o muestras.
 - Horarios históricos: reconstruir 2022–2026 con versiones archivadas del GTFS (el archivo público conserva copias diarias desde marzo de 2026; harían falta otras fuentes para 2022).

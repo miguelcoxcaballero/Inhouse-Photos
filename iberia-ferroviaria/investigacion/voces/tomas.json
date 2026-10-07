@@ -1,0 +1,940 @@
+[
+ {
+  "id": "1mpzu5e",
+  "person": "minister",
+  "text": "¡Enhorabuena, presidente de Renfe!",
+  "takes": [
+   3.6705619040356785
+  ]
+ },
+ {
+  "id": "1kzo5tq",
+  "person": "minister",
+  "text": "Es un cargo precioso. Todo el mundo sabe hacerlo mejor que tú.",
+  "takes": [
+   3.0316693050211945
+  ]
+ },
+ {
+  "id": "1s0exci",
+  "person": "minister",
+  "text": "España sale de la pandemia y, en esta historia alternativa, a alguien se le ocurrió ahorrar dejando trenes en vía muerta.",
+  "takes": [
+   2.8679887849047656
+  ]
+ },
+ {
+  "id": "rmvi6n",
+  "person": "minister",
+  "text": "Las vías siguen ahí. La paciencia de los viajeros. regular.",
+  "takes": [
+   2.7683481880180385
+  ]
+ },
+ {
+  "id": "t884e9",
+  "person": "minister",
+  "text": "Recupera catorce servicios, atiende a los alcaldes, que llamarán, créeme, reforma material y encarga trenes nuevos sin vaciar la caja.",
+  "takes": [
+   3.881138154605953
+  ]
+ },
+ {
+  "id": "1sj1bm3",
+  "person": "minister",
+  "text": "Yo lo contaré en rueda de prensa como un éxito.",
+  "takes": [
+   2.7844044497287608
+  ]
+ },
+ {
+  "id": "1lpmlau",
+  "person": "minister",
+  "text": "Tú encárgate de que lo sea.",
+  "takes": [
+   3.3637111439086955
+  ]
+ },
+ {
+  "id": "132i8f",
+  "person": "president",
+  "text": "Querido presidente de Renfe. Hoy, España elige.",
+  "takes": [
+   4.042050964332821
+  ]
+ },
+ {
+  "id": "906hzi",
+  "person": "president",
+  "text": "Elige Uigo. Elige íryo. Elige el autobús. con un wifi que no funciona.",
+  "takes": [
+   4.181444939142016
+  ]
+ },
+ {
+  "id": "1c8020v",
+  "person": "president",
+  "text": "Combina frecuencias, puntualidad y precios.",
+  "takes": [
+   4.293857176534792
+  ]
+ },
+ {
+  "id": "1nrwny4",
+  "person": "president",
+  "text": "Llegan los primeros trenes nuevos: decide dónde ponerlos.",
+  "takes": [
+   3.934059511805107
+  ]
+ },
+ {
+  "id": "ar0xdk",
+  "person": "president",
+  "text": "Si sale bien, lo anuncio yo.",
+  "takes": [
+   null,
+   3.046139766006879
+  ]
+ },
+ {
+  "id": "6n768r",
+  "person": "president",
+  "text": "Si sale mal. ya sabes dónde está tu despacho.",
+  "takes": [
+   2.6274641848269353
+  ]
+ },
+ {
+  "id": "1lmlp5p",
+  "person": "successor",
+  "text": "Te lo resumo en un tuit. Corredor mediterráneo. ¡Ya!",
+  "takes": [
+   5.343810525973015
+  ]
+ },
+ {
+  "id": "7al992",
+  "person": "successor",
+  "text": "Bueno. ya lo llevamos diciendo treinta años.",
+  "takes": [
+   5.91397946066982
+  ]
+ },
+ {
+  "id": "187xgjp",
+  "person": "successor",
+  "text": "La demanda no entiende de anchos de vía; la infraestructura, por desgracia, sí.",
+  "takes": [
+   6.2696601286431966
+  ]
+ },
+ {
+  "id": "16aomhh",
+  "person": "successor",
+  "text": "Negocia La Encina y Murcia Almería, aguanta los cortes con autobuses, y no me cortes una cinta antes de que haya catenaria. Que luego salen memes.",
+  "takes": [
+   5.490276905775235
+  ]
+ },
+ {
+  "id": "bwd3cf",
+  "person": "successor",
+  "text": "Y si alguien te dice que esto se hace en dos años. bloquéalo.",
+  "takes": [
+   6.320301580574793
+  ]
+ },
+ {
+  "id": "1hd023d",
+  "person": "minister",
+  "text": "Ha vuelto la España vaciada a los telediarios, así que toca acordarse de ella.",
+  "takes": [
+   2.841578141427803
+  ]
+ },
+ {
+  "id": "145geiv",
+  "person": "minister",
+  "text": "¿Solo vamos a crecer donde más se vende?",
+  "takes": [
+   2.9617393464984763
+  ]
+ },
+ {
+  "id": "ow6hw5",
+  "person": "minister",
+  "text": "Pues no. Que hay elecciones.",
+  "takes": [
+   3.2366802511501818
+  ]
+ },
+ {
+  "id": "6qf3iq",
+  "person": "minister",
+  "text": "Recupera conexiones regionales, lleva la renovación al norte y construye una línea propia.",
+  "takes": [
+   2.900341827808675
+  ]
+ },
+ {
+  "id": "tm6rur",
+  "person": "minister",
+  "text": "Rentabilidad y servicio público pueden convivir. Como los cuñados en Nochebuena. Con esfuerzo, y sin hablar de política.",
+  "takes": [
+   2.968564429385903
+  ]
+ },
+ {
+  "id": "170lgzn",
+  "person": "president",
+  "text": "Llega la hora del legado. Que es como llamamos los políticos, a la foto final.",
+  "takes": [
+   1.7064648250398136,
+   1.360768725769297,
+   2.828861550927333
+  ]
+ },
+ {
+  "id": "1vxtjeo",
+  "person": "president",
+  "text": "Sustituye los trenes viejos, consolida los servicios y deja una compañía solvente.",
+  "takes": [
+   4.545625872471539
+  ]
+ },
+ {
+  "id": "ekowb9",
+  "person": "president",
+  "text": "En 2050 a ti te juzgarán por la cobertura, la satisfacción y las cuentas.",
+  "takes": [
+   3.850661415185908
+  ]
+ },
+ {
+  "id": "1wku6h",
+  "person": "president",
+  "text": "A mí me juzgará la Historia. Que ya me la he leído. y salgo estupendamente.",
+  "takes": [
+   3.906266338648751
+  ]
+ },
+ {
+  "id": "9d6wga",
+  "person": "minister",
+  "text": "Los alcaldes quieren sus trenes de vuelta.",
+  "takes": [
+   2.229710295239889,
+   3.2815612123857685
+  ]
+ },
+ {
+  "id": "541uhl",
+  "person": "minister",
+  "text": "Hacienda quiere su dinero de vuelta.",
+  "takes": [
+   null,
+   3.615087478455236
+  ]
+ },
+ {
+  "id": "m5s6oq",
+  "person": "minister",
+  "text": "Y yo, quiero un titular para el telediario de las tres.",
+  "takes": [
+   null,
+   2.792232522789822
+  ]
+ },
+ {
+  "id": "1ov1ihy",
+  "person": "minister",
+  "text": "¿Qué ponemos primero?",
+  "takes": [
+   3.3972766871258635
+  ]
+ },
+ {
+  "id": "30de16",
+  "person": "minister",
+  "text": "La factura energética de 2022 trae más ceros que un fichaje de verano.",
+  "takes": [
+   null,
+   2.470217369390964,
+   2.611090082765648
+  ]
+ },
+ {
+  "id": "1j7gwhf",
+  "person": "minister",
+  "text": "Tienes que decidir cómo amortiguar el golpe durante doce meses.",
+  "takes": [
+   2.8352491945274965
+  ]
+ },
+ {
+  "id": "obzbzh",
+  "person": "minister",
+  "text": "Te adelanto el final. Las dos opciones duelen.",
+  "takes": [
+   3.612591254823492
+  ]
+ },
+ {
+  "id": "15nldb6",
+  "person": "minister",
+  "text": "Desde septiembre de 2022 los abonos de Cercanías y Media Distancia son gratuitos, y media España ha descubierto que existe el regional.",
+  "takes": [
+   3.1821019771989043
+  ]
+ },
+ {
+  "id": "w0yuke",
+  "person": "minister",
+  "text": "Puedes reforzar la oferta con una ayuda extraordinaria…",
+  "takes": [
+   2.5625541581482865
+  ]
+ },
+ {
+  "id": "1r06nhy",
+  "person": "minister",
+  "text": "O encomendarte a la Virgen del Pilar.",
+  "takes": [
+   3.9577277633542742
+  ]
+ },
+ {
+  "id": "fqlgco",
+  "person": "president",
+  "text": "En noviembre de 2022 llega íryo, con trenes rojos y mucha sonrisa.",
+  "takes": [
+   2.601117218957433
+  ]
+ },
+ {
+  "id": "svxna",
+  "person": "president",
+  "text": "Ya no hay viajeros cautivos, presidente: hay viajeros con una aplicación para comparar precios.",
+  "takes": [
+   3.331751124790908
+  ]
+ },
+ {
+  "id": "1blu88f",
+  "person": "president",
+  "text": "Yo, por mi parte, celebro la competencia.",
+  "takes": [
+   1.6455671230498576,
+   3.6221795310701546
+  ]
+ },
+ {
+  "id": "1co9byn",
+  "person": "president",
+  "text": "En público.",
+  "takes": [
+   null,
+   2.166215337608172,
+   null
+  ]
+ },
+ {
+  "id": "b6x8on",
+  "person": "minister",
+  "text": "Pequeño contratiempo con el gálibo de los nuevos trenes de ancho métrico.",
+  "takes": [
+   2.7054872724311574
+  ]
+ },
+ {
+  "id": "hgtrnz",
+  "person": "minister",
+  "text": "Que no cunda el pánico: se detectó en el diseño, no hay ningún tren atascado en un túnel, digan lo que digan los memes.",
+  "takes": [
+   3.1072748973605755
+  ]
+ },
+ {
+  "id": "17n12qk",
+  "person": "minister",
+  "text": "Aun así. esto huele a dimisión.",
+  "takes": [
+   3.5914838868808427
+  ]
+ },
+ {
+  "id": "eng29q",
+  "person": "minister",
+  "text": "Tú, por si acaso, decide rápido: ¿cómo cubrimos la espera?",
+  "takes": [
+   4.5955594123412515
+  ]
+ },
+ {
+  "id": "1et43xo",
+  "person": "successor",
+  "text": "29 de noviembre de 2023: se abre la variante de Pajares.",
+  "takes": [
+   5.196257137897145
+  ]
+ },
+ {
+  "id": "1jh8xay",
+  "person": "successor",
+  "text": "Casi veinte años de obras y unos cincuenta kilómetros de túneles. Una obra española, de las de toda la vida.",
+  "takes": [
+   5.659448895161272
+  ]
+ },
+ {
+  "id": "1r3ybmo",
+  "person": "successor",
+  "text": "Asturias, por fin, a tiro de tren.",
+  "takes": [
+   null,
+   6.0326229965354266
+  ]
+ },
+ {
+  "id": "ezk9d6",
+  "person": "successor",
+  "text": "Lástima que tu flota siga siendo la que es.",
+  "takes": [
+   3.2205499373878155
+  ]
+ },
+ {
+  "id": "lzsn6r",
+  "person": "successor",
+  "text": "21 de mayo de 2024: el ese 106 entra en servicio comercial.",
+  "takes": [
+   4.259448174647289
+  ]
+ },
+ {
+  "id": "101cwta",
+  "person": "successor",
+  "text": "Treinta unidades contratadas que no llegan todas de golpe, que esto no es un pedido por internet.",
+  "takes": [
+   5.767188803609824
+  ]
+ },
+ {
+  "id": "1di3bws",
+  "person": "successor",
+  "text": "Ya lo he tuiteado tres veces.",
+  "takes": [
+   2.7498237750584713
+  ]
+ },
+ {
+  "id": "xi2xft",
+  "person": "successor",
+  "text": "¿Lo celebramos o nos ponemos a trabajar?",
+  "takes": [
+   2.874440028665594
+  ]
+ },
+ {
+  "id": "143ywa9",
+  "person": "successor",
+  "text": "Marzo de 2026: Renfe licita treinta trenes de alta velocidad y diez opcionales.",
+  "takes": [
+   5.514523733461532
+  ]
+ },
+ {
+  "id": "cxggdd",
+  "person": "successor",
+  "text": "Ojo. Licitar no es comprar. Es como mirar pisos en el portal inmobiliario, un domingo por la tarde.",
+  "takes": [
+   5.010572872142224
+  ]
+ },
+ {
+  "id": "1uea5dd",
+  "person": "successor",
+  "text": "El catálogo abre una plataforma futura de ficción, con entregas largas.",
+  "takes": [
+   6.083881981786787
+  ]
+ },
+ {
+  "id": "1oy9uru",
+  "person": "president",
+  "text": "Evento simulado.",
+  "takes": [
+   3.0352435180081656
+  ]
+ },
+ {
+  "id": "1w5r85p",
+  "person": "president",
+  "text": "Ola de calor. Cuarenta y cinco grados en Córdoba. Lo que allí llaman, una tarde fresquita.",
+  "takes": [
+   3.3905078951363987
+  ]
+ },
+ {
+  "id": "11spxcl",
+  "person": "president",
+  "text": "Hay que reforzar el mantenimiento de vía y la información al viajero.",
+  "takes": [
+   1.668713274107017,
+   3.103390419970622
+  ]
+ },
+ {
+  "id": "14x2u9l",
+  "person": "president",
+  "text": "Ahorrar ahora puede salir carísimo luego. Y luego me toca a mí, dar explicaciones.",
+  "takes": [
+   3.3185377219285366
+  ]
+ },
+ {
+  "id": "127xqq1",
+  "person": "minister",
+  "text": "Evento simulado.",
+  "takes": [
+   3.252193288324831
+  ]
+ },
+ {
+  "id": "z30554",
+  "person": "minister",
+  "text": "Varias comarcas ofrecen pagar parte del servicio a cambio de no quedarse sin tren.",
+  "takes": [
+   2.144356852072359,
+   2.8120747629072844
+  ]
+ },
+ {
+  "id": "14yufdk",
+  "person": "minister",
+  "text": "Es un contrato a cinco años. Que en política, es la eternidad.",
+  "takes": [
+   3.1409431704505573
+  ]
+ },
+ {
+  "id": "1nlyjx8",
+  "person": "successor",
+  "text": "Evento simulado.",
+  "takes": [
+   null,
+   2.8463624170027653
+  ]
+ },
+ {
+  "id": "12m5rv6",
+  "person": "successor",
+  "text": "Toda Europa compra trenes a la vez y las fábricas no dan abasto: dieciocho meses de cola, como en el ambulatorio.",
+  "takes": [
+   4.302582766225454
+  ]
+ },
+ {
+  "id": "pna43x",
+  "person": "successor",
+  "text": "Podemos pagar para colarnos. Con cierta elegancia.",
+  "takes": [
+   6.109665373319303
+  ]
+ },
+ {
+  "id": "1gw0vkv",
+  "person": "president",
+  "text": "Quedan cuatro años.",
+  "takes": [
+   3.9359642879519448
+  ]
+ },
+ {
+  "id": "m9rzq1",
+  "person": "president",
+  "text": "El Parlamento pide una red accesible y unas cuentas claras. Dos cosas que, en mi experiencia, rara vez van juntas.",
+  "takes": [
+   null,
+   3.865205784576083
+  ]
+ },
+ {
+  "id": "1wkaocq",
+  "person": "president",
+  "text": "¿Qué comprometes para la recta final?",
+  "takes": [
+   4.325236305069702
+  ]
+ },
+ {
+  "id": "i2iqu2",
+  "person": "minister",
+  "text": "Soy Raquel Sanz, ministra de Transportes (de ficción, que conste en acta).",
+  "takes": [
+   3.148725686191301
+  ]
+ },
+ {
+  "id": "pw0ez7",
+  "person": "minister",
+  "text": "Te enseño a dirigir la red en un periquete.",
+  "takes": [
+   3.253228891306649
+  ]
+ },
+ {
+  "id": "hl3ey4",
+  "person": "minister",
+  "text": "Si ya sabes, sáltate el tutorial. Yo hago como que no me ofendo.",
+  "takes": [
+   3.137950925634013
+  ]
+ },
+ {
+  "id": "2qvc3m",
+  "person": "minister",
+  "text": "Cada círculo es una ciudad.",
+  "takes": [
+   3.6024301484442405
+  ]
+ },
+ {
+  "id": "1o2q3j8",
+  "person": "minister",
+  "text": "Verde: todo funciona. Ámbar: funciona, a la española. Gris: ni está, ni se le espera.",
+  "takes": [
+   3.0688170528815037
+  ]
+ },
+ {
+  "id": "ahr30r",
+  "person": "minister",
+  "text": "Pulsa sobre Madrid. Que aquí todo pasa por Madrid.",
+  "takes": [
+   2.8792176074659355
+  ]
+ },
+ {
+  "id": "16aor3y",
+  "person": "minister",
+  "text": "Aquí tienes la ciudad, sus conexiones y su estación.",
+  "takes": [
+   2.64298569195727
+  ]
+ },
+ {
+  "id": "oztylv",
+  "person": "minister",
+  "text": "Lo dorado del mapa son conexiones en servicio. Lo demás. promesas electorales.",
+  "takes": [
+   2.6830308245427394
+  ]
+ },
+ {
+  "id": "1jc6lje",
+  "person": "minister",
+  "text": "Pulsa + en la conexión con València para poner más trenes del horario real.",
+  "takes": [
+   3.1414624996027634
+  ]
+ },
+ {
+  "id": "oh1kt",
+  "person": "minister",
+  "text": "Los valencianos lo agradecerán, y los madrileños con apartamento en la playa, más.",
+  "takes": [
+   2.7332575411680318
+  ]
+ },
+ {
+  "id": "12okyeu",
+  "person": "minister",
+  "text": "Las conexiones grises están cerradas.",
+  "takes": [
+   3.4407318188989175
+  ]
+ },
+ {
+  "id": "xnocyt",
+  "person": "minister",
+  "text": "Abre la de Salamanca: cuesta 4 millones de euros y usa trenes libres compatibles.",
+  "takes": [
+   2.9208694114760565
+  ]
+ },
+ {
+  "id": "b3dxz7",
+  "person": "minister",
+  "text": "Calderilla, para lo que se estila.",
+  "takes": [
+   3.0768287245149017
+  ]
+ },
+ {
+  "id": "10knjx2",
+  "person": "minister",
+  "text": "Las ciudades con te piden cosas: más trenes, una conexión, una tarifa más baja o una estación decente.",
+  "takes": [
+   3.121198401243553
+  ]
+ },
+ {
+  "id": "1hfoha7",
+  "person": "minister",
+  "text": "Como los alcaldes, pero sin llamarte a las tantas.",
+  "takes": [
+   2.9144045891294375
+  ]
+ },
+ {
+  "id": "132f5gb",
+  "person": "minister",
+  "text": "Cumplirlas da dinero y reputación.",
+  "takes": [
+   2.931823761253713
+  ]
+ },
+ {
+  "id": "5gnuwi",
+  "person": "minister",
+  "text": "Las tienes a la izquierda.",
+  "takes": [
+   2.010532692891034,
+   3.2165871240478396
+  ]
+ },
+ {
+  "id": "7dx5ub",
+  "person": "minister",
+  "text": "Cada jornada empieza con el primer tren real y termina con el último.",
+  "takes": [
+   2.7467977102106937
+  ]
+ },
+ {
+  "id": "k8jqzv",
+  "person": "minister",
+  "text": "Pulsa Comenzar jornada.",
+  "takes": [
+   3.2442711659880272
+  ]
+ },
+ {
+  "id": "hgaq1o",
+  "person": "minister",
+  "text": "Con el café en la mano, a ser posible.",
+  "takes": [
+   2.855427540564177
+  ]
+ },
+ {
+  "id": "11m6nfj",
+  "person": "minister",
+  "text": "Elige 10 por para que el reloj vaya más rápido.",
+  "takes": [
+   6.258464410650218
+  ]
+ },
+ {
+  "id": "1hkp7ns",
+  "person": "minister",
+  "text": "Ojalá las obras funcionaran igual.",
+  "takes": [
+   3.049138014322325
+  ]
+ },
+ {
+  "id": "wjmw2j",
+  "person": "minister",
+  "text": "Cada tren que llega suma viajeros e ingresos: los verás sobre las ciudades y en Hoy, arriba.",
+  "takes": [
+   3.584184713225608
+  ]
+ },
+ {
+  "id": "1cg4x5",
+  "person": "minister",
+  "text": "Sí, ese dinero es tuyo.",
+  "takes": [
+   2.2426961313338905,
+   3.1748391347997393
+  ]
+ },
+ {
+  "id": "1ys0338",
+  "person": "minister",
+  "text": "Bueno, de Renfe.",
+  "takes": [
+   2.8720169972778815
+  ]
+ },
+ {
+  "id": "1dfxqr1",
+  "person": "minister",
+  "text": "Bueno. de Hacienda.",
+  "takes": [
+   2.5355574779795327
+  ]
+ },
+ {
+  "id": "y1tbax",
+  "person": "minister",
+  "text": "¡Una incidencia!",
+  "takes": [
+   3.581256477716121
+  ]
+ },
+ {
+  "id": "1lmpmmr",
+  "person": "minister",
+  "text": "Tranquilidad, que esto pasa en las mejores familias.",
+  "takes": [
+   3.0249504257167095
+  ]
+ },
+ {
+  "id": "1rc8sw4",
+  "person": "minister",
+  "text": "Pulsa Decidir y elige cómo responder.",
+  "takes": [
+   3.4922739083221837
+  ]
+ },
+ {
+  "id": "1dde48v",
+  "person": "minister",
+  "text": "A veces una ciudad tiene un pico de demanda: un partido, un congreso, el puente de diciembre…",
+  "takes": [
+   2.4033414244888234,
+   2.751997026676895
+  ]
+ },
+ {
+  "id": "vi3nv",
+  "person": "minister",
+  "text": "Si refuerzas a tiempo la conexión indicada, te llevas una bonificación.",
+  "takes": [
+   2.4784751950705046,
+   2.6496650404133892
+  ]
+ },
+ {
+  "id": "gfzs7",
+  "person": "minister",
+  "text": "Los trenes se pueden cambiar en plena jornada.",
+  "takes": [
+   2.484780612826321,
+   2.992186843196774
+  ]
+ },
+ {
+  "id": "1chjrld",
+  "person": "minister",
+  "text": "Pulsa Hasta el último tren para cerrar el día.",
+  "takes": [
+   3.2105960501509965
+  ]
+ },
+ {
+  "id": "18ipw7c",
+  "person": "minister",
+  "text": "El último en llegar, que apague la luz.",
+  "takes": [
+   3.3683935129706954
+  ]
+ },
+ {
+  "id": "18yk9rs",
+  "person": "minister",
+  "text": "El parte del día: puntualidad, viajeros y resultado.",
+  "takes": [
+   2.68312070750895
+  ]
+ },
+ {
+  "id": "kulzza",
+  "person": "minister",
+  "text": "Si sale mal, échale la culpa a la meteorología. Que es lo que hacemos todos.",
+  "takes": [
+   2.6521578933078094
+  ]
+ },
+ {
+  "id": "1sx7sal",
+  "person": "minister",
+  "text": "Pulsa Siguiente jornada.",
+  "takes": [
+   2.719910033668651
+  ]
+ },
+ {
+  "id": "hmb6vx",
+  "person": "minister",
+  "text": "Para crecer necesitas más trenes, y tardan unos dos años en llegar: los fabricantes también tienen su ritmo.",
+  "takes": [
+   2.5385338300372315
+  ]
+ },
+ {
+  "id": "fkiddb",
+  "person": "minister",
+  "text": "Abre Compras.",
+  "takes": [
+   3.859180976687526
+  ]
+ },
+ {
+  "id": "1ns18xv",
+  "person": "minister",
+  "text": "Cumple los objetivos del capítulo para recibir financiación.",
+  "takes": [
+   2.420310773637581,
+   2.4833682268242057,
+   3.044380740435731
+  ]
+ },
+ {
+  "id": "josa14",
+  "person": "minister",
+  "text": "Acércate con la rueda para ver trenes, estaciones y obras.",
+  "takes": [
+   2.817407223838178
+  ]
+ },
+ {
+  "id": "1dqc86u",
+  "person": "minister",
+  "text": "Y recuerda. Si algo sale bien. lo anuncio yo.",
+  "takes": [
+   2.8427184368564022
+  ]
+ },
+ {
+  "id": "yn1qit",
+  "person": "minister",
+  "text": "¡Buen viaje!",
+  "takes": [
+   3.604472530374205
+  ]
+ },
+ {
+  "id": "1w8e4eb",
+  "person": "president",
+  "text": "Y yo quiero que elija Renfe, porque Renfe es España. Y España. modestamente. soy un poco yo.",
+  "takes": [
+   null,
+   null,
+   null,
+   2.9956812494594054
+  ]
+ },
+ {
+  "id": "wirghu",
+  "person": "minister",
+  "text": "¡Hola!",
+  "takes": [
+   3.145499430403171
+  ]
+ }
+]
