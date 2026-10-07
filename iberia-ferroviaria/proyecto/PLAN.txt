@@ -1,5 +1,9 @@
-IBERIA FERROVIARIA — PLAN Y ESTADO V0.8
+IBERIA FERROVIARIA — PLAN Y ESTADO V0.9
 7 de octubre de 2026.
+
+HECHO EN 0.9
+- Banda sonora más adulta: tempos un 10–20 % más lentos; fuera marimba, glockenspiel, pandereta, palmas sintéticas, arpegiador y subida de tono; guitarra española, cuerdas, clarinete y trompeta con sordina como voces principales según la sección.
+- Rasgos españoles discretos en cuatro piezas: cadencias andaluza y frigia, falsetas, rasgueados, palmas sordas y una rumba suave. Melodías intactas (test).
 
 HECHO EN 0.8
 - Banda sonora con instrumentos reales muestreados (piano de cola, cuerdas, arpa, maderas, láminas, guitarra, contrabajo y percusión acústica) y arreglos más ricos: conducción de voces, segunda voz, respuestas, redobles y subida de tono final. Melodías intactas (comprobado por test).

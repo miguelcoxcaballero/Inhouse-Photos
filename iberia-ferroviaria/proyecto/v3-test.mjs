@@ -160,7 +160,7 @@ console.log(ok.slice(-1).map(x => '✓ ' + x).join('\n'));
       assert(Math.abs(e.dur - want[k].d * .95 * 60 / s.bpm) < 1e-6, s.title + ': duración de la nota ' + k);
     });
     const insts = new Set(events.map(e => e.inst));
-    assert(insts.size >= 10, s.title + ': orquestación');
+    assert(insts.size >= 8, s.title + ': orquestación');
   }
   console.log(`✓ Banda sonora: ${SONGS.length} piezas originales (${SONGS.filter(s => s.family === 'estacion').length} «Estación», ${SONGS.filter(s => s.family === 'red').length} «Red»), compases y eventos válidos; melodías intactas y arreglos con ${Math.round(SONGS.reduce((n, s) => n + arrange(s).events.length, 0) / SONGS.length)} eventos por pieza de media.`);
 }

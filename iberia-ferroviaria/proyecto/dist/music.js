@@ -203,17 +203,17 @@ function perc(ctx, bus, t, v, type, f, q, decay, rev, attack = .001) {
 // Banco de muestras reales (assets/samples.js): piano de cola, piano eléctrico, vibráfono, marimba, glockenspiel, flauta,
 // clarinete, sección de cuerdas, arpa, guitarra de nailon, contrabajo, bajo eléctrico y percusión acústica.
 // Si una muestra no está decodificada (o no hay Web Audio), suena el sintetizador equivalente.
-const LEVEL = {piano: .5, epiano: .48, vibes: .5, marimba: .55, glock: .3, flute: .42, clarinet: .42, strings: .34, harp: .46, guitar: .46, upright: .38, ebass: .32,
-  hat: .13, hatopen: .09, hatpedal: .1, shaker: .1, tamb: .12, cajon: .4, cajonslap: .21, snare: .24, ghost: .13, rim: .2, conga: .22, congamute: .2, quinto: .2, tumba: .24, bongo: .2, ride: .1, swell: .2, crash: .15};
-const REV = {strings: .45, harp: .4, glock: .5, flute: .35, clarinet: .3, vibes: .35, piano: .28, epiano: .28, upright: .06, ebass: .04, cajon: .08, swell: .5, crash: .35};
-const PAN = {hat: .25, hatopen: .25, hatpedal: .2, shaker: -.3, tamb: .35, conga: -.25, congamute: -.25, quinto: -.35, tumba: -.15, bongo: .3, ride: .3, rim: -.1, crash: .2};
+const LEVEL = {piano: .5, epiano: .48, vibes: .5, marimba: .55, glock: .3, flute: .42, clarinet: .42, strings: .34, harp: .46, guitar: .46, upright: .38, ebass: .32, mtrumpet: .34,
+  hat: .13, hatopen: .09, hatpedal: .1, shaker: .1, tamb: .12, cajon: .4, cajonslap: .21, snare: .24, ghost: .13, rim: .2, conga: .22, congamute: .2, quinto: .2, tumba: .24, bongo: .2, ride: .1, swell: .2, crash: .15, claps: .2};
+const REV = {mtrumpet: .32, claps: .3, strings: .45, harp: .4, glock: .5, flute: .35, clarinet: .3, vibes: .35, piano: .28, epiano: .28, upright: .06, ebass: .04, cajon: .08, swell: .5, crash: .35};
+const PAN = {claps: -.2, hat: .25, hatopen: .25, hatpedal: .2, shaker: -.3, tamb: .35, conga: -.25, congamute: -.25, quinto: -.35, tumba: -.15, bongo: .3, ride: .3, rim: -.1, crash: .2};
 const BRIGHT = new Set(['piano', 'epiano', 'vibes', 'strings', 'guitar', 'harp', 'marimba']);
 const MEL_GAIN = 2.2; // la melodía, siempre por delante del acompañamiento
 const MIX_GAIN = 2; // ganancia de compensación antes del compresor
 const SUSTAIN = new Set(['strings', 'flute', 'clarinet']);
 const ALIAS = {bell: 'glock'};
 const FALLBACK = {harp: 'pluck', guitar: 'pluck', upright: 'bass', ebass: 'bass', glock: 'bell', hatopen: 'hat', hatpedal: 'hat', ghost: 'snare', cajon: 'kick', cajonslap: 'snare',
-  conga: 'rim', congamute: 'rim', quinto: 'rim', tumba: 'rim', bongo: 'rim', tamb: 'shaker', ride: 'hat'};
+  conga: 'rim', congamute: 'rim', quinto: 'rim', tumba: 'rim', bongo: 'rim', tamb: 'shaker', ride: 'hat', claps: 'clap', mtrumpet: 'clarinet'};
 const banks = new WeakMap();
 function b64buf(s) { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
 function decode(ctx, ab) { return new Promise((res, rej) => { const p = ctx.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); }); }
@@ -254,7 +254,7 @@ function sampled(ctx, bus, t, name, m, dur, v, o) {
   const pan = o.pan ?? (tonal ? Math.max(-.55, Math.min(.55, (m - 64) / 48)) : PAN[key] || 0);
   const g = out(ctx, bus, t, end, v, o.rev ?? REV[key] ?? .22, o.del ?? 0, pan);
   let node = g;
-  if (BRIGHT.has(key)) { const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1600 + v * v * 12000; lp.connect(node); node = lp; }
+  if (BRIGHT.has(key) || o.lp) { const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = o.lp || 1600 + v * v * 12000; lp.connect(node); node = lp; }
   if (o.trem) { const tg = ctx.createGain(), l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = 4.6; lg.gain.value = .28; l.connect(lg); lg.connect(tg.gain); tg.connect(node); node = tg; l.start(t); l.stop(end + .05); }
   const src = ctx.createBufferSource(); src.buffer = b; src.playbackRate.value = rate * (tonal ? 1 : .97 + Math.random() * .06); src.connect(node);
   const peak = (LEVEL[key] ?? .4) * Math.pow(v, 1.35) * (o.mel ? MEL_GAIN : 1), a = o.attack ?? (SUSTAIN.has(key) ? .05 : .002);
@@ -271,15 +271,16 @@ const CAST = {
   bossa: {bass: 'upright', counter: 'strings', fill: 'guitar', roll: 'guitar'},
   swing: {bass: 'upright', counter: 'clarinet', fill: 'vibes', roll: 'piano'},
   waltz: {bass: 'upright', counter: 'strings', fill: 'harp', roll: 'harp'},
-  pop: {bass: 'ebass', counter: 'strings', fill: 'marimba', roll: 'piano'},
+  pop: {bass: 'ebass', counter: 'strings', fill: 'guitar', roll: 'piano'},
+  rumba: {bass: 'upright', counter: 'strings', fill: 'guitar', roll: 'guitar'},
   ambient: {bass: 'sub', counter: 'strings', fill: 'harp', roll: 'harp'},
-  drive: {bass: 'synthbass', counter: 'clarinet', fill: 'marimba', roll: 'harp'},
+  drive: {bass: 'synthbass', counter: 'clarinet', fill: 'harp', roll: 'harp'},
   night: {bass: 'upright', counter: 'clarinet', fill: 'vibes', roll: 'epiano'},
   lounge: {bass: 'upright', counter: 'strings', fill: 'guitar', roll: 'epiano'},
 };
 function comp(x, inst, beats, low, high, vel, dur, opt = {}) {
   const {chords, add, st} = x;
-  for (const p of beats) { const c = at(chords, p); const v = st[inst] = led(c.c, low, high, st[inst]); v.forEach((n, k) => add(inst, p + (opt.strum ? k * opt.strum : 0), n, typeof dur === 'function' ? dur(p) : dur, vel * (k === v.length - 1 ? 1.08 : 1), opt)); }
+  for (const p of beats) { const c = at(chords, p); const v = st[inst] = led(c.c, low, high, st[inst]); v.forEach((n, k) => add(inst, p + (opt.strum ? (opt.up ? v.length - 1 - k : k) * opt.strum : 0), n, typeof dur === 'function' ? dur(p) : dur, vel * (k === v.length - 1 ? 1.08 : 1), opt)); }
 }
 function padLong(x, inst, low, high, vel, opt = {}) { for (const c of x.chords) { const v = x.st[inst] = led(c.c, low, high, x.st[inst], false); v.forEach(n => x.add(inst, c.start, n, c.len, vel, opt)); } }
 function arp(x, inst, c, start, len, step, low, vel, up = true, opt = {}) {
@@ -306,6 +307,25 @@ function bassLine(x, inst, patt, low = 36) {
       if (n !== null) add(inst, c.start + p, n, d, v);
     }
   });
+}
+/** Escala para los adornos: frigio dominante sobre los acordes de séptima (el giro andaluz), eólica en menores y jónica en mayores. */
+function scaleFor(c) {
+  const dom = c.iv.includes(4) && c.iv.includes(10), minor = c.iv.includes(3);
+  return (dom ? [0, 1, 4, 5, 7, 8, 10] : minor ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11]).map(k => pcOf(c.root + k));
+}
+/** «Falseta»: respuesta breve de guitarra que baja por la escala del acorde y acaba en una nota del acorde. */
+function falseta(add, c, beat, len, from, vel) {
+  while (from > 79) from -= 12; while (from < 60) from += 12;
+  const pcs = scaleFor(c), ct = c.iv.map(i => pcOf(c.root + i)), steps = Math.max(3, Math.min(7, Math.round(len / .5))), out = [];
+  let n = from + 2;
+  for (let k = 0; k < steps; k++) { do n--; while (!pcs.includes(pcOf(n))); out.push(n); }
+  while (!ct.includes(pcOf(out.at(-1)))) out[out.length - 1]--;
+  out.forEach((m, k) => add('guitar', beat + k * .5 + (k === 1 ? .04 : 0), m, k === out.length - 1 ? 1.2 : .55, vel * (k === 0 ? 1.1 : 1), {rev: .32}));
+}
+/** Rasgueado: un rasgueo de adorno muy rápido justo antes del acorde. */
+function rasgueado(add, c, st, vel) {
+  const v = st.rasg = led(c, 50, 71, st.rasg, false).concat([bassNote({...c, bass: c.root}, 40)]).sort((a, b) => a - b);
+  v.forEach((n, k) => { add('guitar', -.14 + (v.length - 1 - k) * .012, n, .2, vel * .45); add('guitar', k * .028, n, 1.2, vel); });
 }
 const STYLES = {
   bossa(x) {
@@ -354,7 +374,6 @@ const STYLES = {
     if (sec.pad) { const t = led(at(chords, 0).c, 55, 70, null, false), s = [...t, ...t.map(n => n + 12)]; [0, .5, 1, 1.5, 2, 2.5].forEach((p, k) => add('harp', p, s[k % s.length], 1, .3)); }
     if (!sec.light) {
       [1, 2].forEach(p => add('brush', p, 0, .05, .22)); [1, 2].forEach(p => add('hatpedal', p, 0, .05, .26));
-      if (sec.key === 'B') add('tamb', 0, 0, .1, .3);
       if (x.last && !sec.pad) add('swell', 3 - 2 / x.spb, 0, 2, .32);
     }
     if (sec.pad) padLong(x, 'strings', 62, 76, .25, {attack: .4});
@@ -368,7 +387,6 @@ const STYLES = {
       add('cajon', 0, 0, .1, .7); add('cajon', 2.5, 0, .1, .5); if (sec.pad) add('cajon', 1.5, 0, .1, .35);
       [1, 3].forEach(p => add('snare', p, 0, .1, .5)); if (rand() < .4) add('ghost', 3.75, 0, .1, .28);
       for (let p = 0; p < 4; p += .5) add(p === 3.5 && x.i % 2 ? 'hatopen' : 'hat', p, 0, .05, p % 1 ? .45 : .28);
-      if (sec.pad) { for (let p = .5; p < 4; p += 1) add('tamb', p, 0, .1, .32); [1, 3].forEach(p => add('clap', p, 0, .1, .14)); }
       if (x.first && sec.pad) add('crash', 0, 0, 1, .35);
       if (x.last) fill(x, sec.pad ? 'toms' : 'snare');
     }
@@ -390,17 +408,15 @@ const STYLES = {
     const {chords, add, sec, st, cast} = x;
     for (const c of chords) {
       const r = bassNote(c.c, 48) + 12, f = r + 7, t = voicing(c.c, r, false)[0] || r + 4, seq = [r, f, r + 12, f, t, f, r + 12, f];
-      for (let p = 0; p < c.len; p += .5) { const k = Math.round(p * 2) % 8; add('pluck', c.start + p, seq[k], .4, .22, {del: .25, short: true}); if (sec.key === 'B' && k % 2 === 0) add('marimba', c.start + p, seq[k] + 12, .3, .22); }
+      for (let p = 0; p < c.len; p += .5) { const k = Math.round(p * 2) % 8; add('guitar', c.start + p, seq[k], .6, k % 2 ? .24 : .3, {del: .18}); if (sec.key === 'B' && k % 4 === 0) add('harp', c.start + p, seq[k] + 12, .8, .18); }
       st.pad = led(c.c, 52, 67, st.pad, false); st.pad.forEach(n => add('pad', c.start, n, c.len, .22, {attack: .4, bright: true}));
       for (let p = 0; p < c.len; p += .5) add(cast.bass, c.start + p, bassNote(c.c, 36) + (sec.pad && p % 1 ? 12 : 0), .4, p % 1 ? .11 : .15);
-      if (sec.pad) add('bell', c.start, voicing(c.c, 76, false).at(-1), 1, .45);
     }
     if (sec.pad) padLong(x, 'strings', 60, 76, .3, {attack: .25});
     if (!sec.light) {
       (sec.pad || sec.key === 'B' ? [0, 1, 2, 3] : [0, 2]).forEach(p => add('kick', p, 0, .1, .22));
-      if (sec.key === 'B' || sec.pad) [1, 3].forEach(p => add('snare', p, 0, .1, .42)); if (sec.pad) [1, 3].forEach(p => add('clap', p, 0, .1, .14));
+      if (sec.key === 'B' || sec.pad) [1, 3].forEach(p => add('snare', p, 0, .1, .42));
       for (let p = 0; p < 4; p += .25) add(sec.pad && p % 1 === .5 ? 'hatopen' : 'hat', p, 0, .05, p % 1 === .5 ? .4 : p % .5 ? .18 : .26);
-      if (sec.pad) for (let p = .5; p < 4; p += 1) add('tamb', p, 0, .1, .28);
       if (x.first && (sec.key === 'B' || sec.pad)) add('crash', 0, 0, 1, .32);
       if (x.last) fill(x, 'toms');
     }
@@ -418,6 +434,20 @@ const STYLES = {
       if (sec.pad) { add('tumba', 3.5, 0, .1, .3); add('congamute', 1.5, 0, .1, .25); }
       if (x.last) add('swell', 4 - 2 / x.spb, 0, 2, .26);
     }
+  },
+  rumba(x) {
+    const {add, sec, cast} = x;
+    // rasgueo de rumba: abajo en los tiempos, arriba en los contratiempos, con acentos en 1, 2-y y 4
+    [[0, .46, false], [.5, .24, true], [1, .32, false], [1.5, .4, true], [2, .3, false], [2.5, .26, true], [3, .38, false], [3.5, .3, true]]
+      .forEach(([p, v, up]) => comp(x, 'guitar', [p], 50, 69, v, .3, {strum: .018, up}));
+    bassLine(x, cast.bass, [[0, 'r', .9, .8], [1.5, '5', .45, .55], [2, 'r', .9, .7], [3.5, 'a', .45, .5]]);
+    if (!sec.light) {
+      add('cajon', 0, 0, .1, .5); add('cajon', 2.5, 0, .1, .4); [1, 3].forEach(p => add('cajonslap', p, 0, .1, .36));
+      if (sec.key === 'B' || sec.pad) [.5, 1.5, 2.5, 3.5].forEach(p => add('claps', p, 0, .1, .26, {lp: 2200}));
+      if (sec.pad) [1, 3].forEach(p => add('claps', p, 0, .1, .3));
+      if (x.last) [0, .25, .5, .75].forEach((d, k) => add('cajonslap', 3 + d, 0, .1, .3 + k * .1));
+    }
+    if (sec.pad) padLong(x, 'strings', 60, 76, .24, {attack: .5});
   },
   lounge(x) {
     const {add, sec, cast} = x;
@@ -439,69 +469,69 @@ function at(chords, p) { return chords.reduce((best, c) => (c.start <= p ? c : b
 // ------------------------------------------------------------ las doce piezas
 // Melodía: «nota:pulsos», «-:pulsos» para silencio. Acordes por compás («Gm7 C9» divide el compás).
 export const SONGS = [
-  {id: 'anden1', title: 'Andén 1', family: 'estacion', mood: 'any', style: 'bossa', bpm: 128, meter: 4, lead: ['flute', 'vibes'],
+  {id: 'anden1', title: 'Andén 1', family: 'estacion', mood: 'any', style: 'bossa', bpm: 108, meter: 4, lead: ['guitar', 'clarinet'], leads: {A: 'guitar', B: 'guitar', A2: 'clarinet', B2: 'clarinet'},
     A: {chords: ['Fmaj7', 'Gm7 C9', 'Fmaj7', 'Am7 D7b9', 'Gm7', 'C9', 'Fmaj7', 'Gm7 C7'],
       mel: 'A4:1.5 C5:.5 E5:1 D5:1 D5:1.5 Bb4:.5 G4:1 E5:1 F5:2 E5:.5 D5:.5 C5:1 E5:1.5 C5:.5 F#5:1 Eb5:1 D5:1.5 Bb4:.5 A4:.5 G4:.5 F4:1 G4:1 A4:.5 Bb4:.5 D5:2 C5:3 -:1 Bb4:1 A4:1 G4:1 E4:1'},
     B: {chords: ['Bbmaj7', 'Bbm6 Eb9', 'Am7', 'D9', 'Gm7', 'C13', 'Fmaj9', 'Gm7 C7'],
       mel: 'D5:1 F5:1 A5:2 G5:1.5 F5:.5 Db5:2 C5:1 E5:1 G5:1.5 E5:.5 F#5:2 E5:1 D5:1 Bb4:1 D5:1 F5:1 A5:1 G5:1.5 E5:.5 D5:1 Bb4:1 A4:1 G4:1 A4:2 -:2 C5:1 E5:1'}},
-  {id: 'primera', title: 'Primera salida', family: 'red', mood: 'day', style: 'ambient', bpm: 84, meter: 4, lead: ['piano', 'bell'],
+  {id: 'primera', title: 'Primera salida', family: 'red', mood: 'day', style: 'ambient', bpm: 74, meter: 4, lead: ['piano', 'strings'], leads: {A: 'piano', B: 'piano', A2: 'strings', B2: 'piano'},
     A: {chords: ['Dmaj9', 'Bm11', 'Gmaj7', 'A6', 'Dmaj9', 'F#m7', 'Gmaj9', 'Asus4 A'],
       mel: 'F#5:2 A5:1 E5:1 D5:3 -:1 B4:1 D5:1 F#5:2 E5:3 C#5:1 F#5:2 A5:1 B5:1 A5:2 C#6:1 A5:1 B5:2 F#5:2 E5:4'},
     B: {chords: ['Bm9', 'Gmaj7', 'Dmaj7/F#', 'Em9', 'Bm9', 'Gmaj9', 'Em7', 'Asus4'],
       mel: 'D6:2 C#6:1 B5:1 A5:3 -:1 A5:1 F#5:1 D5:2 E5:2 G5:1 F#5:1 D6:2 E6:1 F#6:1 E6:2 D6:1 B5:1 G5:2 B5:1 A5:1 A5:3 -:1'}},
-  {id: 'verano', title: 'Horario de verano', family: 'estacion', mood: 'any', style: 'pop', bpm: 112, meter: 4, lead: ['marimba', 'flute'],
+  {id: 'verano', title: 'Horario de verano', family: 'estacion', mood: 'any', style: 'pop', bpm: 92, meter: 4, lead: ['piano', 'strings'], leads: {A: 'piano', B: 'guitar', A2: 'strings', B2: 'clarinet'},
     A: {chords: ['C', 'G/B', 'Am7', 'F', 'C/E', 'Dm7', 'F G', 'C'],
       mel: 'E5:.5 G5:.5 C6:1 B5:.5 A5:.5 G5:1 G5:.5 D5:.5 G5:1 F5:.5 E5:.5 D5:1 C5:.5 E5:.5 A5:1 G5:.5 E5:.5 C5:1 A4:.5 C5:.5 F5:1.5 E5:.5 D5:1 E5:.5 G5:.5 C6:1 D6:.5 C6:.5 G5:1 F5:1 A5:1 D5:1.5 E5:.5 F5:1 A5:1 G5:1 B5:1 C6:3 -:1'},
     B: {chords: ['Am', 'Em', 'F', 'C', 'Dm7', 'G', 'Em7 A7', 'Dm7 G7'],
       mel: 'A5:1.5 G5:.5 E5:2 G5:1.5 F5:.5 E5:2 F5:1 A5:1 C6:1 A5:1 G5:3 E5:1 F5:1.5 E5:.5 D5:1 C5:1 B4:1 D5:1 G5:2 G5:1 E5:1 C#5:1 E5:1 F5:1 D5:1 B4:1 G4:1'}},
-  {id: 'vialibre', title: 'Vía libre', family: 'red', mood: 'day', style: 'drive', bpm: 118, meter: 4, lead: ['strings', 'flute'],
+  {id: 'vialibre', title: 'Vía libre', family: 'red', mood: 'day', style: 'drive', bpm: 104, meter: 4, lead: ['guitar', 'strings'], leads: {A: 'guitar', B: 'strings', A2: 'clarinet', B2: 'strings'},
     A: {chords: ['Em9', 'Cmaj7', 'G', 'D/F#', 'Em9', 'Cmaj9', 'Am7', 'Dsus4 D'],
       mel: 'B4:3 G4:1 E5:4 D5:3 B4:1 A4:4 B4:2 E5:2 G5:3 F#5:1 E5:2 C5:2 D5:4'},
     B: {chords: ['Cmaj7', 'G/B', 'Am7', 'Em7', 'Cmaj7', 'D', 'Bm7', 'Em'],
       mel: 'G5:2 E5:1 G5:1 D6:3 B5:1 C6:2 B5:1 A5:1 G5:4 E5:2 G5:2 A5:2 F#5:1 D5:1 B5:2 A5:1 F#5:1 E5:4'}},
-  {id: 'tarifa', title: 'Tarifa reducida', family: 'estacion', mood: 'any', style: 'swing', swing: true, bpm: 136, meter: 4, lead: ['vibes', 'piano'],
+  {id: 'tarifa', title: 'Tarifa reducida', family: 'estacion', mood: 'any', style: 'swing', swing: true, bpm: 112, meter: 4, lead: ['piano', 'vibes'], leads: {A: 'piano', B: 'piano', A2: 'vibes', B2: 'vibes'}, cast: {counter: 'mtrumpet'},
     A: {chords: ['Bbmaj7', 'G7', 'Cm7', 'F7', 'Dm7 G7', 'Cm7 F7', 'Bbmaj7 G7', 'Cm7 F7'],
       mel: 'D5:1 F5:.5 G5:.5 A5:1 F5:1 B5:1.5 A5:.5 G5:1 F5:1 Eb5:1 G5:.5 Bb5:.5 C6:1 Bb5:1 A5:2 F5:1 -:1 F5:.5 G5:.5 A5:1 B5:1 D6:1 C6:.5 Bb5:.5 G5:1 A5:1 Eb5:1 D5:2 B4:1 D5:1 C5:1 Eb5:1 A4:1 -:1'},
     B: {chords: ['D7', 'D7', 'G7', 'G7', 'C7', 'C7', 'F7', 'F7'],
       mel: 'F#5:1 A5:1 C6:2 A5:.5 F#5:.5 D5:1 -:2 B4:1 D5:1 F5:2 G5:.5 F5:.5 D5:1 -:2 E5:1 G5:1 Bb5:2 G5:.5 E5:.5 C5:1 -:2 A4:1 C5:1 Eb5:2 F5:2 -:2'}},
-  {id: 'medianoche', title: 'Talgo a medianoche', family: 'red', mood: 'night', style: 'night', bpm: 72, meter: 4, lead: ['vibes', 'flute'],
+  {id: 'medianoche', title: 'Talgo a medianoche', family: 'red', mood: 'night', style: 'night', bpm: 64, meter: 4, lead: ['guitar', 'vibes'], leads: {A: 'guitar', B: 'guitar', A2: 'vibes', B2: 'clarinet'}, spanish: {falseta: true}, intro: ['Am', 'G', 'F', 'E7'], outro: ['Dm9', 'Fmaj7', 'E7b9', 'Am9'],
     A: {chords: ['Am9', 'Fmaj7', 'Dm9', 'E7sus4 E7', 'Am9', 'Cmaj7', 'Fmaj7', 'E7sus4 E7'],
       mel: 'E5:2 C5:1 B4:1 A4:3 -:1 F5:2 E5:1 D5:1 E5:3 -:1 G5:2 E5:1 C5:1 D5:1 E5:1 G5:2 A5:2 C6:1 A5:1 G#5:3 -:1'},
     B: {chords: ['Dm9', 'G13', 'Cmaj9', 'Fmaj7', 'Bm7b5', 'E7b9', 'Am9', 'Am9'],
       mel: 'A5:2 F5:1 E5:1 F5:3 -:1 E5:1 G5:1 B5:2 A5:3 -:1 D5:2 F5:1 A5:1 G#5:2 F5:1 D5:1 C5:2 B4:1 A4:1 A4:3 -:1'}},
-  {id: 'norte', title: 'Estación del Norte', family: 'estacion', mood: 'any', style: 'waltz', bpm: 150, meter: 3, lead: ['clarinet', 'flute'], form: ['intro', 'A', 'A2', 'B', 'A', 'B2', 'A2', 'B', 'A', 'B2', 'A2', 'outro'],
+  {id: 'norte', title: 'Estación del Norte', family: 'estacion', mood: 'any', style: 'waltz', bpm: 126, meter: 3, lead: ['strings', 'clarinet'], leads: {A: 'strings', B: 'clarinet', A2: 'strings', B2: 'clarinet'}, form: ['intro', 'A', 'A2', 'B', 'A', 'B2', 'A2', 'B', 'A', 'B2', 'A2', 'outro'],
     A: {chords: ['G', 'Em', 'Am7', 'D7', 'G', 'B7', 'Em', 'A7 D7'],
       mel: 'D5:2 B4:1 G5:2 E5:1 C5:2 E5:1 F#5:2 D5:1 B5:2 G5:1 F#5:1 D#5:1 B4:1 E5:2 G5:1 C#5:1.5 F#5:1.5'},
     B: {chords: ['C', 'G', 'Am', 'D', 'C', 'G/B', 'Am7 D7', 'G'],
       mel: 'E5:1 G5:1 C6:1 B5:2 D5:1 C5:1 E5:1 A5:1 F#5:2 A5:1 G5:1 E5:1 C5:1 D5:2 G5:1 A5:1.5 F#5:1.5 G5:3'}},
-  {id: 'mediterraneo', title: 'Corredor Mediterráneo', family: 'red', mood: 'day', style: 'drive', bpm: 104, meter: 4, lead: ['strings', 'bell'],
+  {id: 'mediterraneo', title: 'Corredor Mediterráneo', family: 'red', mood: 'day', style: 'drive', bpm: 96, meter: 4, lead: ['guitar', 'strings'], leads: {A: 'guitar', B: 'strings', A2: 'guitar', B2: 'strings'}, spanish: {falseta: true, rasgueo: true, palmas: true}, intro: ['Gm', 'F', 'Ebmaj7', 'Cm7 F'], outro: ['Gm', 'F', 'Ebmaj7', 'Bb'],
     A: {chords: ['Bb', 'F/A', 'Gm7', 'Ebmaj7', 'Bb/D', 'Ebmaj9', 'Cm7', 'F'],
       mel: 'D5:2 F5:2 C5:3 F4:1 Bb4:2 D5:2 G5:3 -:1 F5:2 Bb5:2 G5:2 F5:1 Eb5:1 Eb5:2 D5:1 C5:1 C5:4'},
     B: {chords: ['Gm', 'Ebmaj7', 'Bb', 'F', 'Gm', 'Eb', 'Cm7', 'F'],
       mel: 'Bb5:2 A5:1 G5:1 G5:3 Bb5:1 F5:2 D5:2 C5:4 D5:1 Eb5:1 F5:1 G5:1 G5:2 Bb5:2 Eb6:2 D6:1 C6:1 C6:4'}},
-  {id: 'ancho', title: 'Cambio de ancho', family: 'estacion', mood: 'any', style: 'lounge', bpm: 96, meter: 4, lead: ['vibes', 'flute'],
+  {id: 'ancho', title: 'Cambio de ancho', family: 'estacion', mood: 'any', style: 'lounge', bpm: 84, meter: 4, lead: ['vibes', 'epiano'], leads: {A: 'vibes', B: 'vibes', A2: 'epiano', B2: 'clarinet'},
     A: {chords: ['Ebmaj7', 'Cm7', 'Fm7', 'Bb7', 'Gm7', 'C7b9', 'Fm7', 'Bb7sus4 Bb7'],
       mel: 'G5:1.5 Bb5:.5 D6:1 C6:1 Bb5:1.5 G5:.5 Eb5:2 Ab5:1 G5:.5 F5:.5 C5:1 Ab4:1 D5:2 F5:1 -:1 Bb4:1 D5:1 F5:1 A5:1 G5:1.5 E5:.5 Db5:1 Bb4:1 Ab4:1 C5:1 Eb5:1 Ab5:1 G5:2 F5:2'},
     B: {chords: ['Abmaj7', 'Gm7', 'Fm7', 'Ebmaj7', 'Dm7b5', 'G7b9', 'Cm7', 'F7 Bb7'],
       mel: 'C6:1.5 Bb5:.5 G5:2 Bb5:1.5 F5:.5 D5:2 Ab5:1 G5:1 F5:1 Eb5:1 G5:3 -:1 F5:1 Ab5:1 C6:2 B5:1.5 Ab5:.5 F5:2 Eb5:1 G5:1 Bb5:1 G5:1 A5:2 Ab5:2'}},
-  {id: 'meseta', title: 'Atardecer en la meseta', family: 'red', mood: 'dusk', style: 'ambient', bpm: 76, meter: 4, lead: ['piano', 'strings'],
+  {id: 'meseta', title: 'Atardecer en la meseta', family: 'red', mood: 'dusk', style: 'ambient', bpm: 68, meter: 4, lead: ['piano', 'strings'], leads: {A: 'piano', B: 'piano', A2: 'strings', B2: 'piano'},
     A: {chords: ['Fmaj7#11', 'C/E', 'Dm9', 'Bbmaj7', 'Fmaj7', 'Am7', 'Bbmaj9', 'Csus4 C'],
       mel: 'A5:2 C6:1 B5:1 G5:4 F5:2 A5:1 E5:1 D5:4 C5:1 F5:1 A5:2 G5:2 E5:2 F5:2 D5:1 C5:1 C5:4'},
     B: {chords: ['Dm7', 'Bbmaj7', 'F/A', 'Gm9', 'Dm9', 'Bbmaj7#11', 'Gm7', 'Csus4'],
       mel: 'F6:2 E6:1 D6:1 D6:3 -:1 C6:2 A5:1 F5:1 G5:3 -:1 A5:2 C6:1 E6:1 D6:2 E6:1 F6:1 D6:2 Bb5:1 G5:1 G5:4'}},
-  {id: 'pasajeros', title: 'Pasajeros al tren', family: 'estacion', mood: 'any', style: 'bossa', bpm: 140, meter: 4, lead: ['flute', 'marimba'],
+  {id: 'pasajeros', title: 'Pasajeros al tren', family: 'estacion', mood: 'any', style: 'rumba', bpm: 116, meter: 4, lead: ['guitar', 'clarinet'], leads: {A: 'guitar', B: 'guitar', A2: 'clarinet', B2: 'guitar'}, spanish: {falseta: true, rasgueo: true, palmas: true}, intro: ['Em', 'D', 'C', 'D7'], outro: ['C', 'B7', 'Em', 'Gmaj7'],
     A: {chords: ['Gmaj7', 'Am7 D9', 'Bm7 E7', 'Am7 D7', 'Gmaj7', 'Em7', 'A9', 'Am7 D7'],
       mel: 'B4:1 D5:.5 F#5:.5 A5:2 G5:1 E5:1 C5:1 F#5:1 D5:1.5 B4:.5 G#5:1 D5:1 C5:1 E5:1 F#5:2 B5:1.5 A5:.5 F#5:1 D5:1 E5:2 G5:1 B5:1 C#6:1.5 B5:.5 G5:1 E5:1 A5:2 F#5:2'},
     B: {chords: ['Cmaj7', 'Cm6 F9', 'Bm7', 'E7', 'Am7', 'D9', 'Gmaj7', 'Am7 D7'],
       mel: 'E5:1 G5:1 B5:2 A5:1.5 G5:.5 Eb5:2 D5:1 F#5:1 A5:2 G#5:2 E5:2 C5:1 E5:1 G5:1 B5:1 A5:1.5 F#5:.5 E5:2 D5:4 -:2 C5:1 F#5:1'}},
-  {id: 'obras', title: 'Obras nocturnas', family: 'red', mood: 'night', style: 'night', bpm: 90, meter: 4, lead: ['bell', 'vibes'],
+  {id: 'obras', title: 'Obras nocturnas', family: 'red', mood: 'night', style: 'night', bpm: 78, meter: 4, lead: ['piano', 'vibes'], leads: {A: 'piano', B: 'piano', A2: 'vibes', B2: 'strings'}, spanish: {falseta: true}, intro: ['Dm', 'C', 'Bbmaj7', 'A7'], outro: ['Gm9', 'Bbmaj7', 'A7b9', 'Dm9'],
     A: {chords: ['Dm9', 'Bbmaj7', 'Gm9', 'A7sus4', 'Dm9', 'Fmaj7', 'Gm7', 'Asus4 A7'],
       mel: 'A5:1 F5:1 E5:1 D5:1 D5:3 -:1 Bb5:1 A5:1 F5:1 D5:1 E5:3 -:1 A5:1 C6:1 E6:1 D6:1 C6:3 -:1 Bb5:1 A5:1 G5:1 F5:1 E5:2 C#5:2'},
     B: {chords: ['Gm9', 'C9', 'Fmaj7', 'Bbmaj7', 'Em7b5', 'A7b9', 'Dm9', 'Dm9'],
       mel: 'Bb5:2 D6:2 E6:2 Bb5:2 A5:2 C6:1 A5:1 F5:4 G5:2 Bb5:1 E5:1 C#5:2 E5:1 G5:1 F5:2 E5:1 D5:1 D5:4'}},
 ];
-export const FAMILY_LABEL = {estacion: 'Estilo «Estación»: bossa, jazz, vals y pop', red: 'Estilo «Red»: ambiental orquestal'};
-export const STYLE_LABEL = {bossa: 'Bossa nova', swing: 'Jazz ligero', waltz: 'Vals', pop: 'Pop alegre', lounge: 'Lounge', ambient: 'Ambiental', drive: 'Ambiental rítmica', night: 'Nocturna'};
+export const FAMILY_LABEL = {estacion: 'Estilo «Estación»: bossa, rumba, jazz, vals y pop', red: 'Estilo «Red»: ambiental orquestal'};
+export const STYLE_LABEL = {rumba: 'Rumba suave', bossa: 'Bossa nova', swing: 'Jazz ligero', waltz: 'Vals', pop: 'Pop alegre', lounge: 'Lounge', ambient: 'Ambiental', drive: 'Ambiental rítmica', night: 'Nocturna'};
 
 function parseMel(str) {
   const out = []; let beat = 0;
@@ -524,7 +554,7 @@ export function arrange(song) {
   const spb = 60 / song.bpm, M = song.meter, rand = rng(song.id), events = [], st = {};
   const form = song.form || ['intro', 'A', 'B', 'A2', 'B2', 'A', 'B', 'A2', 'outro'];
   const cast = {...CAST[song.style], ...(song.cast || {})};
-  const lift = song.lift ?? (song.family === 'estacion' || song.style === 'drive');
+  const lift = !!song.lift, sp = song.spanish || {};
   const liftFrom = lift ? form.lastIndexOf('A2') : -1;
   const DYN = {intro: .78, A: .92, B: 1, A2: 1.04, B2: 1.08, outro: .8};
   const swing = b => { if (!song.swing) return b; const f = b - Math.floor(b); return Math.abs(f - .5) < 1e-6 ? Math.floor(b) + .67 : b; };
@@ -532,8 +562,8 @@ export function arrange(song) {
   form.forEach((part, si) => {
     const key = part[0] === 'B' ? 'B' : 'A', sec = song[key], tr = liftFrom >= 0 && si >= liftFrom ? 1 : 0;
     let bars = sec.chords;
-    if (part === 'intro') bars = sec.chords.slice(0, 4);
-    if (part === 'outro') bars = sec.chords.slice(-4, -1).concat([sec.chords[0].split(' ')[0]]);
+    if (part === 'intro') bars = song.intro || sec.chords.slice(0, 4);
+    if (part === 'outro') bars = song.outro || sec.chords.slice(-4, -1).concat([sec.chords[0].split(' ')[0]]);
     const info = {key, part, light: part === 'intro' || part === 'outro', pad: part.endsWith('2'), comp: song.style === 'bossa' && song.id === 'pasajeros' ? 'guitar' : song.style === 'bossa' ? 'epiano' : null};
     const dyn = DYN[part] ?? DYN[key];
     const spans = [];
@@ -547,7 +577,9 @@ export function arrange(song) {
       const nextSpec = bars[i + 1] || sec.chords[0], next = chord(nextSpec.split(' ')[0]);
       const base = (bar0 + i) * M, add = mk(base);
       chords.forEach(c => spans.push({start: base + c.start, end: base + c.start + c.len, c: c.c}));
-      STYLES[song.style]({i, n: bars.length, first: i === 0, last: i === bars.length - 1, chords, add, sec: info, next, st, rand, cast, M, spb});
+      STYLES[song.style]({i, n: bars.length, first: i === 0, last: i === bars.length - 1, chords, add, sec: info, next, st, rand, cast, M, spb, spanish: sp});
+      if (sp.rasgueo && i % 2 === 0 && part !== 'outro') rasgueado(add, chords[0].c, st, info.light ? .3 : .42);
+      if (sp.palmas && song.style !== 'rumba' && !info.light && info.pad) for (let p = .5; p < M; p += 1) add('claps', p, 0, .1, .2, {lp: 2200});
       if (part === 'intro') { const c = chords[0]; arp({add, st}, cast.roll, c, 0, Math.min(2, M), .25, 55, .22, true); if (i === bars.length - 1) add('swell', M - 2 / spb, 0, 2, .26); }
       if (part === 'outro' && i === bars.length - 1) {
         chords.forEach(c => { voicing(c.c, 55, false).forEach((n, k) => add(cast.roll, M + k * .12, n, M * 1.5, .34)); add(cast.bass === 'synthbass' ? 'sub' : cast.bass, M, bassNote(c.c, 33), M * 1.5, cast.bass === 'upright' || cast.bass === 'ebass' ? .5 : .2); });
@@ -555,7 +587,7 @@ export function arrange(song) {
       }
     });
     if (!info.light) {
-      const {notes} = parseMel(sec.mel), lead = song.lead[info.pad ? 1 : 0], other = song.lead[info.pad ? 0 : 1];
+      const {notes} = parseMel(sec.mel), lead = song.leads?.[info.pad ? key + '2' : key] || song.lead[info.pad ? 1 : 0], other = song.lead[info.pad ? 0 : 1];
       const counter = cast.counter === lead ? (lead === 'strings' ? 'clarinet' : 'strings') : cast.counter;
       const chordAt = beat => (spans.find(s => beat >= s.start - 1e-6 && beat < s.end - 1e-6) || spans.at(-1)).c;
       const melodic = notes.filter(n => n.midi !== null), hi = Math.max(...melodic.map(n => n.midi)), lo = Math.min(...melodic.map(n => n.midi));
@@ -563,7 +595,11 @@ export function arrange(song) {
       notes.forEach((n, k) => {
         const beat = bar0 * M + n.beat;
         if (n.midi === null) {
-          if (n.dur >= 1 && rand() < .8) { const c = chordAt(beat); arp({add, st}, cast.fill, {c}, beat, Math.min(n.dur, 2), .5, 62, .3, false); }
+          if (n.dur >= 1 && rand() < .8) {
+            const c = chordAt(beat), prev = notes.slice(0, k).reverse().find(q => q.midi !== null);
+            if (sp.falseta && lead !== 'guitar') falseta(add, c, beat, Math.min(n.dur, 2), prev ? prev.midi : 72, .34);
+            else arp({add, st}, cast.fill === lead ? 'harp' : cast.fill, {c}, beat, Math.min(n.dur, 2), .5, 62, .3, false);
+          }
           return;
         }
         const shape = (n.midi - lo) / Math.max(1, hi - lo);
@@ -571,8 +607,11 @@ export function arrange(song) {
         add(lead, beat, n.midi + (lead === 'bell' ? 12 : 0), n.dur * .95, vel, {mel: true});
         if (tr && si === liftFrom && n.dur >= .5) add(other, beat, n.midi + (other === 'bell' ? 12 : n.midi > 76 ? -12 : 0), n.dur * .9, vel * .45, {});
         if (info.pad && n.dur >= 1) { const u = under(n.midi, chordAt(beat)); if (u !== null) add(counter, beat, u, n.dur * .95, .32, {}); }
-        if (info.pad && song.family === 'estacion' && n.dur >= 1) add('bell', beat, n.midi + 12, .3, .2, {});
-        if (n.dur >= 3 && rand() < .7) { const c = chordAt(beat + 1.5); arp({add, st}, cast.fill, {c}, beat + 1.5, Math.min(n.dur - 1.5, 2), .5, 62, .26, false); }
+        if (n.dur >= 3 && rand() < .7) {
+          const c = chordAt(beat + 1.5);
+          if (sp.falseta && lead !== 'guitar') falseta(add, c, beat + 1.5, Math.min(n.dur - 1.5, 2), n.midi - 3, .3);
+          else arp({add, st}, cast.fill === lead ? 'harp' : cast.fill, {c}, beat + 1.5, Math.min(n.dur - 1.5, 2), .5, 62, .26, false);
+        }
       });
     }
     bar0 += bars.length;

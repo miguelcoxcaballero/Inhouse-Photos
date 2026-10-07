@@ -1,4 +1,4 @@
-IBERIA FERROVIARIA — VERSIÓN JUGABLE 0.8
+IBERIA FERROVIARIA — VERSIÓN JUGABLE 0.9
 Actualización: 7 de octubre de 2026.
 
 PARA JUGAR
@@ -33,7 +33,7 @@ Cada serie de material se ve como un modelo 3D (three.js) iluminado con sol, som
 Ya no hay material de Cercanías (Civia, 450/451, 452, 463/464/465…): el catálogo es de AV, LD y MD.
 
 BANDA SONORA
-Doce piezas originales compuestas para el juego, en el espíritu de las músicas de juegos de construcción y simulación de vida (melodías amables, piano eléctrico, vibráfono, bossa y swing ligeros, ambientes largos). No copian ni citan melodías existentes. Se tocan en tiempo real con Web Audio y suenan con instrumentos reales muestreados (piano de cola Salamander, piano eléctrico, vibráfono, marimba, glockenspiel, flauta, clarinete, sección de cuerdas, arpa, guitarra de nailon, contrabajo, bajo eléctrico y percusión acústica: cajón, congas, bongós, caja, charles, shaker, pandereta y platillos), con sintetizadores para pads y bajos electrónicos. Los arreglos encadenan los acordes con conducción de voces, añaden segunda voz y respuestas a la melodía, redobles, crescendos de platillo y suben un semitono en la última vuelta de las piezas animadas; las melodías son exactamente las mismas que en la versión anterior.
+Doce piezas originales compuestas para el juego, en el espíritu de las músicas de juegos de construcción y simulación de vida (melodías amables, piano eléctrico, vibráfono, bossa y swing ligeros, ambientes largos). No copian ni citan melodías existentes. Se tocan en tiempo real con Web Audio y suenan con instrumentos reales muestreados (piano de cola Salamander, guitarra española de nailon, sección de cuerdas, arpa, clarinete, flauta, vibráfono, piano eléctrico, trompeta con sordina, contrabajo, bajo eléctrico y percusión acústica: cajón, palmas, congas, bongós, caja, charles, shaker y platillos), con sintetizadores solo para pads y bajos electrónicos. Tempos pausados y arreglos con conducción de voces, segunda voz, respuestas a la melodía, redobles y crescendos de platillo. Algunas piezas llevan rasgos de música española de forma discreta: cadencia andaluza en introducciones y finales y cadencia frigia al cerrar (Talgo a medianoche, Obras nocturnas, Corredor Mediterráneo, Pasajeros al tren), falsetas de guitarra en los silencios de la melodía, rasgueados, palmas sordas y una rumba suave. Las melodías son exactamente las de siempre.
 «Estación» (menús y preparación): Andén 1, Horario de verano, Tarifa reducida, Estación del Norte, Cambio de ancho, Pasajeros al tren.
 «Red» (jornada en marcha): Primera salida, Vía libre, Talgo a medianoche, Corredor Mediterráneo, Atardecer en la meseta, Obras nocturnas.
 En modo automático la música cambia según lo que haces y la hora del día (piezas nocturnas de noche). El botón «Música» de la barra lateral abre el reproductor: elegir pieza, orden (automático, lista, repetir), volumen y apagar. Empieza con el primer clic.

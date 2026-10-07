@@ -9,8 +9,8 @@ mono compactos. Créditos y licencias: ../investigacion/musica/MUESTRAS.txt (se 
 Fuentes (todas libres):
 - Salamander Grand Piano V3, Alexander Holm, CC BY 3.0 (copia MP3 de Tone.js).
 - FluidR3_GM (Frank Wen), CC BY 3.0 (MP3 de gleitz/midi-js-soundfonts): piano eléctrico.
-- VSCO 2 Community Edition, Versilian Studios, CC0: cuerdas, arpa, contrabajo pizzicato.
-- VCSL (Versilian Community Sample Library), CC0: vibráfono, marimba, glockenspiel y percusión.
+- VSCO 2 Community Edition, Versilian Studios, CC0: cuerdas, arpa, contrabajo pizzicato y trompeta con sordina.
+- VCSL (Versilian Community Sample Library), CC0: vibráfono y percusión (cajón, congas, bongós, caja, charles, palmas…).
 - tonejs-instruments (Nicholaus Brosowsky; muestras de la Philharmonia Orchestra y otras), CC BY 3.0: flauta,
   clarinete, guitarra de nailon y bajo eléctrico.
 """
@@ -38,8 +38,6 @@ def octs(names, lo, hi):
 
 # Instrumentos con altura: candidatos, registro a cubrir (MIDI), salto máximo entre muestras (semitonos),
 # duración máxima (s) y fuente para los créditos.
-MARIMBA = ['Marimba_hit_Outrigger_' + n + '_med_01.wav' for n in ['F1', 'C2', 'G2', 'B2', 'F3', 'C4', 'G4', 'B4', 'F5', 'C6']]
-
 TONAL = {
     'piano': dict(src='Salamander Grand Piano V3 (CC BY 3.0)', range=(36, 96), gap=3, len=(3.4, 1.6),
                   urls=[SAL + n + '.mp3' for n in octs(['C', 'Ds', 'Fs', 'A'], 2, 6) + ['C7']]),
@@ -48,11 +46,6 @@ TONAL = {
     'vibes': dict(src='VCSL, Vibraphone soft mallets (CC0)', range=(53, 89), gap=4, len=(3.0, 2.2),
                   urls=[VCSL + 'Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_' + n + '_v2_rr1_Main.wav'
                         for n in ['F2', 'A2', 'C3', 'E3', 'G3', 'B3', 'D4', 'F4', 'A4', 'C5', 'E5']]),
-    'marimba': dict(src='VCSL, Marimba (CC0)', range=(55, 96), gap=5, len=(1.1, .7),
-                    urls=[VCSL + 'Idiophones/Struck Idiophones/Marimba/' + f for f in MARIMBA]),
-    'glock': dict(src='VCSL, Glockenspiel (CC0)', range=(76, 108), gap=7, len=(2.2, 1.6),
-                  urls=[VCSL + 'Idiophones/Struck Idiophones/Glockenspiel/glock_medium_' + n + '_01.wav'
-                        for n in ['G4', 'C5', 'G5', 'C6', 'G6', 'C7']]),
     'flute': dict(src='tonejs-instruments, flauta (CC BY 3.0)', range=(60, 96), gap=5, len=(2.8, 2.4),
                   urls=[TJI + 'flute/' + n + '.mp3' for n in ['C4', 'E4', 'A4', 'C5', 'E5', 'A5', 'C6', 'E6', 'A6', 'C7']]),
     'clarinet': dict(src='tonejs-instruments, clarinete (CC BY 3.0)', range=(50, 89), gap=5, len=(2.8, 2.4),
@@ -64,10 +57,12 @@ TONAL = {
     'harp': dict(src='VSCO 2 CE, arpa (CC0)', range=(43, 96), gap=5, len=(2.6, 1.8),
                  urls=[VSCO + 'Strings/Harp/KSHarp_' + n + '.wav' for n in
                        ['G1_mp', 'B1_mf', 'D2_mf', 'F2_mf', 'A2_mf', 'C3_mf', 'E3_mf', 'G3_mf', 'B3_mf', 'D4_mf', 'F4_mf', 'A4_mf', 'C5_mf', 'E5_mf', 'G5_mf', 'B5_mf', 'D6_mf']]),
-    'guitar': dict(src='tonejs-instruments, guitarra de nailon (CC BY 3.0)', range=(40, 81), gap=5, len=(2.0, 1.4),
-                   urls=[TJI + 'guitar-nylon/' + n + '.mp3' for n in ['E2', 'Gs2', 'B2', 'D3', 'Fs3', 'A3', 'Cs4', 'E4', 'Gs4', 'B4', 'D5', 'Fs5']]),
+    'guitar': dict(src='tonejs-instruments, guitarra de nailon (CC BY 3.0)', range=(40, 84), gap=5, len=(2.0, 1.4),
+                   urls=[TJI + 'guitar-nylon/' + n + '.mp3' for n in ['E2', 'Gs2', 'B2', 'D3', 'Fs3', 'A3', 'Cs4', 'E4', 'Gs4', 'B4', 'D5', 'Fs5', 'A5', 'As5']]),
     'upright': dict(src='VSCO 2 CE, contrabajo pizzicato (CC0)', range=(28, 60), gap=6, len=(1.8, 1.2),
                     urls=[VSCO + 'Strings/Solo Contrabass/Pizz/BKCtbss_Pizz_' + n + '_v1_rr1.wav' for n in ['E0', 'A#0', 'C1', 'D1', 'E1', 'A1', 'C#2', 'E2', 'B2']]),
+    'mtrumpet': dict(src='VSCO 2 CE, trompeta con sordina recta (CC0)', range=(55, 84), gap=5, len=(2.6, 2.2),
+                     urls=[VSCO + 'Brass/Trumpet/straightM-sus/Sum_SHTrumpet_straightM-sus_' + n + '_v1_rr1.wav' for n in ['C3', 'D3', 'G3', 'A#3', 'D4', 'F4', 'A4']]),
     'ebass': dict(src='tonejs-instruments, bajo eléctrico (CC BY 3.0)', range=(28, 60), gap=6, len=(1.6, 1.1),
                   urls=[TJI + 'bass-electric/' + n + '.mp3' for n in ['E1', 'G1', 'As1', 'Cs2', 'E2', 'G2', 'As2', 'Cs3', 'E3', 'G3']]),
 }
@@ -89,6 +84,7 @@ DRUMS = {  # nombre: (fuente, [urls de variantes], duración máx, frecuencia de
     'quinto': ('VCSL, quinto (CC0)', [VCSL + P + 'Conga/Quinto_HitN_v2_rr1_Sum.wav'], .5, 32000),
     'tumba': ('VCSL, tumbadora (CC0)', [VCSL + P + 'Conga/Tumba_HitN_v2_rr1_Sum.wav'], .7, 32000),
     'bongo': ('VCSL, bongó (CC0)', [VCSL + P + 'Bongos/BongoH_Hit1_v2_rr1_Mid.wav', VCSL + P + 'Bongos/BongoL_Hit1_v2_rr1_Mid.wav'], .4, 32000),
+    'claps': ('VCSL, palmas (CC0)', [VCSL + I + 'Claps/SoloClap_vl2.wav', VCSL + I + 'Claps/SoloClap_vl3.wav', VCSL + I + 'Claps/Clap_rr1.wav'], .4, 44100),
     'ride': ('VCSL, platillo suspendido con baqueta (CC0)', [VCSL + I + 'Suspended Cymbal 1/susCymb1_hit_stick_mp1.wav'], 2.0, 44100),
     'swell': ('VCSL, crescendo de platillo (CC0)', [VCSL + I + 'Suspended Cymbal 1/susCymb1_cresc_2s.wav'], 3.2, 44100),
     'crash': ('VCSL, platillo suspendido (CC0)', [VCSL + I + 'Suspended Cymbal 1/susCymb1_hit_mp1.wav'], 2.6, 44100),

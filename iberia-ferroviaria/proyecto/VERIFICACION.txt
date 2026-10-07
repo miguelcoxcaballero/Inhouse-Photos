@@ -1,3 +1,6 @@
+VERIFICACIÓN V0.9 — 7 DE OCTUBRE DE 2026
+Banda sonora: v3-test.mjs sigue comprobando que todas las notas de todas las melodías conservan altura y duración (en pulsos) con los nuevos tempos e instrumentos. Stems de Vía libre, Talgo a medianoche, Corredor Mediterráneo y Pasajeros al tren: la melodía queda 4–6 dB por encima de la armonía, con bajo y percusión por debajo. Las 12 piezas se renderizan sin conexión con las muestras. No se ha hecho una escucha humana en el entorno de trabajo.
+
 VERIFICACIÓN V0.8 — 7 DE OCTUBRE DE 2026
 Banda sonora: las 12 piezas se renderizaron sin conexión con los instrumentos muestreados (los 30 instrumentos del banco se decodifican en unos 0,2 s). v3-test.mjs comprueba que cada nota de cada melodía suena con su altura y duración originales (solo la última vuelta sube un semitono en las piezas animadas). Mezcla equilibrada por stems (melodía por delante; armonía 4–6 dB, bajo 7–9 dB y percusión por debajo). En Andén 1 el centroide espectral medio pasa de 826 a 1563 Hz (timbre más rico) con 11,4 LU de rango dinámico; MP3 a −16 LUFS sin saturación. ui-v3-test.mjs espera a que el reproductor arranque con las muestras. No se ha hecho una escucha humana en el entorno de trabajo.
 
