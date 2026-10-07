@@ -1,7 +1,8 @@
 // Genera el juego en dos formas:
 //  · ../outputs/Iberia-Ferroviaria.html: un único archivo jugable sin conexión, con todas las muestras de la banda sonora.
 //  · ../outputs/web/: la misma página sin las muestras dentro (index.html) y, a su lado, los ficheros de muestras
-//    (muestras-orquesta.js, muestras-teclas.js, muestras-percusion.js), que la música pide cuando los necesita.
+//    (muestras-ui.js con los efectos de la interfaz, muestras-orquesta.js, muestras-teclas.js, muestras-percusion.js),
+//    que el juego pide cuando los necesita.
 // Cada módulo de dist/ se envuelve en su propio ámbito (mini-empaquetador ES → IIFE),
 // y las tipografías e ilustraciones se incrustan como data URI.
 import fs from 'node:fs';
@@ -10,7 +11,7 @@ import {fileURLToPath} from 'node:url';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(root, 'dist');
 const order = ['assets/geography.js', 'assets/realdata.js', 'assets/railways.js', 'assets/timetable.js', 'data.js', 'story.js', 'schedule.js', 'network.js',
-  'engine.js', 'operations.js', 'gtfs.js', 'map-v3.js', 'train-art.js', 'train3d.js', 'city-art.js', 'assets/samples-index.js', 'music.js', 'assets/voices.js', 'voice.js', 'app.js'];
+  'engine.js', 'operations.js', 'gtfs.js', 'map-v3.js', 'train-art.js', 'train3d.js', 'city-art.js', 'assets/samples-index.js', 'music.js', 'assets/voices.js', 'voice.js', 'sfx.js', 'app.js'];
 
 function bundle(file) {
   let text = fs.readFileSync(path.join(dist, file), 'utf8');
@@ -38,7 +39,7 @@ html = html.replace('<link rel="stylesheet" href="style-v3.css">', () => '<style
   .replace('<script src="assets/three.min.js"></script>', () => '<script>' + fs.readFileSync(path.join(dist, 'assets/three.min.js'), 'utf8').replaceAll('</script', '<\\/script') + '</script>')
   .replace('<script type="module" src="app.js"></script>', () => '<script>\n(() => {\n' + code.replaceAll('</script', '<\\/script') + '\n})();\n</script>')
   .replace('</body>', () => '<script type="text/plain" id="geodata-license">' + fs.readFileSync(path.join(root, 'LICENSE-GEODATA.txt'), 'utf8').replaceAll('</script', '<\\/script') + '</script></body>');
-const GROUPS = ['orquesta', 'teclas', 'percusion'], BASE = `<script>globalThis.IBERIA_SAMPLE_BASE = 'assets/';</script>`;
+const GROUPS = ['ui', 'orquesta', 'teclas', 'percusion'], BASE = `<script>globalThis.IBERIA_SAMPLE_BASE = 'assets/';</script>`;
 if (!html.includes(BASE)) throw Error('index.html no declara IBERIA_SAMPLE_BASE');
 const inline = file => '<script>' + fs.readFileSync(path.join(dist, file), 'utf8').replaceAll('</script', '<\\/script') + '</script>';
 const full = html.replace(BASE, () => GROUPS.map(g => inline(`assets/muestras-${g}.js`)).join(''));

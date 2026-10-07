@@ -12,6 +12,7 @@ import {citySkyline} from './city-art.js';
 import {trainThumb, mountViewers} from './train3d.js';
 import {Voices, sentences, CAST} from './voice.js';
 import {Soundtrack, SONGS, STYLE_LABEL, FAMILY_LABEL} from './music.js';
+import {Sfx, ACTIONS} from './sfx.js';
 import {REAL_TRAIN_CATALOGUE, COMMUTER_NETWORKS} from './assets/realdata.js';
 
 const $ = id => document.getElementById(id);
@@ -83,6 +84,7 @@ function musicMood() {
 }
 const music = new Soundtrack(musicMood);
 const voices = new Voices(music);
+const sfx = new Sfx(music);
 // ------------------------------------------------------------ voces de los personajes
 /** Texto con cada frase en su propio span, para el subtítulo resaltado mientras se lee. */
 function sayHtml(text) { return sentences(text).map(x => `<span class="say-s">${esc(x)}</span>`).join(' '); }
@@ -106,6 +108,7 @@ function renderMusicButton() {
 }
 music.on(renderMusicButton);
 document.addEventListener('pointerdown', () => { if (music.enabled && !music.current) music.start(); }, {once: true});
+['pointerdown', 'keydown', 'click'].forEach(type => document.addEventListener(type, () => sfx.arm(), {once: true, capture: true}));
 let lastMood = null;
 function checkMusicMood() {
   if (!music.current || music.mode !== 'auto') return;
@@ -124,6 +127,9 @@ function musicDialog(refresh = false) {
   <label for="musicVolume">Volumen</label><input id="musicVolume" type="range" min="0" max="1" step="0.05" value="${music.volume}">
   <h3 class="sub">Voces de los personajes</h3><p class="small">${voices.neural ? `Voces pregrabadas con XTTS-v2 a partir de grabaciones reales de España, con dirección de voz para cada remate. Pedro Sancho: ${CAST.president.label}; Raquel Sanz: ${CAST.minister.label}; Óscar del Puente: ${CAST.successor.label}.` : voices.available ? `Leídas con las voces en español de tu sistema (${esc(voices.voices.slice(0, 3).map(v => v.name).join(', '))}${voices.voices.length > 3 ? '…' : ''}). Pedro Sancho: ${CAST.president.label}; Raquel Sanz: ${CAST.minister.label}; Óscar del Puente: ${CAST.successor.label}.` : 'Tu navegador no ofrece voces en español. En Chrome, Edge o Safari, o instalando una voz española en el sistema, los personajes hablarán.'}</p>
   <div class="toolbar"><button class="btn ${voices.enabled ? '' : 'primary'}" data-action="voice-toggle">${voices.enabled ? 'Silenciar personajes' : 'Activar voces'}</button></div>
+  <h3 class="sub">Efectos de sonido</h3><p class="small">Cada botón, cada clic del mapa y cada control tiene su sonido: madera, papel, campanas de estación y vibráfono, afinados entre sí. Se oyen aunque la música esté apagada.</p>
+  <div class="toolbar"><button class="btn ${sfx.enabled ? '' : 'primary'}" data-action="sfx-toggle">${sfx.enabled ? 'Silenciar efectos' : 'Activar efectos'}</button></div>
+  <label for="sfxVolume">Volumen de los efectos</label><input id="sfxVolume" type="range" min="0" max="1" step="0.05" value="${sfx.volume}">
   <div class="actions"><button class="btn primary" data-action="close-modal">Cerrar</button></div></div>`;
   if (refresh) { const sc = $('modal').querySelector('.content')?.scrollTop || 0; $('modal').innerHTML = `<div class="modal single">${html}</div>`; $('modal').querySelector('.content').scrollTop = sc; }
   else showModal(html, 'single');
@@ -136,8 +142,28 @@ function autosave(announce = false) {
   catch { if (announce) toast('El navegador no permite guardar aquí. Exporta la partida.'); return false; }
 }
 function act(fn, message) {
-  try { fn(); if (message) toast(message); netKey = networkKey(); map.dirty = true; afterCityAction(); autosave(); render(); return true; }
-  catch (error) { toast(error.message); return false; }
+  try { fn(); if (message) toast(message); netKey = networkKey(); map.dirty = true; afterCityAction(); autosave(); render(); sfx.result(true); return true; }
+  catch (error) { toast(error.message); sfx.result(false); return false; }
+}
+/** Efecto de sonido de cada botón (ver ACTIONS en sfx.js): al pulsar, al salir bien la acción o según el estado. */
+const hashOf = x => [...String(x)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+function clickSound(a, b) {
+  const spec = ACTIONS[a], id = b.dataset.id;
+  sfx.intent = null;
+  if (!spec || spec[0] === '@') return;
+  if (spec[0] === '=') {
+    const r = (a === 'freq-up' || a === 'freq-down') && routeById(id);
+    return sfx.expect(spec.slice(1), r ? () => ({level: r.frequency / Math.max(1, E.maxFrequency(r))}) : {});
+  }
+  if (spec === '!play') return sfx.play(a === 'play' && playing ? 'pause' : state.started && state.ops.phase === 'planning' && layer !== 'real' ? 'departure' : 'resume');
+  if (spec === '!toggle') {
+    const on = a === 'music-toggle' ? !music.enabled : a === 'voice-toggle' ? !voices.enabled : a === 'sfx-toggle' ? !sfx.enabled : !map.follow;
+    return a === 'sfx-toggle' && on ? null : sfx.play(on ? 'toggleOn' : 'toggleOff'); // al activar los efectos, el clic suena después
+  }
+  const siblings = [...(b.parentElement?.querySelectorAll(`[data-action="${a}"]`) || [])];
+  const opts = {nav: {i: Object.keys(PAGES).indexOf(b.dataset.screen)}, tab: {i: Math.max(0, siblings.indexOf(b))}, pickCity: {i: hashOf(id)}, lever: {i: ['network', 'real', 'works'].indexOf(id)},
+    speed: {i: +id}, tutorialNext: {i: (tut?.step ?? 0) + 1}}[spec] || {};
+  sfx.play(spec, opts);
 }
 function icon(name) { return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`; }
 function chip(text, color) { return `<span class="chip" style="background:${esc(color)}">${esc(text)}</span>`; }
@@ -371,6 +397,7 @@ function renderCoach() {
 
 // ------------------------------------------------------------ selección en el mapa
 function pick(hit) {
+  sfx.play(!hit ? (inspect ? 'deselect' : 'tick') : {route: 'pickRoute', city: 'pickCity', train: 'pickTrain', station: 'pickStation', work: 'pickWork'}[hit.type] || 'tap', {i: hashOf(hit?.id ?? '')});
   if (!hit) { if (inspect) { inspect = null; map.selected = null; map.selectedTrain = null; map.selectedCity = null; map.follow = false; renderInspector(); } return; }
   if (hit.type === 'route') return selectRoute(hit.id, false);
   map.selectedCity = null;
@@ -420,7 +447,7 @@ function play() {
   if ($('modal').open) return;
   const op = state.ops;
   if (op.phase === 'review') return dayReport();
-  if (op.phase === 'planning' && layer !== 'real') { try { O.startDay(state); seenIncidents = new Set(); resetToday(); netKey = networkKey(); } catch (e) { return toast(e.message); } }
+  if (op.phase === 'planning' && layer !== 'real') { try { O.startDay(state); seenIncidents = new Set(); resetToday(); netKey = networkKey(); } catch (e) { sfx.play('error'); return toast(e.message); } }
   playing = true; renderDaybar();
 }
 function pause() { playing = false; renderDaybar(); }
@@ -912,9 +939,9 @@ function workInspector() {
 }
 
 // ------------------------------------------------------------ ventanas modales
-function showModal(html, cls = '') { pause(); $('modal').innerHTML = `<div class="modal ${cls}">${html}</div>`; if (!$('modal').open) $('modal').showModal(); mountViewers($('modal')); }
+function showModal(html, cls = '') { pause(); const was = $('modal').open; $('modal').innerHTML = `<div class="modal ${cls}">${html}</div>`; if (!was) $('modal').showModal(); mountViewers($('modal')); sfx.play(was ? 'page' : 'open'); }
 function closeModal() { if ($('modal').open) $('modal').close(); }
-$('modal').addEventListener('close', () => { if (!$('modal').open && voices.speaking?.where === 'modal') voices.stop(); });
+$('modal').addEventListener('close', () => { if (!$('modal').open && voices.speaking?.where === 'modal') voices.stop(); sfx.play('close'); });
 function intro() {
   showModal(`<div class="art hero-art"></div><div class="content"><div class="kicker">Campaña · 2022–2050</div><h1>El próximo tren lo decides tú.</h1><p>Enero de 2022. España vuelve a moverse. Asumes la dirección de una Renfe que necesita recuperar servicios, renovar sus trenes y volver a ganarse al viajero.</p><p>Por la red circulan <b>los trenes reales</b>: ${n(S.META.counts.L)} circulaciones de un día laborable del horario oficial, de la Alta Velocidad a los regionales. Cada jornada empieza con el primer tren y termina con el último.</p><div class="actions">${saved ? '<button class="btn primary" data-action="continue">Continuar partida</button>' : ''}<button class="btn ${saved ? '' : 'primary'}" data-action="begin">Asumir la dirección</button><button class="btn ghost" data-action="observe">Solo mirar el horario real</button></div><p class="note">Historia alternativa: la escasez inicial y los cierres son ficción; los horarios, estaciones, proyectos y contratos tienen fuente. Se guarda en este navegador.</p></div>`);
 }
@@ -994,7 +1021,7 @@ function openNetwork(net) {
     while (freq > 1 && E.available(state, f, r.id) < E.requiredUnits(r, MODEL[f.model], freq)) freq = Math.floor(freq * .7);
     try { E.configureRoute(state, r.id, f.id, freq, r.fare); opened++; } catch { missing++; }
   }
-  netKey = networkKey(); map.dirty = true; autosave(); render();
+  netKey = networkKey(); map.dirty = true; autosave(); render(); sfx.result(opened > 0);
   toast(opened ? `${opened} líneas reabiertas${missing ? ' · ' + missing + ' sin material o caja suficiente' : ''}.` : 'No se pudo reabrir ninguna línea: falta material compatible o tesorería.');
 }
 
@@ -1002,6 +1029,7 @@ document.addEventListener('click', event => {
   const b = event.target.closest('[data-action]');
   if (!b || b.disabled) return;
   const a = b.dataset.action, id = b.dataset.id;
+  clickSound(a, b);
   switch (a) {
     case 'navigate': navigate(b.dataset.screen); break;
     case 'close-drawer': screen = null; render(); break;
@@ -1017,8 +1045,8 @@ document.addEventListener('click', event => {
     case 'day-start': if (layer === 'real') setLayer('network'); play(); break;
     case 'day-end': pause(); if (state.ops.phase === 'running') { state.ops.minute = O.dayBounds(plan()).last; finishDay(); } break;
     case 'day-review': dayReport(); break;
-    case 'day-next': try { O.nextDay(state); closeModal(); seenIncidents = new Set(); autosave(); render(); if (E.pendingDecision(state)) showDecision(); else if (state.ended) navigate('story'); } catch (e) { toast(e.message); } break;
-    case 'skip-month': pause(); try { if (O.skipMonth(state)) { autosave(); render(); toast('Mes delegado. Cuentas liquidadas.'); if (E.pendingDecision(state)) showDecision(); if (state.ended) navigate('story'); } } catch (e) { toast(e.message); } break;
+    case 'day-next': try { O.nextDay(state); sfx.result(true); closeModal(); seenIncidents = new Set(); autosave(); render(); if (E.pendingDecision(state)) showDecision(); else if (state.ended) navigate('story'); } catch (e) { sfx.result(false); toast(e.message); } break;
+    case 'skip-month': pause(); try { if (O.skipMonth(state)) { sfx.result(true); autosave(); render(); toast('Mes delegado. Cuentas liquidadas.'); if (E.pendingDecision(state)) showDecision(); if (state.ended) navigate('story'); } else sfx.intent = null; } catch (e) { sfx.result(false); toast(e.message); } break;
     case 'open-incidents': document.querySelector('.alert-pill')?.remove(); navigate('ops'); if (screen !== 'ops') navigate('ops'); break;
     case 'respond': act(() => O.resolveIncident(state, id, b.dataset.option), O.RESPONSES[b.dataset.option].note); break;
     case 'route': selectRoute(id); break;
@@ -1031,6 +1059,7 @@ document.addEventListener('click', event => {
     case 'music-play': { const song = SONGS.find(x => x.id === id); if (song) { if (music.mode === 'auto') music.setMode('list'); music.play(song); } break; }
     case 'music-toggle': music.toggle(); break;
     case 'voice-toggle': voices.toggle(); musicDialog(true); break;
+    case 'sfx-toggle': if (sfx.toggle()) sfx.play('toggleOn'); musicDialog(true); break;
     case 'say': {
       const where = b.dataset.where, root = where === 'coach' ? $('coach') : where === 'modal' ? $('modal') : b.closest('.story');
       if (voices.speaking?.where === where) voices.stop();
@@ -1084,10 +1113,13 @@ document.addEventListener('click', event => {
 document.addEventListener('submit', event => {
   if (event.target.id !== 'routeForm') return;
   event.preventDefault();
+  sfx.expect('plan');
   act(() => E.configureRoute(state, inspect.id, $('routeFleet').value, +$('frequency').value, +$('fare').value), 'Plan de servicio actualizado.');
 });
 document.addEventListener('input', event => {
   const t = event.target;
+  if (t.type === 'range' || t.type === 'number') sfx.slide(t);
+  if (t.id === 'sfxVolume') sfx.setVolume(+t.value);
   if (['routeFleet', 'frequency', 'fare'].includes(t.id)) updatePreview();
   if (t.id === 'musicVolume') music.setVolume(+t.value);
   if (t.id === 'routeSearch') { ui.routeQuery = t.value; renderDrawer(); }
@@ -1099,6 +1131,10 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('change', async event => {
   const t = event.target;
+  if (t.tagName === 'SELECT' || t.type === 'date') sfx.play('select');
+  if (t.type === 'checkbox') sfx.play(t.checked ? 'toggleOn' : 'toggleOff');
+  if (t.type === 'file' && t.files[0]) sfx.play('page');
+  if (t.id === 'maintenance') sfx.intent = null;
   if (t.id === 'routeStatus') { ui.routeStatus = t.value; renderDrawer(); }
   if (t.id === 'ttHour') { ui.ttHour = +t.value; renderDrawer(); }
   if (t.id === 'dayPriority' && state.ops.phase === 'planning') { state.ops.priority = t.value; autosave(); render(); }
@@ -1107,13 +1143,13 @@ document.addEventListener('change', async event => {
   if (t.id === 'maintenance') act(() => { E.ensurePlaying(state); state.maintenance = E.clamp(+t.value, .6, 1.5); });
   if (t.id === 'referenceDate') { referenceDate = t.value; renderDrawer(); }
   if (t.id === 'importSave' && t.files[0]) {
-    try { if (t.files[0].size > 6e6) throw Error('El archivo es demasiado grande.'); state = E.validateSave(JSON.parse(await t.files[0].text())); O.ensureOps(state); state.started = true; autosave(); closeModal(); inspect = null; screen = null; netKey = networkKey(); map.dirty = true; render(); toast('Partida importada.'); if (E.pendingDecision(state)) showDecision(); }
-    catch (e) { toast('No se pudo importar: ' + e.message); }
+    try { if (t.files[0].size > 6e6) throw Error('El archivo es demasiado grande.'); state = E.validateSave(JSON.parse(await t.files[0].text())); O.ensureOps(state); state.started = true; autosave(); sfx.play('confirm'); closeModal(); inspect = null; screen = null; netKey = networkKey(); map.dirty = true; render(); toast('Partida importada.'); if (E.pendingDecision(state)) showDecision(); }
+    catch (e) { sfx.play('error'); toast('No se pudo importar: ' + e.message); }
   }
   if (t.id === 'gtfsImport' && t.files[0]) {
     const file = t.files[0]; t.disabled = true;
-    try { pause(); const feed = await G.importGTFS(file, msg => { const el = $('gtfsProgress'); if (el) el.textContent = msg; }); referenceFeed = G.combineFeeds(referenceFeed, feed); referenceDate = G.dateISO(feed.dateStart); try { await G.storeFeed(referenceFeed); } catch {} toast('GTFS cargado para consulta.'); renderDrawer(); }
-    catch (e) { toast('No se pudo leer el horario: ' + e.message); t.disabled = false; }
+    try { pause(); const feed = await G.importGTFS(file, msg => { const el = $('gtfsProgress'); if (el) el.textContent = msg; }); referenceFeed = G.combineFeeds(referenceFeed, feed); referenceDate = G.dateISO(feed.dateStart); try { await G.storeFeed(referenceFeed); } catch {} sfx.play('confirm'); toast('GTFS cargado para consulta.'); renderDrawer(); }
+    catch (e) { sfx.play('error'); toast('No se pudo leer el horario: ' + e.message); t.disabled = false; }
   }
 });
 document.addEventListener('pointerdown', event => {
@@ -1121,25 +1157,28 @@ document.addEventListener('pointerdown', event => {
   if (!cv || !(layer === 'real' && state.ops.phase !== 'running')) return;
   const r = cv.getBoundingClientRect();
   observerMinute = +cv.dataset.first + (event.clientX - r.left) / r.width * +cv.dataset.span;
-  drawTimeline(); renderClock();
+  drawTimeline(); renderClock(); sfx.play('scrub');
 });
-document.querySelectorAll('[data-layer]').forEach(b => b.onclick = () => setLayer(b.dataset.layer));
-$('zoomIn').onclick = () => map.zoomAt(map.zoom * 1.5);
-$('zoomOut').onclick = () => map.zoomAt(map.zoom / 1.5);
-$('resetMap').onclick = () => map.reset();
+// campos de formulario (al pulsarlos) y enlaces a las fuentes
+document.addEventListener('pointerdown', event => { if (event.target.closest?.('input, select, textarea, label[for], .train3d')) sfx.play('tick'); });
+document.addEventListener('click', event => { if (event.target.closest?.('a[href]')) sfx.play('tap'); });
+document.querySelectorAll('[data-layer]').forEach(b => b.onclick = () => { sfx.play('lever', {i: ['network', 'real', 'works'].indexOf(b.dataset.layer)}); setLayer(b.dataset.layer); });
+$('zoomIn').onclick = () => { sfx.play('zoomIn'); map.zoomAt(map.zoom * 1.5); };
+$('zoomOut').onclick = () => { sfx.play('zoomOut'); map.zoomAt(map.zoom / 1.5); };
+$('resetMap').onclick = () => { sfx.play('resetMap'); map.reset(); };
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !$('modal').open && ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) document.activeElement.blur();
   else if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) || $('modal').open) return;
-  if (event.code === 'Space') { event.preventDefault(); playing ? pause() : play(); }
-  if (['1', '2', '3', '4'].includes(event.key)) { speedIndex = +event.key - 1; renderDaybar(); }
-  if (event.key === '+' || event.key === '=') map.zoomAt(map.zoom * 1.4);
-  if (event.key === '-') map.zoomAt(map.zoom / 1.4);
-  if (event.key === 'Escape') { screen = null; inspect = null; map.selected = null; map.selectedTrain = null; map.follow = false; render(); }
+  if (event.code === 'Space') { event.preventDefault(); sfx.play(playing ? 'pause' : state.started && state.ops.phase === 'planning' && layer !== 'real' ? 'departure' : 'resume'); playing ? pause() : play(); }
+  if (['1', '2', '3', '4'].includes(event.key)) { speedIndex = +event.key - 1; sfx.play('speed', {i: speedIndex}); renderDaybar(); }
+  if (event.key === '+' || event.key === '=') { sfx.play('zoomIn'); map.zoomAt(map.zoom * 1.4); }
+  if (event.key === '-') { sfx.play('zoomOut'); map.zoomAt(map.zoom / 1.4); }
+  if (event.key === 'Escape') { if (screen || inspect) sfx.play('dismiss'); screen = null; inspect = null; map.selected = null; map.selectedTrain = null; map.follow = false; render(); }
 });
 $('modal').addEventListener('cancel', event => { if (E.pendingDecision(state) || !state.started) event.preventDefault(); });
 
 // API de lectura para verificación automatizada y accesibilidad.
-window.railwayGame = {music, voices, snapshot: () => JSON.parse(JSON.stringify(state)), engine: E, operations: O, schedule: S, map, navigate, setLayer, selectRoute,
+window.railwayGame = {music, voices, sfx, snapshot: () => JSON.parse(JSON.stringify(state)), engine: E, operations: O, schedule: S, map, navigate, setLayer, selectRoute,
   plan: () => plan().map(t => ({id: t.id, route: t.route, dep: t.dep, arrival: t.arrival, delay: t.delay, real: t.real})), minute: currentMinute, play, pause, finishDay,
   state: () => state, render, pick, setMinute: m => { if (state.ops.phase === 'running') state.ops.minute = m; else observerMinute = m; render(); }};
 

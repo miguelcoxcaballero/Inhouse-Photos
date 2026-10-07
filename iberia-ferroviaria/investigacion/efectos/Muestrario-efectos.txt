@@ -1,0 +1,64 @@
+MUESTRARIO DE EFECTOS DE SONIDO — Iberia Ferroviaria 1.1
+Minuto:segundo · efecto · dónde suena en el juego
+(En el juego las notas se transportan a la tonalidad de la pieza que suena; aquí están en Re.)
+
+0:00.0  tick          Detalle: pulsar un campo de formulario, agarrar un modelo 3D, clic en el mapa vacío
+0:00.9  tap           Enlaces a las fuentes
+0:01.9  say           Escuchar a un personaje (🔊)
+0:02.8  tab           Pestañas de los paneles (cada pestaña, su nota)
+0:03.7  page          Cambia el contenido de un diálogo abierto / elegir un archivo
+0:04.6  nav           Menú lateral (cada sección, su nota)
+0:06.2  drawerClose   Cerrar el panel lateral
+0:07.6  open          Abrir un diálogo
+0:09.1  close         Se cierra un diálogo
+0:10.4  dismiss       Cerrar a propósito (Salir, ×, Escape)
+0:11.7  focus         Centrar el mapa en una línea, estación u obra
+0:13.1  confirm       Partida o horario GTFS importados
+0:15.7  contract      Firmar un pedido de trenes (sello y campanas)
+0:18.4  infra         Firmar obra, nueva línea o mejora (sello, yunque y campanas)
+0:21.1  decision      Decisión del consejo de dirección
+0:23.6  plan          Aplicar el plan de servicio
+0:26.2  respond       Responder a una incidencia
+0:28.7  request       Atender la petición de una ciudad
+0:31.8  celebrate     Reclamar la financiación del capítulo / mejorar estación
+0:34.9  sell          Vender material
+0:36.8  refurbish     Enviar a reforma
+0:39.5  borrow        Pedir préstamo
+0:42.0  repay         Amortizar
+0:44.5  closeService  Suspender un servicio
+0:46.5  openRoute     Abrir una conexión o una red
+0:49.1  plus          Más trenes (+): la altura sigue a la frecuencia
+0:50.6  minus         Menos trenes (−)
+0:52.0  toggleOn      Interruptor encendido (música, voces, efectos, seguir tren, casillas)
+0:53.2  toggleOff     Interruptor apagado
+0:54.2  lever         Palanca de capa (Tu red / Horario real / Obras)
+0:55.5  speed         Velocidad (tantos tics como su número)
+0:56.9  departure     Comenzar la jornada: aviso de estación y bocina lejana
+0:59.8  resume        Reanudar
+1:01.6  pause         Pausa
+1:03.5  dayEnd        Hasta el último tren: aviso de cierre
+1:06.4  dayNext       Siguiente jornada: indicador de paletas
+1:09.5  skipMonth     Delegar el mes: paletas largas
+1:13.0  timetable     Abrir horarios o un panel de salidas
+1:14.1  pickCity      Pulsar una ciudad (cada ciudad, su nota)
+1:15.5  pickTrain     Pulsar un tren
+1:16.6  pickStation   Pulsar una estación
+1:18.1  pickRoute     Pulsar una línea
+1:19.5  pickWork      Pulsar una obra
+1:20.7  deselect      Clic en el mapa que cierra la ficha
+1:21.5  zoomIn        Acercar (+)
+1:22.5  zoomOut       Alejar (−)
+1:23.4  resetMap      Ver toda la península (⌂)
+1:25.4  scrub         Mover la línea de tiempo
+1:26.2  slider        Deslizadores y casillas numéricas (la altura sigue al valor)
+1:27.1  select        Selectores y fechas
+1:28.2  musicPick     Elegir una pieza
+1:29.8  musicNext     Siguiente pieza
+1:30.8  tutorialNext  Tutorial: siguiente
+1:32.2  tutorialStart Repetir el tutorial
+1:34.9  begin         Asumir la dirección (empezar la campaña)
+1:38.0  continue      Continuar partida
+1:41.0  observe       Solo mirar el horario real
+1:43.5  punch         Guardar ahora (taladro de billete)
+1:45.3  export        Exportar la partida
+1:47.3  error         Lo que no se puede hacer (falta caja, material…): un «no» suave

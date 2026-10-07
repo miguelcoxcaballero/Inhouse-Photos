@@ -1,4 +1,4 @@
-IBERIA FERROVIARIA — VERSIÓN JUGABLE 1.0
+IBERIA FERROVIARIA — VERSIÓN JUGABLE 1.1
 Actualización: 7 de octubre de 2026.
 
 PARA JUGAR
@@ -39,7 +39,11 @@ Dos piezas nuevas con ritmos e instrumentos españoles: Despeñaperros, una bule
 «Estación» (menús y preparación): Andén 1, Horario de verano, Tarifa reducida, Estación del Norte, Cambio de ancho, Pasajeros al tren, Expreso de Andalucía.
 «Red» (jornada en marcha): Primera salida, Vía libre, Talgo a medianoche, Corredor Mediterráneo, Atardecer en la meseta, Obras nocturnas, Despeñaperros.
 En modo automático la música cambia según lo que haces y la hora del día (piezas nocturnas de noche). El botón «Música» de la barra lateral abre el reproductor: elegir pieza, orden (automático, lista, repetir), volumen y apagar. Empieza con el primer clic.
-El HTML autónomo lleva todas las muestras dentro (unos 28 MB). La versión web (outputs/web/, se genera con «npm run build») deja las muestras en tres ficheros al lado de la página y los pide la primera vez que suena una pieza que los necesita.
+El HTML autónomo lleva todas las muestras dentro (unos 28 MB). La versión web (outputs/web/, se genera con «npm run build») deja las muestras en cuatro ficheros al lado de la página: el pequeño de los efectos llega al abrir el juego y los de la música, la primera vez que suena una pieza que los necesita.
+
+EFECTOS DE SONIDO
+Cada botón y cada clic tienen su sonido, pensado para lo que hace: el menú lateral pasa una hoja con una nota propia para cada sección; abrir un diálogo mueve el aire y cerrarlo lo devuelve; firmar un pedido estampa un sello seguido de campanas, y las obras añaden un golpe de yunque; las decisiones del consejo, las peticiones de las ciudades y la financiación de los capítulos tienen su propia firma; los botones + y − suben o bajan de nota según la frecuencia que dejas; las capas del mapa suenan como las palancas de una cabina de enclavamiento; las velocidades dan tantos tics como su número; comenzar la jornada suena como el aviso de megafonía de una estación, con una bocina lejana, y cerrarla con el aviso inverso; pasar de día o delegar el mes repiquetea como las paletas de los antiguos indicadores de salidas; las ciudades, los trenes, las estaciones, las líneas y las obras del mapa suenan distinto al pulsarlos; el zoom, la línea de tiempo, los deslizadores (con una nota que sigue al valor), los selectores, las casillas, los archivos y los atajos de teclado también suenan, y lo que no se puede hacer responde con un «no» suave.
+Todos los efectos son de la misma familia (madera, papel, metal, campanas de mano y vibráfono, grabaciones reales libres) y están escritos en Re pentatónico; mientras suena una pieza, sus notas se transportan a la tonalidad de esa pieza para armonizar con la música. Tienen prioridades para no amontonarse cuando varias cosas pasan a la vez. «Música» → «Efectos de sonido» permite silenciarlos o cambiar su volumen (se oyen aunque la música esté apagada).
 
 LOS PERSONAJES HABLAN
 Pedro Sancho, Raquel Sanz y Óscar del Puente leen en voz alta sus diálogos (tutorial, decisiones y capítulos), con la frase en curso resaltada. Cada uno tiene su propia interpretación burlesca: el presidente, solemne y lento, con fanfarria de inauguración; la ministra, con optimismo de rueda de prensa y «ding» de megafonía; el ministro, a la velocidad de un tuit, con pío de notificación. La música baja mientras hablan.
@@ -61,6 +65,7 @@ dist/train3d.js: modelos 3D procedurales por familia (three.js), miniaturas y vi
 dist/voice.js: voces de los personajes (clips neuronales, respaldo con la voz del sistema, cortinillas y subtítulos). dist/assets/voices.js: clips MP3 generados.
 tools/voice_lines.mjs, tools/voice_direction.json y tools/build_voices.py: regeneran las voces (XTTS-v2 con coqui-tts; frases, tomas y MP3 en investigacion/voces; referencias y créditos en investigacion/voces/referencias/REFERENCIAS.txt). tools/voice_accent.py mide si un audio suena a castellano de España.
 dist/music.js: banda sonora (14 piezas, motor de muestras con capas dinámicas, sostenido encadenado y legato, sintetizadores pregrabados, mezcla por familias, arreglista y reproductor). dist/assets/muestras-orquesta.js, muestras-teclas.js y muestras-percusion.js: banco de instrumentos muestreados en MP3; dist/assets/samples-index.js dice en qué fichero está cada instrumento (todo generado con «npm run samples», tools/build_samples.py, que descarga las bibliotecas libres, detecta la altura real de cada nota y elige las que cubren el registro). dist/render-music.html exporta las piezas a WAV.
+dist/sfx.js: efectos de sonido de la interfaz (recetas por tipo de acción, tabla ACTIONS que asigna un efecto a cada botón, prioridades, volumen propio y afinación con la pieza que suena); sus muestras están en dist/assets/muestras-ui.js.
 dist/train-art.js: ilustraciones laterales (alternativa sin WebGL) por serie (perfil del morro, rodadura, pantógrafo o diésel, puertas, pisos y librea).
 dist/story.js, dist/data.js, dist/gtfs.js: campaña, catálogo y fuentes, importador GTFS.
 dist/assets/timetable.js: horario procesado (generado). dist/assets/fonts: Fraunces, Figtree e IBM Plex Mono (SIL OFL).

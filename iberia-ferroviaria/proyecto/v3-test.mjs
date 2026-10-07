@@ -183,3 +183,18 @@ console.log(ok.slice(-1).map(x => '✓ ' + x).join('\n'));
   assert(!/Cercan[ií]as y Rodalies a la Alta/.test(await (await import('node:fs')).promises.readFile(new URL('./dist/app.js', import.meta.url), 'utf8')));
   console.log(`✓ Voces: ${Object.keys(CAST).length} personajes con voz propia y ${lines.length} diálogos pronunciables y grabados frase a frase (${Object.keys(CLIPS).length} clips).`);
 }
+
+// 11. Efectos de sonido: todos los botones del juego tienen su efecto, y también el mapa, las capas, el zoom, la línea de
+// tiempo, los controles de formulario y los atajos de teclado.
+{
+  const {ACTIONS, RECIPES} = await import('./dist/sfx.js');
+  const src = await (await import('node:fs')).promises.readFile(new URL('./dist/app.js', import.meta.url), 'utf8');
+  const acts = new Set([...src.matchAll(/data-action="([a-z0-9-]+)"/g)].map(m => m[1]).concat([...src.matchAll(/case '([a-z0-9-]+)'/g)].map(m => m[1])));
+  for (const a of acts) assert(a in ACTIONS, 'botón sin efecto de sonido: ' + a);
+  for (const [a, v] of Object.entries(ACTIONS)) assert(/^[@!]/.test(v) || RECIPES[v.replace(/^=/, '')], `${a}: el efecto ${v} no existe`);
+  const other = ['pickCity', 'pickTrain', 'pickStation', 'pickRoute', 'pickWork', 'deselect', 'lever', 'zoomIn', 'zoomOut', 'resetMap', 'scrub', 'slider', 'select', 'toggleOn', 'toggleOff', 'open', 'close', 'page', 'error', 'speed', 'departure', 'pause', 'resume', 'tick', 'tap'];
+  for (const name of other) assert(RECIPES[name], 'falta el efecto ' + name);
+  for (const hook of ["sfx.play('zoomIn')", "sfx.play('zoomOut')", "sfx.play('resetMap')", "sfx.play('lever'", "sfx.play('scrub')", 'sfx.slide(t)', "sfx.play('select')", "sfx.play(t.checked ? 'toggleOn' : 'toggleOff')", "sfx.play(was ? 'page' : 'open')", "sfx.play('close')", "sfx.play('speed'", 'sfx.result(false)'])
+    assert(src.includes(hook), 'falta conectar: ' + hook);
+  console.log(`✓ Efectos de sonido: las ${acts.size} acciones del juego tienen efecto (${Object.keys(RECIPES).length} efectos distintos), también mapa, capas, zoom, línea de tiempo, formularios y teclado.`);
+}

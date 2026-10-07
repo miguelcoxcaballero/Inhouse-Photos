@@ -1,5 +1,8 @@
-IBERIA FERROVIARIA — PLAN Y ESTADO V1.0
+IBERIA FERROVIARIA — PLAN Y ESTADO V1.1
 7 de octubre de 2026.
+
+HECHO EN 1.1
+- Efectos de sonido en todos los botones y clics: 60 efectos de una misma familia (madera, papel, metal, campanas de mano y vibráfono, muestras CC0) asignados a las 73 acciones del juego y al mapa, capas, zoom, línea de tiempo, controles de formulario y atajos de teclado; éxito o error según el resultado de la acción; afinados con la pieza que suena; prioridades para no amontonarse y volumen propio en «Música».
 
 HECHO EN 1.0
 - Banda sonora rehecha con orquesta de verdad: secciones de cuerda (sostenido, spiccato, pizzicato y trémolo) y violín solista con capas piano/forte, maderas, metales, timbales, piano de cola estéreo, Rhodes, saxo, batería multimicrófono y percusión española; 45 instrumentos en tres ficheros de muestras.

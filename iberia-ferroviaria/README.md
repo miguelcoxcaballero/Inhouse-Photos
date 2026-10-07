@@ -1,6 +1,6 @@
-# Iberia Ferroviaria · v1.0
+# Iberia Ferroviaria · v1.1
 
-Juego de gestión ferroviaria en español: diriges Renfe de 2022 a 2050 sobre el mapa de España, con **el horario oficial de todos los trenes de Alta Velocidad, Larga y Media Distancia**, ciudades que piden cosas, un tutorial guiado, trenes en 3D, una banda sonora original de 14 piezas con orquesta, jazz y flamenco muestreados (incluidas una bulería y un pasodoble) y personajes satíricos que hablan con voces en castellano de España.
+Juego de gestión ferroviaria en español: diriges Renfe de 2022 a 2050 sobre el mapa de España, con **el horario oficial de todos los trenes de Alta Velocidad, Larga y Media Distancia**, ciudades que piden cosas, un tutorial guiado, trenes en 3D, una banda sonora original de 14 piezas con orquesta, jazz y flamenco muestreados (incluidas una bulería y un pasodoble), efectos de sonido cuidados en cada botón y clic y personajes satíricos que hablan con voces en castellano de España.
 
 - **Jugar:** abre [`outputs/Iberia-Ferroviaria.html`](outputs/Iberia-Ferroviaria.html) en un navegador moderno. Funciona sin conexión (lleva dentro todas las muestras de la música).
 - **Instrucciones, datos y licencias:** [`proyecto/LEEME.txt`](proyecto/LEEME.txt).

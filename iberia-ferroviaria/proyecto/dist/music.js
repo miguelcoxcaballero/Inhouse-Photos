@@ -305,7 +305,11 @@ export function loadInstruments(ctx, names) {
   })]));
 }
 /** Libera los instrumentos ya decodificados que no estén en `keep`. */
-export function releaseInstruments(keep) { for (const [n, e] of [...decoded]) if (e.value && !keep.has(n) && !SYNTH_BANK[n]) decoded.delete(n); }
+export function releaseInstruments(keep) { for (const [n, e] of [...decoded]) if (e.value && !keep.has(n) && !SYNTH_BANK[n] && !n.startsWith('ui_')) decoded.delete(n); }
+/** Instrumento ya decodificado (para los efectos de la interfaz) o null. */
+export const instrument = name => decoded.get(name)?.value || null;
+/** Pide al servidor, sin decodificarlos, los ficheros de muestras de estos instrumentos (versión web). */
+export function prefetchInstruments(names) { return Promise.all([...new Set(names.filter(n => SAMPLE_INDEX[n] && !bank()[n]).map(n => SAMPLE_INDEX[n]))].map(loadGroup)); }
 function hash(a, b) {
   let x = (Math.floor(a * 9973) ^ Math.imul(b | 0, 2654435761)) >>> 0;
   x = Math.imul(x ^ (x >>> 16), 2246822519) >>> 0; x = Math.imul(x ^ (x >>> 13), 3266489917) >>> 0;
@@ -387,7 +391,7 @@ function hit(ctx, mix, t, name, inst, v, o, I) {
 // ------------------------------------------------------------ mezcla
 /** Respuesta de una sala de conciertos: primeras reflexiones distintas en cada canal y cola en tres bandas que se
  *  apagan a distinto ritmo (los agudos antes que los graves), con un breve crecimiento inicial de la densidad. */
-function hallIR(ctx, seconds = 2.9, rt = [2.5, 2.1, 1.0], pre = .024, taps = [11, 17, 23, 29, 37, 43, 53, 61, 71, 83]) {
+export function hallIR(ctx, seconds = 2.9, rt = [2.5, 2.1, 1.0], pre = .024, taps = [11, 17, 23, 29, 37, 43, 53, 61, 71, 83]) {
   const sr = ctx.sampleRate, len = Math.floor(sr * seconds), buf = ctx.createBuffer(2, len, sr), p0 = Math.floor(sr * pre);
   const a1 = 1 - Math.exp(-2 * Math.PI * 450 / sr), a2 = 1 - Math.exp(-2 * Math.PI * 3800 / sr);
   for (let ch = 0; ch < 2; ch++) {

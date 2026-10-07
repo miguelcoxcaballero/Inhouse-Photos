@@ -8,7 +8,7 @@ biblioteca numera las octavas a su manera), elige las notas que cubren el regist
 inicial, aplica un fundido de salida, iguala el nivel entre notas conservando la diferencia natural entre dinámicas
 (p, f…) y codifica MP3 compactos. Las baterías pueden mezclar varios micrófonos de la misma toma.
 
-Salida: dist/assets/muestras-<grupo>.js (orquesta, teclas, percusion). Cada fichero añade sus instrumentos a
+Salida: dist/assets/muestras-<grupo>.js (orquesta, teclas, percusion y ui, los efectos de la interfaz). Cada fichero añade sus instrumentos a
 window.IBERIA_SAMPLES; dist/assets/samples-index.js dice en qué fichero está cada instrumento, para cargarlos solo
 cuando una pieza los necesita. Créditos y licencias: ../investigacion/musica/MUESTRAS.txt (se regenera aquí).
 
@@ -23,6 +23,8 @@ Fuentes, todas libres:
 - Double bass de D. Smolken (Otto Rubner, 1958), CC0: contrabajo en pizzicato.
 - Weresax (Karoryfer), CC0: saxofón alto.
 - tonejs-instruments (Nicholaus Brosowsky), CC BY 3.0: guitarra española de nailon y bajo eléctrico.
+Interfaz (grupo ui, VCSL y Virtuosity Drums, CC0): caja china, claves, cabasa, triángulo, crótalos, carillón de
+barras, yunque, campanas de mano y vibráfono.
 """
 import base64, json, os, re, subprocess, sys, tempfile, urllib.error, urllib.parse, urllib.request
 
@@ -129,6 +131,11 @@ TONAL = {
                   cands=L(TJI + 'bass-electric/{n}.mp3', ['E1', 'G1', 'As1', 'Cs2', 'E2', 'G2', 'As2', 'Cs3', 'E3', 'G3'], [''])),
     'sax': dict(src='Weresax (Karoryfer), saxofón alto, dinámicas p y f (CC0)', group='teclas', range=(49, 82), gap=4, len=(2.8, 2.4),
                 cands=L(SAX + '{n}_{l}_rr1_cnd.wav', ['db2', 'e2', 'g2', 'bb2', 'db3', 'e3', 'g3', 'bb3', 'db4', 'e4', 'g4', 'ab4'], ['p', 'f'])),
+    # interfaz: campanas de mano (avisos de estación, confirmaciones) y vibráfono suave (notas de los botones)
+    'ui_chime': dict(src='VCSL, campanas de mano (CC0)', group='ui', range=(60, 90), gap=3, len=(2.2, 1.8),
+                     cands=L(VCSL + 'Idiophones/Struck Idiophones/Hand Chimes/sus_{n}_r01_main.wav', ['C4', 'D4', 'F#4', 'A4', 'C5', 'D5', 'E5', 'F#5', 'G#5', 'A#5', 'C6'], [''])),
+    'ui_vibe': dict(src='VCSL, vibráfono con baquetas blandas, notas cortas (CC0)', group='ui', range=(60, 88), gap=3, len=(1.4, 1.1),
+                    cands=L(VCSL + 'Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_{n}_v1_rr1_Main.wav', ['C3', 'E3', 'G3', 'B3', 'D4', 'F4', 'A4', 'C5', 'E5'], [''])),
 }
 
 P = 'Membranophones/Struck Membranophones/'
@@ -178,6 +185,17 @@ DRUMS = {
                   dict(rate=1.5, decay=.03, hp=900)),
     'swell': ('VCSL, crescendo de platillo suspendido (CC0)', [[(VCSL + I + 'Suspended Cymbal 1/susCymb1_cresc_2s.wav', 1)]], 3.2, 44100),
 }
+UI = dict(group='ui')
+DRUMS.update({
+    'ui_wood': ('VCSL, caja china suave (CC0)', [[(VCSL + I + f'Woodblock/wood_click_pp_rr{r}.wav', 1)] for r in (1, 2, 3)], .25, 44100, UI),
+    'ui_woodf': ('VCSL, caja china media y fuerte (CC0)', [[(VCSL + I + 'Woodblock/' + f, 1)] for f in ('wood_click_mp.wav', 'wood_click_f_rr1.wav', 'wood_click_f_rr2.wav')], .3, 44100, UI),
+    'ui_clave': ('Virtuosity Drums, claves suaves (CC0)', [[(VIR + f'perc/mid/claves/Claves1_Hit_v1_rr{r}_Mid.wav', 1)] for r in (1, 2)], .25, 44100, UI),
+    'ui_paper': ('Virtuosity Drums, cabasa frotada (papel) (CC0)', [[(VIR + f'perc/mid/cabasa/Cabasa1_Rub_v1_rr{r}_Mid.wav', 1)] for r in (1, 2, 3)], .45, 44100, UI),
+    'ui_tri': ('VCSL, triángulo apagado (CC0)', [[(VCSL + I + 'Triangles/Legacy/1/triangle1_hit_pp_muted.wav', 1)], [(VCSL + I + 'Triangles/Triangle1_HitM_v1_rr2_Mid.wav', 1)]], .5, 44100, UI),
+    'ui_finger': ('VCSL, crótalos (CC0)', [[(VCSL + I + 'Finger Cymbals/Fing_Cymb.wav', 1)]], 2.0, 44100, UI),
+    'ui_shimmer': ('VCSL, carillón de barras ascendente y descendente (CC0)', [[(VCSL + I + 'Mark Trees/Legacy/windchimes_asc1.wav', 1)], [(VCSL + I + 'Mark Trees/Legacy/windchimes_desc1.wav', 1)]], 2.5, 44100, UI),
+    'ui_anvil': ('VCSL, yunque suave (CC0)', [[(VCSL + I + f'Anvil/Anvil_Hit{h}_v1_rr1_Mid.wav', 1)] for h in (1, 2)], 1.2, 44100, UI),
+})
 DRUM_GROUP = 'percusion'
 
 
@@ -380,11 +398,12 @@ def main():
     only = set(os.environ.get('SOLO', '').split(',')) - {''}
     groups, index, credits, sizes = {}, {}, [], {}
     old = {}
-    for g in ('orquesta', 'teclas', 'percusion'):
+    for g in ('orquesta', 'teclas', 'percusion', 'ui'):
         path = os.path.join(ASSETS, f'muestras-{g}.js')
         if only and os.path.exists(path):  # reconstrucción parcial: conserva el resto
             s = open(path, encoding='utf-8').read()
-            old.update(json.loads(s[s.index('{'): s.rindex('}') + 1]))
+            mark = 'Object.assign(globalThis.IBERIA_SAMPLES, '
+            old.update(json.loads(s[s.index(mark) + len(mark): s.rindex(')')]))
     for name, spec in TONAL.items():
         if only and name not in only:
             if name in old:
@@ -394,12 +413,13 @@ def main():
         groups.setdefault(spec['group'], {})[name] = entry; index[name] = spec['group']; credits.append(credit); sizes[name] = total
         print(f'{name:9} {len(entry["notes"])} notas × {len(entry["layers"])} capas {entry["notes"]} {total / 1024:.0f} KB', flush=True)
     for name, (src, variants, length, sr, *fx) in DRUMS.items():
+        group = (fx[0] if fx else {}).get('group', DRUM_GROUP)
         if only and name not in only:
             if name in old:
-                groups.setdefault(DRUM_GROUP, {})[name] = old[name]; index[name] = DRUM_GROUP
+                groups.setdefault(group, {})[name] = old[name]; index[name] = group
             continue
         entry, credit, total = build_drum(name, src, variants, length, sr, fx[0] if fx else None)
-        groups.setdefault(DRUM_GROUP, {})[name] = entry; index[name] = DRUM_GROUP; credits.append(credit); sizes[name] = total
+        groups.setdefault(group, {})[name] = entry; index[name] = group; credits.append(credit); sizes[name] = total
         print(f'{name:9} {len(entry["data"])} variante(s) {total / 1024:.0f} KB', flush=True)
     for g, bank in groups.items():
         with open(os.path.join(ASSETS, f'muestras-{g}.js'), 'w', encoding='utf-8') as f:

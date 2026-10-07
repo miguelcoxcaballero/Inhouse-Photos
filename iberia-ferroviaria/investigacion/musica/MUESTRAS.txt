@@ -43,6 +43,8 @@ guitar: tonejs-instruments, guitarra española de nailon (CC BY 3.0). Notas MIDI
 upright: D. Smolken, contrabajo Otto Rubner en pizzicato, dinámicas media y fuerte (CC0). Notas MIDI 24(nombre 24)+0.01, 27(nombre 27)-0.19, 31(nombre 31)+0.11, 34(nombre 34)-0.09, 38(nombre 38)+0.11, 41(nombre 41)+0.01, 45(nombre 45)+0.01, 48(nombre 48)+0.01, 52(nombre 52)+0.01, 57(nombre 57)+0.11; 2 capa(s).
 ebass: tonejs-instruments, bajo eléctrico (CC BY 3.0). Notas MIDI 28(nombre 28)+0.11, 34(nombre 34)+0.01, 40(nombre 40)+0.01, 46(nombre 46)+0.01, 52(nombre 52)+0.01, 55(nombre 55)+0.01; 1 capa(s).
 sax: Weresax (Karoryfer), saxofón alto, dinámicas p y f (CC0). Notas MIDI 49(nombre 37)+0.01, 52(nombre 40)+0.01, 55(nombre 43)+0.01, 58(nombre 46)+0.01, 61(nombre 49)+0.01, 64(nombre 52)+0.01, 67(nombre 55)+0.01, 70(nombre 58)+0.01, 73(nombre 61)+0.01, 76(nombre 64)+0.01, 80(nombre 68)+0.01; 2 capa(s).
+ui_chime: VCSL, campanas de mano (CC0). Notas MIDI 72(nombre 60)+0.01, 74(nombre 62)+0.01, 78(nombre 66)+0.11, 81(nombre 69)+0.11, 84(nombre 72)+0.01, 86(nombre 74)+0.01, 88(nombre 76)+0.01, 90(nombre 78)+0.01, 92(nombre 80)+0.11; 1 capa(s).
+ui_vibe: VCSL, vibráfono con baquetas blandas, notas cortas (CC0). Notas MIDI 67(nombre 55)+0.01, 71(nombre 59)+0.01, 74(nombre 62)+0.01, 77(nombre 65)+0.01, 81(nombre 69)+0.01, 84(nombre 72)+0.01, 88(nombre 76)+0.01; 1 capa(s).
 kick: Virtuosity Drums, bombo (micrófono de bombo + ambiente) (CC0); 2 variante(s).
 snare: Virtuosity Drums, caja (CC0); 2 variante(s).
 ghost: Virtuosity Drums, caja suave (CC0); 2 variante(s).
@@ -75,3 +77,11 @@ msnare: VCSL, caja de banda (CC0); 2 variante(s).
 clash: VCSL, platos de choque (CC0); 1 variante(s).
 castanets: aproximación a castañuelas: claves de Virtuosity Drums (CC0) una quinta más agudas y muy apagadas; 4 variante(s).
 swell: VCSL, crescendo de platillo suspendido (CC0); 1 variante(s).
+ui_wood: VCSL, caja china suave (CC0); 3 variante(s).
+ui_woodf: VCSL, caja china media y fuerte (CC0); 3 variante(s).
+ui_clave: Virtuosity Drums, claves suaves (CC0); 2 variante(s).
+ui_paper: Virtuosity Drums, cabasa frotada (papel) (CC0); 3 variante(s).
+ui_tri: VCSL, triángulo apagado (CC0); 2 variante(s).
+ui_finger: VCSL, crótalos (CC0); 1 variante(s).
+ui_shimmer: VCSL, carillón de barras ascendente y descendente (CC0); 2 variante(s).
+ui_anvil: VCSL, yunque suave (CC0); 2 variante(s).

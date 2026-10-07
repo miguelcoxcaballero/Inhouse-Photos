@@ -56,6 +56,7 @@ assert(await page.locator('#modal .train3d canvas').count() === 1, 'visor 3D en 
 await shot(page, '01e-modelo-3d');
 await page.click('[data-action=close-modal]');
 done.push('Banda sonora con instrumentos muestreados en marcha y visor 3D del S112.');
+await page.evaluate(() => { const m = window.railwayGame.sfx.missing; for (const k in m) delete m[k]; });
 // Día laborable de primavera
 await page.evaluate(() => { const g = window.railwayGame, s = g.state(), E = g.engine; s.month = 4; s.ops.day = 11; for (let d; (d = E.pendingDecision(s));) E.decide(s, d.id, 0); document.getElementById('modal').close(); g.render(); });
 await page.click('[data-action=day-start]');
@@ -120,6 +121,14 @@ await page.click('[data-action=day-end]');
 await page.waitForTimeout(600);
 await shot(page, '17-parte-del-dia');
 await page.click('[data-action=day-next]');
+{
+  // efectos de sonido de lo pulsado hasta aquí, todos con sus muestras reales
+  const {log, missing} = await page.evaluate(() => ({log: [...window.railwayGame.sfx.log], missing: {...window.railwayGame.sfx.missing}}));
+  for (const name of ['begin', 'decision', 'tutorialNext', 'pickCity', 'plus', 'open', 'musicPick', 'close', 'departure', 'focus', 'dayEnd', 'dayNext'])
+    assert(log.includes(name), 'no ha sonado el efecto ' + name + ' (sonaron: ' + log.join(', ') + ')');
+  assert.deepEqual(missing, {}, 'efectos con muestras reales');
+  done.push(`Efectos de sonido en cada clic (${new Set(log).size} distintos: ${[...new Set(log)].join(', ')}).`);
+}
 done.push('Noche con luces y parte de la jornada.');
 // Horario real completo
 await page.evaluate(() => { const g = window.railwayGame; g.map.reset(); g.setLayer('real'); g.setMinute(8 * 60); });
@@ -166,9 +175,10 @@ done.push('Móvil 390 × 844 sin desbordamiento horizontal.');
   await w.waitForFunction(() => window.railwayGame.music.current?.ready === true, null, {timeout: 40000});
   await w.waitForTimeout(3000);
   assert.deepEqual(await w.evaluate(() => ({...window.railwayGame.music.substituted})), {}, 'web: todos los instrumentos suenan con sus muestras');
-  assert.deepEqual([...new Set(asked)].sort(), ['muestras-orquesta.js', 'muestras-percusion.js', 'muestras-teclas.js']);
+  assert.deepEqual([...new Set(asked)].sort(), ['muestras-orquesta.js', 'muestras-percusion.js', 'muestras-teclas.js', 'muestras-ui.js']);
+  assert.deepEqual(await w.evaluate(() => ({...window.railwayGame.sfx.missing})), {}, 'web: efectos con muestras reales');
   await w.close(); server.close();
-  done.push('Versión web: la bulería pide sus muestras al servidor al sonar y todos sus instrumentos suenan con muestras reales.');
+  done.push('Versión web: los efectos y la bulería piden sus muestras al servidor y todo suena con muestras reales.');
 }
 await browser.close();
 assert.deepEqual(errors, []);
