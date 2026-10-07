@@ -1,8 +1,10 @@
-// Banda sonora original de Iberia Ferroviaria, sintetizada en tiempo real con Web Audio.
+// Banda sonora original de Iberia Ferroviaria, tocada en tiempo real con Web Audio: instrumentos muestreados reales
+// (assets/samples.js) y sintetizadores para pads, bajos electrónicos y efectos.
 // Doce piezas en dos familias de estilo:
 //  · «Estación» (preparación y menús): bossa nova, jazz ligero, vals, pop y lounge.
 //  · «Red» (jornadas): ambiental orquestal-electrónica de día y piezas nocturnas.
 // Melodías, armonías y arreglos son composiciones originales de este proyecto.
+import {SAMPLE_BANK} from './assets/samples.js';
 
 // ------------------------------------------------------------ teoría
 const PC = {C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11};
@@ -36,7 +38,30 @@ const bassNote = (c, low = 36) => { let n = c.bass; while (n < low) n += 12; ret
 const fifth = (c, low = 36) => bassNote({...c, bass: (c.root + 7) % 12}, low);
 const third = (c, low = 36) => bassNote({...c, bass: (c.root + c.iv[1]) % 12}, low);
 
-// ------------------------------------------------------------ instrumentos
+const pcOf = n => ((n % 12) + 12) % 12;
+const avg = a => a.reduce((s, x) => s + x, 0) / a.length;
+function tones(c, rootless) { const ivs = rootless && c.iv.length >= 4 ? c.iv.slice(1) : c.iv; return [...new Set(ivs.map(i => pcOf(c.root + i)))]; }
+/** Voz con conducción de voces: la inversión (o «drop 2») más cercana a la anterior dentro de [low, high]. */
+function led(c, low, high, prev, rootless = true) {
+  const pcs = tones(c, rootless), cands = [];
+  for (let r = 0; r < pcs.length; r++) {
+    const rot = pcs.slice(r).concat(pcs.slice(0, r));
+    let n = rot[0]; while (n < low) n += 12;
+    const v = [n]; for (let k = 1; k < rot.length; k++) { let x = rot[k]; while (x <= v[k - 1]) x += 12; v.push(x); }
+    if (v.at(-1) <= high) cands.push(v);
+    if (v.length >= 4) { const d = v.slice(); d[d.length - 2] -= 12; d.sort((a, b) => a - b); if (d[0] >= low - 7 && d.at(-1) <= high) cands.push(d); }
+  }
+  if (!cands.length) return voicing(c, low, rootless);
+  const mid = (low + high) / 2;
+  const cost = v => (prev && prev.length ? v.reduce((s, x) => s + Math.min(...prev.map(p => Math.abs(p - x))), 0) + Math.abs(avg(v) - avg(prev)) * .5 : 0) + Math.abs(avg(v) - mid) * .2;
+  return cands.reduce((b, v) => (cost(v) < cost(b) ? v : b));
+}
+/** Segunda voz para la melodía: el tono del acorde más agudo entre 3 y 9 semitonos por debajo (terceras y sextas). */
+function under(m, c) { const pcs = c.iv.map(i => pcOf(c.root + i)); for (let n = m - 3; n >= m - 9; n--) if (pcs.includes(pcOf(n))) return n; return null; }
+/** Nota de aproximación cromática hacia `target`, desde arriba o desde abajo según venga la línea. */
+const approach = (target, from) => target + (from > target ? 1 : -1);
+
+// ------------------------------------------------------------ instrumentos sintetizados
 let noiseBuf = null;
 function noise(ctx) {
   if (noiseBuf && noiseBuf.sampleRate === ctx.sampleRate) return noiseBuf;
@@ -65,7 +90,7 @@ function adsr(p, t, peak, a, d, s, dur, r) {
   p.setTargetAtTime(0, t + Math.max(a, dur), r / 4);
 }
 
-const INSTR = {
+const SYNTH = {
   piano(ctx, bus, t, m, dur, v, o) {
     const f = hz(m), decay = Math.max(.6, 3.2 - (m - 48) * .045), end = t + Math.min(dur + .4, decay + .3);
     const g = out(ctx, bus, t, end, v, o.rev ?? .28, o.del ?? 0, (m - 64) / 60);
@@ -174,75 +199,239 @@ function perc(ctx, bus, t, v, type, f, q, decay, rev, attack = .001) {
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + attack); g.gain.setTargetAtTime(0, t + attack, decay);
 }
 
+// ------------------------------------------------------------ instrumentos muestreados
+// Banco de muestras reales (assets/samples.js): piano de cola, piano eléctrico, vibráfono, marimba, glockenspiel, flauta,
+// clarinete, sección de cuerdas, arpa, guitarra de nailon, contrabajo, bajo eléctrico y percusión acústica.
+// Si una muestra no está decodificada (o no hay Web Audio), suena el sintetizador equivalente.
+const LEVEL = {piano: .5, epiano: .48, vibes: .5, marimba: .55, glock: .3, flute: .42, clarinet: .42, strings: .34, harp: .46, guitar: .46, upright: .38, ebass: .32,
+  hat: .13, hatopen: .09, hatpedal: .1, shaker: .1, tamb: .12, cajon: .4, cajonslap: .21, snare: .24, ghost: .13, rim: .2, conga: .22, congamute: .2, quinto: .2, tumba: .24, bongo: .2, ride: .1, swell: .2, crash: .15};
+const REV = {strings: .45, harp: .4, glock: .5, flute: .35, clarinet: .3, vibes: .35, piano: .28, epiano: .28, upright: .06, ebass: .04, cajon: .08, swell: .5, crash: .35};
+const PAN = {hat: .25, hatopen: .25, hatpedal: .2, shaker: -.3, tamb: .35, conga: -.25, congamute: -.25, quinto: -.35, tumba: -.15, bongo: .3, ride: .3, rim: -.1, crash: .2};
+const BRIGHT = new Set(['piano', 'epiano', 'vibes', 'strings', 'guitar', 'harp', 'marimba']);
+const MEL_GAIN = 2.2; // la melodía, siempre por delante del acompañamiento
+const MIX_GAIN = 2; // ganancia de compensación antes del compresor
+const SUSTAIN = new Set(['strings', 'flute', 'clarinet']);
+const ALIAS = {bell: 'glock'};
+const FALLBACK = {harp: 'pluck', guitar: 'pluck', upright: 'bass', ebass: 'bass', glock: 'bell', hatopen: 'hat', hatpedal: 'hat', ghost: 'snare', cajon: 'kick', cajonslap: 'snare',
+  conga: 'rim', congamute: 'rim', quinto: 'rim', tumba: 'rim', bongo: 'rim', tamb: 'shaker', ride: 'hat'};
+const banks = new WeakMap();
+function b64buf(s) { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
+function decode(ctx, ab) { return new Promise((res, rej) => { const p = ctx.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); }); }
+/** Inicio real del sonido (el MP3 añade un retardo de codificación que se salta al reproducir). */
+function firstSound(buf) {
+  const d = buf.getChannelData(0), n = Math.min(d.length, Math.floor(buf.sampleRate * .5));
+  let peak = 0; for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(d[i]));
+  for (let i = 0; i < n; i++) if (Math.abs(d[i]) > peak * .02) return Math.max(0, i - 24) / buf.sampleRate;
+  return 0;
+}
+/** Decodifica, una sola vez por contexto de audio, los instrumentos que aparecen en `names`. */
+export function loadInstruments(ctx, names) {
+  if (!ctx?.decodeAudioData || typeof atob !== 'function') return Promise.resolve([]);
+  if (!banks.has(ctx)) banks.set(ctx, new Map());
+  const bank = banks.get(ctx);
+  const wanted = [...new Set(names.map(n => ALIAS[n] || n))].filter(n => SAMPLE_BANK[n]);
+  return Promise.all(wanted.map(n => {
+    if (!bank.has(n)) {
+      const entry = {value: null};
+      entry.promise = Promise.all(SAMPLE_BANK[n].data.map(s => decode(ctx, b64buf(s))))
+        .then(bufs => (entry.value = {spec: SAMPLE_BANK[n], bufs: bufs.map(b => ({b, off: firstSound(b)})), rr: 0}))
+        .catch(() => null);
+      bank.set(n, entry);
+    }
+    return bank.get(n).promise;
+  }));
+}
+function sampled(ctx, bus, t, name, m, dur, v, o) {
+  const key = ALIAS[name] || name, inst = banks.get(ctx)?.get(key)?.value;
+  if (!inst) return false;
+  const {spec} = inst, tonal = spec.kind === 'tonal';
+  let k = 0, rate = 1;
+  if (tonal) { const ns = spec.notes; k = ns.reduce((b, n, i) => (Math.abs(n - m) < Math.abs(ns[b] - m) ? i : b), 0); rate = 2 ** ((m - ns[k]) / 12); }
+  else k = inst.rr = (inst.rr + 1) % inst.bufs.length;
+  const {b, off} = inst.bufs[k], avail = (b.duration - off) / rate;
+  const rel = o.rel ?? (SUSTAIN.has(key) ? .35 : .45);
+  const end = tonal ? Math.min(t + avail, t + dur + rel * 3) : t + avail;
+  const pan = o.pan ?? (tonal ? Math.max(-.55, Math.min(.55, (m - 64) / 48)) : PAN[key] || 0);
+  const g = out(ctx, bus, t, end, v, o.rev ?? REV[key] ?? .22, o.del ?? 0, pan);
+  let node = g;
+  if (BRIGHT.has(key)) { const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1600 + v * v * 12000; lp.connect(node); node = lp; }
+  if (o.trem) { const tg = ctx.createGain(), l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = 4.6; lg.gain.value = .28; l.connect(lg); lg.connect(tg.gain); tg.connect(node); node = tg; l.start(t); l.stop(end + .05); }
+  const src = ctx.createBufferSource(); src.buffer = b; src.playbackRate.value = rate * (tonal ? 1 : .97 + Math.random() * .06); src.connect(node);
+  const peak = (LEVEL[key] ?? .4) * Math.pow(v, 1.35) * (o.mel ? MEL_GAIN : 1), a = o.attack ?? (SUSTAIN.has(key) ? .05 : .002);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + a);
+  if (tonal && t + dur < end) g.gain.setTargetAtTime(0, t + Math.max(a, dur), rel / 3);
+  src.start(t, off); src.stop(end + .05);
+  return true;
+}
+
 // ------------------------------------------------------------ estilos de acompañamiento
-// Cada estilo recibe un compás con sus acordes y añade eventos (en pulsos).
+// Cada estilo recibe un compás (x: acordes, sección, estado, aleatorio…) y añade eventos con add(inst, pulso, midi, pulsos, vel, opciones).
+// El estado `st` guarda la última voz de cada instrumento para encadenar los acordes con conducción de voces.
+const CAST = {
+  bossa: {bass: 'upright', counter: 'strings', fill: 'guitar', roll: 'guitar'},
+  swing: {bass: 'upright', counter: 'clarinet', fill: 'vibes', roll: 'piano'},
+  waltz: {bass: 'upright', counter: 'strings', fill: 'harp', roll: 'harp'},
+  pop: {bass: 'ebass', counter: 'strings', fill: 'marimba', roll: 'piano'},
+  ambient: {bass: 'sub', counter: 'strings', fill: 'harp', roll: 'harp'},
+  drive: {bass: 'synthbass', counter: 'clarinet', fill: 'marimba', roll: 'harp'},
+  night: {bass: 'upright', counter: 'clarinet', fill: 'vibes', roll: 'epiano'},
+  lounge: {bass: 'upright', counter: 'strings', fill: 'guitar', roll: 'epiano'},
+};
+function comp(x, inst, beats, low, high, vel, dur, opt = {}) {
+  const {chords, add, st} = x;
+  for (const p of beats) { const c = at(chords, p); const v = st[inst] = led(c.c, low, high, st[inst]); v.forEach((n, k) => add(inst, p + (opt.strum ? k * opt.strum : 0), n, typeof dur === 'function' ? dur(p) : dur, vel * (k === v.length - 1 ? 1.08 : 1), opt)); }
+}
+function padLong(x, inst, low, high, vel, opt = {}) { for (const c of x.chords) { const v = x.st[inst] = led(c.c, low, high, x.st[inst], false); v.forEach(n => x.add(inst, c.start, n, c.len, vel, opt)); } }
+function arp(x, inst, c, start, len, step, low, vel, up = true, opt = {}) {
+  const t = led(c.c, low, low + 14, null, false), seq = up ? [...t, ...t.map(n => n + 12)] : [...t.map(n => n + 12), ...t].reverse();
+  for (let p = 0, k = 0; p < len - 1e-6; p += step, k++) x.add(inst, start + p, seq[k % seq.length], step * 2.2, vel * (k % 2 ? .85 : 1), opt);
+}
+/** Redoble o «fill» de batería en el último compás de la sección. */
+function fill(x, kind) {
+  const {add, M} = x, s = M - 1;
+  if (kind === 'snare') [0, .25, .5, .75].forEach((d, k) => add('snare', s + d, 0, .1, .35 + k * .12));
+  if (kind === 'toms') { [0, .25, .5, .75].forEach((d, k) => add(k < 2 ? 'quinto' : 'tumba', s + d, 0, .1, .45 + k * .1)); add('snare', s + .75, 0, .1, .5); }
+  if (kind === 'conga') [0, .25, .5, .75].forEach((d, k) => add(k % 2 ? 'conga' : 'quinto', s + d, 0, .1, .4 + k * .08));
+  if (kind === 'bongo') [0, .25, .5, .75].forEach((d, k) => add('bongo', s + d, 0, .1, .4 + k * .1));
+  if (kind === 'brush') [.0, .33, .67].forEach((d, k) => add('ghost', s + d, 0, .1, .35 + k * .1));
+}
+function bassLine(x, inst, patt, low = 36) {
+  const {chords, add, next, rand} = x;
+  chords.forEach((c, ci) => {
+    const nextC = chords[ci + 1]?.c || next;
+    for (const [p, what, d, v] of patt) {
+      if (p >= c.len - 1e-6) continue;
+      let n = what === 'r' ? bassNote(c.c, low) : what === '5' ? fifth(c.c, low) : what === '8' ? bassNote(c.c, low) + 12 : what === '3' ? third(c.c, low) : null;
+      if (what === 'a') n = rand() < .55 ? approach(bassNote(nextC, low), bassNote(c.c, low)) : fifth(c.c, low);
+      if (n !== null) add(inst, c.start + p, n, d, v);
+    }
+  });
+}
 const STYLES = {
-  bossa(bar, chords, add, sec) {
-    const pattern = bar % 2 ? [.5, 2, 3.5] : [0, 1.5, 3];
-    for (const p of pattern) { const c = at(chords, p); voicing(c.c, 53).forEach(n => add(sec.comp || 'epiano', p, n, .45, .42)); }
-    for (const c of chords) { add('bass', c.start, bassNote(c.c), 1.4, .8); if (c.len >= 2) add('bass', c.start + 1.5, fifth(c.c), .45, .6); if (c.len >= 4) { add('bass', c.start + 2, bassNote(c.c), 1.4, .75); add('bass', c.start + 3.5, fifth(c.c), .45, .55); } }
-    if (!sec.light) { (bar % 2 ? [1, 2.5] : [0, 1.5, 3]).forEach(p => add('rim', p, 0, .1, .45)); for (let p = 0; p < 4; p += .5) add('shaker', p, 0, .1, p % 1 ? .5 : .3); add('kick', 0, 0, .1, .35); add('kick', 2, 0, .1, .3); }
-    if (sec.pad) chords.forEach(c => voicing(c.c, 60, false).forEach(n => add('strings', c.start, n, c.len, .35, {attack: .6})));
+  bossa(x) {
+    const {i, sec, add, cast} = x, alt = i % 2;
+    comp(x, sec.comp || 'guitar', alt ? [.5, 2, 3.5] : [0, 1.5, 3], 52, 70, .42, .5, {strum: .02});
+    if ((sec.key === 'B' || sec.pad) && sec.comp !== 'epiano') padLong(x, 'epiano', 53, 69, .2, {rev: .35});
+    if ((sec.key === 'B' || sec.pad) && sec.comp === 'epiano') for (const p of [.5, 1.5, 2.5, 3.5]) add('guitar', p, led(at(x.chords, p).c, 58, 70, null)[1], .2, .2);
+    bassLine(x, cast.bass, [[0, 'r', 1.4, .8], [1.5, '5', .45, .6], [2, 'r', 1.4, .75], [3.5, 'a', .45, .55]]);
+    if (!sec.light) {
+      (alt ? [1, 2.5] : [0, 1.5, 3]).forEach(p => add('rim', p, 0, .1, .5));
+      for (let p = 0; p < 4; p += .5) add('shaker', p, 0, .1, p % 1 ? .55 : .3);
+      add('cajon', 0, 0, .1, .4); add('cajon', 2, 0, .1, .34); [1, 3].forEach(p => add('hatpedal', p, 0, .1, .35));
+      if (sec.pad) { add('congamute', 0, 0, .1, .35); add('conga', 3, 0, .1, .45); add('conga', 3.5, 0, .1, .4); if (alt) add('quinto', 1.5, 0, .1, .35); }
+      if (x.last) fill(x, 'bongo');
+    }
+    if (sec.pad) padLong(x, 'strings', 60, 76, .3, {attack: .5});
   },
-  swing(bar, chords, add, sec, next) {
-    for (const c of chords) { const v = voicing(c.c, 52); v.forEach(n => add('piano', c.start, n, .6, .35)); if (c.len >= 2) v.forEach(n => add('piano', c.start + 1.5, n, .3, .3)); }
+  swing(x) {
+    const {chords, add, sec, next, rand, st, cast} = x;
+    const push = rand() < .3 && !x.last;
+    comp(x, 'piano', push ? [0, 1.5] : [0, 1.5, 2.5], 50, 68, .34, p => (p ? .35 : .6));
+    if (push) { const v = st.piano = led(next, 50, 68, st.piano); v.forEach(n => add('piano', 3.5, n, .5, .36)); }
     const beats = [];
     for (const c of chords) for (let b = 0; b < c.len; b++) beats.push({c: c.c, b, last: b === c.len - 1});
-    beats.forEach((x, i) => {
-      const nextRoot = i + 1 < beats.length ? beats[i + 1].c : next || x.c;
-      let n = x.b === 0 ? bassNote(x.c, 34) : x.last ? bassNote(nextRoot, 34) + (i % 2 ? -1 : 1) : x.b === 1 ? third(x.c, 34) : fifth(x.c, 34);
-      add('bass', i, n, .9, .75);
+    beats.forEach((y, k) => {
+      const nextRoot = k + 1 < beats.length ? beats[k + 1].c : next || y.c, cur = bassNote(y.c, 34);
+      const n = y.b === 0 ? cur : y.last ? approach(bassNote(nextRoot, 34), cur) : y.b === 1 ? third(y.c, 34) : fifth(y.c, 34);
+      add(cast.bass, k, n, .9, k % 2 ? .7 : .8);
+      if (rand() < .12 && !y.last) add(cast.bass, k + .67, n, .2, .35);
     });
-    if (!sec.light) { [0, 1, 1.5, 2, 3, 3.5].forEach(p => add('hat', p, 0, .4, p % 1 ? .35 : .55)); [1, 3].forEach(p => add('hat', p, 0, .05, .5)); [0, 1, 2, 3].forEach(p => add('brush', p, 0, .2, .3)); add('kick', 0, 0, .1, .2); }
-    if (sec.pad) chords.forEach(c => voicing(c.c, 60, false).forEach(n => add('pad', c.start, n, c.len, .4, {attack: .5, bright: true})));
-  },
-  waltz(bar, chords, add, sec) {
-    const c = chords[0];
-    add('bass', 0, bar % 2 ? fifth(c.c, 36) : bassNote(c.c, 36), .9, .8);
-    [1, 2].forEach(p => voicing(at(chords, p).c, 55).forEach(n => add('piano', p, n, .4, .32)));
-    if (!sec.light) { add('hat', 0, 0, .05, .3); add('shaker', 1, 0, .05, .25); add('shaker', 2, 0, .05, .25); }
-    if (sec.pad) chords.forEach(cc => voicing(cc.c, 62, false).forEach(n => add('strings', cc.start, n, cc.len, .3, {attack: .4})));
-  },
-  pop(bar, chords, add, sec) {
-    for (const p of [0, 1, 1.5, 2.5, 3]) voicing(at(chords, p).c, 55).forEach(n => add('piano', p, n, .4, .3));
-    for (const c of chords) { add('bass', c.start, bassNote(c.c), .9, .8); if (c.len >= 2) add('bass', c.start + 1.5, bassNote(c.c), .45, .6); if (c.len >= 4) { add('bass', c.start + 2, fifth(c.c), .9, .7); add('bass', c.start + 3, bassNote(c.c) + 12, .45, .6); add('bass', c.start + 3.5, fifth(c.c), .45, .55); } }
-    if (!sec.light) { add('kick', 0, 0, .1, .6); add('kick', 2.5, 0, .1, .45); add('clap', 1, 0, .1, .45); add('clap', 3, 0, .1, .45); for (let p = 0; p < 4; p += .5) add('hat', p, 0, .05, p % 1 ? .45 : .25); }
-    if (sec.pad) chords.forEach(c => voicing(c.c, 64, false).forEach(n => add('strings', c.start, n, c.len, .3, {attack: .3})));
-  },
-  ambient(bar, chords, add, sec) {
-    for (const c of chords) {
-      voicing(c.c, 48, false).forEach(n => add('pad', c.start, n, c.len, .45));
-      add('sub', c.start, bassNote(c.c, 33), c.len, .6);
-      const tones = voicing(c.c, 60, false), arp = [...tones, ...tones.map(n => n + 12)];
-      for (let p = 0; p < c.len; p += .5) { const k = Math.round(p * 2); add('piano', c.start + p, arp[(bar % 2 ? arp.length - 1 - (k % arp.length) : k % arp.length)], .5, .14, {del: .35, rev: .5}); }
-      if (sec.pad) voicing(c.c, 67, false).forEach(n => add('strings', c.start, n, c.len, .3, {attack: 1.4}));
+    if (!sec.light) {
+      [0, 1, 1.67, 2, 3, 3.67].forEach(p => add('ride', p, 0, .4, p % 1 ? .3 : p % 2 ? .55 : .42));
+      [1, 3].forEach(p => add('hatpedal', p, 0, .05, .45)); [0, 1, 2, 3].forEach(p => add('brush', p, 0, .2, .25));
+      if (rand() < .3) add('ghost', rand() < .5 ? 2.67 : 3.67, 0, .1, .3);
+      if (x.first && (sec.key === 'B' || sec.pad)) add('crash', 0, 0, 1, .3);
+      if (x.last) fill(x, 'brush');
     }
-    if (!sec.light) { add('kick', 0, 0, .1, .28); for (let p = .5; p < 4; p += 1) add('hat', p, 0, .05, .14); }
+    if (sec.pad) padLong(x, 'strings', 60, 74, .22, {attack: .5});
   },
-  drive(bar, chords, add, sec) {
+  waltz(x) {
+    const {chords, add, sec, rand, next, st, cast} = x, c = chords[0];
+    const root = x.i % 2 ? fifth(c.c, 36) : bassNote(c.c, 36);
+    add(cast.bass, 0, root, .9, .8);
+    if (chords.length === 1 && rand() < .45) add(cast.bass, 2, approach(bassNote(next, 36), root), .45, .5);
+    comp(x, 'piano', [1, 2], 55, 72, .3, .5);
+    if (sec.pad) { const t = led(at(chords, 0).c, 55, 70, null, false), s = [...t, ...t.map(n => n + 12)]; [0, .5, 1, 1.5, 2, 2.5].forEach((p, k) => add('harp', p, s[k % s.length], 1, .3)); }
+    if (!sec.light) {
+      [1, 2].forEach(p => add('brush', p, 0, .05, .22)); [1, 2].forEach(p => add('hatpedal', p, 0, .05, .26));
+      if (sec.key === 'B') add('tamb', 0, 0, .1, .3);
+      if (x.last && !sec.pad) add('swell', 3 - 2 / x.spb, 0, 2, .32);
+    }
+    if (sec.pad) padLong(x, 'strings', 62, 76, .25, {attack: .4});
+  },
+  pop(x) {
+    const {add, sec, rand, cast} = x;
+    comp(x, 'piano', [0, 1, 1.5, 2.5, 3], 55, 72, .3, .4);
+    if (sec.key === 'B' || sec.pad) comp(x, 'guitar', [0, 1.5, 2, 3, 3.5], 52, 69, .32, .35, {strum: .03});
+    bassLine(x, cast.bass, [[0, 'r', .9, .8], [1.5, 'r', .45, .6], [2, '5', .9, .7], [3, '8', .45, .6], [3.5, 'a', .45, .55]]);
+    if (!sec.light) {
+      add('cajon', 0, 0, .1, .7); add('cajon', 2.5, 0, .1, .5); if (sec.pad) add('cajon', 1.5, 0, .1, .35);
+      [1, 3].forEach(p => add('snare', p, 0, .1, .5)); if (rand() < .4) add('ghost', 3.75, 0, .1, .28);
+      for (let p = 0; p < 4; p += .5) add(p === 3.5 && x.i % 2 ? 'hatopen' : 'hat', p, 0, .05, p % 1 ? .45 : .28);
+      if (sec.pad) { for (let p = .5; p < 4; p += 1) add('tamb', p, 0, .1, .32); [1, 3].forEach(p => add('clap', p, 0, .1, .14)); }
+      if (x.first && sec.pad) add('crash', 0, 0, 1, .35);
+      if (x.last) fill(x, sec.pad ? 'toms' : 'snare');
+    }
+    if (sec.pad) padLong(x, 'strings', 64, 79, .26, {attack: .3});
+  },
+  ambient(x) {
+    const {chords, add, sec, st, cast} = x;
+    for (const c of chords) {
+      st.pad = led(c.c, 48, 64, st.pad, false); st.pad.forEach(n => add('pad', c.start, n, c.len, .09));
+      add(cast.bass, c.start, bassNote(c.c, 33), c.len, .09);
+      if (sec.key === 'A' || sec.pad) arp(x, 'piano', c, c.start, c.len, .5, 60, .11, x.i % 2 === 0, {del: .3, rev: .45});
+      if (sec.key === 'B' || sec.pad) arp(x, 'harp', c, c.start + .25, Math.min(2, c.len), .25, 55, .15, true);
+    }
+    if (sec.pad) padLong(x, 'strings', 62, 78, .2, {attack: 1.2});
+    if (!sec.light) { add('kick', 0, 0, .1, .1); for (let p = .5; p < 4; p += 1) add('hat', p, 0, .05, .16); if (sec.pad) for (let p = .25; p < 4; p += .5) add('shaker', p, 0, .1, .2); }
+    if (x.last && !sec.light) add('swell', 4 - 2 / x.spb, 0, 2, .3);
+  },
+  drive(x) {
+    const {chords, add, sec, st, cast} = x;
     for (const c of chords) {
       const r = bassNote(c.c, 48) + 12, f = r + 7, t = voicing(c.c, r, false)[0] || r + 4, seq = [r, f, r + 12, f, t, f, r + 12, f];
-      for (let p = 0; p < c.len; p += .5) add('pluck', c.start + p, seq[Math.round(p * 2) % 8], .4, .32, {del: .25, short: true});
-      voicing(c.c, 52, false).forEach(n => add('pad', c.start, n, c.len, .4, {attack: .4, bright: true}));
-      for (let p = 0; p < c.len; p += .5) add('synthbass', c.start + p, bassNote(c.c, 36), .4, p % 1 ? .4 : .55);
-      if (sec.pad) add('bell', c.start, voicing(c.c, 76, false).at(-1), 1, .5);
+      for (let p = 0; p < c.len; p += .5) { const k = Math.round(p * 2) % 8; add('pluck', c.start + p, seq[k], .4, .22, {del: .25, short: true}); if (sec.key === 'B' && k % 2 === 0) add('marimba', c.start + p, seq[k] + 12, .3, .22); }
+      st.pad = led(c.c, 52, 67, st.pad, false); st.pad.forEach(n => add('pad', c.start, n, c.len, .22, {attack: .4, bright: true}));
+      for (let p = 0; p < c.len; p += .5) add(cast.bass, c.start + p, bassNote(c.c, 36) + (sec.pad && p % 1 ? 12 : 0), .4, p % 1 ? .11 : .15);
+      if (sec.pad) add('bell', c.start, voicing(c.c, 76, false).at(-1), 1, .45);
     }
-    if (!sec.light) { (sec.pad ? [0, 1, 2, 3] : [0, 2]).forEach(p => add('kick', p, 0, .1, .5)); if (sec.pad) [1, 3].forEach(p => add('clap', p, 0, .1, .4)); for (let p = .5; p < 4; p += 1) add('hat', p, 0, .05, .4); }
+    if (sec.pad) padLong(x, 'strings', 60, 76, .3, {attack: .25});
+    if (!sec.light) {
+      (sec.pad || sec.key === 'B' ? [0, 1, 2, 3] : [0, 2]).forEach(p => add('kick', p, 0, .1, .22));
+      if (sec.key === 'B' || sec.pad) [1, 3].forEach(p => add('snare', p, 0, .1, .42)); if (sec.pad) [1, 3].forEach(p => add('clap', p, 0, .1, .14));
+      for (let p = 0; p < 4; p += .25) add(sec.pad && p % 1 === .5 ? 'hatopen' : 'hat', p, 0, .05, p % 1 === .5 ? .4 : p % .5 ? .18 : .26);
+      if (sec.pad) for (let p = .5; p < 4; p += 1) add('tamb', p, 0, .1, .28);
+      if (x.first && (sec.key === 'B' || sec.pad)) add('crash', 0, 0, 1, .32);
+      if (x.last) fill(x, 'toms');
+    }
   },
-  night(bar, chords, add, sec) {
+  night(x) {
+    const {chords, add, sec, st, cast} = x;
     for (const c of chords) {
-      voicing(c.c, 52).forEach(n => add('epiano', c.start, n, c.len * .95, .38, {trem: true, del: .2}));
-      add('sub', c.start, bassNote(c.c, 33), c.len, .55);
-      if (sec.pad) voicing(c.c, 60, false).forEach(n => add('pad', c.start, n, c.len, .35, {attack: 2}));
+      st.epiano = led(c.c, 52, 68, st.epiano); st.epiano.forEach(n => add('epiano', c.start, n, c.len * .95, .36, {trem: true, del: .2}));
+      add(cast.bass, c.start, bassNote(c.c, 33), Math.min(c.len, 2), .55); add('sub', c.start, bassNote(c.c, 33), c.len, .12);
+      if (sec.pad) { padLong(x, 'pad', 60, 74, .3, {attack: 2}); const t = led(c.c, 64, 78, null, false); t.forEach((n, k) => add('vibes', c.start + 1 + k * .5, n, 1.5, .2, {del: .2})); }
     }
-    if (!sec.light) { add('kick', 0, 0, .1, .3); add('rim', 2, 0, .1, .4); for (let p = .5; p < 4; p += 1) add('hat', p, 0, .05, .18); if (sec.pad) add('kick', 2.5, 0, .1, .2); }
+    if (!sec.light) {
+      add('cajon', 0, 0, .1, .32); add('cajon', 2.5, 0, .1, .22); [1, 3].forEach(p => add('rim', p, 0, .1, .4));
+      for (let p = 0; p < 4; p += .5) add('hat', p + (p % 1 ? .08 : 0), 0, .05, p % 1 ? .2 : .14);
+      if (sec.pad) { add('tumba', 3.5, 0, .1, .3); add('congamute', 1.5, 0, .1, .25); }
+      if (x.last) add('swell', 4 - 2 / x.spb, 0, 2, .26);
+    }
   },
-  lounge(bar, chords, add, sec) {
-    for (const p of [0, 1.5, 2.5, 3.5]) voicing(at(chords, p).c, 53).forEach(n => add('epiano', p, n, p % 1 ? .4 : .8, .34));
-    for (const p of [.5, 1.5, 2.5, 3.5]) { const c = at(chords, p).c; add('pluck', p, voicing(c, 60)[1], .2, .22, {short: true}); }
-    for (const c of chords) { add('bass', c.start, bassNote(c.c), 1.4, .8); if (c.len >= 2) add('bass', c.start + 1.5, fifth(c.c), .45, .6); if (c.len >= 4) { add('bass', c.start + 2.5, bassNote(c.c) + 12, .45, .55); add('bass', c.start + 3.5, fifth(c.c), .45, .5); } }
-    if (!sec.light) { add('kick', 0, 0, .1, .45); add('kick', 2.5, 0, .1, .35); add('rim', 1, 0, .1, .4); add('rim', 3, 0, .1, .4); for (let p = 0; p < 4; p += .5) add('hat', p, 0, .05, p % 1 ? .3 : .18); }
-    if (sec.pad) chords.forEach(c => voicing(c.c, 62, false).forEach(n => add('pad', c.start, n, c.len, .3, {attack: .8, bright: true})));
+  lounge(x) {
+    const {add, sec, cast} = x;
+    comp(x, 'epiano', [0, 1.5, 2.5, 3.5], 53, 69, .32, p => (p % 1 ? .4 : .8));
+    for (const p of [.5, 1.5, 2.5, 3.5]) { const c = at(x.chords, p).c; add('guitar', p, led(c, 60, 72, null)[1], .2, .22); }
+    bassLine(x, cast.bass, [[0, 'r', 1.4, .8], [1.5, '5', .45, .6], [2.5, '8', .45, .55], [3.5, 'a', .45, .5]]);
+    if (!sec.light) {
+      add('cajon', 0, 0, .1, .5); add('cajon', 2.5, 0, .1, .38); [1, 3].forEach(p => add('rim', p, 0, .1, .42));
+      for (let p = 0; p < 4; p += .25) add('shaker', p, 0, .1, p % .5 ? .18 : p % 1 ? .4 : .28);
+      if (sec.key === 'B' || sec.pad) [0, .5, 1, 1.5, 2, 2.5, 3].forEach((p, k) => add('bongo', p, 0, .1, k % 2 ? .22 : .3));
+      if (sec.pad) add('hatopen', 3.5, 0, .1, .25);
+      if (x.last) fill(x, 'conga');
+    }
+    if (sec.pad) padLong(x, 'strings', 62, 76, .22, {attack: .8});
   },
 };
 function at(chords, p) { return chords.reduce((best, c) => (c.start <= p ? c : best), chords[0]); }
@@ -327,65 +516,105 @@ export function validate(song) {
 
 // ------------------------------------------------------------ composición de eventos
 function rng(seed) { let x = 0; for (const c of seed) x = (x * 31 + c.charCodeAt(0)) >>> 0; return () => ((x = (Math.imul(x, 1664525) + 1013904223) >>> 0) / 4294967296); }
-/** Convierte una pieza en una lista de eventos {t (s), inst, midi, dur (s), vel, opt}. */
+/** Convierte una pieza en una lista de eventos {t (s), inst, midi, dur (s), vel, opt}.
+ *  La melodía de cada sección se toca tal cual está escrita (marcada con opt.mel); el arreglo añade conducción de
+ *  voces, segunda voz en las secciones «2», respuestas en los silencios de la melodía, redobles, crescendos de
+ *  platillo y una subida de tono de un semitono en la última vuelta de las piezas animadas. */
 export function arrange(song) {
-  const spb = 60 / song.bpm, M = song.meter, rand = rng(song.id), events = [];
+  const spb = 60 / song.bpm, M = song.meter, rand = rng(song.id), events = [], st = {};
   const form = song.form || ['intro', 'A', 'B', 'A2', 'B2', 'A', 'B', 'A2', 'outro'];
+  const cast = {...CAST[song.style], ...(song.cast || {})};
+  const lift = song.lift ?? (song.family === 'estacion' || song.style === 'drive');
+  const liftFrom = lift ? form.lastIndexOf('A2') : -1;
+  const DYN = {intro: .78, A: .92, B: 1, A2: 1.04, B2: 1.08, outro: .8};
   const swing = b => { if (!song.swing) return b; const f = b - Math.floor(b); return Math.abs(f - .5) < 1e-6 ? Math.floor(b) + .67 : b; };
   let bar0 = 0;
-  for (const part of form) {
-    const key = part[0] === 'B' ? 'B' : 'A', sec = song[key];
+  form.forEach((part, si) => {
+    const key = part[0] === 'B' ? 'B' : 'A', sec = song[key], tr = liftFrom >= 0 && si >= liftFrom ? 1 : 0;
     let bars = sec.chords;
     if (part === 'intro') bars = sec.chords.slice(0, 4);
     if (part === 'outro') bars = sec.chords.slice(-4, -1).concat([sec.chords[0].split(' ')[0]]);
-    const info = {light: part === 'intro' || part === 'outro', pad: part.endsWith('2'), comp: song.style === 'bossa' && song.id === 'pasajeros' ? 'pluck' : null};
+    const info = {key, part, light: part === 'intro' || part === 'outro', pad: part.endsWith('2'), comp: song.style === 'bossa' && song.id === 'pasajeros' ? 'guitar' : song.style === 'bossa' ? 'epiano' : null};
+    const dyn = DYN[part] ?? DYN[key];
+    const spans = [];
+    const mk = base => (inst, beat, m, dur, vel, opt = {}) => {
+      const tight = ['kick', 'snare', 'clap', 'hat', 'hatopen', 'hatpedal', 'shaker', 'rim', 'brush', 'ghost', 'cajon', 'cajonslap', 'conga', 'congamute', 'quinto', 'tumba', 'bongo', 'tamb', 'ride', 'swell', 'crash'].includes(inst);
+      events.push({t: Math.max(0, swing(base + beat) * spb + (rand() - .5) * (tight ? .006 : .012)), inst, midi: tight ? m : m + tr, dur: dur * spb, vel: Math.min(1, vel * (.88 + rand() * .2) * dyn), opt});
+    };
     bars.forEach((spec, i) => {
       const syms = spec.split(' '), len = M / syms.length;
       const chords = syms.map((s, k) => ({c: chord(s), start: k * len, len}));
       const nextSpec = bars[i + 1] || sec.chords[0], next = chord(nextSpec.split(' ')[0]);
-      const base = (bar0 + i) * M;
-      const add = (inst, beat, m, dur, vel, opt = {}) => {
-        const human = INSTR[inst] && ['kick', 'snare', 'clap', 'hat', 'shaker', 'rim', 'brush'].includes(inst) ? .004 : .009;
-        events.push({t: swing(base + beat) * spb + (rand() - .5) * human, inst, midi: m, dur: dur * spb, vel: Math.min(1, vel * (.88 + rand() * .2) * (info.light ? .8 : 1)), opt});
-      };
-      STYLES[song.style](i, chords, add, info, next);
-      if (part === 'outro' && i === bars.length - 1) chords.forEach(c => voicing(c.c, 55, false).forEach(n => add(song.style === 'night' || song.style === 'lounge' || song.style === 'bossa' ? 'epiano' : 'piano', M, n, M * 1.5, .35)));
+      const base = (bar0 + i) * M, add = mk(base);
+      chords.forEach(c => spans.push({start: base + c.start, end: base + c.start + c.len, c: c.c}));
+      STYLES[song.style]({i, n: bars.length, first: i === 0, last: i === bars.length - 1, chords, add, sec: info, next, st, rand, cast, M, spb});
+      if (part === 'intro') { const c = chords[0]; arp({add, st}, cast.roll, c, 0, Math.min(2, M), .25, 55, .22, true); if (i === bars.length - 1) add('swell', M - 2 / spb, 0, 2, .26); }
+      if (part === 'outro' && i === bars.length - 1) {
+        chords.forEach(c => { voicing(c.c, 55, false).forEach((n, k) => add(cast.roll, M + k * .12, n, M * 1.5, .34)); add(cast.bass === 'synthbass' ? 'sub' : cast.bass, M, bassNote(c.c, 33), M * 1.5, cast.bass === 'upright' || cast.bass === 'ebass' ? .5 : .2); });
+        add('crash', M, 0, 2, .16);
+      }
     });
     if (!info.light) {
-      const {notes} = parseMel(sec.mel), lead = song.lead[part.endsWith('2') ? 1 : 0];
-      for (const n of notes) if (n.midi !== null) {
-        const t = swing(bar0 * M + n.beat) * spb + (rand() - .5) * .01, vel = .55 + rand() * .15 + (n.dur >= 2 ? .05 : 0);
-        events.push({t, inst: lead, midi: n.midi + (lead === 'bell' ? 12 : 0), dur: n.dur * spb * .95, vel, opt: {}});
-        if (part.endsWith('2') && song.family === 'estacion' && n.dur >= 1) events.push({t, inst: 'bell', midi: n.midi + 12, dur: .3, vel: .22, opt: {}});
-      }
+      const {notes} = parseMel(sec.mel), lead = song.lead[info.pad ? 1 : 0], other = song.lead[info.pad ? 0 : 1];
+      const counter = cast.counter === lead ? (lead === 'strings' ? 'clarinet' : 'strings') : cast.counter;
+      const chordAt = beat => (spans.find(s => beat >= s.start - 1e-6 && beat < s.end - 1e-6) || spans.at(-1)).c;
+      const melodic = notes.filter(n => n.midi !== null), hi = Math.max(...melodic.map(n => n.midi)), lo = Math.min(...melodic.map(n => n.midi));
+      const add = mk(0);
+      notes.forEach((n, k) => {
+        const beat = bar0 * M + n.beat;
+        if (n.midi === null) {
+          if (n.dur >= 1 && rand() < .8) { const c = chordAt(beat); arp({add, st}, cast.fill, {c}, beat, Math.min(n.dur, 2), .5, 62, .3, false); }
+          return;
+        }
+        const shape = (n.midi - lo) / Math.max(1, hi - lo);
+        const vel = .55 + rand() * .1 + shape * .1 + (n.dur >= 2 ? .05 : 0);
+        add(lead, beat, n.midi + (lead === 'bell' ? 12 : 0), n.dur * .95, vel, {mel: true});
+        if (tr && si === liftFrom && n.dur >= .5) add(other, beat, n.midi + (other === 'bell' ? 12 : n.midi > 76 ? -12 : 0), n.dur * .9, vel * .45, {});
+        if (info.pad && n.dur >= 1) { const u = under(n.midi, chordAt(beat)); if (u !== null) add(counter, beat, u, n.dur * .95, .32, {}); }
+        if (info.pad && song.family === 'estacion' && n.dur >= 1) add('bell', beat, n.midi + 12, .3, .2, {});
+        if (n.dur >= 3 && rand() < .7) { const c = chordAt(beat + 1.5); arp({add, st}, cast.fill, {c}, beat + 1.5, Math.min(n.dur - 1.5, 2), .5, 62, .26, false); }
+      });
     }
     bar0 += bars.length;
-  }
+  });
   events.sort((a, b) => a.t - b.t);
-  return {events, length: bar0 * M * spb + 3.5};
+  return {events, length: bar0 * M * spb + 4};
 }
 
 // ------------------------------------------------------------ mezcla y reproducción
-function impulse(ctx, seconds = 2.8) {
-  const len = Math.floor(ctx.sampleRate * seconds), buf = ctx.createBuffer(2, len, ctx.sampleRate);
-  for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); let last = 0; for (let i = 0; i < len; i++) { const x = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); last = last * .6 + x * .4; d[i] = last; } }
+/** Impulso de reverberación estéreo: sala cálida con predelay y agudos amortiguados. */
+function impulse(ctx, seconds = 3) {
+  const len = Math.floor(ctx.sampleRate * seconds), pre = Math.floor(ctx.sampleRate * .018), buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch); let last = 0;
+    for (let i = pre; i < len; i++) { const k = (i - pre) / (len - pre), damp = .35 + .5 * k; const x = (Math.random() * 2 - 1) * Math.pow(1 - k, 3.4); last = last * damp + x * (1 - damp); d[i] = last; }
+  }
   return buf;
 }
-/** Cadena de mezcla: seco + reverberación + eco, a una salida común. */
+/** Cadena de mezcla: seco + reverberación (sin graves) + eco, a una salida común. */
 export function makeBus(ctx, dest) {
-  const dry = ctx.createGain(), rev = ctx.createConvolver(), revIn = ctx.createGain(), del = ctx.createDelay(1), delIn = ctx.createGain(), fb = ctx.createGain(), delOut = ctx.createGain();
-  rev.buffer = impulse(ctx); revIn.connect(rev); rev.connect(dest); revIn.gain.value = .9;
-  del.delayTime.value = .36; fb.gain.value = .32; delOut.gain.value = .5; delIn.connect(del); del.connect(fb); fb.connect(del); del.connect(delOut); delOut.connect(dest);
+  const dry = ctx.createGain(), rev = ctx.createConvolver(), revIn = ctx.createGain(), hp = ctx.createBiquadFilter(), del = ctx.createDelay(1), delIn = ctx.createGain(), fb = ctx.createGain(), delOut = ctx.createGain(), dlp = ctx.createBiquadFilter();
+  hp.type = 'highpass'; hp.frequency.value = 240; rev.buffer = impulse(ctx); revIn.connect(hp); hp.connect(rev); rev.connect(dest); revIn.gain.value = .85;
+  dlp.type = 'lowpass'; dlp.frequency.value = 3500;
+  del.delayTime.value = .36; fb.gain.value = .3; delOut.gain.value = .45; delIn.connect(del); del.connect(dlp); dlp.connect(fb); fb.connect(del); dlp.connect(delOut); delOut.connect(dest);
   dry.connect(dest);
   return {dry, rev: revIn, del: delIn};
 }
-function play(ctx, bus, e, t0) { INSTR[e.inst](ctx, bus, t0 + e.t, e.midi, e.dur, e.vel, e.opt || {}); }
+function play(ctx, bus, e, t0) {
+  const o = e.opt || {};
+  if (sampled(ctx, bus, t0 + e.t, e.inst, e.midi, e.dur, e.vel, o)) return;
+  const fn = SYNTH[e.inst] || SYNTH[FALLBACK[e.inst]];
+  if (fn) fn(ctx, bus, t0 + e.t, e.midi, e.dur, e.vel, o);
+}
+/** Instrumentos que usa una lista de eventos (para decodificarlos antes de tocar). */
+export const instrumentsOf = events => [...new Set(events.map(e => e.inst))];
 
 /** Renderiza una pieza completa en un búfer (para exportar a audio). */
-export async function renderSong(song, sampleRate = 44100) {
-  const {events, length} = arrange(song);
+export async function renderSong(song, sampleRate = 44100, keep = null) {
+  const {events: all, length} = arrange(song), events = keep ? all.filter(keep) : all;
   const ctx = new OfflineAudioContext(2, Math.ceil(length * sampleRate), sampleRate);
-  const master = ctx.createGain(); master.gain.value = .8;
+  await loadInstruments(ctx, instrumentsOf(events));
+  const master = ctx.createGain(); master.gain.value = .8 * MIX_GAIN;
   const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 3; master.connect(comp); comp.connect(ctx.destination);
   const bus = makeBus(ctx, master);
   for (const e of events) play(ctx, bus, e, .05);
@@ -409,8 +638,9 @@ export class Soundtrack {
     if (!AC) return;
     this.ctx = new AC();
     this.master = this.ctx.createGain(); this.master.gain.value = this.volume;
+    const makeup = this.ctx.createGain(); makeup.gain.value = MIX_GAIN;
     const comp = this.ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 3;
-    this.master.connect(comp); comp.connect(this.ctx.destination);
+    this.master.connect(makeup); makeup.connect(comp); comp.connect(this.ctx.destination);
   }
   start() { this.init(); if (this.enabled && !this.current) this.next(); }
   setVolume(v) { this.volume = v; if (this.master) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, .1); this.save(); this.emit(); }
@@ -435,17 +665,24 @@ export class Soundtrack {
     if (!this.ctx) return;
     this.stop(1.2);
     this.enabled = true; this.save();
-    const gain = this.ctx.createGain(); gain.gain.value = 0; gain.gain.setTargetAtTime(1, this.ctx.currentTime, .4); gain.connect(this.master);
-    const bus = makeBus(this.ctx, gain), {events, length} = arrange(song), t0 = this.ctx.currentTime + .15;
-    const cur = this.current = {song, gain, bus, events, length, t0, i: 0};
-    this.timer = setInterval(() => {
+    const gain = this.ctx.createGain(); gain.gain.value = 0; gain.connect(this.master);
+    const bus = makeBus(this.ctx, gain), {events, length} = arrange(song);
+    const cur = this.current = {song, gain, bus, events, length, t0: 0, i: 0, ready: false};
+    // las muestras se decodifican la primera vez; mientras, la pieza ya figura como «sonando»
+    loadInstruments(this.ctx, instrumentsOf(events)).then(() => {
       if (this.current !== cur) return;
-      const now = this.ctx.currentTime;
-      while (cur.i < events.length && cur.t0 + events[cur.i].t < now + .3) { play(this.ctx, bus, events[cur.i], cur.t0); cur.i++; }
-      if (now > cur.t0 + length) this.next();
-    }, 60);
+      cur.t0 = this.ctx.currentTime + .15; cur.ready = true;
+      gain.gain.setTargetAtTime(1, this.ctx.currentTime, .4);
+      clearInterval(this.timer);
+      this.timer = setInterval(() => {
+        if (this.current !== cur) return;
+        const now = this.ctx.currentTime;
+        while (cur.i < events.length && cur.t0 + events[cur.i].t < now + .3) { play(this.ctx, bus, events[cur.i], cur.t0); cur.i++; }
+        if (now > cur.t0 + length) this.next();
+      }, 60);
+    });
     this.emit();
   }
   next() { if (this.enabled) this.play(this.pick()); }
-  get position() { return this.current && this.ctx ? Math.max(0, this.ctx.currentTime - this.current.t0) : 0; }
+  get position() { return this.current?.ready && this.ctx ? Math.max(0, this.ctx.currentTime - this.current.t0) : 0; }
 }

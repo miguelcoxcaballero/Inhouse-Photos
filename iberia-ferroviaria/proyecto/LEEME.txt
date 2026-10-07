@@ -1,4 +1,4 @@
-IBERIA FERROVIARIA — VERSIÓN JUGABLE 0.7
+IBERIA FERROVIARIA — VERSIÓN JUGABLE 0.8
 Actualización: 7 de octubre de 2026.
 
 PARA JUGAR
@@ -33,7 +33,7 @@ Cada serie de material se ve como un modelo 3D (three.js) iluminado con sol, som
 Ya no hay material de Cercanías (Civia, 450/451, 452, 463/464/465…): el catálogo es de AV, LD y MD.
 
 BANDA SONORA
-Doce piezas originales compuestas para el juego, en el espíritu de las músicas de juegos de construcción y simulación de vida (melodías amables, piano eléctrico, vibráfono, bossa y swing ligeros, ambientes largos). No copian ni citan melodías existentes: se generan en tiempo real con Web Audio, sin ficheros de audio.
+Doce piezas originales compuestas para el juego, en el espíritu de las músicas de juegos de construcción y simulación de vida (melodías amables, piano eléctrico, vibráfono, bossa y swing ligeros, ambientes largos). No copian ni citan melodías existentes. Se tocan en tiempo real con Web Audio y suenan con instrumentos reales muestreados (piano de cola Salamander, piano eléctrico, vibráfono, marimba, glockenspiel, flauta, clarinete, sección de cuerdas, arpa, guitarra de nailon, contrabajo, bajo eléctrico y percusión acústica: cajón, congas, bongós, caja, charles, shaker, pandereta y platillos), con sintetizadores para pads y bajos electrónicos. Los arreglos encadenan los acordes con conducción de voces, añaden segunda voz y respuestas a la melodía, redobles, crescendos de platillo y suben un semitono en la última vuelta de las piezas animadas; las melodías son exactamente las mismas que en la versión anterior.
 «Estación» (menús y preparación): Andén 1, Horario de verano, Tarifa reducida, Estación del Norte, Cambio de ancho, Pasajeros al tren.
 «Red» (jornada en marcha): Primera salida, Vía libre, Talgo a medianoche, Corredor Mediterráneo, Atardecer en la meseta, Obras nocturnas.
 En modo automático la música cambia según lo que haces y la hora del día (piezas nocturnas de noche). El botón «Música» de la barra lateral abre el reproductor: elegir pieza, orden (automático, lista, repetir), volumen y apagar. Empieza con el primer clic.
@@ -57,7 +57,7 @@ dist/app.js, dist/index.html, dist/style-v3.css: interfaz.
 dist/train3d.js: modelos 3D procedurales por familia (three.js), miniaturas y visor.
 dist/voice.js: voces de los personajes (clips neuronales, respaldo con la voz del sistema, cortinillas y subtítulos). dist/assets/voices.js: clips MP3 generados.
 tools/voice_lines.mjs, tools/voice_direction.json y tools/build_voices.py: regeneran las voces (XTTS-v2 con coqui-tts; frases, tomas y MP3 en investigacion/voces; referencias y créditos en investigacion/voces/referencias/REFERENCIAS.txt). tools/voice_accent.py mide si un audio suena a castellano de España.
-dist/music.js: banda sonora (12 piezas, sintetizadores Web Audio, arreglos y reproductor); dist/render-music.html la exporta a WAV.
+dist/music.js: banda sonora (12 piezas, motor de muestras y sintetizadores Web Audio, arreglos y reproductor); dist/assets/samples.js: banco de instrumentos muestreados (generado con tools/build_samples.py); dist/render-music.html la exporta a WAV.
 dist/train-art.js: ilustraciones laterales (alternativa sin WebGL) por serie (perfil del morro, rodadura, pantógrafo o diésel, puertas, pisos y librea).
 dist/story.js, dist/data.js, dist/gtfs.js: campaña, catálogo y fuentes, importador GTFS.
 dist/assets/timetable.js: horario procesado (generado). dist/assets/fonts: Fraunces, Figtree e IBM Plex Mono (SIL OFL).
@@ -75,5 +75,5 @@ Vías: © OpenStreetMap contributors, ODbL 1.0 (LICENSE-OSM.txt). España y Port
 Tipografías: SIL Open Font License 1.1 (dist/assets/fonts).
 three.js r159: MIT (dist/assets/LICENSE-three.txt).
 Voces: sintetizadas con XTTS-v2 (Coqui, Coqui Public Model License 1.0: solo uso no comercial, lo que se aplica a estos audios) a partir de grabaciones de «dave» (NabuCasa/voice-datasets, CC0) y de voces de estudio de XTTS. Son voces sintéticas; no imitan a ninguna persona real.
-Banda sonora: composición original para este proyecto.
+Banda sonora: composición original para este proyecto. Instrumentos muestreados: Salamander Grand Piano V3 (Alexander Holm, CC BY 3.0), FluidR3_GM (Frank Wen, CC BY 3.0), VSCO 2 Community Edition y VCSL (Versilian Studios, CC0), tonejs-instruments (Nicholaus Brosowsky; muestras de la Philharmonia Orchestra y otras, CC BY 3.0). Detalle en investigacion/musica/MUESTRAS.txt.
 Las marcas identifican operadores y fabricantes. No es un producto oficial de Renfe, Adif ni Alsa.

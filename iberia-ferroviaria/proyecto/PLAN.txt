@@ -1,5 +1,9 @@
-IBERIA FERROVIARIA — PLAN Y ESTADO V0.7
+IBERIA FERROVIARIA — PLAN Y ESTADO V0.8
 7 de octubre de 2026.
+
+HECHO EN 0.8
+- Banda sonora con instrumentos reales muestreados (piano de cola, cuerdas, arpa, maderas, láminas, guitarra, contrabajo y percusión acústica) y arreglos más ricos: conducción de voces, segunda voz, respuestas, redobles y subida de tono final. Melodías intactas (comprobado por test).
+- Voces recomprimidas a 40 kbps para dejar sitio al banco de muestras.
 
 HECHO EN 0.7
 - Voces definitivas: XTTS-v2 con una grabación real de España y voces castellanas verificadas con un medidor de acento; cada toma comprobada.

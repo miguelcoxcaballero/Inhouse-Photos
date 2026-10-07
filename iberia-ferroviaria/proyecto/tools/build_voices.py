@@ -132,7 +132,7 @@ def main():
                 sf.write(tmp.name, x, engine.sr)
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', tmp.name, '-af',
                             'silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse,loudnorm=I=-17:TP=-1.5:LRA=11',
-                            '-ar', '24000', '-ac', '1', '-c:a', 'libmp3lame', '-b:a', '64k', mp3], check=True)
+                            '-ar', '24000', '-ac', '1', '-c:a', 'libmp3lame', '-b:a', '40k', mp3], check=True)
             os.unlink(tmp.name)
             made += 1
             report.append({'id': item['id'], 'person': item['person'], 'text': text, 'takes': scores})

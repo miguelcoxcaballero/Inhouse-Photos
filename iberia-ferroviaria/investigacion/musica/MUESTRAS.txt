@@ -1,0 +1,44 @@
+MUESTRAS DE LA BANDA SONORA (dist/assets/samples.js)
+
+Generadas con tools/build_samples.py a partir de bibliotecas libres. La música (melodías, armonías y arreglos)
+es composición original del proyecto; las muestras solo dan el timbre de los instrumentos.
+
+Licencias:
+- Salamander Grand Piano V3, Alexander Holm: CC BY 3.0 (https://github.com/sfzinstruments/SalamanderGrandPiano).
+- FluidR3_GM, Frank Wen: CC BY 3.0 (https://github.com/gleitz/midi-js-soundfonts).
+- VSCO 2 Community Edition, Versilian Studios: CC0 (https://github.com/sgossner/VSCO-2-CE).
+- VCSL, Versilian Community Sample Library: CC0 (https://github.com/sgossner/VCSL).
+- tonejs-instruments, Nicholaus P. Brosowsky (muestras de la Philharmonia Orchestra y otras): CC BY 3.0
+  (https://github.com/nbrosowsky/tonejs-instruments).
+
+Instrumentos (altura detectada; entre paréntesis, la que indica el nombre del fichero; desviación en semitonos):
+piano: Salamander Grand Piano V3 (CC BY 3.0). Muestras MIDI 36(nombre 36)+0.01, 39(nombre 39)+0.01, 42(nombre 42)+0.01, 45(nombre 45)+0.01, 48(nombre 48)+0.01, 51(nombre 51)+0.01, 54(nombre 54)+0.01, 57(nombre 57)+0.01, 60(nombre 60)+0.01, 63(nombre 63)+0.01, 66(nombre 66)+0.01, 69(nombre 69)+0.11, 72(nombre 72)+0.11, 75(nombre 75)+0.11, 78(nombre 78)+0.01, 81(nombre 81)+0.11, 84(nombre 84)+0.11, 87(nombre 87)+0.11, 90(nombre 90)+0.11, 93(nombre 93)+0.21, 96(nombre 96)+0.31.
+epiano: FluidR3_GM, Electric Piano 1 (CC BY 3.0). Muestras MIDI 48(nombre 48)+0.01, 52(nombre 52)+0.01, 56(nombre 56)+0.01, 60(nombre 60)+0.01, 64(nombre 64)+0.01, 68(nombre 68)+0.01, 72(nombre 72)+0.01, 76(nombre 76)+0.01, 80(nombre 80)+0.01, 84(nombre 84)+0.01, 88(nombre 88)+0.01.
+vibes: VCSL, Vibraphone soft mallets (CC0). Muestras MIDI 53(nombre 41)+0.11, 57(nombre 45)+0.01, 60(nombre 48)+0.01, 64(nombre 52)+0.01, 67(nombre 55)+0.01, 71(nombre 59)+0.01, 74(nombre 62)+0.01, 77(nombre 65)+0.01, 81(nombre 69)+0.01, 84(nombre 72)+0.01, 88(nombre 76)+0.01.
+marimba: VCSL, Marimba (CC0). Muestras MIDI 55(nombre 43)+0.01, 59(nombre 47)+0.01, 65(nombre 53)+0.01, 72(nombre 60)+0.01, 79(nombre 67)+0.01, 83(nombre 71)+0.01, 89(nombre 77)+0.01, 96(nombre 84)+0.11.
+glock: VCSL, Glockenspiel (CC0). Muestras MIDI 79(nombre 67)+0.01, 84(nombre 72)+0.11, 91(nombre 79)+0.11, 96(nombre 96)+0.31, 103(nombre 91)+0.21.
+flute: tonejs-instruments, flauta (CC BY 3.0). Muestras MIDI 60(nombre 60)+0.01, 64(nombre 64)+0.01, 69(nombre 69)+0.01, 72(nombre 72)+0.01, 76(nombre 76)+0.01, 81(nombre 81)+0.01, 84(nombre 84)+0.01, 88(nombre 88)+0.01, 93(nombre 93)+0.01, 96(nombre 96)+0.01.
+clarinet: tonejs-instruments, clarinete (CC BY 3.0). Muestras MIDI 50(nombre 50)+0.01, 53(nombre 53)+0.01, 58(nombre 58)+0.01, 62(nombre 62)+0.01, 65(nombre 65)+0.11, 70(nombre 70)+0.01, 74(nombre 74)+0.01, 77(nombre 77)+0.11, 82(nombre 82)+0.01, 86(nombre 86)+0.11.
+strings: VSCO 2 CE, secciones de violines, violas y violonchelos (CC0). Muestras MIDI 36(nombre 24)+0.01, 43(nombre 31)+0.01, 47(nombre 35)+0.01, 50(nombre 38)+0.01, 55(nombre 43)+0.01, 60(nombre 48)+0.01, 65(nombre 53)+0.01, 69(nombre 57)+0.01, 72(nombre 60)+0.01, 76(nombre 64)+0.01, 79(nombre 67)+0.01, 83(nombre 71)+0.01, 86(nombre 74)+0.01.
+harp: VSCO 2 CE, arpa (CC0). Muestras MIDI 38(nombre 38)-0.09, 41(nombre 41)-0.09, 45(nombre 45)+0.01, 48(nombre 48)+0.01, 52(nombre 52)+0.01, 55(nombre 55)-0.09, 59(nombre 59)-0.09, 62(nombre 62)-0.09, 65(nombre 65)+0.01, 69(nombre 69)-0.09, 72(nombre 72)-0.09, 76(nombre 76)-0.09, 79(nombre 79)-0.09, 83(nombre 83)-0.09, 86(nombre 86)-0.09.
+guitar: tonejs-instruments, guitarra de nailon (CC BY 3.0). Muestras MIDI 40(nombre 40)+0.01, 44(nombre 44)+0.01, 47(nombre 47)+0.01, 50(nombre 50)+0.01, 54(nombre 54)+0.01, 57(nombre 57)+0.01, 61(nombre 61)+0.01, 64(nombre 64)+0.01, 68(nombre 68)+0.01, 71(nombre 71)+0.01, 75(nombre 74)+0.01, 78(nombre 78)+0.11.
+upright: VSCO 2 CE, contrabajo pizzicato (CC0). Muestras MIDI 28(nombre 16)+0.01, 34(nombre 22)+0.06, 40(nombre 47)-0.19, 45(nombre 33)+0.16, 49(nombre 37)+0.01, 52(nombre 40)+0.01.
+ebass: tonejs-instruments, bajo eléctrico (CC BY 3.0). Muestras MIDI 28(nombre 28)+0.11, 34(nombre 34)+0.01, 40(nombre 40)+0.01, 46(nombre 46)+0.01, 52(nombre 52)+0.01, 55(nombre 55)+0.01.
+hat: VCSL, charles (CC0).
+hatopen: VCSL, charles abierto (CC0).
+hatpedal: VCSL, charles con pedal (CC0).
+shaker: VCSL, shaker pequeño (CC0).
+tamb: VCSL, pandereta (CC0).
+cajon: VCSL, cajón (CC0).
+cajonslap: VCSL, cajón (CC0).
+snare: VCSL, caja moderna (CC0).
+ghost: VCSL, caja, toques suaves (CC0).
+rim: VCSL, caja, golpe de aro (CC0).
+conga: VCSL, conga (CC0).
+congamute: VCSL, conga apagada (CC0).
+quinto: VCSL, quinto (CC0).
+tumba: VCSL, tumbadora (CC0).
+bongo: VCSL, bongó (CC0).
+ride: VCSL, platillo suspendido con baqueta (CC0).
+swell: VCSL, crescendo de platillo (CC0).
+crash: VCSL, platillo suspendido (CC0).

@@ -143,8 +143,26 @@ console.log(ok.slice(-1).map(x => '✓ ' + x).join('\n'));
     const {events, length} = arrange(s);
     assert(events.length > 300 && length > 80, s.title);
     assert(events.every(e => e.t >= -0.05 && e.t < length && Number.isFinite(e.midi) && e.vel > 0 && e.vel <= 1), s.title);
+    // la melodía escrita suena entera y sin cambios: mismas notas y duraciones, solo transportada un semitono en la última vuelta
+    const form = s.form || ['intro', 'A', 'B', 'A2', 'B2', 'A', 'B', 'A2', 'outro'], want = [];
+    for (const part of form) if (part !== 'intro' && part !== 'outro') {
+      let beat = 0;
+      for (const tok of s[part[0] === 'B' ? 'B' : 'A'].mel.trim().split(/\s+/)) { const [n, d] = tok.split(':'); if (n !== '-') want.push({n, d: +d}); beat += +d; }
+    }
+    const mel = events.filter(e => e.opt?.mel);
+    assert.equal(mel.length, want.length, s.title + ': notas de melodía');
+    const {midi} = await import('./dist/music.js');
+    let lifted = false;
+    mel.forEach((e, k) => {
+      const diff = e.midi - midi(want[k].n) - (e.inst === 'bell' ? 12 : 0);
+      assert(diff === 0 || diff === 1, `${s.title}: nota ${k} alterada (${diff})`);
+      if (diff === 1) lifted = true; else assert(!lifted, s.title + ': la subida de tono no vuelve atrás');
+      assert(Math.abs(e.dur - want[k].d * .95 * 60 / s.bpm) < 1e-6, s.title + ': duración de la nota ' + k);
+    });
+    const insts = new Set(events.map(e => e.inst));
+    assert(insts.size >= 10, s.title + ': orquestación');
   }
-  console.log(`✓ Banda sonora: ${SONGS.length} piezas originales (${SONGS.filter(s => s.family === 'estacion').length} «Estación», ${SONGS.filter(s => s.family === 'red').length} «Red»), compases y eventos válidos.`);
+  console.log(`✓ Banda sonora: ${SONGS.length} piezas originales (${SONGS.filter(s => s.family === 'estacion').length} «Estación», ${SONGS.filter(s => s.family === 'red').length} «Red»), compases y eventos válidos; melodías intactas y arreglos con ${Math.round(SONGS.reduce((n, s) => n + arrange(s).events.length, 0) / SONGS.length)} eventos por pieza de media.`);
 }
 
 // 10. Voces y diálogos: cada personaje tiene voz, y todo el texto hablado es pronunciable.

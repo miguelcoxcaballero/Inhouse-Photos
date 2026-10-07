@@ -44,6 +44,7 @@ assert(await page.evaluate(() => !!window.railwayGame.music.current), 'la banda 
 await page.click('#musicBtn');
 await page.click('[data-action=music-play][data-id=vialibre]');
 assert.equal(await page.evaluate(() => window.railwayGame.music.current.song.id), 'vialibre');
+await page.waitForFunction(() => window.railwayGame.music.current?.ready === true, null, {timeout: 20000});
 await shot(page, '01d-banda-sonora');
 await page.click('[data-action=close-modal]');
 await page.evaluate(() => window.railwayGame.navigate('market'));
@@ -52,7 +53,7 @@ await page.waitForTimeout(1500);
 assert(await page.locator('#modal .train3d canvas').count() === 1, 'visor 3D en la ficha de pedido');
 await shot(page, '01e-modelo-3d');
 await page.click('[data-action=close-modal]');
-done.push('Banda sonora en marcha y visor 3D del S112.');
+done.push('Banda sonora con instrumentos muestreados en marcha y visor 3D del S112.');
 // Día laborable de primavera
 await page.evaluate(() => { const g = window.railwayGame, s = g.state(), E = g.engine; s.month = 4; s.ops.day = 11; for (let d; (d = E.pendingDecision(s));) E.decide(s, d.id, 0); document.getElementById('modal').close(); g.render(); });
 await page.click('[data-action=day-start]');
