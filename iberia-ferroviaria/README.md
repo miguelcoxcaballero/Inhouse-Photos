@@ -1,18 +1,18 @@
-# Iberia Ferroviaria · v1.1
+# Iberia Ferroviaria · v2.0
 
-Juego de gestión ferroviaria en español: diriges Renfe de 2022 a 2050 sobre el mapa de España, con **el horario oficial de todos los trenes de Alta Velocidad, Larga y Media Distancia**, ciudades que piden cosas, un tutorial guiado, trenes en 3D, una banda sonora original de 14 piezas con orquesta, jazz y flamenco muestreados (incluidas una bulería y un pasodoble), efectos de sonido cuidados en cada botón y clic y personajes satíricos que hablan con voces en castellano de España.
+Juego de gestión ferroviaria en español: diriges la alta velocidad de Renfe de 2022 a 2050 sobre el mapa de España. Solo hay **AVE y Alvia**, y lo que puede circular depende de la vía: ancho estándar, ibérico o mixto, con catenaria o sin ella. Electrificas, pones tercer carril, pasas líneas a ancho estándar y construyes cambiadores, con **el horario oficial de todos los AVE y Alvia**, mapas de anchos y de electrificación, nueve personajes satíricos con retrato propio y tres caras, imprevistos que te obligan a decidir, trenes en 3D, banda sonora original y voces en castellano de España.
 
-- **Jugar:** abre [`outputs/Iberia-Ferroviaria.html`](outputs/Iberia-Ferroviaria.html) en un navegador moderno. Funciona sin conexión (lleva dentro todas las muestras de la música).
+- **Jugar:** abre [`outputs/Iberia-Ferroviaria.html`](outputs/Iberia-Ferroviaria.html) en un navegador moderno. Funciona sin conexión.
 - **Instrucciones, datos y licencias:** [`proyecto/LEEME.txt`](proyecto/LEEME.txt).
 - **Estado y próximos pasos:** [`proyecto/PLAN.txt`](proyecto/PLAN.txt) · **Verificación:** [`proyecto/VERIFICACION.txt`](proyecto/VERIFICACION.txt).
 
 ```sh
 cd proyecto
-npm run timetable   # regenera dist/assets/timetable.js desde investigacion/gtfs (Python 3 + numpy)
-npm run samples     # regenera el banco de muestras de la banda sonora (Python 3 + numpy, soundfile, librosa)
+npm run infra       # regenera la red de anchos y catenaria (dist/assets/infra.js) sobre las vías OSM
+npm run timetable   # regenera el horario AVE y Alvia desde investigacion/gtfs (Python 3 + numpy)
 npm run build       # genera ../outputs/Iberia-Ferroviaria.html y la versión web ../outputs/web/
-npm test            # motor, campaña completa, horario oficial y jornadas
-node ui-v3-test.mjs /ruta/a/playwright/index.mjs   # recorrido de interfaz con capturas
+npm test            # reglas del juego y campaña completa 2022–2050 jugada por un jugador automático
+node ui-test.mjs /ruta/a/playwright/index.mjs   # recorrido de interfaz con capturas
 ```
 
-Horarios: Renfe Data (CC BY 4.0). Vías: © OpenStreetMap contributors (ODbL). three.js (MIT). Historia alternativa: la escasez inicial, los cierres de 2022 y los personajes son ficción; la economía y 2027–2050 son simulación.
+Horarios: Renfe Data (CC BY 4.0). Vías: © colaboradores de OpenStreetMap (ODbL). three.js (MIT). La economía y lo que pasa desde 2027 es simulación.

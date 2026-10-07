@@ -1,5 +1,16 @@
-IBERIA FERROVIARIA — PLAN Y ESTADO V1.1
+IBERIA FERROVIARIA — PLAN Y ESTADO V2.0
 7 de octubre de 2026.
+
+HECHO EN 2.0
+- Solo alta velocidad: el horario oficial se filtra a AVE, AVLO y Alvia (393 circulaciones en laborable, 91 relaciones) y el catálogo a 9 modelos AVE y Alvia. Fuera Media Distancia, Regionales, Avant, Intercity y el atlas de series.
+- Red de infraestructura nueva (tools/build_infra.py): 90 nodos y 125 tramos trazados sobre OSM con ancho (estándar, ibérico o mixto), electrificación (25 kV, 3 kV o ninguna) y velocidad; 11 cambiadores en 2022; obras históricas en su fecha (Burgos y Plasencia — Badajoz en 2022, Murcia en 2022, Pajares en 2023, catenaria de Extremadura en 2023) y 1.189 km proyectados.
+- Recorridos por producto sobre la red de cada momento (AVE fijo estándar, Alvia eléctrico con cambiadores, Alvia híbrido sin catenaria), con lo que falta explicado tramo a tramo y regla contra desvíos absurdos.
+- Obras de tramo (electrificar, tercer carril, ancho estándar que corta la línea) y cambiadores; mapas «Anchos» y «Electrificación»; fichas de tramo y de nodo; relación nueva entre dos ciudades.
+- Nueve personajes con retrato ilustrado propio y tres expresiones; seis voces nuevas; 22 imprevistos aleatorios con decisión (algunos son apuestas).
+- Diálogos reescritos en tono faltón; fuera los avisos de ficción, los enlaces externos y el texto que sobraba.
+- Interfaz: cinco secciones (Jornada, Red, Trenes, Obras, Despacho) con pestañas cortas; paneles de papel con doble filete dorado, cabeceras esmaltadas con divisoria de vía, ventanas con retrato y placa, tutorial que señala y desplaza hasta cada botón.
+- Equilibrio: los costes suben un 1,2 % al año; una campaña completa jugada por un jugador automático supera los cinco capítulos yendo justa de caja (campaign-test.mjs).
+- Pruebas nuevas: reglas (test.mjs), campaña completa (campaign-test.mjs) e interfaz con capturas (ui-test.mjs).
 
 HECHO EN 1.1
 - Efectos de sonido en todos los botones y clics: 60 efectos de una misma familia (madera, papel, metal, campanas de mano y vibráfono, muestras CC0) asignados a las 73 acciones del juego y al mapa, capas, zoom, línea de tiempo, controles de formulario y atajos de teclado; éxito o error según el resultado de la acción; afinados con la pieza que suena; prioridades para no amontonarse y volumen propio en «Música».
@@ -50,12 +61,13 @@ HECHO EN 0.3
 8. Partidas v0.2 importables.
 
 SIGUIENTES PASOS PROPUESTOS
+- Velocidades por tramo según obra (renovación de vía a 220 km/h, variantes) y limitaciones temporales de velocidad.
+- Cambiadores de ancho con capacidad y averías propias por modelo (Talgo, CAF BRAVA), y conversión del Corredor Mediterráneo por fases reales.
 - Voces: grabar referencias con actores reales de España (10–15 s por personaje, con permiso) para clonar timbre e interpretación más burlescos.
 - Modelos 3D modelados a mano (glTF) por serie, con interiores, para sustituir la reconstrucción procedural.
 - Banda sonora: escucha humana y ajuste fino de la mezcla pieza a pieza; castañuelas grabadas de verdad si aparece una biblioteca libre.
 - Horarios históricos: reconstruir 2022–2026 con versiones archivadas del GTFS (el archivo público conserva copias diarias desde marzo de 2026; harían falta otras fuentes para 2022).
 - Asignación de material por circulación y rotaciones (diagramas de turnos) con depósitos reales.
-- Vía estrecha (antigua FEVE) desde OSM railway=narrow_gauge para eliminar los tramos aproximados del norte.
 - Demanda por estación con datos públicos de viajeros (Renfe Data, Consorcios) en lugar de parámetros por línea.
 - Festivos autonómicos y locales; horarios de verano y Navidad.
 - Competidores ferroviarios (iryo, Ouigo) con sus horarios y efecto en la cuota por corredor.

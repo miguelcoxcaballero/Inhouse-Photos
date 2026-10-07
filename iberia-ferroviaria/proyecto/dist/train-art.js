@@ -48,8 +48,7 @@ const SERIES = {
   2400: 'metricDiesel', 2600: 'metricDiesel', 2700: 'metricDiesel', 2900: 'metric', 3300: 'metric', 3500: 'metric', 3600: 'metric', 3800: 'metric',
   401: 'metric', 402: 'alpine', 334: 'loco',
 };
-const MODEL_SERIES = {s112: '112', s130: '130', s599: '599', s449: '449', civia: '463', metric: '2700', s106f: '106', s106v: '106', s107: '107',
-  s452: '452', s453: '453', s453long: '453', s480: '480', s460: '460', s401: '401', future: 'future', s480uic: '480'};
+const MODEL_SERIES = {s100: '100', s112: '112', s103: '103', s106f: '106', s106v: '106', av2030: 'future', s120: '120', s130: '130', s730: '730', future: 'future'};
 
 let uid = 0;
 

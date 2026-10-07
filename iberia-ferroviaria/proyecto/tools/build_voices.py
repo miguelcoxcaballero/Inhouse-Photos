@@ -29,6 +29,12 @@ CAST = {
     'president': {'temperature': 0.75, 'speed': 0.92, 'repetition_penalty': 5.0},   # solemne, de mitin
     'minister': {'temperature': 0.8, 'speed': 1.0, 'repetition_penalty': 5.0},      # rueda de prensa entusiasta
     'successor': {'temperature': 0.8, 'speed': 1.08, 'repetition_penalty': 5.0},    # rápido, de tuit
+    'treasury': {'temperature': 0.72, 'speed': 0.98, 'repetition_penalty': 5.0},    # seca, de funcionaria con tijera
+    'adif': {'temperature': 0.75, 'speed': 0.96, 'repetition_penalty': 5.0},        # ingeniero resignado
+    'workshop': {'temperature': 0.78, 'speed': 0.94, 'repetition_penalty': 5.0},    # mecánico veterano
+    'riders': {'temperature': 0.8, 'speed': 1.06, 'repetition_penalty': 5.0},       # indignada
+    'mayor': {'temperature': 0.8, 'speed': 1.0, 'repetition_penalty': 5.0},         # alcalde de pueblo
+    'rival': {'temperature': 0.75, 'speed': 1.02, 'repetition_penalty': 5.0},       # ejecutivo engolado
 }
 
 

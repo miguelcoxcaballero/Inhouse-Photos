@@ -1,45 +1,33 @@
 [
  {
-  "id": "1mpzu5e",
+  "id": "1to431s",
   "person": "minister",
-  "raw": "¡Enhorabuena, presidente de Renfe!",
-  "text": "¡Enhorabuena, presidente de Renfe!"
+  "raw": "Enhorabuena por el cargo, que es precioso: todo el mundo sabe hacerlo mejor que tú.",
+  "text": "Enhorabuena por el cargo, que es precioso: todo el mundo sabe hacerlo mejor que tú."
  },
  {
-  "id": "1kzo5tq",
+  "id": "68qy0",
   "person": "minister",
-  "raw": "Es un cargo precioso: todo el mundo sabe hacerlo mejor que tú.",
-  "text": "Es un cargo precioso: todo el mundo sabe hacerlo mejor que tú."
+  "raw": "Te dejo media flota parada y dos anchos de vía que no se hablan desde mil ochocientos cuarenta y ocho.",
+  "text": "Te dejo media flota parada y dos anchos de vía que no se hablan desde mil ochocientos cuarenta y ocho."
  },
  {
-  "id": "1s0exci",
+  "id": "mcz2k",
   "person": "minister",
-  "raw": "España sale de la pandemia y, en esta historia alternativa, a alguien se le ocurrió ahorrar dejando trenes en vía muerta.",
-  "text": "España sale de la pandemia y, en esta historia alternativa, a alguien se le ocurrió ahorrar dejando trenes en vía muerta."
+  "raw": "Pon trenes, atiende a los alcaldes, que llamarán, y encarga material sin vaciar la caja.",
+  "text": "Pon trenes, atiende a los alcaldes, que llamarán, y encarga material sin vaciar la caja."
  },
  {
-  "id": "rmvi6n",
+  "id": "boq74y",
   "person": "minister",
-  "raw": "Las vías siguen ahí; la paciencia de los viajeros, regular.",
-  "text": "Las vías siguen ahí; la paciencia de los viajeros, regular."
+  "raw": "Yo lo venderé en rueda de prensa como un éxito.",
+  "text": "Yo lo venderé en rueda de prensa como un éxito."
  },
  {
-  "id": "t884e9",
+  "id": "1jlm734",
   "person": "minister",
-  "raw": "Recupera catorce servicios, atiende a los alcaldes, que llamarán, créeme, reforma material y encarga trenes nuevos sin vaciar la caja.",
-  "text": "Recupera catorce servicios, atiende a los alcaldes, que llamarán, créeme, reforma material y encarga trenes nuevos sin vaciar la caja."
- },
- {
-  "id": "1sj1bm3",
-  "person": "minister",
-  "raw": "Yo lo contaré en rueda de prensa como un éxito.",
-  "text": "Yo lo contaré en rueda de prensa como un éxito."
- },
- {
-  "id": "1lpmlau",
-  "person": "minister",
-  "raw": "Tú encárgate de que lo sea.",
-  "text": "Tú encárgate de que lo sea."
+  "raw": "Tú encárgate de que lo sea, que para eso cobras.",
+  "text": "Tú encárgate de que lo sea, que para eso cobras."
  },
  {
   "id": "132i8f",
@@ -48,28 +36,22 @@
   "text": "Querido presidente de Renfe: hoy España elige."
  },
  {
-  "id": "906hzi",
+  "id": "1ktv41i",
   "person": "president",
-  "raw": "Elige Ouigo, elige iryo, elige el autobús con un wifi que no funciona.",
-  "text": "Elige Uigo, elige íryo, elige el autobús con un wifi que no funciona."
+  "raw": "Elige iryo, elige Ouigo, elige el autobús con un wifi que no funciona.",
+  "text": "Elige íryo, elige Uigo, elige el autobús con un wifi que no funciona."
  },
  {
-  "id": "1w8e4eb",
+  "id": "1l7zihl",
   "person": "president",
-  "raw": "Y yo quiero que elija Renfe, porque Renfe es España, y España, modestamente, soy un poco yo.",
-  "text": "Y yo quiero que elija Renfe, porque Renfe es España, y España, modestamente, soy un poco yo."
+  "raw": "Y yo quiero que elija Renfe, porque Renfe es España, y España, modestamente, soy yo.",
+  "text": "Y yo quiero que elija Renfe, porque Renfe es España, y España, modestamente, soy yo."
  },
  {
-  "id": "1c8020v",
+  "id": "1pdj11t",
   "person": "president",
-  "raw": "Combina frecuencias, puntualidad y precios.",
-  "text": "Combina frecuencias, puntualidad y precios."
- },
- {
-  "id": "1nrwny4",
-  "person": "president",
-  "raw": "Llegan los primeros trenes nuevos: decide dónde ponerlos.",
-  "text": "Llegan los primeros trenes nuevos: decide dónde ponerlos."
+  "raw": "Pon más trenes, construye algún cambiador de ancho y deja de perder viajeros, que da mala imagen.",
+  "text": "Pon más trenes, construye algún cambiador de ancho y deja de perder viajeros, que da mala imagen."
  },
  {
   "id": "ar0xdk",
@@ -78,10 +60,10 @@
   "text": "Si sale bien, lo anuncio yo."
  },
  {
-  "id": "6n768r",
+  "id": "rw0kd1",
   "person": "president",
-  "raw": "Si sale mal, ya sabes dónde está tu despacho.",
-  "text": "Si sale mal, ya sabes dónde está tu despacho."
+  "raw": "Si sale mal, ya sabes dónde está la puerta.",
+  "text": "Si sale mal, ya sabes dónde está la puerta."
  },
  {
   "id": "1lmlp5p",
@@ -90,22 +72,28 @@
   "text": "Te lo resumo en un tuit: corredor mediterráneo, ya."
  },
  {
-  "id": "7al992",
+  "id": "1v9qii1",
   "person": "successor",
-  "raw": "Bueno, «ya» lo llevamos diciendo treinta años.",
-  "text": "Bueno, ya lo llevamos diciendo treinta años."
+  "raw": "Bueno, ese «ya» lo llevamos diciendo treinta años.",
+  "text": "Bueno, ese ya lo llevamos diciendo treinta años."
  },
  {
-  "id": "187xgjp",
+  "id": "1o77qvn",
   "person": "successor",
-  "raw": "La demanda no entiende de anchos de vía; la infraestructura, por desgracia, sí.",
-  "text": "La demanda no entiende de anchos de vía; la infraestructura, por desgracia, sí."
+  "raw": "La demanda no entiende de anchos de vía; la vía, por desgracia, sí.",
+  "text": "La demanda no entiende de anchos de vía; la vía, por desgracia, sí."
  },
  {
-  "id": "16aomhh",
+  "id": "lbnejj",
   "person": "successor",
-  "raw": "Negocia La Encina y Murcia–Almería, aguanta los cortes con autobuses y no me cortes una cinta antes de que haya catenaria, que luego salen memes.",
-  "text": "Negocia La Encina y Murcia, Almería, aguanta los cortes con autobuses y no me cortes una cinta antes de que haya catenaria, que luego salen memes."
+  "raw": "Quiero un AVE de València a Barcelona y la alta velocidad en Almería.",
+  "text": "Quiero un Ave de València a Barcelona y la alta velocidad en Almería."
+ },
+ {
+  "id": "97g1r",
+  "person": "successor",
+  "raw": "Pon tercer carril donde haga falta y no me cortes una cinta sin catenaria, que luego salen memes.",
+  "text": "Pon tercer carril donde haga falta y no me cortes una cinta sin catenaria, que luego salen memes."
  },
  {
   "id": "bwd3cf",
@@ -114,32 +102,26 @@
   "text": "Y si alguien te dice que esto se hace en dos años, bloquéalo."
  },
  {
-  "id": "1hd023d",
-  "person": "minister",
+  "id": "1apdcko",
+  "person": "successor",
   "raw": "Ha vuelto la España vaciada a los telediarios, así que toca acordarse de ella.",
   "text": "Ha vuelto la España vaciada a los telediarios, así que toca acordarse de ella."
  },
  {
-  "id": "145geiv",
-  "person": "minister",
-  "raw": "¿Solo vamos a crecer donde más se vende?",
-  "text": "¿Solo vamos a crecer donde más se vende?"
+  "id": "1f51ima",
+  "person": "successor",
+  "raw": "Que sí, que Madrid y Barcelona dan dinero, pero Soria, Teruel y Extremadura también tienen urnas.",
+  "text": "Que sí, que Madrid y Barcelona dan dinero, pero Soria, Teruel y Extremadura también tienen urnas."
  },
  {
-  "id": "ow6hw5",
-  "person": "minister",
-  "raw": "Pues no, que hay elecciones.",
-  "text": "Pues no, que hay elecciones."
+  "id": "1996d8m",
+  "person": "successor",
+  "raw": "Electrifica lo que siga con gasóleo, lleva el AVE a más ciudades y termina alguna línea nueva antes de que me jubile.",
+  "text": "Electrifica lo que siga con gasóleo, lleva el Ave a más ciudades y termina alguna línea nueva antes de que me jubile."
  },
  {
-  "id": "6qf3iq",
-  "person": "minister",
-  "raw": "Recupera conexiones regionales, lleva la renovación al norte y construye una línea propia.",
-  "text": "Recupera conexiones regionales, lleva la renovación al norte y construye una línea propia."
- },
- {
-  "id": "tm6rur",
-  "person": "minister",
+  "id": "d9j9dw",
+  "person": "successor",
   "raw": "Rentabilidad y servicio público pueden convivir, como los cuñados en Nochebuena: con esfuerzo y sin hablar de política.",
   "text": "Rentabilidad y servicio público pueden convivir, como los cuñados en Nochebuena: con esfuerzo y sin hablar de política."
  },
@@ -150,16 +132,16 @@
   "text": "Llega la hora del legado, que es como llamamos los políticos a la foto final."
  },
  {
-  "id": "1vxtjeo",
+  "id": "58iqrx",
   "person": "president",
-  "raw": "Sustituye los trenes viejos, consolida los servicios y deja una compañía solvente.",
-  "text": "Sustituye los trenes viejos, consolida los servicios y deja una compañía solvente."
+  "raw": "Quiero AVE hasta en el último rincón con estación, trenes llenos y unas cuentas que no den vergüenza.",
+  "text": "Quiero Ave hasta en el último rincón con estación, trenes llenos y unas cuentas que no den vergüenza."
  },
  {
-  "id": "ekowb9",
+  "id": "om3vil",
   "person": "president",
-  "raw": "En 2050 a ti te juzgarán por la cobertura, la satisfacción y las cuentas.",
-  "text": "En 2050 a ti te juzgarán por la cobertura, la satisfacción y las cuentas."
+  "raw": "A ti te juzgarán por la red que dejes.",
+  "text": "A ti te juzgarán por la red que dejes."
  },
  {
   "id": "1wku6h",
@@ -168,16 +150,16 @@
   "text": "A mí me juzgará la Historia, que ya me la he leído y salgo estupendamente."
  },
  {
-  "id": "9d6wga",
+  "id": "1dmisv8",
   "person": "minister",
-  "raw": "Los alcaldes quieren sus trenes de vuelta.",
-  "text": "Los alcaldes quieren sus trenes de vuelta."
+  "raw": "Los alcaldes quieren sus trenes.",
+  "text": "Los alcaldes quieren sus trenes."
  },
  {
-  "id": "541uhl",
+  "id": "1gfxzzn",
   "person": "minister",
-  "raw": "Hacienda quiere su dinero de vuelta.",
-  "text": "Hacienda quiere su dinero de vuelta."
+  "raw": "Hacienda quiere su dinero.",
+  "text": "Hacienda quiere su dinero."
  },
  {
   "id": "m5s6oq",
@@ -192,46 +174,70 @@
   "text": "¿Qué ponemos primero?"
  },
  {
-  "id": "30de16",
+  "id": "1w1bmyp",
   "person": "minister",
-  "raw": "La factura energética de 2022 trae más ceros que un fichaje de verano.",
-  "text": "La factura energética de 2022 trae más ceros que un fichaje de verano."
+  "raw": "Piénsalo rápido, que tengo una inauguración.",
+  "text": "Piénsalo rápido, que tengo una inauguración."
  },
  {
-  "id": "1j7gwhf",
-  "person": "minister",
-  "raw": "Tienes que decidir cómo amortiguar el golpe durante doce meses.",
-  "text": "Tienes que decidir cómo amortiguar el golpe durante doce meses."
+  "id": "ovfifr",
+  "person": "treasury",
+  "raw": "La factura eléctrica de este año trae más ceros que un fichaje de verano.",
+  "text": "La factura eléctrica de este año trae más ceros que un fichaje de verano."
  },
  {
-  "id": "obzbzh",
-  "person": "minister",
-  "raw": "Te adelanto el final: las dos opciones duelen.",
-  "text": "Te adelanto el final: las dos opciones duelen."
+  "id": "1vx8q4u",
+  "person": "treasury",
+  "raw": "O pagamos un seguro de precio, o rezamos.",
+  "text": "O pagamos un seguro de precio, o rezamos."
  },
  {
-  "id": "15nldb6",
-  "person": "minister",
-  "raw": "Desde septiembre de 2022 los abonos de Cercanías y Media Distancia son gratuitos, y media España ha descubierto que existe el regional.",
-  "text": "Desde septiembre de 2022 los abonos de Cercanías y Media Distancia son gratuitos, y media España ha descubierto que existe el regional."
+  "id": "b5le8r",
+  "person": "treasury",
+  "raw": "Te adelanto el final: las dos opciones duelen, y la segunda, más.",
+  "text": "Te adelanto el final: las dos opciones duelen, y la segunda, más."
  },
  {
-  "id": "w0yuke",
+  "id": "z96f1d",
   "person": "minister",
-  "raw": "Puedes reforzar la oferta con una ayuda extraordinaria…",
-  "text": "Puedes reforzar la oferta con una ayuda extraordinaria…"
+  "raw": "Julio de dos mil veintidós: abre la alta velocidad de Venta de Baños a Burgos, con su cambiador de ancho incluido.",
+  "text": "Julio de dos mil veintidós: abre la alta velocidad de Venta de Baños a Burgos, con su cambiador de ancho incluido."
  },
  {
-  "id": "1r06nhy",
+  "id": "bno58r",
   "person": "minister",
-  "raw": "o encomendarte a la Virgen del Pilar.",
-  "text": "o encomendarte a la Virgen del Pilar."
+  "raw": "Ya puedes llevar el AVE a Burgos, y los Alvia del norte cambiarán de ancho allí.",
+  "text": "Ya puedes llevar el Ave a Burgos, y los Alvia del norte cambiarán de ancho allí."
  },
  {
-  "id": "fqlgco",
+  "id": "l32ljn",
+  "person": "minister",
+  "raw": "Yo me encargo de la foto.",
+  "text": "Yo me encargo de la foto."
+ },
+ {
+  "id": "1j0k0u",
+  "person": "minister",
+  "raw": "Tú, de que haya trenes en la foto.",
+  "text": "Tú, de que haya trenes en la foto."
+ },
+ {
+  "id": "1gu4gnd",
+  "person": "minister",
+  "raw": "El Gobierno regala descuentos para viajar en tren y media España ha descubierto que existe el Alvia.",
+  "text": "El Gobierno regala descuentos para viajar en tren y media España ha descubierto que existe el Alvia."
+ },
+ {
+  "id": "qun952",
+  "person": "minister",
+  "raw": "Puedes reforzar el servicio con ayuda extraordinaria, o encomendarte a la Virgen del Pilar y que los viajeros vayan de pie.",
+  "text": "Puedes reforzar el servicio con ayuda extraordinaria, o encomendarte a la Virgen del Pilar y que los viajeros vayan de pie."
+ },
+ {
+  "id": "ftqocv",
   "person": "president",
-  "raw": "En noviembre de 2022 llega iryo, con trenes rojos y mucha sonrisa.",
-  "text": "En noviembre de 2022 llega íryo, con trenes rojos y mucha sonrisa."
+  "raw": "En noviembre llega iryo, con trenes rojos y mucha sonrisa.",
+  "text": "En noviembre llega íryo, con trenes rojos y mucha sonrisa."
  },
  {
   "id": "svxna",
@@ -240,10 +246,10 @@
   "text": "Ya no hay viajeros cautivos, presidente: hay viajeros con una aplicación para comparar precios."
  },
  {
-  "id": "1blu88f",
+  "id": "rviul2",
   "person": "president",
-  "raw": "Yo, por mi parte, celebro la competencia.",
-  "text": "Yo, por mi parte, celebro la competencia."
+  "raw": "Yo celebro la competencia.",
+  "text": "Yo celebro la competencia."
  },
  {
   "id": "1co9byn",
@@ -252,16 +258,46 @@
   "text": "En público."
  },
  {
-  "id": "b6x8on",
-  "person": "minister",
-  "raw": "Pequeño contratiempo con el gálibo de los nuevos trenes de ancho métrico.",
-  "text": "Pequeño contratiempo con el gálibo de los nuevos trenes de ancho métrico."
+  "id": "4vavss",
+  "person": "president",
+  "raw": "En privado, espabila.",
+  "text": "En privado, espabila."
  },
  {
-  "id": "hgtrnz",
+  "id": "1us1qlq",
   "person": "minister",
-  "raw": "Que no cunda el pánico: se detectó en el diseño, no hay ningún tren atascado en un túnel, digan lo que digan los memes.",
-  "text": "Que no cunda el pánico: se detectó en el diseño, no hay ningún tren atascado en un túnel, digan lo que digan los memes."
+  "raw": "Veinte de diciembre de dos mil veintidós: el AVE llega a Murcia.",
+  "text": "Veinte de diciembre de dos mil veintidós: el Ave llega a Murcia."
+ },
+ {
+  "id": "15v6dz5",
+  "person": "minister",
+  "raw": "Veinte años de promesas y tres ministros después, pero llega.",
+  "text": "Veinte años de promesas y tres ministros después, pero llega."
+ },
+ {
+  "id": "epx85s",
+  "person": "minister",
+  "raw": "Los murcianos no se lo creen; yo tampoco, sinceramente.",
+  "text": "Los murcianos no se lo creen; yo tampoco, sinceramente."
+ },
+ {
+  "id": "lkv2yp",
+  "person": "minister",
+  "raw": "Unos trenes nuevos de vía estrecha no caben por los túneles del norte.",
+  "text": "Unos trenes nuevos de vía estrecha no caben por los túneles del norte."
+ },
+ {
+  "id": "10q64my",
+  "person": "minister",
+  "raw": "No son nuestros, pero el titular sí.",
+  "text": "No son nuestros, pero el titular sí."
+ },
+ {
+  "id": "k6i0ak",
+  "person": "minister",
+  "raw": "Que no cunda el pánico: no hay ningún tren atascado en un túnel, digan lo que digan los memes.",
+  "text": "Que no cunda el pánico: no hay ningún tren atascado en un túnel, digan lo que digan los memes."
  },
  {
   "id": "17n12qk",
@@ -270,22 +306,22 @@
   "text": "Aun así, esto huele a dimisión."
  },
  {
-  "id": "eng29q",
+  "id": "ub40z4",
   "person": "minister",
-  "raw": "Tú, por si acaso, decide rápido: ¿cómo cubrimos la espera?",
-  "text": "Tú, por si acaso, decide rápido: ¿cómo cubrimos la espera?"
+  "raw": "Tú, por si acaso, revisa lo tuyo.",
+  "text": "Tú, por si acaso, revisa lo tuyo."
  },
  {
-  "id": "1et43xo",
+  "id": "12y8oca",
   "person": "successor",
-  "raw": "29 de noviembre de 2023: se abre la variante de Pajares.",
-  "text": "29 de noviembre de 2023: se abre la variante de Pajares."
+  "raw": "Veintinueve de noviembre de dos mil veintitrés: se abre la variante de Pajares, en ancho mixto, con cambiador en Pola de Lena.",
+  "text": "Veintinueve de noviembre de dos mil veintitrés: se abre la variante de Pajares, en ancho mixto, con cambiador en Pola de Lena."
  },
  {
-  "id": "1jh8xay",
+  "id": "16ndw8f",
   "person": "successor",
-  "raw": "Casi veinte años de obras y unos cincuenta kilómetros de túneles: una obra española de las de toda la vida.",
-  "text": "Casi veinte años de obras y unos cincuenta kilómetros de túneles: una obra española de las de toda la vida."
+  "raw": "Casi veinte años de obras y cincuenta kilómetros de túneles: una obra española de las de toda la vida.",
+  "text": "Casi veinte años de obras y cincuenta kilómetros de túneles: una obra española de las de toda la vida."
  },
  {
   "id": "1r3ybmo",
@@ -300,16 +336,40 @@
   "text": "Lástima que tu flota siga siendo la que es."
  },
  {
-  "id": "lzsn6r",
+  "id": "bvt8nk",
   "person": "successor",
-  "raw": "21 de mayo de 2024: el S106 entra en servicio comercial.",
-  "text": "21 de mayo de 2024: el ese 106 entra en servicio comercial."
+  "raw": "Plasencia, Cáceres, Mérida y Badajoz ya tienen catenaria.",
+  "text": "Plasencia, Cáceres, Mérida y Badajoz ya tienen catenaria."
  },
  {
-  "id": "101cwta",
+  "id": "q5aliq",
   "person": "successor",
-  "raw": "Treinta unidades contratadas que no llegan todas de golpe, que esto no es un pedido por internet.",
-  "text": "Treinta unidades contratadas que no llegan todas de golpe, que esto no es un pedido por internet."
+  "raw": "Lo que no tienen es catenaria hasta Madrid, porque de Talavera a Plasencia seguimos con gasóleo como en los ochenta.",
+  "text": "Lo que no tienen es catenaria hasta Madrid, porque de Talavera a Plasencia seguimos con gasóleo como en los ochenta."
+ },
+ {
+  "id": "d68fvb",
+  "person": "successor",
+  "raw": "Ya no hay excusa para el tren de museo.",
+  "text": "Ya no hay excusa para el tren de museo."
+ },
+ {
+  "id": "i3hxr7",
+  "person": "successor",
+  "raw": "O electrificas lo que falta, o al menos pones Alvia decentes.",
+  "text": "O electrificas lo que falta, o al menos pones Alvia decentes."
+ },
+ {
+  "id": "xql4ef",
+  "person": "successor",
+  "raw": "Mayo de dos mil veinticuatro: el S106 entra en servicio.",
+  "text": "Mayo de dos mil veinticuatro: el ese 106 entra en servicio."
+ },
+ {
+  "id": "ohbaj0",
+  "person": "successor",
+  "raw": "Treinta trenes contratados que no llegan todos de golpe, que esto no es un pedido por internet.",
+  "text": "Treinta trenes contratados que no llegan todos de golpe, que esto no es un pedido por internet."
  },
  {
   "id": "1di3bws",
@@ -318,16 +378,16 @@
   "text": "Ya lo he tuiteado tres veces."
  },
  {
-  "id": "xi2xft",
+  "id": "1rdwg3b",
   "person": "successor",
-  "raw": "¿Lo celebramos o nos ponemos a trabajar?",
-  "text": "¿Lo celebramos o nos ponemos a trabajar?"
+  "raw": "¿Lo celebramos o nos ponemos a trabajar, que también se puede?",
+  "text": "¿Lo celebramos o nos ponemos a trabajar, que también se puede?"
  },
  {
-  "id": "143ywa9",
+  "id": "jdiy2t",
   "person": "successor",
-  "raw": "Marzo de 2026: Renfe licita treinta trenes de alta velocidad y diez opcionales.",
-  "text": "Marzo de 2026: Renfe licita treinta trenes de alta velocidad y diez opcionales."
+  "raw": "Renfe licita treinta trenes de alta velocidad y diez opcionales.",
+  "text": "Renfe licita treinta trenes de alta velocidad y diez opcionales."
  },
  {
   "id": "cxggdd",
@@ -336,28 +396,28 @@
   "text": "Ojo, licitar no es comprar: es como mirar pisos en el portal inmobiliario un domingo por la tarde."
  },
  {
-  "id": "1uea5dd",
+  "id": "15xwslf",
   "person": "successor",
-  "raw": "El catálogo abre una plataforma futura de ficción, con entregas largas.",
-  "text": "El catálogo abre una plataforma futura de ficción, con entregas largas."
+  "raw": "Se abre el catálogo de la nueva generación, con entregas largas.",
+  "text": "Se abre el catálogo de la nueva generación, con entregas largas."
  },
  {
-  "id": "1oy9uru",
+  "id": "rje53f",
   "person": "president",
-  "raw": "Evento simulado.",
-  "text": "Evento simulado."
+  "raw": "Cuarenta y cinco grados en Córdoba, lo que allí llaman una tarde fresquita.",
+  "text": "Cuarenta y cinco grados en Córdoba, lo que allí llaman una tarde fresquita."
  },
  {
-  "id": "1w5r85p",
+  "id": "g2urtg",
   "person": "president",
-  "raw": "Ola de calor: cuarenta y cinco grados en Córdoba, lo que allí llaman una tarde fresquita.",
-  "text": "Ola de calor: cuarenta y cinco grados en Córdoba, lo que allí llaman una tarde fresquita."
+  "raw": "La vía se dilata, la catenaria se descuelga y los viajeros se derriten.",
+  "text": "La vía se dilata, la catenaria se descuelga y los viajeros se derriten."
  },
  {
-  "id": "11spxcl",
+  "id": "1veofqi",
   "person": "president",
-  "raw": "Hay que reforzar el mantenimiento de vía y la información al viajero.",
-  "text": "Hay que reforzar el mantenimiento de vía y la información al viajero."
+  "raw": "Hay que reforzar el mantenimiento.",
+  "text": "Hay que reforzar el mantenimiento."
  },
  {
   "id": "14x2u9l",
@@ -366,40 +426,40 @@
   "text": "Ahorrar ahora puede salir carísimo luego, y luego me toca a mí dar explicaciones."
  },
  {
-  "id": "127xqq1",
-  "person": "minister",
-  "raw": "Evento simulado.",
-  "text": "Evento simulado."
+  "id": "kulvcl",
+  "person": "mayor",
+  "raw": "Señor presidente de Renfe, le habla el alcalde de Villanueva del Andén, cuatrocientos doce habitantes y una estación preciosa sin trenes.",
+  "text": "Señor presidente de Renfe, le habla el alcalde de Villanueva del Andén, cuatrocientos doce habitantes y una estación preciosa sin trenes."
  },
  {
-  "id": "z30554",
-  "person": "minister",
-  "raw": "Varias comarcas ofrecen pagar parte del servicio a cambio de no quedarse sin tren.",
-  "text": "Varias comarcas ofrecen pagar parte del servicio a cambio de no quedarse sin tren."
+  "id": "1d20h9r",
+  "person": "mayor",
+  "raw": "Varias comarcas pagamos parte del servicio si no nos dejan sin tren.",
+  "text": "Varias comarcas pagamos parte del servicio si no nos dejan sin tren."
  },
  {
-  "id": "14yufdk",
-  "person": "minister",
+  "id": "1iy4od9",
+  "person": "mayor",
   "raw": "Es un contrato a cinco años, que en política es la eternidad.",
   "text": "Es un contrato a cinco años, que en política es la eternidad."
  },
  {
-  "id": "1nlyjx8",
-  "person": "successor",
-  "raw": "Evento simulado.",
-  "text": "Evento simulado."
+  "id": "1xkda8t",
+  "person": "workshop",
+  "raw": "Toda Europa compra trenes a la vez y las fábricas van con dieciocho meses de cola, como el ambulatorio.",
+  "text": "Toda Europa compra trenes a la vez y las fábricas van con dieciocho meses de cola, como el ambulatorio."
  },
  {
-  "id": "12m5rv6",
-  "person": "successor",
-  "raw": "Toda Europa compra trenes a la vez y las fábricas no dan abasto: dieciocho meses de cola, como en el ambulatorio.",
-  "text": "Toda Europa compra trenes a la vez y las fábricas no dan abasto: dieciocho meses de cola, como en el ambulatorio."
+  "id": "1r5l2rw",
+  "person": "workshop",
+  "raw": "Podemos pagar para colarnos, con elegancia.",
+  "text": "Podemos pagar para colarnos, con elegancia."
  },
  {
-  "id": "pna43x",
-  "person": "successor",
-  "raw": "Podemos pagar para colarnos, con cierta elegancia.",
-  "text": "Podemos pagar para colarnos, con cierta elegancia."
+  "id": "160fe37",
+  "person": "workshop",
+  "raw": "O esperar, y que mis mecánicos sigan haciendo milagros con cinta americana.",
+  "text": "O esperar, y que mis mecánicos sigan haciendo milagros con cinta americana."
  },
  {
   "id": "1gw0vkv",
@@ -408,10 +468,10 @@
   "text": "Quedan cuatro años."
  },
  {
-  "id": "m9rzq1",
+  "id": "fcwphn",
   "person": "president",
-  "raw": "El Parlamento pide una red accesible y unas cuentas claras, dos cosas que en mi experiencia rara vez van juntas.",
-  "text": "El Parlamento pide una red accesible y unas cuentas claras, dos cosas que en mi experiencia rara vez van juntas."
+  "raw": "El Parlamento pide una red para todos y unas cuentas claras, dos cosas que en mi experiencia rara vez van juntas.",
+  "text": "El Parlamento pide una red para todos y unas cuentas claras, dos cosas que en mi experiencia rara vez van juntas."
  },
  {
   "id": "1wkaocq",
@@ -420,28 +480,520 @@
   "text": "¿Qué comprometes para la recta final?"
  },
  {
-  "id": "wirghu",
-  "person": "minister",
-  "raw": "¡Hola!",
-  "text": "¡Hola!"
+  "id": "17mt2ni",
+  "person": "adif",
+  "raw": "Esta noche se han llevado tres kilómetros de cable de señalización.",
+  "text": "Esta noche se han llevado tres kilómetros de cable de señalización."
  },
  {
-  "id": "i2iqu2",
-  "person": "minister",
-  "raw": "Soy Raquel Sanz, ministra de Transportes (de ficción, que conste en acta).",
-  "text": "Soy Raquel Sanz, ministra de Transportes (de ficción, que conste en acta)."
+  "id": "13b8ax",
+  "person": "adif",
+  "raw": "Profesionales, oiga: ni una pieza de más.",
+  "text": "Profesionales, oiga: ni una pieza de más."
  },
  {
-  "id": "pw0ez7",
-  "person": "minister",
-  "raw": "Te enseño a dirigir la red en un periquete.",
-  "text": "Te enseño a dirigir la red en un periquete."
+  "id": "1851oag",
+  "person": "adif",
+  "raw": "Podemos reponerlo deprisa y pagar el doble, o hacerlo a nuestro ritmo, que ya sabe usted cuál es.",
+  "text": "Podemos reponerlo deprisa y pagar el doble, o hacerlo a nuestro ritmo, que ya sabe usted cuál es."
  },
  {
-  "id": "hl3ey4",
+  "id": "2m36fq",
+  "person": "workshop",
+  "raw": "Los maquinistas han convocado huelga.",
+  "text": "Los maquinistas han convocado huelga."
+ },
+ {
+  "id": "1wbifeh",
+  "person": "workshop",
+  "raw": "Dicen que llevan diez años esperando el convenio.",
+  "text": "Dicen que llevan diez años esperando el convenio."
+ },
+ {
+  "id": "1mzb0ss",
+  "person": "workshop",
+  "raw": "Yo llevo treinta esperando una llave inglesa que no esté doblada, y aquí sigo.",
+  "text": "Yo llevo treinta esperando una llave inglesa que no esté doblada, y aquí sigo."
+ },
+ {
+  "id": "1jfntrt",
+  "person": "workshop",
+  "raw": "Usted verá si negocia o si aguanta.",
+  "text": "Usted verá si negocia o si aguanta."
+ },
+ {
+  "id": "17oohnm",
+  "person": "riders",
+  "raw": "Le habla Marisa Andén, de los viajeros.",
+  "text": "Le habla Marisa Andén, de los viajeros."
+ },
+ {
+  "id": "1njugvv",
+  "person": "riders",
+  "raw": "El wifi de sus trenes va a la velocidad de un burro cansado, y los enchufes, cuando funcionan, dan calambre.",
+  "text": "El wifi de sus trenes va a la velocidad de un burro cansado, y los enchufes, cuando funcionan, dan calambre."
+ },
+ {
+  "id": "qvr5h4",
+  "person": "riders",
+  "raw": "Un influencer con dos millones de seguidores lo ha grabado.",
+  "text": "Un influencer con dos millones de seguidores lo ha grabado."
+ },
+ {
+  "id": "1lp0zs",
+  "person": "riders",
+  "raw": "Enhorabuena: es usted tendencia.",
+  "text": "Enhorabuena: es usted tendencia."
+ },
+ {
+  "id": "1k63jbs",
+  "person": "treasury",
+  "raw": "Bruselas manda dinero para electrificar y modernizar vías, y hay que gastarlo antes de que se den cuenta de que no tenemos proyectos.",
+  "text": "Bruselas manda dinero para electrificar y modernizar vías, y hay que gastarlo antes de que se den cuenta de que no tenemos proyectos."
+ },
+ {
+  "id": "64ly7j",
+  "person": "treasury",
+  "raw": "Durante dos años, tus obras de catenaria y de ancho saldrán un cuarenta por ciento más baratas.",
+  "text": "Durante dos años, tus obras de catenaria y de ancho saldrán un cuarenta por ciento más baratas."
+ },
+ {
+  "id": "13upoy8",
+  "person": "treasury",
+  "raw": "No te acostumbres.",
+  "text": "No te acostumbres."
+ },
+ {
+  "id": "fb20bv",
+  "person": "treasury",
+  "raw": "Mala noticia: este año no hay presupuestos, y sin presupuestos no hay alegrías.",
+  "text": "Mala noticia: este año no hay presupuestos, y sin presupuestos no hay alegrías."
+ },
+ {
+  "id": "1vea61w",
+  "person": "treasury",
+  "raw": "Te retengo una parte de las transferencias.",
+  "text": "Te retengo una parte de las transferencias."
+ },
+ {
+  "id": "1bw1irv",
+  "person": "treasury",
+  "raw": "No me mires así, que yo solo soy la de la tijera.",
+  "text": "No me mires así, que yo solo soy la de la tijera."
+ },
+ {
+  "id": "16ta9oe",
+  "person": "mayor",
+  "raw": "Me he encadenado a la vía de mi pueblo y de aquí no me muevo hasta que llegue el AVE.",
+  "text": "Me he encadenado a la vía de mi pueblo y de aquí no me muevo hasta que llegue el Ave."
+ },
+ {
+  "id": "n57z1w",
+  "person": "mayor",
+  "raw": "Bueno, me muevo para comer, que tengo una edad.",
+  "text": "Bueno, me muevo para comer, que tengo una edad."
+ },
+ {
+  "id": "1ri3t32",
+  "person": "mayor",
+  "raw": "Pero vuelvo.",
+  "text": "Pero vuelvo."
+ },
+ {
+  "id": "c0fx7e",
+  "person": "mayor",
+  "raw": "¿Qué va a hacer usted?",
+  "text": "¿Qué va a hacer usted?"
+ },
+ {
+  "id": "eu6fyc",
+  "person": "rival",
+  "raw": "Buenos días, competidor.",
+  "text": "Buenos días, competidor."
+ },
+ {
+  "id": "17o8i4f",
+  "person": "rival",
+  "raw": "Le aviso por cortesía: Autocares Meseta saca billetes a cinco euros a todas sus ciudades.",
+  "text": "Le aviso por cortesía: Autocares Meseta saca billetes a cinco euros a todas sus ciudades."
+ },
+ {
+  "id": "151p6hh",
+  "person": "rival",
+  "raw": "Con wifi que funciona, por cierto.",
+  "text": "Con wifi que funciona, por cierto."
+ },
+ {
+  "id": "6m32p6",
+  "person": "rival",
+  "raw": "Que tenga usted un buen día, si puede.",
+  "text": "Que tenga usted un buen día, si puede."
+ },
+ {
+  "id": "piyj3k",
+  "person": "adif",
+  "raw": "Los carriles están a sesenta grados y se dilatan más que el presupuesto de una obra.",
+  "text": "Los carriles están a sesenta grados y se dilatan más que el presupuesto de una obra."
+ },
+ {
+  "id": "179wxjd",
+  "person": "adif",
+  "raw": "Hay que limitar velocidades o arriesgarse a que la vía haga una ese.",
+  "text": "Hay que limitar velocidades o arriesgarse a que la vía haga una ese."
+ },
+ {
+  "id": "pznufo",
+  "person": "adif",
+  "raw": "Usted decide.",
+  "text": "Usted decide."
+ },
+ {
+  "id": "dhpar6",
+  "person": "adif",
+  "raw": "Yo, por si acaso, me pongo el casco.",
+  "text": "Yo, por si acaso, me pongo el casco."
+ },
+ {
+  "id": "1akqy1c",
+  "person": "adif",
+  "raw": "Ha nevado en la meseta como no se recuerda, y la catenaria se ha congelado en tres puertos.",
+  "text": "Ha nevado en la meseta como no se recuerda, y la catenaria se ha congelado en tres puertos."
+ },
+ {
+  "id": "1qm69gp",
+  "person": "adif",
+  "raw": "Las máquinas quitanieves están en camino.",
+  "text": "Las máquinas quitanieves están en camino."
+ },
+ {
+  "id": "18u7srs",
+  "person": "adif",
+  "raw": "Una de ellas lleva desde el año pasado en camino, pero esa es otra historia.",
+  "text": "Una de ellas lleva desde el año pasado en camino, pero esa es otra historia."
+ },
+ {
+  "id": "b9fbze",
+  "person": "adif",
+  "raw": "Un rebaño de vacas ha decidido pastar en la vía.",
+  "text": "Un rebaño de vacas ha decidido pastar en la vía."
+ },
+ {
+  "id": "qaugqb",
+  "person": "adif",
+  "raw": "Llevan media hora mirando al Alvia y el Alvia las mira a ellas.",
+  "text": "Llevan media hora mirando al Alvia y el Alvia las mira a ellas."
+ },
+ {
+  "id": "bsig4d",
+  "person": "adif",
+  "raw": "Nadie cede.",
+  "text": "Nadie cede."
+ },
+ {
+  "id": "1iepagr",
+  "person": "adif",
+  "raw": "Yo propongo esperar, que las vacas tienen más paciencia que nosotros.",
+  "text": "Yo propongo esperar, que las vacas tienen más paciencia que nosotros."
+ },
+ {
+  "id": "14hmcoj",
+  "person": "workshop",
+  "raw": "Un operador extranjero se deshace de unos trenes de alta velocidad casi nuevos.",
+  "text": "Un operador extranjero se deshace de unos trenes de alta velocidad casi nuevos."
+ },
+ {
+  "id": "glkszf",
+  "person": "workshop",
+  "raw": "Bueno, casi nuevos: tienen algún arañazo y huelen a queso.",
+  "text": "Bueno, casi nuevos: tienen algún arañazo y huelen a queso."
+ },
+ {
+  "id": "16lmvij",
+  "person": "workshop",
+  "raw": "Si los quiere, son suyos a buen precio.",
+  "text": "Si los quiere, son suyos a buen precio."
+ },
+ {
+  "id": "1tjnlyu",
+  "person": "workshop",
+  "raw": "Yo los arreglo.",
+  "text": "Yo los arreglo."
+ },
+ {
+  "id": "9p562a",
+  "person": "workshop",
+  "raw": "Se ha quemado una nave del taller.",
+  "text": "Se ha quemado una nave del taller."
+ },
+ {
+  "id": "wnwt2c",
+  "person": "workshop",
+  "raw": "No ha habido heridos, solo un bocadillo de chorizo y mi orgullo.",
+  "text": "No ha habido heridos, solo un bocadillo de chorizo y mi orgullo."
+ },
+ {
+  "id": "oapkfn",
+  "person": "workshop",
+  "raw": "Necesito dinero para arreglarlo, o tendremos los trenes peor cuidados unos meses.",
+  "text": "Necesito dinero para arreglarlo, o tendremos los trenes peor cuidados unos meses."
+ },
+ {
+  "id": "vhjygj",
+  "person": "riders",
+  "raw": "Un tren suyo ha llegado puntual y un viajero lo ha grabado: lleva tres millones de visitas.",
+  "text": "Un tren suyo ha llegado puntual y un viajero lo ha grabado: lleva tres millones de visitas."
+ },
+ {
+  "id": "13imgbl",
+  "person": "riders",
+  "raw": "Es lo más visto del día, por delante de un perro que habla.",
+  "text": "Es lo más visto del día, por delante de un perro que habla."
+ },
+ {
+  "id": "wpkb1b",
+  "person": "riders",
+  "raw": "No sé si felicitarle o preocuparme.",
+  "text": "No sé si felicitarle o preocuparme."
+ },
+ {
+  "id": "oxrt5q",
+  "person": "mayor",
+  "raw": "Este verano hay fiestas, ferias, conciertos y romerías en media España.",
+  "text": "Este verano hay fiestas, ferias, conciertos y romerías en media España."
+ },
+ {
+  "id": "18r7vd9",
+  "person": "mayor",
+  "raw": "Bueno, como todos los veranos, pero este año la gente viaja más.",
+  "text": "Bueno, como todos los veranos, pero este año la gente viaja más."
+ },
+ {
+  "id": "ziwxuu",
+  "person": "mayor",
+  "raw": "Si pone trenes, se llenan.",
+  "text": "Si pone trenes, se llenan."
+ },
+ {
+  "id": "1oynx2q",
+  "person": "mayor",
+  "raw": "Si no, se llenan los autobuses de ese señor tan simpático del asfalto.",
+  "text": "Si no, se llenan los autobuses de ese señor tan simpático del asfalto."
+ },
+ {
+  "id": "f4eku8",
+  "person": "treasury",
+  "raw": "El Tribunal de Cuentas quiere revisar tus gastos.",
+  "text": "El Tribunal de Cuentas quiere revisar tus gastos."
+ },
+ {
+  "id": "193cwqr",
+  "person": "treasury",
+  "raw": "Todo en orden, ¿verdad?",
+  "text": "Todo en orden, ¿verdad?"
+ },
+ {
+  "id": "1bfohy2",
+  "person": "treasury",
+  "raw": "Claro que sí.",
+  "text": "Claro que sí."
+ },
+ {
+  "id": "1ja4vtp",
+  "person": "treasury",
+  "raw": "Por si acaso, pon un abogado bueno o paga una consultora que nos diga lo que queremos oír.",
+  "text": "Por si acaso, pon un abogado bueno o paga una consultora que nos diga lo que queremos oír."
+ },
+ {
+  "id": "1gmoz7j",
+  "person": "adif",
+  "raw": "En una de sus obras han aparecido restos romanos.",
+  "text": "En una de sus obras han aparecido restos romanos."
+ },
+ {
+  "id": "1o5zyv6",
+  "person": "adif",
+  "raw": "Una calzada, un mosaico y lo que parece una moneda de Trajano.",
+  "text": "Una calzada, un mosaico y lo que parece una moneda de Trajano."
+ },
+ {
+  "id": "1cs1oxr",
+  "person": "adif",
+  "raw": "Precioso, pero los arqueólogos tienen prioridad.",
+  "text": "Precioso, pero los arqueólogos tienen prioridad."
+ },
+ {
+  "id": "16t75oh",
+  "person": "adif",
+  "raw": "Calcule unos meses de retraso.",
+  "text": "Calcule unos meses de retraso."
+ },
+ {
+  "id": "1tq1tzm",
+  "person": "adif",
+  "raw": "O pague y lo hacemos de noche, con linternas.",
+  "text": "O pague y lo hacemos de noche, con linternas."
+ },
+ {
+  "id": "vjd9qt",
+  "person": "adif",
+  "raw": "No se lo va a creer, pero una de sus obras va adelantada.",
+  "text": "No se lo va a creer, pero una de sus obras va adelantada."
+ },
+ {
+  "id": "1uuvcwv",
+  "person": "adif",
+  "raw": "Lo he comprobado tres veces.",
+  "text": "Lo he comprobado tres veces."
+ },
+ {
+  "id": "egvryy",
+  "person": "adif",
+  "raw": "Si pone un poco más de dinero, terminamos antes y nos hacemos una foto, que no pasa todos los días.",
+  "text": "Si pone un poco más de dinero, terminamos antes y nos hacemos una foto, que no pasa todos los días."
+ },
+ {
+  "id": "fkxn1i",
+  "person": "president",
+  "raw": "Viene un jefe de Estado extranjero y quiere viajar en AVE.",
+  "text": "Viene un jefe de Estado extranjero y quiere viajar en Ave."
+ },
+ {
+  "id": "yf5ouy",
+  "person": "president",
+  "raw": "Que vea lo mejor que tenemos, y que no vea lo demás.",
+  "text": "Que vea lo mejor que tenemos, y que no vea lo demás."
+ },
+ {
+  "id": "1vt1rvq",
+  "person": "president",
+  "raw": "Si todo sale bien, la foto es mía.",
+  "text": "Si todo sale bien, la foto es mía."
+ },
+ {
+  "id": "13synbc",
+  "person": "president",
+  "raw": "Si sale mal, la culpa es tuya, como siempre.",
+  "text": "Si sale mal, la culpa es tuya, como siempre."
+ },
+ {
+  "id": "1wsphq5",
+  "person": "president",
+  "raw": "He convocado elecciones, que me apetecía.",
+  "text": "He convocado elecciones, que me apetecía."
+ },
+ {
+  "id": "c623f0",
+  "person": "president",
+  "raw": "Necesito inaugurar algo ya, lo que sea, aunque sea un apeadero o una máquina de café.",
+  "text": "Necesito inaugurar algo ya, lo que sea, aunque sea un apeadero o una máquina de café."
+ },
+ {
+  "id": "f99il4",
+  "person": "president",
+  "raw": "Dame algo que cortar con unas tijeras grandes.",
+  "text": "Dame algo que cortar con unas tijeras grandes."
+ },
+ {
+  "id": "1j8lkof",
+  "person": "successor",
+  "raw": "Anoche le contesté a un señor que se quejaba de un retraso.",
+  "text": "Anoche le contesté a un señor que se quejaba de un retraso."
+ },
+ {
+  "id": "1ibdd9r",
+  "person": "successor",
+  "raw": "Y luego a otro.",
+  "text": "Y luego a otro."
+ },
+ {
+  "id": "1fyrbg",
+  "person": "successor",
+  "raw": "Y luego a su cuñado.",
+  "text": "Y luego a su cuñado."
+ },
+ {
+  "id": "5f0w6r",
+  "person": "successor",
+  "raw": "Ahora todo el país habla de nuestros trenes.",
+  "text": "Ahora todo el país habla de nuestros trenes."
+ },
+ {
+  "id": "11c4omi",
+  "person": "successor",
+  "raw": "Bien o mal, no lo sé, pero hablan.",
+  "text": "Bien o mal, no lo sé, pero hablan."
+ },
+ {
+  "id": "u0bysf",
+  "person": "successor",
+  "raw": "Necesito que esta semana todo funcione.",
+  "text": "Necesito que esta semana todo funcione."
+ },
+ {
+  "id": "lxz5u0",
+  "person": "mayor",
+  "raw": "Le recuerdo, por si se le había olvidado, que Teruel existe.",
+  "text": "Le recuerdo, por si se le había olvidado, que Teruel existe."
+ },
+ {
+  "id": "rc9q4",
+  "person": "mayor",
+  "raw": "Y Soria.",
+  "text": "Y Soria."
+ },
+ {
+  "id": "102nk9a",
+  "person": "mayor",
+  "raw": "Y mi pueblo, aunque eso lo sabemos los de siempre.",
+  "text": "Y mi pueblo, aunque eso lo sabemos los de siempre."
+ },
+ {
+  "id": "maqpts",
+  "person": "mayor",
+  "raw": "Queremos tren decente, con catenaria y sin gasóleo.",
+  "text": "Queremos tren decente, con catenaria y sin gasóleo."
+ },
+ {
+  "id": "1ib5wy3",
+  "person": "mayor",
+  "raw": "¿Lo pone usted o se lo pido a los Reyes Magos?",
+  "text": "¿Lo pone usted o se lo pido a los Reyes Magos?"
+ },
+ {
+  "id": "13kpzkh",
+  "person": "riders",
+  "raw": "Los viajeros ya no saben dónde meter las maletas.",
+  "text": "Los viajeros ya no saben dónde meter las maletas."
+ },
+ {
+  "id": "1gfl99z",
+  "person": "riders",
+  "raw": "Hay maletas en los pasillos, en los baños y una en el techo, no me pregunte cómo.",
+  "text": "Hay maletas en los pasillos, en los baños y una en el techo, no me pregunte cómo."
+ },
+ {
+  "id": "n31q9u",
+  "person": "riders",
+  "raw": "Podría reformar los coches, o seguir jugando al tetris.",
+  "text": "Podría reformar los coches, o seguir jugando al tetris."
+ },
+ {
+  "id": "1o91rk7",
   "person": "minister",
-  "raw": "Si ya sabes, sáltate el tutorial; yo hago como que no me ofendo.",
-  "text": "Si ya sabes, sáltate el tutorial; yo hago como que no me ofendo."
+  "raw": "Hola, soy Raquel Sanz, ministra de Transportes y, desde hoy, tu jefa.",
+  "text": "Hola, soy Raquel Sanz, ministra de Transportes y, desde hoy, tu jefa."
+ },
+ {
+  "id": "1orlzpk",
+  "person": "minister",
+  "raw": "Te lo explico rapidito, que a las doce inauguro algo y todavía no sé el qué.",
+  "text": "Te lo explico rapidito, que a las doce inauguro algo y todavía no sé el qué."
+ },
+ {
+  "id": "15hssku",
+  "person": "minister",
+  "raw": "Si ya sabes jugar, sáltatelo; yo haré como que me importa.",
+  "text": "Si ya sabes jugar, sáltatelo; yo haré como que me importa."
  },
  {
   "id": "2qvc3m",
@@ -450,88 +1002,160 @@
   "text": "Cada círculo es una ciudad."
  },
  {
-  "id": "1o2q3j8",
+  "id": "y3vf31",
   "person": "minister",
-  "raw": "Verde: todo funciona; ámbar: funciona a la española; gris: ni está ni se le espera.",
-  "text": "Verde: todo funciona; ámbar: funciona a la española; gris: ni está ni se le espera."
+  "raw": "Verde: todo funciona.",
+  "text": "Verde: todo funciona."
  },
  {
-  "id": "ahr30r",
+  "id": "59d7sc",
   "person": "minister",
-  "raw": "Pulsa sobre Madrid, que aquí todo pasa por Madrid.",
-  "text": "Pulsa sobre Madrid, que aquí todo pasa por Madrid."
+  "raw": "Ámbar: funciona a la española.",
+  "text": "Ámbar: funciona a la española."
  },
  {
-  "id": "16aor3y",
+  "id": "189660n",
   "person": "minister",
-  "raw": "Aquí tienes la ciudad, sus conexiones y su estación.",
-  "text": "Aquí tienes la ciudad, sus conexiones y su estación."
+  "raw": "Gris: ni está ni se la espera.",
+  "text": "Gris: ni está ni se la espera."
  },
  {
-  "id": "oztylv",
+  "id": "1qcuoaf",
   "person": "minister",
-  "raw": "Lo dorado del mapa son conexiones en servicio; lo demás, promesas electorales.",
-  "text": "Lo dorado del mapa son conexiones en servicio; lo demás, promesas electorales."
+  "raw": "Pulsa en Madrid, que aquí todo pasa por Madrid, y lo que no pasa, se le obliga.",
+  "text": "Pulsa en Madrid, que aquí todo pasa por Madrid, y lo que no pasa, se le obliga."
  },
  {
-  "id": "1jc6lje",
+  "id": "il5axr",
   "person": "minister",
-  "raw": "Pulsa + en la conexión con València para poner más trenes del horario real.",
-  "text": "Pulsa + en la conexión con València para poner más trenes del horario real."
+  "raw": "Esto es Madrid: sus conexiones, su estación y sus quejas.",
+  "text": "Esto es Madrid: sus conexiones, su estación y sus quejas."
  },
  {
-  "id": "oh1kt",
+  "id": "1nmri6a",
   "person": "minister",
-  "raw": "Los valencianos lo agradecerán, y los madrileños con apartamento en la playa, más.",
-  "text": "Los valencianos lo agradecerán, y los madrileños con apartamento en la playa, más."
+  "raw": "Lo rojo es AVE, lo azul es Alvia y lo gris es una promesa electoral.",
+  "text": "Lo rojo es Ave, lo azul es Alvia y lo gris es una promesa electoral."
  },
  {
-  "id": "12okyeu",
+  "id": "yr4c",
   "person": "minister",
-  "raw": "Las conexiones grises están cerradas.",
-  "text": "Las conexiones grises están cerradas."
+  "raw": "Pulsa el más en València.",
+  "text": "Pulsa el más en València."
  },
  {
-  "id": "xnocyt",
+  "id": "1v4j6l2",
   "person": "minister",
-  "raw": "Abre la de Salamanca: cuesta 4 M€ y usa trenes libres compatibles.",
-  "text": "Abre la de Salamanca: cuesta 4 millones de euros y usa trenes libres compatibles."
+  "raw": "Más trenes, más viajeros, más dinero.",
+  "text": "Más trenes, más viajeros, más dinero."
  },
  {
-  "id": "b3dxz7",
+  "id": "1tsx9lp",
   "person": "minister",
-  "raw": "Calderilla, para lo que se estila.",
-  "text": "Calderilla, para lo que se estila."
+  "raw": "Hasta tú lo puedes entender.",
+  "text": "Hasta tú lo puedes entender."
  },
  {
-  "id": "10knjx2",
+  "id": "1icz2cn",
   "person": "minister",
-  "raw": "Las ciudades con ❗ te piden cosas: más trenes, una conexión, una tarifa más baja o una estación decente.",
-  "text": "Las ciudades con te piden cosas: más trenes, una conexión, una tarifa más baja o una estación decente."
+  "raw": "Abre la de Salamanca.",
+  "text": "Abre la de Salamanca."
  },
  {
-  "id": "1hfoha7",
+  "id": "1fke7oh",
   "person": "minister",
-  "raw": "Como los alcaldes, pero sin llamarte a las tantas.",
-  "text": "Como los alcaldes, pero sin llamarte a las tantas."
+  "raw": "Es un Alvia: sale por la alta velocidad, se cambia de ancho en Medina del Campo y sigue por la vía de toda la vida.",
+  "text": "Es un Alvia: sale por la alta velocidad, se cambia de ancho en Medina del Campo y sigue por la vía de toda la vida."
  },
  {
-  "id": "132f5gb",
+  "id": "1450e3s",
   "person": "minister",
-  "raw": "Cumplirlas da dinero y reputación.",
-  "text": "Cumplirlas da dinero y reputación."
+  "raw": "Cuesta cuatro millones, que para lo que se estila es calderilla.",
+  "text": "Cuesta cuatro millones, que para lo que se estila es calderilla."
  },
  {
-  "id": "5gnuwi",
+  "id": "p5gtrr",
   "person": "minister",
-  "raw": "Las tienes a la izquierda.",
-  "text": "Las tienes a la izquierda."
+  "raw": "Pulsa «Anchos».",
+  "text": "Pulsa Anchos."
  },
  {
-  "id": "7dx5ub",
+  "id": "rsbut4",
   "person": "minister",
-  "raw": "Cada jornada empieza con el primer tren real y termina con el último.",
-  "text": "Cada jornada empieza con el primer tren real y termina con el último."
+  "raw": "Rojo es ancho estándar: por ahí va el AVE.",
+  "text": "Rojo es ancho estándar: por ahí va el Ave."
+ },
+ {
+  "id": "aic61v",
+  "person": "minister",
+  "raw": "Naranja es el ibérico de toda la vida: solo Alvia.",
+  "text": "Naranja es el ibérico de toda la vida: solo Alvia."
+ },
+ {
+  "id": "1k455w1",
+  "person": "minister",
+  "raw": "Morado es mixto: valen los dos.",
+  "text": "Morado es mixto: valen los dos."
+ },
+ {
+  "id": "ykia0q",
+  "person": "minister",
+  "raw": "Los rombos son cambiadores, donde el Alvia se cambia de zapatos.",
+  "text": "Los rombos son cambiadores, donde el Alvia se cambia de zapatos."
+ },
+ {
+  "id": "1fqfvfk",
+  "person": "minister",
+  "raw": "Ahora pulsa «Electrificación».",
+  "text": "Ahora pulsa Electrificación."
+ },
+ {
+  "id": "1wkdnsx",
+  "person": "minister",
+  "raw": "Lo discontinuo no tiene catenaria: por ahí solo pasa el Alvia híbrido, quemando gasóleo como si fuera mil novecientos ochenta y cinco.",
+  "text": "Lo discontinuo no tiene catenaria: por ahí solo pasa el Alvia híbrido, quemando gasóleo como si fuera mil novecientos ochenta y cinco."
+ },
+ {
+  "id": "fglb0q",
+  "person": "minister",
+  "raw": "Pulsa cualquier tramo del mapa y verás qué admite: electrificar, tercer carril o pasarlo a ancho estándar.",
+  "text": "Pulsa cualquier tramo del mapa y verás qué admite: electrificar, tercer carril o pasarlo a ancho estándar."
+ },
+ {
+  "id": "i8d43t",
+  "person": "minister",
+  "raw": "El estándar sale barato, pero corta la línea mientras dura.",
+  "text": "El estándar sale barato, pero corta la línea mientras dura."
+ },
+ {
+  "id": "1r710wk",
+  "person": "minister",
+  "raw": "Como todo lo barato.",
+  "text": "Como todo lo barato."
+ },
+ {
+  "id": "17l2454",
+  "person": "minister",
+  "raw": "Las ciudades con exclamación te piden cosas.",
+  "text": "Las ciudades con exclamación te piden cosas."
+ },
+ {
+  "id": "1y1t3ep",
+  "person": "minister",
+  "raw": "Si una te pide AVE, que no te tiemble el pulso: eso no se arregla con un tren, se arregla con obras.",
+  "text": "Si una te pide Ave, que no te tiemble el pulso: eso no se arregla con un tren, se arregla con obras."
+ },
+ {
+  "id": "1cc62z2",
+  "person": "minister",
+  "raw": "Cumplir da dinero; ignorarlas, titulares.",
+  "text": "Cumplir da dinero; ignorarlas, titulares."
+ },
+ {
+  "id": "1ixx6dh",
+  "person": "minister",
+  "raw": "Cada jornada empieza con el primer tren y acaba con el último.",
+  "text": "Cada jornada empieza con el primer tren y acaba con el último."
  },
  {
   "id": "k8jqzv",
@@ -546,28 +1170,28 @@
   "text": "Con el café en la mano, a ser posible."
  },
  {
-  "id": "11m6nfj",
+  "id": "1phmz7i",
   "person": "minister",
-  "raw": "Elige 10× para que el reloj vaya más rápido.",
-  "text": "Elige 10 por para que el reloj vaya más rápido."
+  "raw": "Pon diez por.",
+  "text": "Pon diez por."
  },
  {
-  "id": "1hkp7ns",
+  "id": "1f0sy02",
   "person": "minister",
-  "raw": "Ojalá las obras funcionaran igual.",
-  "text": "Ojalá las obras funcionaran igual."
+  "raw": "Ojalá las obras fueran igual de rápidas.",
+  "text": "Ojalá las obras fueran igual de rápidas."
  },
  {
-  "id": "wjmw2j",
+  "id": "1ejj1nr",
   "person": "minister",
-  "raw": "Cada tren que llega suma viajeros e ingresos: los verás sobre las ciudades y en «Hoy», arriba.",
-  "text": "Cada tren que llega suma viajeros e ingresos: los verás sobre las ciudades y en Hoy, arriba."
+  "raw": "Cada tren que llega suma viajeros y dinero, arriba, en «Hoy».",
+  "text": "Cada tren que llega suma viajeros y dinero, arriba, en Hoy."
  },
  {
-  "id": "1cg4x5",
+  "id": "khkzr9",
   "person": "minister",
-  "raw": "Sí, ese dinero es tuyo.",
-  "text": "Sí, ese dinero es tuyo."
+  "raw": "Ese dinero es tuyo.",
+  "text": "Ese dinero es tuyo."
  },
  {
   "id": "1ys0338",
@@ -594,46 +1218,52 @@
   "text": "Tranquilidad, que esto pasa en las mejores familias."
  },
  {
-  "id": "1rc8sw4",
+  "id": "w42ld8",
   "person": "minister",
-  "raw": "Pulsa «Decidir» y elige cómo responder.",
-  "text": "Pulsa Decidir y elige cómo responder."
+  "raw": "Pulsa «Decidir» y elige.",
+  "text": "Pulsa Decidir y elige."
  },
  {
-  "id": "1dde48v",
+  "id": "1g7hdgr",
   "person": "minister",
-  "raw": "A veces una ciudad tiene un pico de demanda: un partido, un congreso, el puente de diciembre…",
-  "text": "A veces una ciudad tiene un pico de demanda: un partido, un congreso, el puente de diciembre…"
+  "raw": "Si es en un cambiador de ancho, ya sabes a quién culpar: al ancho ibérico.",
+  "text": "Si es en un cambiador de ancho, ya sabes a quién culpar: al ancho ibérico."
  },
  {
-  "id": "vi3nv",
+  "id": "1hjti0",
   "person": "minister",
-  "raw": "Si refuerzas a tiempo la conexión indicada, te llevas una bonificación.",
-  "text": "Si refuerzas a tiempo la conexión indicada, te llevas una bonificación."
+  "raw": "A veces una ciudad tiene un pico de demanda: un partido, un congreso, un puente.",
+  "text": "A veces una ciudad tiene un pico de demanda: un partido, un congreso, un puente."
  },
  {
-  "id": "gfzs7",
+  "id": "q54ot2",
   "person": "minister",
-  "raw": "Los trenes se pueden cambiar en plena jornada.",
-  "text": "Los trenes se pueden cambiar en plena jornada."
+  "raw": "Si refuerzas a tiempo, cobras.",
+  "text": "Si refuerzas a tiempo, cobras."
  },
  {
-  "id": "1chjrld",
+  "id": "16kvuv6",
   "person": "minister",
-  "raw": "Pulsa «Hasta el último tren» para cerrar el día.",
-  "text": "Pulsa Hasta el último tren para cerrar el día."
+  "raw": "Si no, te lo recordarán en las redes.",
+  "text": "Si no, te lo recordarán en las redes."
  },
  {
-  "id": "18ipw7c",
+  "id": "1f5kcg3",
   "person": "minister",
-  "raw": "El último en llegar, que apague la luz.",
-  "text": "El último en llegar, que apague la luz."
+  "raw": "Pulsa «Hasta el último tren».",
+  "text": "Pulsa Hasta el último tren."
  },
  {
-  "id": "18yk9rs",
+  "id": "1rew4r",
   "person": "minister",
-  "raw": "El parte del día: puntualidad, viajeros y resultado.",
-  "text": "El parte del día: puntualidad, viajeros y resultado."
+  "raw": "El último que llegue, que apague la luz.",
+  "text": "El último que llegue, que apague la luz."
+ },
+ {
+  "id": "ukno2m",
+  "person": "minister",
+  "raw": "El parte del día.",
+  "text": "El parte del día."
  },
  {
   "id": "kulzza",
@@ -648,34 +1278,40 @@
   "text": "Pulsa Siguiente jornada."
  },
  {
-  "id": "hmb6vx",
+  "id": "73xyz7",
   "person": "minister",
-  "raw": "Para crecer necesitas más trenes, y tardan unos dos años en llegar: los fabricantes también tienen su ritmo.",
-  "text": "Para crecer necesitas más trenes, y tardan unos dos años en llegar: los fabricantes también tienen su ritmo."
+  "raw": "Para crecer necesitas trenes, y tardan dos años en llegar.",
+  "text": "Para crecer necesitas trenes, y tardan dos años en llegar."
  },
  {
-  "id": "fkiddb",
+  "id": "jsvkj5",
   "person": "minister",
-  "raw": "Abre «Compras».",
-  "text": "Abre Compras."
+  "raw": "Abre «Trenes».",
+  "text": "Abre Trenes."
  },
  {
-  "id": "1ns18xv",
+  "id": "1tgvxr4",
   "person": "minister",
-  "raw": "Cumple los objetivos del capítulo para recibir financiación.",
-  "text": "Cumple los objetivos del capítulo para recibir financiación."
+  "raw": "Los AVE solo van por ancho estándar; los Alvia, por donde les echen.",
+  "text": "Los Ave solo van por ancho estándar; los Alvia, por donde les echen."
  },
  {
-  "id": "josa14",
+  "id": "aof3gg",
   "person": "minister",
-  "raw": "Acércate con la rueda para ver trenes, estaciones y obras.",
-  "text": "Acércate con la rueda para ver trenes, estaciones y obras."
+  "raw": "Cumple los objetivos del capítulo y te suelto dinero.",
+  "text": "Cumple los objetivos del capítulo y te suelto dinero."
  },
  {
   "id": "1dqc86u",
   "person": "minister",
   "raw": "Y recuerda: si algo sale bien, lo anuncio yo.",
   "text": "Y recuerda: si algo sale bien, lo anuncio yo."
+ },
+ {
+  "id": "1neyhye",
+  "person": "minister",
+  "raw": "Si sale mal, has sido tú.",
+  "text": "Si sale mal, has sido tú."
  },
  {
   "id": "yn1qit",

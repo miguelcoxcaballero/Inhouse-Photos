@@ -7,6 +7,12 @@ export const CAST = {
   president: {gender: 'm', pitch: .93, rate: .93, swing: .03, pause: 380, sting: 'fanfare', label: 'solemne y pausado'},
   minister: {gender: 'f', pitch: 1.05, rate: 1.03, swing: .04, pause: 160, sting: 'ding', label: 'optimismo de rueda de prensa'},
   successor: {gender: 'm', pitch: 1.0, rate: 1.12, swing: .03, pause: 90, sting: 'tweet', label: 'a la velocidad de un tuit'},
+  treasury: {gender: 'f', pitch: .98, rate: 1.0, swing: .02, pause: 200, sting: 'coins', label: 'seca y con tijera'},
+  adif: {gender: 'm', pitch: .96, rate: .98, swing: .03, pause: 240, sting: 'anvil', label: 'ingeniero resignado'},
+  workshop: {gender: 'm', pitch: .92, rate: .96, swing: .03, pause: 260, sting: 'anvil', label: 'mecánico de los de antes'},
+  riders: {gender: 'f', pitch: 1.04, rate: 1.06, swing: .04, pause: 140, sting: 'ding', label: 'indignada'},
+  mayor: {gender: 'm', pitch: .97, rate: 1.0, swing: .04, pause: 220, sting: 'bells', label: 'alcalde de pueblo'},
+  rival: {gender: 'm', pitch: 1.0, rate: 1.03, swing: .02, pause: 180, sting: 'horn', label: 'ejecutivo encantado de sí mismo'},
 };
 
 const FEMALE = /elvira|helena|laura|m[oó]nica|paulina|luc[ií]a|elena|abril|dalia|ximena|sabina|marisol|esperanza|estrella|irene|triana|vera|lola|carmen|paloma|female|mujer|google español/i;
@@ -106,6 +112,10 @@ export class Voices {
       [0, .11].forEach(d => { const o = tone(2400, t + d, .09, 'sine', .7); o.frequency.setValueAtTime(1900, t + d); o.frequency.exponentialRampToValueAtTime(3400, t + d + .07); });
       return 380;
     }
+    if (kind === 'coins') { [2093, 2637, 2349].forEach((f, i) => tone(f, t + i * .07, .22, 'triangle', .55)); return 420; } // monedas en la caja
+    if (kind === 'anvil') { [0, .18].forEach(d => { tone(523, t + d, .3, 'square', .25); tone(1568, t + d, .2, 'triangle', .35); }); return 560; } // golpe de martillo
+    if (kind === 'bells') { [[523, 0], [659, .32]].forEach(([f, d]) => { tone(f, t + d, 1.1, 'sine', .7); tone(f * 2.01, t + d, .7, 'sine', .2); }); return 900; } // campanas de la iglesia del pueblo
+    if (kind === 'horn') { tone(311, t, .42, 'sawtooth', .3); tone(370, t, .42, 'sawtooth', .3); return 520; } // bocina de autobús
     [880, 1109, 1319].forEach((f, i) => tone(f, t + i * .1, .5, 'triangle', .8)); // «ding» de megafonía
     return 520;
   }

@@ -33,18 +33,12 @@ INCLUDE_CERCANIAS = os.environ.get('INCLUDE_CERCANIAS') == '1'
 DAYS = {'L': '20261014', 'S': '20261017', 'D': '20261018'}
 WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
+# v2.0: solo AVE y Alvia. Los AVLO y los AVE internacionales se cuentan como AVE.
 PRODUCTS = {
-    'AVE': ('AVE', 'av', 'hs'), 'AVLO': ('AVLO', 'av', 'hs'), 'AVANT': ('Avant', 'av', 'hs'),
-    'AVANT EXP': ('Avant Exprés', 'av', 'hs'), 'AVE INT': ('AVE Internacional', 'av', 'hs'),
-    'EUROMED': ('Euromed', 'av', 'mix'), 'ALVIA': ('Alvia', 'ld', 'mix'), 'Intercity': ('Intercity', 'ld', 'mix'),
-    'MD': ('Media Distancia', 'md', 'conv'), 'REGIONAL': ('Regional', 'md', 'conv'),
-    'REG.EXP.': ('Regional Exprés', 'md', 'conv'), 'PROXIMDAD': ('Proximidad', 'md', 'conv'),
-    'TRENCELTA': ('Trencelta', 'md', 'conv'),
+    'AVE': ('AVE', 'av', 'hs'), 'AVLO': ('AVE', 'av', 'hs'), 'AVE INT': ('AVE', 'av', 'hs'),
+    'ALVIA': ('Alvia', 'ld', 'mix'),
 }
-PRODUCT_COLORS = {'AVE': '#a3123a', 'AVLO': '#7b2d8e', 'Avant': '#c4462b', 'Avant Exprés': '#c4462b',
-                  'AVE Internacional': '#a3123a', 'Euromed': '#b0306a', 'Alvia': '#2f6f9f', 'Intercity': '#3f7f8c',
-                  'Media Distancia': '#c27a18', 'Regional': '#8a6d3b', 'Regional Exprés': '#a0782c',
-                  'Proximidad': '#6f8a2e', 'Trencelta': '#5b7d6b'}
+PRODUCT_COLORS = {'AVE': '#a3123a', 'Alvia': '#2f6f9f'}
 # Relaciones de la campaña v0.2 que corresponden a una línea de Cercanías publicada.
 CERCANIAS_ALIASES = {'c-valencia-c2': 'valencia-xativa', 'c-asturias-c1': 'oviedo-gijon', 'c-sanSebastian-c1': 'donostia-irun',
                      'c-madrid-c2': 'madrid-guadalajara', 'c-valencia-c6': 'valencia-castellon'}
@@ -253,8 +247,8 @@ class RailGraph:
 # ---------------------------------------------------------------- main
 def main():
     game = json.loads(subprocess.check_output(['node', '--input-type=module', '-e', '''
-import * as D from './dist/data.js';import {COMMUTER_NETWORKS} from './dist/assets/realdata.js';
-console.log(JSON.stringify({cities:D.CITIES,routes:D.ROUTES,networks:COMMUTER_NETWORKS.map(n=>({id:n.id,name:n.name,center:String(n.centerStationId).padStart(5,'0'),lon:n.lon,lat:n.lat}))}));
+import * as D from './dist/data.js';import {INFRA} from './dist/assets/infra.js';
+console.log(JSON.stringify({cities:D.CITIES,routes:D.ROUTES,nodes:INFRA.nodes,tramos:INFRA.tramos.map(t=>({a:t.a,b:t.b,plan:t.plan||null})),networks:[]}));
 '''], cwd=ROOT))
     cer, ld = zipfile.ZipFile(CER_ZIP), zipfile.ZipFile(LD_ZIP)
     feed_date = max(i.date_time for i in cer.infolist())
@@ -281,7 +275,7 @@ console.log(JSON.stringify({cities:D.CITIES,routes:D.ROUTES,networks:COMMUTER_NE
             trips[t['trip_id']] = dict(feed='cer', route=r, days=days, bus=r['route_type'] == '3', shape=t.get('shape_id', ''), block=t.get('block_id', ''))
     for t in rows(ld, 'trips.txt'):
         r = ld_routes.get(t['route_id'])
-        if not r:
+        if not r or r['route_short_name'] not in PRODUCTS:
             continue
         days = [k for k in DAYS if t['service_id'] in active[k][1]]
         if days:
@@ -529,10 +523,22 @@ console.log(JSON.stringify({cities:D.CITIES,routes:D.ROUTES,networks:COMMUTER_NE
         best = min(cities.values(), key=lambda c: hav(lon, lat, c['lon'], c['lat']))
         return best['id'] if hav(lon, lat, best['lon'], best['lat']) < radius else None
     corridor_routes = game['routes']
+    nodepos = {n['id']: (n['lon'], n['lat']) for n in game['nodes']}
+    # Solo nodos con vías existentes: una bifurcación que solo tiene líneas proyectadas no es una parada.
+    built = {x for t in game['tramos'] if not t.get('plan') for x in (t['a'], t['b'])}
+    stopnodes = {k: v for k, v in nodepos.items() if k in built}
+    for r in corridor_routes:
+        pts = [nodepos.get(v) or (cities[v]['lon'], cities[v]['lat']) for v in r['via']]
+        r['km'] = round(1.15 * sum(hav(*a, *b) for a, b in zip(pts, pts[1:])), 1)
+
+    def node_of(s, radius=9):
+        _, lon, lat = stops[s]
+        best = min(stopnodes, key=lambda k: hav(lon, lat, *stopnodes[k]))
+        return best if hav(lon, lat, *stopnodes[best]) < radius else None
     routes, route_index = [], {}
     for r in corridor_routes:
         route_index[r['id']] = len(routes)
-        routes.append({'id': r['id'], 'base': True, 'kind': r['kind'], 'ends': r['ends'], 'net': None, 'line': None})
+        routes.append({'id': r['id'], 'base': True, 'kind': r['kind'], 'ends': r['ends'], 'net': None, 'line': None, 'way': r['via']})
     unmatched = collections.Counter()
     for tid, t in trips.items():
         if t['feed'] == 'cer':
@@ -551,13 +557,13 @@ console.log(JSON.stringify({cities:D.CITIES,routes:D.ROUTES,networks:COMMUTER_NE
         trip_km = sum(edges[e if e >= 0 else -1 - e]['km'] for e in patterns[t['pattern']]['e'] if e is not None)
         best, score = None, 0
         for r in corridor_routes:
-            # La relación base debe cubrir al menos la mitad del recorrido del tren.
-            if r['km'] < trip_km * 0.5:
+            # La relación base debe cubrir casi todo el recorrido del tren; si no, el tren tiene su propia relación.
+            if r['km'] < trip_km * 0.85:
                 continue
             if r['ends'][0] in cs and r['ends'][1] in cs:
-                via = r['via']
+                via = [v for v in r['via'] if v in cities]
                 cover = sum(1 for v in via if v in cs) / len(via)
-                sc = r['km'] * cover
+                sc = r['km'] * cover * (1.6 if set(r['ends']) == {cs[0], cs[-1]} else 1)
                 if sc > score:
                     best, score = r, sc
         if best:
@@ -598,6 +604,14 @@ console.log(JSON.stringify({cities:D.CITIES,routes:D.ROUTES,networks:COMMUTER_NE
                 r['endStations'] = list(main)
                 r['ends'] = ['st' + main[0], 'st' + main[1]]
             r['stations'] = len({s for t in ts for _, s, _, _ in t['stops']})
+            if not r.get('way'):
+                pat = collections.Counter(tuple(s for _, s, _, _ in t['stops']) for t in ts).most_common(1)[0][0]
+                way = []
+                for s in pat:
+                    nid = node_of(s)
+                    if nid and (not way or way[-1] != nid):
+                        way.append(nid)
+                r['way'] = way
     routes = [r for r in routes if r['base'] or r.get('tripsByDay', {}).get('L', 0) + r.get('tripsByDay', {}).get('S', 0) + r.get('tripsByDay', {}).get('D', 0) > 0]
     # reindexa tras descartar relaciones sin circulaciones
     idx_by_id = {r['id']: i for i, r in enumerate(routes)}
@@ -632,11 +646,6 @@ console.log(JSON.stringify({cities:D.CITIES,routes:D.ROUTES,networks:COMMUTER_NE
     pattern_out = [[p['s'], [x if x is not None else 'n' for x in p['e']]] for p in patterns]
     meta = {
         'snapshot': '2026-10-06', 'days': DAYS,
-        'sources': [
-            {'name': 'Renfe Data · GTFS Cercanías (fomento_transit.zip)', 'url': 'https://ssl.renfe.com/ftransit/Fichero_CER_FOMENTO/fomento_transit.zip', 'license': 'CC BY 4.0'},
-            {'name': 'Renfe Data · GTFS AV/LD/MD (google_transit.zip)', 'url': 'https://ssl.renfe.com/gtransit/Fichero_AV_LD/google_transit.zip', 'license': 'CC BY 4.0'},
-            {'name': 'Copia diaria pública elguardagujas/renfe-gtfs-archive', 'url': 'https://github.com/elguardagujas/renfe-gtfs-archive'},
-        ],
         'counts': {k: len(v) for k, v in out_trips.items()},
         'geometry': dict(stats),
     }

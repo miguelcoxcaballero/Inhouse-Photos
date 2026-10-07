@@ -1,0 +1,3027 @@
+[
+ {
+  "id": "mad-gua-av",
+  "name": "LAV Madrid — Guadalajara",
+  "km": 64.9,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 280
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Madrid-Zaragoza-Barcelona-Frontera francesa",
+    "Línea de alta velocidad Madrid - Sevilla"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "gua-cal-av",
+  "name": "LAV Guadalajara — Calatayud",
+  "km": 156.4,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Madrid-Zaragoza-Barcelona-Frontera francesa"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "cal-zar-av",
+  "name": "LAV Calatayud — Zaragoza",
+  "km": 85.5,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 280
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Madrid-Zaragoza-Barcelona-Frontera francesa",
+    "Línea Bifurcación Canal Imperial-Bifurcación Moncasi"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "zar-lle-av",
+  "name": "LAV Zaragoza — Lleida",
+  "km": 140.4,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 290
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Madrid-Zaragoza-Barcelona-Frontera francesa",
+    "Línia d'alta velocitat Madrid - Zaragoza - Barcelona - Frontera francesa",
+    "Línea Bifurcación Canal Imperial-Bifurcación Moncasi"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "lle-tar-av",
+  "name": "LAV Lleida — Camp de Tarragona",
+  "km": 81.6,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 290
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línia d'alta velocitat Madrid - Zaragoza - Barcelona - Frontera francesa",
+    "Via 4"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "tar-bcn-av",
+  "name": "LAV Camp de Tarragona — Barcelona",
+  "km": 99.9,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 260
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línia d'alta velocitat Madrid - Zaragoza - Barcelona - Frontera francesa",
+    "Via 4"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "bcn-gir-av",
+  "name": "LAV Barcelona — Girona",
+  "km": 94.2,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 220
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línia d'alta velocitat Madrid - Zaragoza - Barcelona - Frontera francesa",
+    "Túnel de Montornès I",
+    "Túnel de Montornès II"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "gir-fig-av",
+  "name": "LAV Girona — Figueres",
+  "km": 34.9,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 270
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línia d'alta velocitat Madrid - Zaragoza - Barcelona - Frontera francesa"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "fig-per-av",
+  "name": "Figueres — Perpiñán (Pertús)",
+  "km": 54.1,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 270
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 88,
+    "1.5kv": 12,
+    "?": 0
+   },
+   "lineas": [
+    "Línia d'alta velocitat Madrid - Zaragoza - Barcelona - Frontera francesa",
+    "LGV Perpignan-Figueras",
+    "Ligne à Grande Vitesse Perpignan-Figueras"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "zar-tdn-av",
+  "name": "LAV Zaragoza — Tardienta",
+  "km": 62.5,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 190
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "mixto": 0,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Zaragoza-Huesca",
+    "Línea Bifurcación Canal Imperial-Bifurcación Moncasi"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "tdn-huc",
+  "name": "Tardienta — Huesca",
+  "km": 22.0,
+  "state": {
+   "gauge": "mixto",
+   "elec": "25kv",
+   "speed": 150
+  },
+  "osm": {
+   "ancho": {
+    "mixto": 95,
+    "ib": 5,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 95,
+    "no": 4,
+    "3kv": 0,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Zaragoza-Huesca",
+    "Línea Madrid-Barcelona"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mad-tol-av",
+  "name": "LAV Madrid — Toledo",
+  "km": 75.2,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 230
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Madrid - Sevilla",
+    "Línea de La Sagra a Toledo",
+    "Vía 3"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mad-cic-av",
+  "name": "LAV Madrid — Ciudad Real",
+  "km": 170.9,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 260
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Madrid - Sevilla"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "cic-pue-av",
+  "name": "LAV Ciudad Real — Puertollano",
+  "km": 39.5,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 270
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Madrid - Sevilla",
+    "LAV Madrid - Sevilla"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "pue-cor-av",
+  "name": "LAV Puertollano — Córdoba",
+  "km": 133.8,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 230
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Madrid - Sevilla",
+    "LAV"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "cor-sev-av",
+  "name": "LAV Córdoba — Sevilla",
+  "km": 126.7,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 240
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Madrid - Sevilla"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "cor-ant-av",
+  "name": "LAV Córdoba — Antequera",
+  "km": 111.5,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 290
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Córdoba - Málaga",
+    "Línea de alta velocidad Madrid - Sevilla"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "ant-mal-av",
+  "name": "LAV Antequera — Málaga",
+  "km": 59.7,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 250
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Córdoba - Málaga"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "ant-gra-av",
+  "name": "LAV Antequera — Granada",
+  "km": 114.0,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 230
+  },
+  "osm": {
+   "ancho": {
+    "std": 74,
+    "mixto": 26,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Antequera-Granada"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mad-cue-av",
+  "name": "LAV Madrid — Cuenca",
+  "km": 187.7,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 280
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Madrid - Cuenca - Valencia",
+    "Línea de alta velocidad Madrid - Sevilla",
+    "LAV Madrid - Cuenca - Valencia"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "cue-mot-av",
+  "name": "LAV Cuenca — Motilla",
+  "km": 54.4,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {
+    "std": 100
+   },
+   "catenaria": {
+    "25kv": 100
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Madrid - Cuenca - Valencia"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mot-req-av",
+  "name": "LAV Motilla — Requena",
+  "km": 187.6,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Madrid - Cuenca - Valencia"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "req-vlc-av",
+  "name": "LAV Requena — València",
+  "km": 69.4,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 270
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Madrid - Cuenca - Valencia",
+    "Línea de Alta Velocidad Madrid-Cuenca-València",
+    "Vía 1"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mot-alb-av",
+  "name": "LAV Motilla — Albacete",
+  "km": 180.6,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Madrid - Cuenca - Valencia",
+    "Línea de alta velocidad Madrid-Levante",
+    "LAV Madrid-Alicante-Murcia"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "alb-mnc-av",
+  "name": "LAV Albacete — Monforte del Cid",
+  "km": 141.9,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 280
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Madrid-Levante",
+    "Línea de Alta Velocidad Madrid - Alacant-Terminal/Murcia",
+    "LAV Madrid-Alicante-Murcia"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mnc-ali-av",
+  "name": "LAV Monforte del Cid — Alicante",
+  "km": 24.5,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 220
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Madrid - Alacant-Terminal/Murcia"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mnc-elx-av",
+  "name": "LAV Monforte del Cid — Elche",
+  "km": 21.6,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 190
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Madrid-Levante"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "elx-mur-av",
+  "name": "LAV Elche — Murcia",
+  "km": 46.7,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 190
+  },
+  "osm": {
+   "ancho": {
+    "std": 89,
+    "mixto": 10,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de alta velocidad Madrid-Levante",
+    "Línea Chinchilla-Cartagena",
+    "Línea de alta velocidad Madrid - Levante"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mad-seg-av",
+  "name": "LAV Madrid — Segovia",
+  "km": 68.1,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 260
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Madrid-Segovia–Valladolid-Burgos",
+    "Línea de Alta Velocidad Madrid-Segovia-Valladolid-Burgos",
+    "Línea de Alta Velocidad Madrid–Valladolid-Burgos"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "seg-olm-av",
+  "name": "LAV Segovia — Olmedo",
+  "km": 67.7,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Madrid-Segovia–Valladolid-Burgos",
+    "Línea de Alta Velocidad Madrid-Segovia-Valladolid-Burgos"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "olm-vll-av",
+  "name": "LAV Olmedo — Valladolid",
+  "km": 46.8,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 270
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Madrid-Segovia–Valladolid-Burgos",
+    "Línea de Alta Velocidad Madrid–Valladolid-Burgos"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "olm-med-av",
+  "name": "LAV Olmedo — Medina del Campo",
+  "km": 23.0,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 250
+  },
+  "osm": {
+   "ancho": {
+    "mixto": 84,
+    "std": 10,
+    "ib": 6
+   },
+   "catenaria": {
+    "25kv": 95,
+    "3kv": 5
+   },
+   "lineas": []
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "med-zam-av",
+  "name": "LAV Medina del Campo — Zamora",
+  "km": 120.0,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 250
+  },
+  "osm": {
+   "ancho": {
+    "std": 85,
+    "mixto": 14,
+    "ib": 1,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 99,
+    "3kv": 1,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Olmedo-Zamora-Santiago de Compostela",
+    "Línea de Alta Velocidad Olmedo-Zamora-Galicia",
+    "Línea de Alta Velocidad Madrid-Segovia–Valladolid-Burgos"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "zam-our-av",
+  "name": "LAV Zamora — Ourense",
+  "km": 232.9,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 280
+  },
+  "osm": {
+   "ancho": {
+    "std": 93,
+    "mixto": 7,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Olmedo-Zamora-Galicia",
+    "Liña de Alta Velocidade Olmedo-Zamora-Santiago de Compostela",
+    "Línea de Alta Velocidad Olmedo-Zamora-Santiago de Compostela"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "our-scq-av",
+  "name": "LAV Ourense — Santiago",
+  "km": 87.9,
+  "state": {
+   "gauge": "ib",
+   "elec": "25kv",
+   "speed": 280
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Liña de Alta Velocidade Olmedo-Zamora-Santiago de Compostela"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "vll-vdb-av",
+  "name": "LAV Valladolid — Venta de Baños",
+  "km": 38.4,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 270
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Madrid–Valladolid-Burgos",
+    "Línea de Alta Velocidad Valladolid-Venta de Baños"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "vdb-pal-av",
+  "name": "LAV Venta de Baños — Palencia",
+  "km": 12.8,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 130
+  },
+  "osm": {
+   "ancho": {
+    "std": 100
+   },
+   "catenaria": {
+    "25kv": 100
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Venta de Baños-León"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "pal-leo-av",
+  "name": "LAV Palencia — León",
+  "km": 114.9,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 280
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Venta de Baños-León"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "vdb-bur-av",
+  "name": "LAV Venta de Baños — Burgos",
+  "km": 86.2,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 290
+  },
+  "osm": {
+   "ancho": {
+    "std": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Madrid–Valladolid-Burgos"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "leo-pol",
+  "name": "León — Pola de Lena (Pajares)",
+  "km": 71.1,
+  "state": {
+   "gauge": "mixto",
+   "elec": "25kv",
+   "speed": 220
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 60,
+    "3kv": 40,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad La Robla - Pola de Lena",
+    "Línea Venta de Baños-Gijón"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mad-avi",
+  "name": "Madrid — Ávila",
+  "km": 121.3,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 110
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 99,
+    "?": 1
+   },
+   "lineas": [
+    "Línea General del Norte",
+    "Línea Madrid-Hendaya",
+    "Vía 5"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "avi-med",
+  "name": "Ávila — Medina del Campo",
+  "km": 86.6,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 150
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Madrid-Hendaya",
+    "Línea General del Norte"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "med-vll",
+  "name": "Medina del Campo — Valladolid",
+  "km": 42.3,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 150
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100
+   },
+   "catenaria": {
+    "3kv": 100
+   },
+   "lineas": [
+    "Línea Madrid-Hendaya"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "med-sal",
+  "name": "Medina del Campo — Salamanca",
+  "km": 76.6,
+  "state": {
+   "gauge": "ib",
+   "elec": "25kv",
+   "speed": 150
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 94,
+    "3kv": 6,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Medina del Campo-Vilar Formoso"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "avi-sal",
+  "name": "Ávila — Salamanca",
+  "km": 114.8,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 99,
+    "25kv": 0,
+    "3kv": 0,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Ávila-Salamanca",
+    "Línea Madrid-Hendaya",
+    "Línea General del Norte"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "vll-vdb",
+  "name": "Valladolid — Venta de Baños",
+  "km": 38.0,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 99,
+    "mixto": 1,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 99,
+    "25kv": 1,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Madrid-Hendaya"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "vdb-pal",
+  "name": "Venta de Baños — Palencia",
+  "km": 11.3,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 160
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Venta de Baños-Gijón"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "vdb-bur",
+  "name": "Venta de Baños — Burgos",
+  "km": 87.0,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 160
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Madrid-Hendaya"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "pal-san",
+  "name": "Palencia — Santander",
+  "km": 217.3,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 110
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Ferrocarril Madrid - Santander",
+    "Túnel de Reinosa",
+    "Ferrocarril Santander - Palencia"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "leo-ppf",
+  "name": "León — Ponferrada",
+  "km": 128.9,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea León-A Coruña",
+    "Ferrocarril León - Ponferrada",
+    "Línea Venta de Baños-Gijón"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "bur-mir",
+  "name": "Burgos — Miranda de Ebro",
+  "km": 83.9,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Madrid-Hendaya",
+    "Línea Bilbao-Casetas"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mir-vit",
+  "name": "Miranda de Ebro — Vitoria",
+  "km": 33.4,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 130
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Madril-Hendaia trenbidea",
+    "Línea Madrid-Hendaya"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "vit-alt",
+  "name": "Vitoria — Altsasu",
+  "km": 43.2,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 150
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 98,
+    "?": 2
+   },
+   "lineas": [
+    "Madril-Hendaia trenbidea"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "alt-don",
+  "name": "Altsasu — Donostia",
+  "km": 85.2,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 100
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "mixto": 0,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Madril-Hendaia trenbidea",
+    "Puente de Hierro"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "don-iru",
+  "name": "Donostia — Irún",
+  "km": 16.9,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 130
+  },
+  "osm": {
+   "ancho": {
+    "ib": 93,
+    "mixto": 7,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "4"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mir-bil",
+  "name": "Miranda de Ebro — Bilbao",
+  "km": 103.5,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 90
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Bilbo-Casetas trenbidea",
+    "Línea Bilbao-Casetas"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mir-log",
+  "name": "Miranda de Ebro — Logroño",
+  "km": 69.6,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 100
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Bilbao-Casetas",
+    "Línea Madrid-Hendaya",
+    "Línea Bifurcación Rioja-Bifurcación Castilla"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "log-cst",
+  "name": "Logroño — Castejón",
+  "km": 76.1,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 120
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Bilbao-Casetas"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "cst-zar",
+  "name": "Castejón — Zaragoza",
+  "km": 89.7,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 160
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Bilbao-Casetas",
+    "Línea Madrid-Barcelona"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "cst-pam",
+  "name": "Castejón — Pamplona",
+  "km": 88.0,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 130
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 99,
+    "?": 1
+   },
+   "lineas": [
+    "Línea Alsasua-Castejón de Ebro",
+    "Línea Bilbao-Casetas"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "pam-alt",
+  "name": "Pamplona — Altsasu",
+  "km": 52.0,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 130
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Altsasu-Castejón de Ebro trenbidea",
+    "Línea Alsasua-Castejón de Ebro",
+    "Madril-Hendaia trenbidea"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "pol-ovi",
+  "name": "Pola de Lena — Oviedo",
+  "km": 29.6,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 110
+  },
+  "osm": {
+   "ancho": {
+    "ib": 99,
+    "?": 1
+   },
+   "catenaria": {
+    "3kv": 99,
+    "?": 1
+   },
+   "lineas": [
+    "Ferrocarril León - Gijón",
+    "Ferrocarril León - Gijón/Xixón",
+    "Ferrocarril Llión - Xixón"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "ovi-gij",
+  "name": "Oviedo — Gijón",
+  "km": 31.7,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 110
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 99,
+    "?": 1
+   },
+   "lineas": [
+    "Ferrocarril León - Gijón",
+    "Ferrocarril Madrid - Gijón"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "ovi-avl",
+  "name": "Oviedo — Avilés",
+  "km": 30.1,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 110
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "San Juan de Nieva - Villabona",
+    "Ferrocarril León - Gijón"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "ppf-mfl",
+  "name": "Ponferrada — Monforte de Lemos",
+  "km": 109.9,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 130
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Vía 2"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mfl-our",
+  "name": "Monforte de Lemos — Ourense",
+  "km": 46.1,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 100
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 95,
+    "3kv": 5,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Monforte de Lemos - Vigo",
+    "Liña Monforte de Lemos - Vigo"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "our-vig",
+  "name": "Ourense — Vigo (por Guillarei)",
+  "km": 133.2,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 150
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 91,
+    "25kv": 9,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Monforte de Lemos - Vigo",
+    "Túnel das Maceiras",
+    "Eje Atlántico de Alta Velocidad Vigo - A Coruña"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mfl-lug",
+  "name": "Monforte de Lemos — Lugo",
+  "km": 69.7,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 160
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 99,
+    "3kv": 1,
+    "?": 0
+   },
+   "lineas": [
+    "Túnel do Oural",
+    "Túnel da Torrente",
+    "Línea León - A Coruña"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "lug-bet",
+  "name": "Lugo — Betanzos",
+  "km": 91.8,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 160
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea León - A Coruña"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "bet-aco",
+  "name": "Betanzos — A Coruña",
+  "km": 25.3,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 100
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 98,
+    "25kv": 2,
+    "?": 0
+   },
+   "lineas": [
+    "Línea León - A Coruña",
+    "Vía 4"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "bet-fer",
+  "name": "Betanzos — Ferrol",
+  "km": 38.9,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 100
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Liña Betanzos-Infesta - Ferrol"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "aco-scq",
+  "name": "Eje atlántico: A Coruña — Santiago",
+  "km": 60.9,
+  "state": {
+   "gauge": "ib",
+   "elec": "25kv",
+   "speed": 180
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Eixo Atlántico",
+    "Eixo Atlántico - Túnel Pena Longa",
+    "Eixo Atlántico - Túnel Monte de Uceira"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "scq-pon",
+  "name": "Eje atlántico: Santiago — Pontevedra",
+  "km": 66.3,
+  "state": {
+   "gauge": "ib",
+   "elec": "25kv",
+   "speed": 180
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Eje Atlántico de Alta Velocidad Vigo - A Coruña",
+    "Línea Alta Velocidad Vigo Santiago"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "pon-vig",
+  "name": "Eje atlántico: Pontevedra — Vigo",
+  "km": 27.8,
+  "state": {
+   "gauge": "ib",
+   "elec": "25kv",
+   "speed": 190
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Eje Atlántico de Alta Velocidad Vigo - A Coruña",
+    "Túnel das Maceiras",
+    "Línea Alta Velocidad Vigo Santiago"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mad-gua",
+  "name": "Madrid — Guadalajara",
+  "km": 56.7,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 86,
+    "?": 14
+   },
+   "lineas": [
+    "Línea Madrid-Barcelona",
+    "Línea Madrid Atocha-San Fernando de Henares",
+    "Atocha-Cercanías"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "gua-trb",
+  "name": "Guadalajara — Torralba",
+  "km": 101.2,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 98,
+    "no": 2,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Madrid-Barcelona",
+    "Línea Torralba-Soria"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "trb-sor",
+  "name": "Torralba — Soria",
+  "km": 90.8,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 110
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Torralba-Soria"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "zar-ter",
+  "name": "Zaragoza — Teruel",
+  "km": 190.2,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 160
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 92,
+    "3kv": 8,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Sagunto - Bifurcación Teruel",
+    "FFCC Sagunt - Bifurcación Teruel",
+    "Línea CIM de Zaragoza-La Cartuja"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "ter-sag",
+  "name": "Teruel — Sagunt",
+  "km": 137.1,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 160
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 100,
+    "3kv": 0,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Sagunto - Bifurcación Teruel",
+    "FFCC Sagunt - Bifurcación Teruel"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "sag-vlc",
+  "name": "Sagunt — València",
+  "km": 34.2,
+  "state": {
+   "gauge": "mixto",
+   "elec": "3kv",
+   "speed": 160
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100
+   },
+   "catenaria": {
+    "3kv": 100
+   },
+   "lineas": [
+    "FFCC València - Sant Vicenç de Calders"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "sag-cas",
+  "name": "Sagunt — Castelló",
+  "km": 40.3,
+  "state": {
+   "gauge": "mixto",
+   "elec": "3kv",
+   "speed": 200
+  },
+  "osm": {
+   "ancho": {
+    "ib": 76,
+    "mixto": 24,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC València - Sant Vicenç de Calders",
+    "Rodalies Valencia - Castelló",
+    "Rodalies Valencia - Vinaros"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "cas-tar",
+  "name": "Castelló — Tarragona",
+  "km": 190.1,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 190
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "mixto": 0,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC València - Sant Vicenç de Calders",
+    "FFCC València-Tarragona",
+    "FFCC Barcelona-Saragossa via Caspe"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "tar-bcn",
+  "name": "Tarragona — Barcelona",
+  "km": 84.4,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Barcelona - Tarragona via Vilanova i la Geltrú",
+    "FFCC València - Sant Vicenç de Calders",
+    "Línia Madrid - Zaragoza -Barcelona"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "vlc-xat",
+  "name": "València — Xàtiva",
+  "km": 56.4,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 150
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "300 - Madrid Chamartín - València Estació del Nord",
+    "2"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "xat-enc",
+  "name": "Xàtiva — La Encina",
+  "km": 53.0,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Xàtiva - La Encina",
+    "340 - Bifurcación Vallada - Xàtiva aguja km 47,0",
+    "300 - Madrid Chamartín - València Estació del Nord"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "enc-alb",
+  "name": "La Encina — Albacete",
+  "km": 97.8,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 160
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Madrid-Valencia",
+    "300 - Madrid Chamartín - València Estació del Nord",
+    "Madrid-Alicante"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "enc-ali",
+  "name": "La Encina — Alicante",
+  "km": 78.4,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Madrid-Alicante",
+    "330 - La Encina - Alacant Terminal"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "ali-mur",
+  "name": "Alicante — Murcia (por Elche)",
+  "km": 75.2,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 160
+  },
+  "osm": {
+   "ancho": {
+    "ib": 72,
+    "std": 19,
+    "mixto": 9,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 70,
+    "25kv": 28,
+    "?": 2
+   },
+   "lineas": [
+    "Línea El Reguerón-Alicante",
+    "Línea de alta velocidad Madrid-Levante",
+    "Línea Chinchilla-Cartagena"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "alb-mur",
+  "name": "Albacete — Murcia (por Hellín)",
+  "km": 146.2,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Madrid-Cartagena"
+   ]
+  },
+  "aproximado": 0.68
+ },
+ {
+  "id": "mur-car",
+  "name": "Murcia — Cartagena",
+  "km": 65.1,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 95,
+    "mixto": 5,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 95,
+    "25kv": 5,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Chinchilla-Cartagena",
+    "FF.CC. Cartagena-Madrid"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mad-alc",
+  "name": "Madrid — Alcázar de San Juan",
+  "km": 146.9,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 150
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Madrid-Valencia",
+    "FFCC Alcázar de San Juan-Cádiz"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "alc-alb",
+  "name": "Alcázar de San Juan — Albacete",
+  "km": 130.9,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 170
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100
+   },
+   "catenaria": {
+    "3kv": 100
+   },
+   "lineas": [
+    "Línea Madrid-Valencia"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "alc-lin",
+  "name": "Alcázar de San Juan — Linares",
+  "km": 166.7,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Alcázar de San Juan-Cádiz"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "lin-jae",
+  "name": "Linares — Jaén",
+  "km": 57.5,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 160
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Jaén-Espeluy",
+    "FFCC Alcázar de San Juan-Cádiz"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "lin-cor",
+  "name": "Linares — Córdoba",
+  "km": 127.0,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 160
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Alcázar de San Juan-Cádiz"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "lin-mor",
+  "name": "Linares — Moreda",
+  "km": 117.0,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 97,
+    "3kv": 3,
+    "?": 1
+   },
+   "lineas": [
+    "FFCC Linares - Almería"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mor-gra",
+  "name": "Moreda — Granada",
+  "km": 56.3,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 97,
+    "mixto": 3,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 100,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Moreda - Granada"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mor-alm",
+  "name": "Moreda — Almería",
+  "km": 122.7,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 130
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 62,
+    "no": 38,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Linares - Almería"
+   ]
+  },
+  "aproximado": 0.04
+ },
+ {
+  "id": "cor-ant",
+  "name": "Córdoba — Bobadilla",
+  "km": 126.4,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 150
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "no": 0,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Córdoba - Málaga",
+    "FFCC Bobadilla - Algeciras"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "ant-ron",
+  "name": "Bobadilla — Ronda",
+  "km": 70.1,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 120
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 80,
+    "?": 20,
+    "3kv": 0
+   },
+   "lineas": [
+    "FFCC Bobadilla - Algeciras",
+    "FFCC Córdoba - Málaga"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "ron-alg",
+  "name": "Ronda — Algeciras",
+  "km": 95.3,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 120
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 100,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Bobadilla - Algeciras"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "sev-utr",
+  "name": "Sevilla — Utrera",
+  "km": 31.2,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 150
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Alcázar de San Juan-Cádiz"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "utr-jer",
+  "name": "Utrera — Jerez",
+  "km": 72.8,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 200
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Alcázar de San Juan-Cádiz"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "jer-cad",
+  "name": "Jerez — Cádiz",
+  "km": 52.4,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 180
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Alcázar de San Juan-Cádiz"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "sev-hue",
+  "name": "Sevilla — Huelva",
+  "km": 116.9,
+  "state": {
+   "gauge": "ib",
+   "elec": "3kv",
+   "speed": 140
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "3kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Sevilla-Huelva",
+    "FFCC Alcázar de San Juan-Cádiz"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mer-sev",
+  "name": "Mérida — Sevilla (por Zafra)",
+  "km": 238.9,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 120
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 85,
+    "3kv": 14,
+    "25kv": 0,
+    "?": 0
+   },
+   "lineas": [
+    "FFCC Mérida-Los Rosales",
+    "FFCC Alcázar de San Juan-Cádiz",
+    "Línea Mérida-Los Rosales"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mad-tal",
+  "name": "Madrid — Talavera",
+  "km": 137.1,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 150
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 80,
+    "3kv": 20,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Madrid-Valencia de Alcántara",
+    "Línea Móstoles-Parla",
+    "Línea Móstoles-Humanes"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "tal-pla",
+  "name": "Talavera — Plasencia",
+  "km": 134.5,
+  "state": {
+   "gauge": "ib",
+   "elec": "no",
+   "speed": 150
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "no": 95,
+    "25kv": 5,
+    "?": 0
+   },
+   "lineas": [
+    "Línea Madrid-Valencia de Alcántara",
+    "Línea de Alta Velocidad Plasencia-Badajoz",
+    "Línea Monfragüe-Bifurcación El Chaparral"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "pla-cac",
+  "name": "Plasencia — Cáceres",
+  "km": 78.9,
+  "state": {
+   "gauge": "ib",
+   "elec": "25kv",
+   "speed": 180
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Plasencia-Badajoz",
+    "Línea Cáceres-Valencia de Alcántara"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "cac-mer",
+  "name": "Cáceres — Mérida",
+  "km": 78.0,
+  "state": {
+   "gauge": "ib",
+   "elec": "25kv",
+   "speed": 180
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Plasencia-Badajoz",
+    "Línea Ciudad Real-Badajoz"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mer-bad",
+  "name": "Mérida — Badajoz",
+  "km": 59.1,
+  "state": {
+   "gauge": "ib",
+   "elec": "25kv",
+   "speed": 180
+  },
+  "osm": {
+   "ancho": {
+    "ib": 100,
+    "?": 0
+   },
+   "catenaria": {
+    "25kv": 100,
+    "?": 0
+   },
+   "lineas": [
+    "Línea de Alta Velocidad Plasencia-Badajoz",
+    "Línea Ciudad Real-Badajoz"
+   ]
+  },
+  "aproximado": 0.0
+ },
+ {
+  "id": "mur-lor-av",
+  "name": "LAV Murcia — Lorca",
+  "km": 60.1,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "lor-alm-av",
+  "name": "LAV Lorca — Almería",
+  "km": 120.5,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "vit-ber-av",
+  "name": "Y vasca: Vitoria — Bergara",
+  "km": 35.8,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "ber-bil-av",
+  "name": "Y vasca: Bergara — Bilbao",
+  "km": 45.2,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "ber-don-av",
+  "name": "Y vasca: Bergara — Donostia",
+  "km": 56.7,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "bur-vit-av",
+  "name": "LAV Burgos — Vitoria",
+  "km": 96.7,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "zar-cst-av",
+  "name": "LAV Zaragoza — Castejón",
+  "km": 87.2,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "cst-pam-av",
+  "name": "LAV Castejón — Pamplona",
+  "km": 72.6,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "mad-tal-av",
+  "name": "LAV Madrid — Talavera",
+  "km": 119.4,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "tal-pla-av",
+  "name": "LAV Talavera — Plasencia",
+  "km": 115.3,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "mur-car-av",
+  "name": "LAV Murcia — Cartagena",
+  "km": 45.8,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "pal-san-av",
+  "name": "LAV Palencia — Santander",
+  "km": 175.2,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "sev-hue-av",
+  "name": "LAV Sevilla — Huelva",
+  "km": 88.5,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ },
+ {
+  "id": "our-pon-av",
+  "name": "LAV Ourense — Pontevedra (Cerdedo)",
+  "km": 70.4,
+  "state": {
+   "gauge": "std",
+   "elec": "25kv",
+   "speed": 300
+  },
+  "osm": {
+   "ancho": {},
+   "catenaria": {},
+   "lineas": []
+  },
+  "aproximado": 1.0
+ }
+]

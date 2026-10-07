@@ -1,9 +1,10 @@
 // Jornadas por turnos: cada día empieza con la primera salida y termina con la última llegada.
-// Las circulaciones de las relaciones con horario oficial son las publicadas por Renfe (GTFS 2026)
-// para el tipo de día; las relaciones sin horario publicado usan un plan simulado.
+// Las relaciones con horario oficial usan las circulaciones AVE y Alvia publicadas por Renfe para el tipo de día;
+// las demás, un plan con salidas repartidas y el recorrido que permite la red.
 import * as E from './engine.js';
-import {MODEL, CITY, PROJECTS} from './data.js';
+import {MODEL, CITY, CITIES} from './data.js';
 import * as S from './schedule.js';
+import * as I from './infra.js';
 
 export const opDays = m => new Date(Date.UTC(2022 + Math.floor(m / 12), m % 12 + 1, 0)).getUTCDate();
 export const clockText = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.floor(m) % 60).padStart(2, '0')}${m >= 1440 ? ' +' + Math.floor(m / 1440) : ''}`;
@@ -41,6 +42,7 @@ const INCIDENTS = {
   signal: {title: 'Incidencia de infraestructura', icon: '⚠', reasons: ['Fallo de señalización', 'Avería de un desvío', 'Corte de tensión en catenaria', 'Robo de cable']},
   trespass: {title: 'Arrollamiento o intrusión en la vía', icon: '⛔', reasons: ['Persona en la vía', 'Arrollamiento de animal', 'Objeto sobre la vía']},
   weather: {title: 'Meteorología adversa', icon: '☂', reasons: ['Viento fuerte: limitación de velocidad', 'Lluvias intensas', 'Nevada en la línea', 'Ola de calor: limitación temporal']},
+  changer: {title: 'Avería en un cambiador de ancho', icon: '⇄', reasons: ['Atasco en el cambiador de ancho', 'Un bogie no quiere cambiar de ancho', 'Cambiador fuera de servicio por mantenimiento']},
 };
 export const INCIDENT_TYPES = INCIDENTS;
 export const RESPONSES = {
@@ -50,14 +52,22 @@ export const RESPONSES = {
 };
 
 const planCache = {key: null, trips: null};
+const hashCode = x => [...String(x)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 function planKey(s) {
   const op = ensureOps(s);
   return [s.month, op.day, op.priority, JSON.stringify(op.incidents), JSON.stringify(op.choices), op.resolved.join(','),
     s.routes.filter(r => r.active).map(r => r.id + ':' + r.frequency + ':' + r.fleet + ':' + (r.first ?? '') + ':' + (r.last ?? '')).join('|'),
-    s.projects.filter(p => !p.done).map(p => p.id).join(',')].join('#');
+    s.projects.filter(p => !p.done).map(p => p.id).join(','), s.infra.ver].join('#');
 }
 
-function workOn(s, r) { return s.projects.find(p => !p.done && (p.route === r.id || PROJECTS.find(d => d.id === p.id)?.routes.includes(r.id))); }
+/** Obra en curso sobre el recorrido de una relación (con su tren actual). */
+export function workOn(s, r) {
+  if (s.projects.some(p => !p.done && p.type === 'upgrade' && p.route === r.id)) return s.projects.find(p => !p.done && p.type === 'upgrade' && p.route === r.id);
+  const f = s.fleet.find(f => f.id === r.fleet), m = f && MODEL[f.model];
+  const tramos = new Set((m ? E.routeCheck(s, r, m) : E.routeOptions(s, r).hybrid).tramos.map(t => t.id));
+  return s.projects.find(p => !p.done && p.type === 'tramo' && tramos.has(p.target)) || null;
+}
+const isCity = id => CITIES.some(c => c.id === id);
 
 /** Circulaciones del día de campaña, con retrasos derivados de incidencias. */
 export function servicePlan(s) {
@@ -67,27 +77,29 @@ export function servicePlan(s) {
   for (const r of s.routes.filter(r => r.active)) {
     const f = s.fleet.find(f => f.id === r.fleet), m = MODEL[f?.model];
     if (!m) continue;
-    const work = workOn(s, r);
+    const work = workOn(s, r), path = E.routeCheck(s, r, m);
     const real = r.real ? S.thin(S.routeTrips(type, r.id), Math.min(1, r.frequency / r.baseFrequency)) : null;
     if (real && real.length) {
       for (const t of real) {
         const name = S.STATIONS[t.stations[0]].name + ' → ' + S.STATIONS[t.stations.at(-1)].name;
         trips.push({id: t.key, route: r.id, name, label: (t.bus ? 'Bus ' : '') + (r.code || S.LINES[t.line].code) + (t.number ? ' ' + t.number : ''),
           line: t.line, number: t.number, model: t.bus ? 'Autobús de sustitución' : m.name, seats: t.bus ? 55 : m.seats, dep: t.start,
-          scheduled: t.end, duration: t.end - t.start, delay: work ? 3 : 0, real: true, bus: t.bus, trip: t, ends: [t.stations[0], t.stations.at(-1)]});
+          scheduled: t.end, duration: t.end - t.start, delay: work ? 3 : 0, real: true, bus: t.bus, trip: t, ends: [t.stations[0], t.stations.at(-1)], family: m.family, changes: path.changes});
       }
       continue;
     }
-    // Plan simulado para relaciones sin horario oficial publicado (obras futuras, líneas propias).
-    const first = Number.isFinite(r.first) ? r.first : r.kind === 'commuter' ? 330 : 360;
-    const last = Number.isFinite(r.last) ? r.last : r.kind === 'commuter' ? 1410 : 1260;
-    const duration = Math.round((r.km / Math.max(30, Math.min(r.speed, m.speed) * .78) + .18) * 60);
-    for (let direction = 0; direction < (r.circular ? 1 : 2); direction++) for (let i = 0; i < r.frequency; i++) {
-      const dep = Math.round(first + (last - first) * (r.frequency === 1 ? 0 : i / (r.frequency - 1))) + direction * 7;
+    // Plan propio: salidas repartidas entre las 6:30 y las 21:30 por el recorrido que permite la red.
+    if (!path.ok) continue;
+    const coords = I.pathCoords(s, path), cum = [0];
+    for (let k = 1; k < coords.length; k++) cum.push(cum[k - 1] + Math.hypot((coords[k][0] - coords[k - 1][0]) * 85, (coords[k][1] - coords[k - 1][1]) * 111));
+    const stops = I.pathNodes(s, path, r.via[0]).filter((n, k, all) => k === 0 || k === all.length - 1 || isCity(n)).length;
+    const duration = Math.round(path.minutes + Math.max(0, stops - 2) * 2), first = 390, last = 1290;
+    for (let direction = 0; direction < 2; direction++) for (let i = 0; i < r.frequency; i++) {
+      const dep = Math.round(first + (last - first) * (r.frequency === 1 ? .35 : i / (r.frequency - 1))) + direction * 7;
       const ends = direction ? [...r.ends].reverse() : r.ends;
-      trips.push({id: `${r.id}-${direction}-${i}`, route: r.id, name: ends.map(id => CITY[id]?.name || id).join(' → '), label: 'Plan simulado',
-        model: m.name, seats: m.seats, dep, scheduled: dep + duration, duration, delay: work ? 8 : 0, direction, real: false,
-        coords: (direction ? [...r.via].reverse() : r.via).map(id => [CITY[id].lon, CITY[id].lat])});
+      trips.push({id: `${r.id}-${direction}-${i}`, route: r.id, name: ends.map(id => CITY[id]?.name || id).join(' → '), label: m.family + ' ' + (9000 + (hashCode(r.id) % 900) + i * 2 + direction),
+        model: m.name, seats: m.seats, dep, scheduled: dep + duration, duration, delay: work ? 6 : 0, direction, real: false, family: m.family, changes: path.changes,
+        coords: direction ? [...coords].reverse() : coords, cum: direction ? cum.map(x => cum.at(-1) - x).reverse() : cum});
     }
   }
   // Retrasos por incidencias del día.
@@ -134,20 +146,22 @@ export function startDay(s) {
   const trips = servicePlan(s);
   if (trips.length) {
     const reliability = s.fleet.reduce((v, f) => v + f.condition * f.qty, 0) / Math.max(1, s.fleet.reduce((v, f) => v + f.qty, 0));
-    const count = Math.min(4, Math.floor(E.random(s) * 2.2 + trips.length / 900 + (80 - reliability) / 40 + (s.maintenance < 1 ? .6 : 0)));
+    const count = Math.min(4, Math.floor(E.random(s) * 2.2 + trips.length / 300 + (80 - reliability) / 40 + (s.maintenance < 1 ? .6 : 0)));
     const month = s.month % 12;
     for (let i = 0; i < Math.max(0, count); i++) {
       const trip = pick(s, trips.filter(t => !t.bus));
       if (!trip) break;
       const roll = E.random(s);
-      const type = roll < .45 ? 'breakdown' : roll < .75 ? 'signal' : roll < .9 ? 'trespass' : 'weather';
+      let type = roll < .45 ? 'breakdown' : roll < .75 ? 'signal' : roll < .9 ? 'trespass' : 'weather';
+      if (trip.changes?.length && E.random(s) < .35) type = 'changer';
       if (op.incidents.some(x => x.route === trip.route)) continue;
       let reason = pick(s, INCIDENTS[type].reasons);
       if (type === 'weather') reason = month <= 1 || month === 11 ? pick(s, ['Nevada en la línea', 'Viento fuerte: limitación de velocidad']) : month >= 5 && month <= 8 ? 'Ola de calor: limitación temporal' : pick(s, ['Lluvias intensas', 'Viento fuerte: limitación de velocidad']);
+      if (type === 'changer') reason += ' de ' + (I.NODES[pick(s, trip.changes)]?.changer || I.NODES[pick(s, trip.changes)]?.name || '');
       const delay = type === 'breakdown' ? 15 + Math.floor(E.random(s) * 40) : type === 'weather' ? 6 + Math.floor(E.random(s) * 10) : 12 + Math.floor(E.random(s) * 30);
       const id = 'inc-' + s.month + '-' + op.day + '-' + i;
       const at = trip.dep + Math.floor(trip.duration * (.2 + E.random(s) * .5));
-      const place = trip.real ? S.STATIONS[trip.trip.stations[Math.min(trip.trip.stations.length - 1, Math.floor(trip.trip.stations.length * .4))]].name : (CITY[trip.route.split('-')[0]]?.name || '');
+      const place = trip.real ? S.STATIONS[trip.trip.stations[Math.min(trip.trip.stations.length - 1, Math.floor(trip.trip.stations.length * .4))]].name : trip.name.split(' → ')[0];
       op.incidents.push({trip: id, id, type, route: trip.route, target: trip.id, label: trip.label, place, at, delay, span: type === 'weather' ? 240 : 60 + Math.floor(E.random(s) * 60), reason});
     }
   }
@@ -198,7 +212,7 @@ export function endDay(s) {
   for (const t of trips) byRoute[t.route] = (byRoute[t.route] || 0) + 1;
   const busiest = Object.entries(byRoute).sort((a, b) => b[1] - a[1])[0];
   const worst = trips.reduce((w, t) => t.delay > (w?.delay || 0) ? t : w, null);
-  const km = trips.reduce((v, t) => v + (t.real ? S.tripKm(t.trip) : (s.routes.find(r => r.id === t.route)?.km || 0)), 0);
+  const km = trips.reduce((v, t) => v + (t.real ? S.tripKm(t.trip) : (t.cum?.at(-1) || s.routes.find(r => r.id === t.route)?.km || 0)), 0);
   op.last = {date: dayLabel(s), kind, trains: trips.length, late, punctuality: Math.round((1 - late / Math.max(1, trips.length)) * 100),
     passengers: Math.round(b.passengers / opDays(s.month) * factor), net: b.net / opDays(s.month) - penalties, first: dayBounds(trips).first, last: op.minute,
     incidents: op.incidents.length, attended: op.resolved.length, km: Math.round(km), buses: trips.filter(t => t.bus).length,
@@ -213,6 +227,7 @@ export function nextDay(s) {
   if (op.phase !== 'review') throw Error('Cierra primero la jornada.');
   const {last, completed, priority} = op;
   if (op.day >= opDays(s.month)) { if (!E.step(s)) throw Error('No se puede cerrar el mes.'); op.day = 1; } else op.day++;
+  E.advanceInfra(s);
   Object.assign(op, {phase: 'planning', minute: 0, incidents: [], resolved: [], choices: {}, surges: [], last, completed, priority});
 }
 

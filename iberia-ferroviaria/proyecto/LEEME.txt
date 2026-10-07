@@ -1,87 +1,91 @@
-IBERIA FERROVIARIA — VERSIÓN JUGABLE 1.1
+IBERIA FERROVIARIA — VERSIÓN JUGABLE 2.0
 Actualización: 7 de octubre de 2026.
 
 PARA JUGAR
-Abre outputs/Iberia-Ferroviaria.html con Chrome, Edge o Firefox actualizados. Funciona sin Internet y sin instalar nada; solo los enlaces a fuentes necesitan conexión.
-Pulsa «Asumir la dirección» y resuelve la primera decisión. «Solo mirar el horario real» abre el mapa en modo observación, sin campaña.
+Abre outputs/Iberia-Ferroviaria.html con Chrome, Edge o Firefox actualizados. Funciona sin Internet y sin instalar nada.
+Pulsa «Asumir la dirección» y resuelve la primera decisión. «Solo mirar los trenes» abre el mapa en modo observación, sin campaña.
+Las partidas guardadas con versiones anteriores (1.x) no se pueden cargar: la red y el material son otros.
+
+QUÉ CAMBIA EN LA 2.0
+- Solo alta velocidad: AVE y Alvia. Desaparecen Media Distancia, Regionales, Avant e Intercity, y su material.
+- La red tiene anchos de vía y catenaria: ancho estándar, ibérico o mixto (tercer carril), y 25 kV, 3 kV o sin electrificar.
+- Dos mapas nuevos, «Anchos» y «Electrificación», y obras para poner tercer carril, pasar un tramo a ancho estándar, electrificarlo o construir cambiadores de ancho.
+- Nueve personajes, cada uno con su retrato ilustrado y tres caras (contento, enfadado y preocupado) según el momento.
+- Veintidós imprevistos aleatorios con su decisión, además de las quince del consejo de dirección.
+- Interfaz rehecha: cinco secciones en lugar de nueve, paneles de papel con marco dorado, cabeceras esmaltadas y menos texto.
+- Diálogos reescritos, mucho más faltones.
+- Los costes de energía, personal y canon suben un 1,2 % al año: con el tiempo hay que revisar tarifas y frecuencias.
+
+LA RED: ANCHOS Y CATENARIA
+El mapa de juego tiene 90 nodos (estaciones y bifurcaciones) y 125 tramos trazados sobre las vías de OpenStreetMap: 3.386 km de líneas de alta velocidad y 6.234 km de líneas convencionales en servicio en 2022, más 1.189 km proyectados.
+- El AVE (S100, S112, S103, S106 y AV 2030) es de ancho estándar fijo y eléctrico: solo va por ancho estándar o mixto con catenaria.
+- El Alvia eléctrico (S120, S130 y S106 de ancho variable) va por los dos anchos, pero solo cambia de uno a otro en un cambiador, y necesita catenaria.
+- El Alvia híbrido (S730) también va por vías sin electrificar, a 160 km/h como mucho.
+Cada relación calcula su recorrido sobre la red de hoy para los tres productos: tiempo, kilómetros, dónde cambia de ancho y, si no puede, qué le falta («Pola de Lena — Oviedo: ancho ibérico»). Un desvío absurdo no vale: si el único camino da la vuelta a media España, la relación queda bloqueada.
+Mapas: «Anchos» pinta en rojo el ancho estándar, en naranja el ibérico y en morado el mixto; los rombos son cambiadores. «Electrificación» pinta 25 kV en azul, 3 kV en verde y lo que no tiene catenaria en discontinuo.
+Pulsa un tramo para ver su ficha (longitud, velocidad, ancho, catenaria, qué relaciones lo usan y cuáles lo esperan) y las obras posibles:
+- Electrificar a 25 kV: no corta la línea.
+- Tercer carril (ancho mixto): pasan AVE y Alvia sin cambiar; no corta la línea.
+- Cambio a ancho estándar: más barato, pero corta la línea mientras dura; los servicios que la usan se suspenden y se pueden reabrir al acabar.
+Pulsa una estación o una bifurcación donde se crucen los dos anchos para construir un cambiador.
+La red cambia sola en las fechas reales: Plasencia — Badajoz (julio de 2022), LAV Venta de Baños — Burgos con su cambiador (julio de 2022), LAV Elche — Murcia (diciembre de 2022), variante de Pajares en ancho mixto con cambiador en Pola de Lena (noviembre de 2023) y electrificación de Extremadura (diciembre de 2023). Las grandes líneas pendientes (Murcia — Almería, Y vasca, Burgos — Vitoria, corredor navarro, Madrid — Extremadura, Cartagena, Cantabria, Huelva y Cerdedo) se financian en «Obras» y nunca acaban antes de su año. También puedes trazar una línea propia.
 
 TUTORIAL
-Al empezar una campaña, un tutorial guiado te acompaña paso a paso: pulsar una ciudad, añadir trenes, abrir una conexión, atender peticiones, jugar la jornada, responder a una avería y comprar material. Puedes saltarlo y repetirlo desde Ayuda.
+Dieciocho pasos guiados por la ministra: pulsar una ciudad, añadir trenes, abrir un Alvia, mirar los mapas de anchos y electrificación, atender peticiones, jugar la jornada, responder a una avería, leer el parte y comprar material. Cada paso avanza en cuanto haces lo que pide. Puedes saltarlo y repetirlo desde Ayuda.
 
 LAS CIUDADES MANDAN
-En el mapa se pulsan las ciudades, no las vías. Cada ciudad abre un menú visual con su ilustración (el cielo cambia con la hora), sus conexiones en tarjetas con botones + y − para poner más o menos trenes del horario real, «Abrir» para recuperar una conexión, su estación (cuatro niveles: cada mejora aumenta la demanda y la fiabilidad de todas sus conexiones) y sus próximas salidas.
-El color del círculo indica si la ciudad tiene todas sus conexiones (verde), algunas (ámbar) o ninguna (gris). Las marcas rojas avisan de trenes llenos.
-Peticiones (❗): las ciudades piden recuperar una conexión, más trenes, bajar una tarifa o una estación mejor. Tienen plazo y recompensa; si no las atiendes, pierdes reputación.
+Cada ciudad abre su ficha con su ilustración (el cielo cambia con la hora), sus conexiones en tarjetas con + y − para poner más o menos trenes, «Abrir» para poner una conexión en marcha, su estación (cuatro niveles) y sus próximas salidas. Las peticiones (❗) piden abrir una conexión, más trenes, una tarifa más baja, una estación mejor o un AVE donde hoy llega un Alvia; tienen plazo y recompensa.
+«Relación nueva» (en Red) une dos ciudades cualesquiera: la red decide por dónde puede ir cada tren.
 
 UN DÍA, UN TURNO
-Cada jornada empieza con la salida del primer tren y termina con la llegada del último. El reloj avanza (1×, 3×, 10× o 30×), cada llegada suma viajeros e ingresos que aparecen sobre la ciudad y en «Hoy», y puedes cambiar los trenes en directo.
-Momentos del día (⚡): picos de demanda (un partido, un congreso, un puente) que premian reforzar a tiempo una conexión concreta.
-Incidencias: averías, fallos de infraestructura, intrusiones en la vía y meteorología. Respondes con un equipo de intervención, un plan por carretera o esperando. Al final, el parte del día. La tesorería se liquida al cerrar el mes; «Delegar mes» avanza sin jugar cada día.
+Cada jornada empieza con la salida del primer tren y termina con la llegada del último. El reloj avanza a 1×, 3×, 10× o 30×; cada llegada suma viajeros e ingresos. Hay picos de demanda (⚡) e incidencias (averías, cambiadores de ancho que se atascan, catenaria, meteorología) que se resuelven con un equipo, un plan por carretera o esperando. Al final, el parte del día. La tesorería se liquida al cerrar el mes; «Delegar mes» avanza sin jugar cada día.
 
-TODOS LOS TRENES REALES DE LARGA Y MEDIA DISTANCIA
-El juego incluye el horario oficial de Renfe AV/LD/MD (GTFS publicado el 6 de octubre de 2026) para tres días tipo: laborable (1.581 circulaciones), sábado (1.216) y domingo o festivo (1.323), con número de tren, paradas y horas: AVE, AVLO, Avant, Alvia, Intercity, Euromed, Media Distancia, Regional, Regional Exprés, Proximidad y Trencelta. Desde la versión 0.4 no se incluyen Cercanías ni Rodalies (se pueden regenerar con INCLUDE_CERCANIAS=1 npm run timetable).
-En la campaña, cada conexión abierta ofrece las circulaciones reales que tú decidas. La capa «Horario real» muestra todas las circulaciones publicadas. Es el horario de 2026: la campaña lo usa como base desde 2022. El GTFS no publica el material asignado.
+EL HORARIO REAL
+El juego incluye las circulaciones AVE, AVLO y Alvia del horario oficial de Renfe (GTFS del 6 de octubre de 2026) para tres días tipo: laborable (393), sábado (305) y domingo o festivo (342), con número de tren, paradas y horas en 131 estaciones. Son 91 relaciones jugables: 43 corredores de campaña y el resto, relaciones del horario oficial. La capa «Horario real» muestra todas las circulaciones publicadas; en la campaña, cada conexión ofrece las que tú decidas.
+
+PERSONAJES
+Pedro Sancho (presidente del Gobierno), Raquel Sanz (ministra de Transportes), Óscar del Puente (su sucesor), Amparo Tijera (Presupuestos), Benito Balasto (jefe de obras de Adif), Fermín Bogie (jefe de talleres), Marisa Andén (portavoz de los viajeros), Paco Terruño (alcalde de Villanueva del Andén) e Íñigo Asfalto (Autocares Meseta).
+Cada uno tiene su retrato ilustrado (dibujo vectorial original, con trazo a mano y textura de papel) y tres expresiones: contento, enfadado y preocupado. Las decisiones, los imprevistos, los capítulos y el tutorial eligen la cara según lo que se cuenta. Los retratos no copian a nadie: son caricaturas originales.
+Hablan con voces sintéticas en castellano de España (XTTS-v2), una distinta por personaje, con la frase en curso resaltada. El botón del altavoz repite o detiene; «Música» → «Silenciar personajes» las apaga.
+
+IMPREVISTOS
+Cada mes puede saltar uno, al azar entre los que encajan con la fecha y lo que pasa en tu red: robo de cable, huelga, ola de calor, nevada, vacas en la vía, incendio en el taller, fondos europeos, auditoría, retrasos o adelantos de Adif, un alcalde encadenado, autobuses a cinco euros, un vídeo viral, elecciones… Todos piden decidir algo y algunos son una apuesta.
 
 MAPA
-Arrastra para moverte; rueda, botones o pinza para ampliar (hasta ver cada estación). Las líneas siguen trazados reales: shapes del GTFS de Cercanías y caminos calculados sobre la red OSM para AV/LD/MD, según ancho y velocidad. Un 3,1 % del trazado (vía estrecha fuera del extracto OSM y Francia) se dibuja como enlace aproximado discontinuo.
-La luz sigue la altura del sol calculada para la fecha, la hora oficial y la longitud: el ocaso avanza de este a oeste. De noche se encienden ciudades, estaciones y faros de los trenes.
-Pulsa una ciudad para abrir su menú, un tren para seguirlo con sus paradas, una estación para ver su panel de salidas o una obra para visitarla. En la capa «Obras», al acercarte se ven el tramo terminado, las traviesas, los hitos de cada fase y el frente de obra.
-Relieve y ríos son una ilustración esquemática.
+Arrastra para moverte; rueda, botones o pinza para ampliar. La luz sigue la altura del sol para la fecha y la hora: de noche se encienden ciudades, estaciones y faros. Pulsa una ciudad, un tren, una estación, un tramo, un cambiador o una obra. En la capa «Obras», al acercarte se ve el frente de obra.
 
 TRENES EN 3D
-Cada serie de material se ve como un modelo 3D (three.js) iluminado con sol, sombras y reflejos: miniaturas en Flota y Compras, y un visor que gira solo (arrástralo para girar, rueda para acercar) en las fichas de tren, lote, pedido y serie. Los modelos son reconstrucciones procedurales de cada familia (morro, perfil de caja, bogies, pantógrafos o techo diésel, puertas, ventanas y librea Renfe) hechas a partir de fotografías y fichas públicas: se parecen a los trenes reales, pero no son planos de fabricante ni réplicas exactas. Si el navegador no tiene WebGL se muestran las ilustraciones planas.
-Ya no hay material de Cercanías (Civia, 450/451, 452, 463/464/465…): el catálogo es de AV, LD y MD.
+Cada modelo de compra se ve en 3D (three.js) con sol, sombras y reflejos: miniaturas en Trenes y un visor que gira en las fichas. Son reconstrucciones procedurales de cada familia (morro, perfil, bogies, pantógrafos, librea), no planos de fabricante.
 
-BANDA SONORA
-Catorce piezas originales compuestas para el juego. No copian ni citan melodías existentes. Se tocan en tiempo real con Web Audio y suenan con instrumentos reales muestreados, casi todos con dos capas dinámicas (piano y forte) para que cambie el timbre, no solo el volumen: secciones de violines, violas, violonchelos y contrabajos (sostenido, spiccato, pizzicato y trémolo), violín solista, arpa, flauta, oboe, clarinete, fagot, trompa, trompeta (también con sordina), trombón, tuba, timbales, piano de cola, Rhodes, vibráfono, guitarra española, contrabajo de jazz, saxo alto, batería (bombo, caja, charles, ride, aro, toms y platos) y percusión: cajón, palmas, bongós, congas, darbuka, caja y bombo de banda, platos de choque y castañuelas.
-Los arreglos crecen con la forma: cada pieza empieza con su base rítmica y armónica y va sumando capas (cuerdas a cuatro o cinco partes con conducción de voces, contracantos de violonchelo, trompa, fagot o trombón con notas guía, doblajes de la melodía a la octava, maderas en terceras, trompas y timbales en los clímax, redobles de timbal, platillo y arpa en las transiciones). Las notas sostenidas se encadenan con fundidos para durar lo que pide la partitura, la melodía se toca ligada en los instrumentos de arco y viento, el acompañamiento evita las notas que rozarían a la melodía y cada familia tiene su bus de mezcla con ecualización y sala de concierto. Los sintetizadores son analógicos y discretos y solo aparecen en Vía libre (pad y bajo) y Primera salida (pad bajo las cuerdas); se «graban» una vez con todo su circuito y luego se tocan como muestras, para que no gasten procesador.
-Dos piezas nuevas con ritmos e instrumentos españoles: Despeñaperros, una bulería en La frigio (compás de doce tiempos con acentos en 12, 3, 6, 8 y 10; guitarra rasgueada, palmas claras y sordas, cajón, violín solista y orquesta que responde en spiccato) y Expreso de Andalucía, un pasodoble en Re menor con trío en Fa mayor (trompeta, tuba, trompas a contratiempo, caja de banda con su ritmo con puntillo, bombo y platos, castañuelas y final «ta-chán»). Otras cuatro mantienen rasgos españoles discretos (cadencia andaluza, falsetas, rasgueados, palmas, cajón y darbuka). Las melodías de las doce piezas anteriores son exactamente las de siempre.
-«Estación» (menús y preparación): Andén 1, Horario de verano, Tarifa reducida, Estación del Norte, Cambio de ancho, Pasajeros al tren, Expreso de Andalucía.
-«Red» (jornada en marcha): Primera salida, Vía libre, Talgo a medianoche, Corredor Mediterráneo, Atardecer en la meseta, Obras nocturnas, Despeñaperros.
-En modo automático la música cambia según lo que haces y la hora del día (piezas nocturnas de noche). El botón «Música» de la barra lateral abre el reproductor: elegir pieza, orden (automático, lista, repetir), volumen y apagar. Empieza con el primer clic.
-El HTML autónomo lleva todas las muestras dentro (unos 28 MB). La versión web (outputs/web/, se genera con «npm run build») deja las muestras en cuatro ficheros al lado de la página: el pequeño de los efectos llega al abrir el juego y los de la música, la primera vez que suena una pieza que los necesita.
-
-EFECTOS DE SONIDO
-Cada botón y cada clic tienen su sonido, pensado para lo que hace: el menú lateral pasa una hoja con una nota propia para cada sección; abrir un diálogo mueve el aire y cerrarlo lo devuelve; firmar un pedido estampa un sello seguido de campanas, y las obras añaden un golpe de yunque; las decisiones del consejo, las peticiones de las ciudades y la financiación de los capítulos tienen su propia firma; los botones + y − suben o bajan de nota según la frecuencia que dejas; las capas del mapa suenan como las palancas de una cabina de enclavamiento; las velocidades dan tantos tics como su número; comenzar la jornada suena como el aviso de megafonía de una estación, con una bocina lejana, y cerrarla con el aviso inverso; pasar de día o delegar el mes repiquetea como las paletas de los antiguos indicadores de salidas; las ciudades, los trenes, las estaciones, las líneas y las obras del mapa suenan distinto al pulsarlos; el zoom, la línea de tiempo, los deslizadores (con una nota que sigue al valor), los selectores, las casillas, los archivos y los atajos de teclado también suenan, y lo que no se puede hacer responde con un «no» suave.
-Todos los efectos son de la misma familia (madera, papel, metal, campanas de mano y vibráfono, grabaciones reales libres) y están escritos en Re pentatónico; mientras suena una pieza, sus notas se transportan a la tonalidad de esa pieza para armonizar con la música. Tienen prioridades para no amontonarse cuando varias cosas pasan a la vez. «Música» → «Efectos de sonido» permite silenciarlos o cambiar su volumen (se oyen aunque la música esté apagada).
-
-LOS PERSONAJES HABLAN
-Pedro Sancho, Raquel Sanz y Óscar del Puente leen en voz alta sus diálogos (tutorial, decisiones y capítulos), con la frase en curso resaltada. Cada uno tiene su propia interpretación burlesca: el presidente, solemne y lento, con fanfarria de inauguración; la ministra, con optimismo de rueda de prensa y «ding» de megafonía; el ministro, a la velocidad de un tuit, con pío de notificación. La música baja mientras hablan.
-Las voces van dentro del juego (funcionan sin conexión) y se sintetizan con XTTS-v2 a partir de grabaciones reales de hablantes de castellano de España: Pedro Sancho a partir de «dave» (grabaciones publicadas en CC0 para crear voces sintéticas); Raquel Sanz y Óscar del Puente con las voces de estudio «Camilla Holmström» y «Eugenio Mataracı» integradas en XTTS (nombres inventados, sin identidad real), elegidas entre 22 porque pronuncian con distinción (la «z» castellana), comprobada con un reconocedor de fonemas (tools/voice_accent.py). Ninguna imita a las personas parodiadas. Cada frase irónica tiene dirección de voz (tools/voice_direction.json): pausa antes del remate; cada toma se comprueba y, si sale con artefactos, se repite. Si se añade un diálogo nuevo sin regenerar las voces, ese diálogo se lee con la voz en español del sistema. El botón 🔊 repite o detiene; «Música» → «Silenciar personajes» las apaga.
-Los diálogos se han reescrito en tono irónico y castizo. Las fechas e hitos reales (Pajares, S106, abonos, iryo, gálibo) siguen siendo correctos; el resto es sátira de ficción.
+BANDA SONORA Y EFECTOS
+Catorce piezas originales tocadas en tiempo real con instrumentos reales muestreados (orquesta, piano, guitarra española, jazz y percusión, incluidas una bulería y un pasodoble). La música cambia según lo que haces y la hora del día; el botón «Música» abre el reproductor.
+Cada botón y cada clic tiene su sonido (madera, papel, metal, campanas y vibráfono), afinado con la pieza que suena: las capas del mapa suenan como palancas de enclavamiento, las obras con un golpe de yunque, los pedidos con un sello.
 
 GUARDADO
-Guardado automático en el navegador. Exporta la partida (.json) desde «Guardar» para conservarla. Las partidas de la versión 0.2 se pueden importar: se añaden las nuevas relaciones del horario oficial.
+Guardado automático en el navegador. «Guardar» exporta la partida (.json) para conservarla o llevarla a otro equipo.
 
 PROYECTO EDITABLE (proyecto/)
-dist/schedule.js: horario oficial en tiempo de ejecución, tramos y posición de los trenes.
-dist/network.js: relaciones jugables (51 corredores de campaña + 166 relaciones del horario oficial).
-dist/city-art.js: ilustraciones de ciudad (cielo, perfil urbano, monumento, estación por nivel).
-dist/operations.js: jornadas por turnos, incidencias, sol y fases de obra.
-dist/engine.js: economía mensual, flota, compras, obras y validación de partidas.
-dist/map-v3.js: mapa ilustrado, luz, red, trenes, estaciones y obras.
+dist/infra.js: red de anchos y catenaria, recorridos por producto (AVE, Alvia, híbrido), obras, cambiadores y obras históricas. dist/assets/infra.js: nodos y tramos (generado por tools/build_infra.py sobre las vías OSM; informe en investigacion/red/informe-red.json).
+dist/engine.js: economía mensual, flota, compras, obras, decisiones, imprevistos y validación de partidas.
+dist/network.js: relaciones jugables. dist/data.js: ciudades, corredores, material y proyectos. dist/story.js: capítulos, personajes, decisiones e imprevistos.
+dist/operations.js: jornadas por turnos, trenes simulados por la red, incidencias, sol y fases de obra.
+dist/schedule.js y dist/assets/timetable.js: horario oficial AVE y Alvia (generado por tools/build_timetable.py).
+dist/map-v3.js: mapa ilustrado con capas Tu red, Horario real, Anchos, Electrificación y Obras.
+dist/faces.js: retratos ilustrados de los personajes con sus tres expresiones.
 dist/app.js, dist/index.html, dist/style-v3.css: interfaz.
-dist/train3d.js: modelos 3D procedurales por familia (three.js), miniaturas y visor.
-dist/voice.js: voces de los personajes (clips neuronales, respaldo con la voz del sistema, cortinillas y subtítulos). dist/assets/voices.js: clips MP3 generados.
-tools/voice_lines.mjs, tools/voice_direction.json y tools/build_voices.py: regeneran las voces (XTTS-v2 con coqui-tts; frases, tomas y MP3 en investigacion/voces; referencias y créditos en investigacion/voces/referencias/REFERENCIAS.txt). tools/voice_accent.py mide si un audio suena a castellano de España.
-dist/music.js: banda sonora (14 piezas, motor de muestras con capas dinámicas, sostenido encadenado y legato, sintetizadores pregrabados, mezcla por familias, arreglista y reproductor). dist/assets/muestras-orquesta.js, muestras-teclas.js y muestras-percusion.js: banco de instrumentos muestreados en MP3; dist/assets/samples-index.js dice en qué fichero está cada instrumento (todo generado con «npm run samples», tools/build_samples.py, que descarga las bibliotecas libres, detecta la altura real de cada nota y elige las que cubren el registro). dist/render-music.html exporta las piezas a WAV.
-dist/sfx.js: efectos de sonido de la interfaz (recetas por tipo de acción, tabla ACTIONS que asigna un efecto a cada botón, prioridades, volumen propio y afinación con la pieza que suena); sus muestras están en dist/assets/muestras-ui.js.
-dist/train-art.js: ilustraciones laterales (alternativa sin WebGL) por serie (perfil del morro, rodadura, pantógrafo o diésel, puertas, pisos y librea).
-dist/story.js, dist/data.js, dist/gtfs.js: campaña, catálogo y fuentes, importador GTFS.
-dist/assets/timetable.js: horario procesado (generado). dist/assets/fonts: Fraunces, Figtree e IBM Plex Mono (SIL OFL).
-tools/build_timetable.py: regenera el horario a partir de los ZIP GTFS (Python 3 con numpy).
-Comandos desde proyecto/: «npm run timetable» regenera el horario; «npm run samples» regenera el banco de muestras; «npm run build» genera ../outputs/Iberia-Ferroviaria.html (autónomo) y ../outputs/web/ (página y muestras por separado); «npm test» ejecuta test.mjs, v2-test.mjs y v3-test.mjs; «node ui-v3-test.mjs <ruta a playwright>» hace el recorrido de interfaz y guarda capturas en investigacion/verificacion-v0.3.
+dist/train3d.js y dist/train-art.js: trenes en 3D y su alternativa plana. dist/city-art.js: ilustraciones de ciudad.
+dist/voice.js y dist/assets/voices.js: voces de los personajes. tools/voice_lines.mjs, tools/voice_direction.json y tools/build_voices.py las regeneran (frases, tomas y MP3 en investigacion/voces).
+dist/music.js, dist/sfx.js y dist/assets/muestras-*.js: banda sonora, efectos y banco de muestras (tools/build_samples.py).
+Comandos desde proyecto/: «npm run build» genera ../outputs/Iberia-Ferroviaria.html (autónomo) y ../outputs/web/; «npm test» ejecuta las pruebas de reglas (test.mjs) y la campaña completa jugada por un jugador automático (campaign-test.mjs); «node ui-test.mjs <ruta a playwright>» recorre la interfaz y guarda capturas en investigacion/verificacion-2.0; «npm run infra» y «npm run timetable» regeneran la red y el horario.
 
 DATOS Y ALCANCE
-Hechos con fuente: horarios y paradas (GTFS Renfe), estaciones, vías OSM, proyectos de infraestructura, contratos de material y fichas técnicas.
-Ficción de campaña: escasez inicial, cierres de 2022 y personajes (Pedro Sancho, Raquel Sanz y Óscar del Puente son caricaturas originales con nombres y diálogos inventados).
-Simulación: demanda, tarifas medias, cuentas, unidades necesarias (estimadas con el pico de trenes simultáneos del horario), incidencias, obras y todo 2027–2050.
+Con fuente: horarios y paradas (GTFS de Renfe), vías, anchos y electrificación (OpenStreetMap), fechas de las obras de 2022–2023, proyectos de alta velocidad y contratos de material.
+Simulación: demanda, tarifas, cuentas, unidades necesarias, costes y plazos de obra, incidencias y todo lo que pasa a partir de 2027.
 
 LICENCIAS
-Horarios: Renfe Data, CC BY 4.0 (https://data.renfe.com). Copia de los ZIP: investigacion/gtfs/, obtenidos del archivo público https://github.com/elguardagujas/renfe-gtfs-archive (el servidor ssl.renfe.com no era accesible desde el entorno de trabajo).
-Vías: © OpenStreetMap contributors, ODbL 1.0 (LICENSE-OSM.txt). España y Portugal: georgique/world-geojson, GPL-3.0 (LICENSE-GEODATA.txt). Otros contornos: Natural Earth, dominio público.
-Tipografías: SIL Open Font License 1.1 (dist/assets/fonts).
-three.js r159: MIT (dist/assets/LICENSE-three.txt).
-Voces: sintetizadas con XTTS-v2 (Coqui, Coqui Public Model License 1.0: solo uso no comercial, lo que se aplica a estos audios) a partir de grabaciones de «dave» (NabuCasa/voice-datasets, CC0) y de voces de estudio de XTTS. Son voces sintéticas; no imitan a ninguna persona real.
-Banda sonora: composición original para este proyecto. Instrumentos muestreados: VSCO 2 Community Edition y VCSL (Versilian Studios, CC0), Salamander Grand Piano V3 (Alexander Holm, CC BY 3.0), jRhodes3d (Jeff Learman, muestras CC BY-NC 4.0: solo uso no comercial), Virtuosity Drums (CC0), contrabajo de D. Smolken (CC0), Weresax de Karoryfer (CC0) y tonejs-instruments (Nicholaus Brosowsky, CC BY 3.0). Las castañuelas son una aproximación hecha con claves de madera (no hay grabaciones libres de castañuelas). Detalle en investigacion/musica/MUESTRAS.txt.
-Las marcas identifican operadores y fabricantes. No es un producto oficial de Renfe, Adif ni Alsa.
+Horarios: Renfe Data, CC BY 4.0. Copia de los ZIP en investigacion/gtfs/.
+Vías: © colaboradores de OpenStreetMap, ODbL 1.0 (LICENSE-OSM.txt). España y Portugal: georgique/world-geojson, GPL-3.0 (LICENSE-GEODATA.txt). Otros contornos: Natural Earth, dominio público.
+Tipografías: SIL Open Font License 1.1 (dist/assets/fonts). three.js r159: MIT (dist/assets/LICENSE-three.txt).
+Voces: XTTS-v2 (Coqui Public Model License 1.0, uso no comercial) con grabaciones de «dave» (CC0) y voces de estudio de XTTS. No imitan a ninguna persona real.
+Banda sonora: composición original. Instrumentos: VSCO 2 CE y VCSL (CC0), Salamander Grand Piano V3 (CC BY 3.0), jRhodes3d (CC BY-NC 4.0), Virtuosity Drums (CC0), contrabajo de D. Smolken (CC0), Weresax (CC0) y tonejs-instruments (CC BY 3.0). Detalle en investigacion/musica/MUESTRAS.txt.
+Las marcas identifican operadores y fabricantes. No es un producto oficial de Renfe ni de Adif.

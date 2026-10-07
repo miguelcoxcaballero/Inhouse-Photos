@@ -236,12 +236,13 @@ export const ACTIONS = {
   'open-incidents': 'nav', respond: '=respond', route: 'pickRoute', city: 'pickCity', 'freq-up': '=plus', 'freq-down': '=minus',
   'open-route': '=openRoute', request: '=request', 'station-up': '=celebrate', music: '@open', 'music-play': 'musicPick', 'music-toggle': '!toggle',
   'voice-toggle': '!toggle', 'sfx-toggle': '!toggle', say: 'say', 'music-next': 'musicNext', 'tutorial-next': 'tutorialNext', 'tutorial-skip': 'dismiss',
-  'tutorial-start': 'tutorialStart', 'route-zoom': 'focus', 'route-trips': 'timetable', 'route-tab': 'tab', 'network-zoom': 'focus', 'open-network': '=openRoute',
+  'tutorial-start': 'tutorialStart', 'route-zoom': 'focus', 'route-trips': 'timetable', 'route-tab': 'tab', 'net-view': 'tab', 'new-service': '@open', 'confirm-service': '=openRoute',
   train: 'pickTrain', station: 'pickStation', 'station-map': 'focus', 'station-timetable': 'timetable', 'tt-type': 'tab', 'tt-station': 'timetable',
   'real-trip': 'pickTrain', follow: '!toggle', layer: 'lever', 'visit-work': 'focus', 'close-service': '=closeService', upgrade: '=infra', 'fleet-tab': 'tab',
-  'fleet-detail': '@open', refurbish: '=refurbish', sell: '=sell', 'train-record': '@open', 'market-tab': 'tab', purchase: '@open', 'confirm-buy': '=contract',
-  project: '@open', 'confirm-project': '=infra', 'new-line': '@open', 'confirm-line': '=infra', borrow: '=borrow', repay: '=repay', 'archive-tab': 'tab',
-  license: '@open', 'save-dialog': '@open', help: '@open', 'save-now': 'punch', export: 'export', 'new-game': '@open',
+  'fleet-detail': '@open', refurbish: '=refurbish', sell: '=sell', purchase: '@open', 'confirm-buy': '=contract', tramo: 'pickRoute', node: 'pickStation', 'tramo-zoom': 'focus',
+  project: '@open', 'confirm-project': '=infra', 'new-line': '@open', 'confirm-line': '=infra', borrow: '=borrow', repay: '=repay', 'office-tab': 'tab',
+  'works-tab': 'tab', work: '@open', 'confirm-work': '=infra',
+  'save-dialog': '@open', help: '@open', 'save-now': 'punch', export: 'export', 'new-game': '@open',
 };
 
 /** Motor de efectos: comparte el contexto de audio de la banda sonora pero tiene su propio volumen. */

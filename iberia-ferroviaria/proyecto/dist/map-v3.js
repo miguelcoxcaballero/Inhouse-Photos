@@ -1,16 +1,16 @@
 // Mapa ilustrado de la red: relieve y ríos esquemáticos, luz solar por longitud, luces urbanas,
-// tramos coloreados por línea y tráfico, trenes sobre su trazado, estaciones y obras.
-import {CITIES, CITY, PROJECTS} from './data.js';
+// tramos coloreados por producto, mapas de anchos y de electrificación, trenes sobre su trazado, estaciones y obras.
+import {CITIES, CITY, PROJECTS, POP, MODEL} from './data.js';
 import {COUNTRIES} from './assets/geography.js';
-import {RAILWAYS, RAIL_PATHS} from './assets/railways.js';
+import {RAILWAYS} from './assets/railways.js';
 import * as S from './schedule.js';
+import * as E from './engine.js';
+import * as I from './infra.js';
 import {sunAltitude, constructionStatus, STAGES} from './operations.js';
 
-// Población aproximada del área urbana (miles) para dimensionar las luces nocturnas.
-const POP = {mad: 6700, bcn: 5600, vlc: 1600, ali: 760, mur: 700, car: 215, lor: 95, alm: 200, gra: 530, mal: 1000, sev: 1500, cor: 320, cad: 400, hue: 145,
-  alg: 260, ron: 34, ant: 41, jae: 112, cic: 75, pue: 47, cue: 54, alb: 173, xat: 30, enc: 2, cas: 300, tar: 300, gir: 200, fig: 47, zar: 760, lle: 140, huc: 53,
-  ter: 36, sag: 68, pam: 370, log: 150, bil: 1000, vit: 255, don: 440, iru: 62, san: 300, bur: 175, pal: 78, vll: 420, seg: 52, leo: 200, ovi: 220, gij: 270,
-  fer: 65, aco: 420, scq: 98, vig: 480, pon: 83, our: 105, lug: 98, zam: 60, sal: 150, avi: 57, pla: 40, cac: 96, mer: 60, bad: 150, tol: 85, gua: 87, cal: 20, alc: 30, med: 20};
+export const FAMILY_COLOR = {AVE: '#a3123a', Alvia: '#2f6f9f'};
+export const GAUGE_COLOR = {std: '#a3123a', ib: '#d08a1c', mixto: '#7a4fb0'};
+export const ELEC_COLOR = {'25kv': '#2f6fb0', '3kv': '#3f9a5c', no: '#9a7f5c'};
 const FOREIGN = [['Lisboa', -9.14, 38.72, 2900], ['Porto', -8.61, 41.15, 1700], ['Braga', -8.42, 41.55, 190], ['Coimbra', -8.43, 40.2, 140], ['Faro', -7.93, 37.02, 120],
   ['Évora', -7.91, 38.57, 55], ['Toulouse', 1.44, 43.6, 1000], ['Perpignan', 2.9, 42.7, 200], ['Montpellier', 3.88, 43.61, 450], ['Bayonne', -1.47, 43.49, 300],
   ['Andorra', 1.52, 42.51, 80], ['Palma', 2.65, 39.57, 420], ['Eivissa', 1.43, 38.91, 50], ['Maó', 4.26, 39.89, 30], ['Tánger', -5.81, 35.77, 1000],
@@ -127,12 +127,17 @@ export class RailMap {
     this.focusAt((a + c) / 2, (b + d) / 2, Math.min(max, Math.max(1, .82 / span)));
   }
   routeCoords(id) {
-    const edges = S.routeEdges(id);
-    if (edges.length) return edges.flatMap(i => S.edge(i).pts);
-    const path = RAIL_PATHS[id];
-    if (path?.coordinates) return path.coordinates;
-    const r = this.opts.getState().routes.find(r => r.id === id);
-    return r ? r.via.map(c => [CITY[c].lon, CITY[c].lat]) : [];
+    const state = this.opts.getState(), r = state.routes.find(r => r.id === id);
+    if (r?.real) { const edges = S.routeEdges(id); if (edges.length) return edges.flatMap(i => S.edge(i).pts); }
+    return r ? this.infraCoords(r) : [];
+  }
+  /** Recorrido por la red de una relación: el de su tren o, si no tiene, el mejor posible. */
+  infraCoords(r) {
+    const state = this.opts.getState(), f = state.fleet.find(f => f.id === r.fleet);
+    let p = f ? E.routeCheck(state, r, MODEL[f.model]) : null;
+    if (!p || !p.tramos.length) { const o = E.routeOptions(state, r); p = o.ave.ok ? o.ave : o.alvia.ok ? o.alvia : o.hybrid.ok ? o.hybrid : o.hybrid; }
+    const pts = I.pathCoords(state, p);
+    return pts.length > 1 ? pts : r.via.map(c => [CITY[c]?.lon ?? I.NODES[c]?.lon, CITY[c]?.lat ?? I.NODES[c]?.lat]);
   }
   focus(id, zoom = true) { this.selected = id; this.dirty = true; if (zoom) this.fit(this.routeCoords(id)); }
 
@@ -147,6 +152,12 @@ export class RailMap {
     if (best) return best;
     // 2. Peticiones y obras
     for (const w of this.workPoints || []) if (Math.hypot(w.x - x, w.y - y) < 14) return {type: 'work', id: w.id};
+    // 2b. Mapas de anchos y electrificación: nodos (cambiadores) y tramos
+    if (this.layer === 'gauge' || this.layer === 'power') {
+      for (const n of this.nodePoints || []) if (Math.hypot(n.x - x, n.y - y) < 10) return {type: 'node', id: n.id};
+      const t = this.tramoAt(x, y);
+      if (t) return {type: 'tramo', id: t};
+    }
     // 3. Trenes
     bd = 11;
     for (const p of this.trainPoints || []) { const d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = {type: 'train', id: p.id}; } }
@@ -159,6 +170,22 @@ export class RailMap {
     return best;
   }
   screenOf(lon, lat) { return this.project(lon, lat); }
+  /** Tramo de la red más cercano a un punto de pantalla (a menos de 9 px). */
+  tramoAt(x, y) {
+    const state = this.opts.getState();
+    let best = null, bd = 9;
+    for (const d of I.allTramos(state)) {
+      const pts = I.tramoGeom(d).pts;
+      let prev = this.project(pts[0][0], pts[0][1]);
+      for (let k = 1; k < pts.length; k++) {
+        const q = this.project(pts[k][0], pts[k][1]), dx = q[0] - prev[0], dy = q[1] - prev[1], L = dx * dx + dy * dy || 1;
+        const t = Math.max(0, Math.min(1, ((x - prev[0]) * dx + (y - prev[1]) * dy) / L)), dd = Math.hypot(prev[0] + t * dx - x, prev[1] + t * dy - y);
+        if (dd < bd) { bd = dd; best = d.id; }
+        prev = q;
+      }
+    }
+    return best;
+  }
 
   // ------------------------------------------------------------ capas en caché
   ctxOf(name) { const c = this.caches[name].getContext('2d'); c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.clearRect(0, 0, this.w, this.h); return c; }
@@ -267,9 +294,6 @@ export class RailMap {
 
   drawLines(view, night) {
     const c = this.ctxOf('lines'), state = this.opts.getState(), z = this.zoom;
-    const usage = S.edgeUsage(view.dayType || 'L');
-    const active = new Map(state.routes.filter(r => r.active).map(r => [r.id, r]));
-    const real = view.mode === 'real', works = this.layer === 'works';
     const zw = Math.min(3.2, Math.max(1, Math.pow(z, .38)));
     c.lineCap = 'round'; c.lineJoin = 'round';
     const draw = (pts, color, width, dash = null, alpha = 1) => {
@@ -277,34 +301,81 @@ export class RailMap {
       pts.forEach(([lon, lat], k) => { const p = this.project(lon, lat); k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); });
       c.setLineDash(dash || []); c.globalAlpha = alpha; c.strokeStyle = color; c.lineWidth = width; c.stroke(); c.globalAlpha = 1; c.setLineDash([]);
     };
+    if (this.layer === 'gauge' || this.layer === 'power') return this.drawInfra(c, draw, zw, night);
+    const usage = S.edgeUsage(view.dayType || 'L');
+    const active = new Map(state.routes.filter(r => r.active).map(r => [r.id, r]));
+    const real = view.mode === 'real', works = this.layer === 'works';
     const items = [];
     for (const [i, u] of usage) {
       const b = this.edgeBox[i], p1 = this.project(b[0], b[3]), p2 = this.project(b[2], b[1]);
       if (p2[0] < -20 || p1[0] > this.w + 20 || p2[1] < -20 || p1[1] > this.h + 20) continue;
-      let count = 0, best = null, bestN = 0;
-      if (real) { count = u.count; for (const [line, n] of u.lines) if (n > bestN) { bestN = n; best = line; } }
+      let count = 0, color = null, bestN = 0;
+      if (real) { count = u.count; for (const [line, n] of u.lines) if (n > bestN) { bestN = n; color = this.lineColor(line); } }
       else {
-        for (const [rid, n] of u.routes) { const r = active.get(rid); if (!r) continue; const share = Math.min(1, r.frequency / (r.baseFrequency || 1)); count += n * share; }
-        if (count) { const lines = [...u.lines.entries()].sort((a, b) => b[1] - a[1]); for (const [line] of lines) { best = line; break; } }
+        const fam = {};
+        for (const [rid, n] of u.routes) { const r = active.get(rid); if (!r) continue; const k = n * Math.min(1, r.frequency / (r.baseFrequency || 1)); count += k; const f = E.product(state, r); fam[f] = (fam[f] || 0) + k; }
+        if (count) color = FAMILY_COLOR[Object.entries(fam).sort((a, b) => b[1] - a[1])[0][0]] || '#8a3550';
       }
-      items.push({i, count, best, bus: u.bus === u.count});
+      items.push({i, count, color});
     }
-    // tramos sin servicio (por recuperar) primero
+    // tramos sin servicio (por abrir) primero
     for (const it of items) if (!it.count) draw(S.edge(it.i).pts, night > .5 ? 'rgba(210,200,170,.35)' : 'rgba(110,96,74,.45)', Math.max(.8, zw * .8), [2, 4]);
     items.sort((a, b) => a.count - b.count);
     const served = items.filter(it => it.count).map(it => ({...it, e: S.edge(it.i), width: (0.9 + Math.log2(1 + it.count) * .42) * zw * (works ? .6 : 1)}));
     // primero todos los contornos y después los colores: así los tramos consecutivos no se cortan
-    if (!works) for (const it of served) if (!it.bus && !it.e.approx) draw(it.e.pts, night > .5 ? 'rgba(10,16,30,.55)' : 'rgba(255,250,236,.85)', it.width + 2.4 * Math.min(2, zw));
-    for (const it of served) {
-      const color = works ? 'rgba(120,110,90,.6)' : it.bus ? '#c98a1c' : this.lineColor(it.best);
-      draw(it.e.pts, color, it.width, it.bus || it.e.approx === 2 ? [4, 4] : it.e.approx ? [6, 3] : null, works ? .7 : 1);
-    }
-    // corredores activos sin horario publicado: trazado OSM o enlace conceptual
-    for (const r of state.routes) {
-      if (r.real || (!r.active && !works)) continue;
-      const pts = this.routeCoords(r.id), osm = !!RAIL_PATHS[r.id];
+    if (!works) for (const it of served) if (!it.e.approx) draw(it.e.pts, night > .5 ? 'rgba(10,16,30,.55)' : 'rgba(255,250,236,.85)', it.width + 2.4 * Math.min(2, zw));
+    for (const it of served) draw(it.e.pts, works ? 'rgba(120,110,90,.6)' : it.color, it.width, it.e.approx ? [6, 3] : null, works ? .7 : 1);
+    // relaciones sin horario publicado: recorrido por la red
+    if (!real) for (const r of state.routes) {
+      if (r.real || !r.active) continue;
+      const pts = this.infraCoords(r);
       if (pts.length < 2) continue;
-      draw(pts, r.active ? '#8a3550' : 'rgba(120,100,80,.5)', r.active ? 2.4 * zw : 1.2, osm && !r.custom ? null : [3, 6]);
+      draw(pts, night > .5 ? 'rgba(10,16,30,.55)' : 'rgba(255,250,236,.85)', 2.4 * zw + 2.4);
+      draw(pts, FAMILY_COLOR[E.product(state, r)] || '#8a3550', 2.4 * zw);
+    }
+  }
+
+  /** Mapa de anchos o de electrificación: cada tramo de la red con su estado actual. */
+  drawInfra(c, draw, zw, night) {
+    const state = this.opts.getState(), gauge = this.layer === 'gauge', busy = new Map();
+    for (const p of state.projects) if (!p.done && (p.type === 'tramo' || p.type === 'custom')) busy.set(p.target, p);
+    for (const p of state.projects) if (!p.done && p.type === 'infrastructure') for (const t of I.TRAMOS) if (t.plan === p.id) busy.set(t.id, p);
+    const list = I.allTramos(state).map(d => ({d, st: state.infra.t[d.id], pts: I.tramoGeom(d).pts})).filter(x => x.st);
+    // proyectadas (sin construir) primero, discontinuas
+    for (const {d, st, pts} of list) if (!st.b) draw(pts, busy.has(d.id) ? '#d18a2a' : night > .5 ? 'rgba(230,220,200,.55)' : 'rgba(110,96,74,.6)', (d.kind === 'lav' ? 2.2 : 1.6) * zw, [5, 5]);
+    const built = list.filter(x => x.st.b), width = d => (d.kind === 'lav' ? 3.1 : 2.1) * zw;
+    for (const {d, pts} of built) draw(pts, night > .5 ? 'rgba(10,16,30,.6)' : 'rgba(255,250,236,.92)', width(d) + 2.6);
+    for (const {d, st, pts} of built) {
+      if (gauge) draw(pts, GAUGE_COLOR[st.g], width(d));
+      else draw(pts, ELEC_COLOR[st.e], width(d), st.e === 'no' ? [6, 4] : null);
+      const job = busy.get(d.id);
+      if (job && job.type === 'tramo' && (gauge ? job.work !== 'electrify' : job.work === 'electrify')) draw(pts, '#f1b43c', width(d) * .55, [3, 5]);
+    }
+  }
+
+  /** Nodos del mapa de anchos y electrificación: cambiadores de ancho (rombos) y bifurcaciones. */
+  drawNodes(view, night) {
+    this.nodePoints = [];
+    if (this.layer !== 'gauge' && this.layer !== 'power') return;
+    const c = this.ctx, state = this.opts.getState(), gauge = this.layer === 'gauge', zw = Math.min(3.2, Math.max(1, Math.pow(this.zoom, .38)));
+    const changing = new Set(state.projects.filter(p => !p.done && p.type === 'changer').map(p => p.target));
+    for (const n of Object.values(I.NODES)) {
+      const p = this.project(n.lon, n.lat);
+      if (!this.visible(p, 10)) continue;
+      const has = state.infra.c.includes(n.id), building = changing.has(n.id);
+      if (gauge && (has || building)) {
+        const r = Math.max(5, Math.min(9, 4 + zw * 1.6)), h = r / 1.4;
+        c.save(); c.translate(p[0], p[1]); c.rotate(Math.PI / 4);
+        c.fillStyle = '#fffaf0'; c.fillRect(-h, -h, h * 2, h * 2);
+        if (!building) { c.fillStyle = GAUGE_COLOR.std; c.fillRect(-h, -h, h, h * 2); c.fillStyle = GAUGE_COLOR.ib; c.fillRect(0, -h, h, h * 2); }
+        c.strokeStyle = building ? '#d18a2a' : night > .5 ? '#fff4d6' : '#2a1f1c'; c.lineWidth = 1.8; c.setLineDash(building ? [2, 2] : []); c.strokeRect(-h, -h, h * 2, h * 2); c.setLineDash([]);
+        c.restore();
+        this.nodePoints.push({id: n.id, x: p[0], y: p[1]});
+      } else if (n.kind === 'junction' && this.zoom > 1.6) {
+        c.fillStyle = night > .5 ? '#e8dcc0' : '#4a3e30'; c.beginPath(); c.arc(p[0], p[1], 2.6, 0, Math.PI * 2); c.fill();
+        this.nodePoints.push({id: n.id, x: p[0], y: p[1]});
+        if (this.zoom > 3.2) { c.font = '600 10.5px Figtree'; c.lineWidth = 3; c.strokeStyle = night > .5 ? 'rgba(10,15,30,.85)' : 'rgba(245,238,218,.92)'; c.strokeText(n.name, p[0] + 5, p[1] - 4); c.fillStyle = night > .5 ? '#e5d6b4' : '#4b4234'; c.fillText(n.name, p[0] + 5, p[1] - 4); }
+      } else if (gauge && I.changerPossible(state, n.id)) this.nodePoints.push({id: n.id, x: p[0], y: p[1]});
     }
   }
 
@@ -366,6 +437,7 @@ export class RailMap {
     const nightW = 1 - lightOf(altW), nightE = 1 - lightOf(altE), night = (nightW + nightE) / 2;
     const idle = performance.now() - this.lastInteraction > 140;
     if (!this.snap || this.dirty || (idle && (this.snap.zoom !== this.zoom || this.snap.pan.x !== this.pan.x || this.snap.pan.y !== this.pan.y)) || this.snap.night !== (night > .5) || this.snap.layer !== this.layer || this.snap.mode !== view.mode || this.snap.key !== view.networkKey) this.renderCaches(view, night);
+    const infraLayer = this.layer === 'gauge' || this.layer === 'power';
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.fillStyle = '#6f9fa8'; c.fillRect(0, 0, w, h);
     this.blit('base');
@@ -383,9 +455,10 @@ export class RailMap {
       c.fillStyle = g; c.fillRect(0, 0, w, h);
     }
     if (night > .05) this.blit('lights', Math.min(1, night * 1.15));
-    this.blit('lines', this.layer === 'works' ? .55 : 1 - night * .12);
+    this.blit('lines', this.layer === 'works' ? .55 : infraLayer ? 1 : 1 - night * .12);
     this.drawSelected(view, night);
     this.drawWorks(view, night, t);
+    this.drawNodes(view, night);
     this.drawStations(view, night);
     this.drawCities(view, night, t);
     this.blit('labels');
@@ -420,20 +493,25 @@ export class RailMap {
   }
 
   workGeometry(job) {
-    const def = PROJECTS.find(d => d.id === job.id), routes = def ? def.routes : [job.route];
-    const paths = [];
-    for (const id of routes) {
-      const path = RAIL_PATHS[id]?.coordinates;
-      if (path) paths.push({pts: path, conceptual: false});
-      else { const r = this.opts.getState().routes.find(r => r.id === id); if (r) paths.push({pts: r.via.map(v => [CITY[v].lon, CITY[v].lat]), conceptual: true}); }
-    }
-    return paths;
+    const state = this.opts.getState();
+    if (job.type === 'tramo' || job.type === 'custom') { const d = I.tramoDef(state, job.target); return d ? [{pts: I.tramoGeom(d).pts}] : []; }
+    if (job.type === 'changer') { const n = I.NODES[job.target]; return n ? [{pts: [[n.lon - .03, n.lat - .015], [n.lon + .03, n.lat + .015]]}] : []; }
+    if (job.type === 'upgrade') { const r = state.routes.find(r => r.id === job.route); return r ? [{pts: this.routeCoords(r.id)}] : []; }
+    return I.TRAMOS.filter(t => t.plan === job.id).map(t => ({pts: I.tramoGeom(t).pts}));
+  }
+  workName(job) {
+    const state = this.opts.getState(), def = PROJECTS.find(d => d.id === job.id);
+    if (def) return def.name;
+    if (job.type === 'changer') return 'Cambiador de ' + (I.NODES[job.target]?.name || '');
+    if (job.type === 'tramo' || job.type === 'custom') return (I.tramoDef(state, job.target)?.name || 'Obra').replace(/^LAV /, '');
+    return 'Obra';
   }
 
   drawWorks(view, night, t) {
     const state = this.opts.getState(), c = this.ctx, z = this.zoom, showAll = this.layer === 'works';
     this.workPoints = [];
     const jobs = state.projects.filter(p => !p.done && p.type !== 'upgrade');
+    if (this.layer === 'gauge' || this.layer === 'power') return;
     const planned = showAll ? PROJECTS.filter(p => !state.projects.some(j => j.id === p.id)) : [];
     c.lineCap = 'round'; c.lineJoin = 'round';
     for (const def of planned) for (const g of this.workGeometry({id: def.id})) {
@@ -494,8 +572,7 @@ export class RailMap {
         c.restore();
         this.workPoints.push({id: job.id, x: front[0], y: front[1]});
         if (z > 3 || showAll) {
-          const def = PROJECTS.find(d => d.id === job.id), r = state.routes.find(r => r.id === job.route);
-          const text = (def ? def.name.split(' · ')[0] : r ? r.name || r.id : 'Obra') + ' · ' + Math.round(st.progress * 100) + '%';
+          const text = this.workName(job) + ' · ' + Math.round(st.progress * 100) + '%';
           c.font = '700 12px Figtree'; const wd = c.measureText(text).width;
           c.fillStyle = night > .5 ? 'rgba(20,24,40,.92)' : 'rgba(255,248,232,.95)'; c.beginPath(); c.roundRect(front[0] + 14, front[1] - 30, wd + 16, 22, 11); c.fill();
           c.fillStyle = night > .5 ? '#ffd58a' : '#7a4b12'; c.fillText(text, front[0] + 22, front[1] - 15);
@@ -558,15 +635,18 @@ export class RailMap {
       let pos;
       if (trip.trip) pos = S.position(trip.trip, minute, trip.delay || 0);
       else if (trip.coords?.length) {
-        const pts = trip.coords, f = Math.max(0, Math.min(1, (minute - trip.dep) / ((trip.arrival - trip.dep) || 1)));
-        const idx = Math.min(pts.length - 2, Math.floor(f * (pts.length - 1))), g = f * (pts.length - 1) - idx, a = pts[idx], b = pts[idx + 1] || a;
+        const pts = trip.coords, cum = trip.cum, f = Math.max(0, Math.min(1, (minute - trip.dep - (trip.delay || 0)) / ((trip.scheduled - trip.dep) || 1)));
+        let idx, g;
+        if (cum?.length === pts.length) { const d = f * cum.at(-1); idx = 0; while (idx < pts.length - 2 && cum[idx + 1] < d) idx++; g = (d - cum[idx]) / ((cum[idx + 1] - cum[idx]) || 1); }
+        else { idx = Math.min(pts.length - 2, Math.floor(f * (pts.length - 1))); g = f * (pts.length - 1) - idx; }
+        const a = pts[idx], b = pts[idx + 1] || a;
         pos = {lon: mix(a[0], b[0], g), lat: mix(a[1], b[1], g), angle: Math.atan2(-(b[1] - a[1]), (b[0] - a[0]) * .77)};
       }
       if (!pos) continue;
       const p = this.project(pos.lon, pos.lat);
       if (trip.id === this.selectedTrain) follow = p;
       if (!this.visible(p, 20)) continue;
-      const color = trip.line !== undefined && trip.line !== null ? this.lineColor(trip.line) : '#8a3550';
+      const color = FAMILY_COLOR[trip.family] || (trip.line !== undefined && trip.line !== null ? this.lineColor(trip.line) : '#8a3550');
       this.trainSprite(c, p[0], p[1], pos.angle, color, scale, night, trip.delay > 5, trip.bus, trip.id === this.selectedTrain);
       this.trainPoints.push({id: trip.id, x: p[0], y: p[1]});
       if (this.zoom > 28 && trip.label) {
@@ -600,8 +680,16 @@ export class RailMap {
       text = r.name || r.id; sub = r.active ? 'En servicio · ' + r.frequency + ' salidas por sentido' : 'Sin servicio · pulsa para gestionar';
       at = this.lastPointer;
     } else if (this.hover.type === 'work') {
-      const def = PROJECTS.find(p => p.id === this.hover.id), w = this.workPoints.find(p => p.id === this.hover.id);
-      text = def?.name || 'Obra'; sub = 'Pulsa para visitar la obra'; at = w ? [w.x, w.y] : null;
+      const job = state.projects.find(p => p.id === this.hover.id) || {id: this.hover.id}, w = this.workPoints.find(p => p.id === this.hover.id);
+      text = this.workName(job); sub = 'Pulsa para ver la obra'; at = w ? [w.x, w.y] : null;
+    } else if (this.hover.type === 'tramo') {
+      const d = I.tramoDef(state, this.hover.id), st = state.infra.t[this.hover.id];
+      if (!d || !st) return;
+      text = d.name; sub = !st.b ? 'Proyectada · ' + Math.round(d.km) + ' km' : `${I.GAUGE_LABEL[st.g]} · ${I.ELEC_LABEL[st.e]} · ${st.v} km/h`; at = this.lastPointer;
+    } else if (this.hover.type === 'node') {
+      const n = I.NODES[this.hover.id], p = this.nodePoints?.find(p => p.id === this.hover.id);
+      if (!n || !p) return;
+      text = n.name; sub = state.infra.c.includes(n.id) ? 'Cambiador de ancho' + (n.changer ? ' de ' + n.changer : '') : I.changerPossible(state, n.id) ? 'Aquí cabe un cambiador de ancho' : 'Bifurcación'; at = [p.x, p.y];
     }
     if (!at) return;
     c.font = '700 13px Figtree'; const w1 = c.measureText(text).width; c.font = '500 12px Figtree'; const w2 = c.measureText(sub).width;
