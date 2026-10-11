@@ -2,7 +2,7 @@
 
 A private photo and video library for your own computer. Browse from Android or the web, back up new files, and manage the Windows server from one clear dashboard.
 
-[Download Inhouse Photos](https://fotos.miguelcoxcaballero.com/descargas/) · [Windows server installer](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.5/Inhouse-Photos-Server-Setup.exe) · [Latest Android APK](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/latest/download/Inhouse-Photos.apk)
+[Download Inhouse Photos](https://fotos.miguelcoxcaballero.com/descargas/) · [Windows server installer](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.5/Inhouse-Photos-Server-Setup.exe) · [Android 3.1.102 · A](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.102-a/Inhouse-Photos.apk)
 
 ## Get started
 
@@ -31,3 +31,7 @@ Published Android APKs must follow [AGENTS.md](AGENTS.md), including the permane
 ## Source and acknowledgements
 
 Inhouse Photos is an independent fork based on [Immich](https://github.com/immich-app/immich) v3.1.0. The underlying compatibility protocol and some internal service identifiers remain unchanged so existing libraries and clients continue to work. This project is not affiliated with or endorsed by the upstream project. The corresponding source is available here under the [GNU AGPL v3](LICENSE); copyright and third-party notices remain in the source and the app's legal information.
+
+## Inhouse services updater
+
+Android usa el [actualizador común de las cinco apps](https://github.com/miguelcoxcaballero/inhouse-services-updater). En **Ajustes → Actualizaciones** puedes elegir **A: cambios recientes; B: versiones revisadas** y comprobar manualmente. El popup es opcional, muestra versiones y cambios breves y permite aplazarlo 14 días. B solo se publica por petición expresa. [Reglas de sincronización](UPDATER.md) · [Compilación, firma, JNI y descarga verificados](https://github.com/miguelcoxcaballero/Inhouse-Photos/actions/runs/38151893484).

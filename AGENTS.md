@@ -11,9 +11,9 @@ For every APK update published to GitHub:
 3. Set `android-update.json.versionCode` to the ARM64 split APK version code (the base Flutter build number plus 2000).
 4. Build `mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` with the permanent Inhouse signing key.
 5. Replace both `Inhouse-Photos.apk` and the APK inside `Inhouse-Photos-Android.zip` in the same commit as the manifest.
-6. Publish a new GitHub Release and mark it as latest.
+6. Publish a new channel A prerelease with `--latest=false`; B requires the user's explicit request.
 
-Never publish a manifest that points at an APK with a different version, package name, or signing certificate. The app intentionally blocks use when `required` is true and the manifest semantic version is newer.
+Never publish a manifest that points at an APK with a different version, package name, or signing certificate. Legacy APKs read `required:true` to discover the migration. Inhouse services updater uses channel catalogs and never blocks use.
 
 ## Required checks
 
