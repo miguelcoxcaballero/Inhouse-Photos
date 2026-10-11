@@ -1,3 +1,4 @@
+// Shared updater: users default to B; A requires warning acknowledgement and slide confirmation. Publish new changes to A; promote B only on explicit user request. Edit canonical inhouse-services-updater and sync all five apps.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
