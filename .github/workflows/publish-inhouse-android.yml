@@ -150,25 +150,10 @@ jobs:
             ${{ runner.temp }}/android-release-verification.json
           if-no-files-found: error
 
-      - name: Commit the APK, ZIP, pubspec version and manifest atomically
-        id: commit
-        run: |
-          git fetch --no-tags origin "refs/heads/$GITHUB_REF_NAME"
-          python .github/scripts/prepare_android_publication.py \
-            --source "$GITHUB_SHA" --target FETCH_HEAD \
-            --directory "$RUNNER_TEMP/android-publication"
-          cd "$RUNNER_TEMP/android-publication"
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- mobile/pubspec.yaml Inhouse-Photos.apk Inhouse-Photos-Android.zip android-update.json updates/A.json updates/B.json
-          git commit -m "chore(android): publish verified $ANDROID_RELEASE_VERSION channel A APK"
-          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
       - name: Publish the verified Android release in channel A
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_COMMIT: ${{ steps.commit.outputs.sha }}
+          RELEASE_COMMIT: ${{ github.sha }}
         run: |
           python - "$RUNNER_TEMP/android-release-notes.md" <<'PY'
           import os, sys
@@ -210,3 +195,20 @@ jobs:
           print('Public ZIP contains the exact verified signed APK')
           PY
           python .github/scripts/verify_android_release.py
+
+      # Advertise channel metadata only after the exact APK is public and verified.
+      - name: Commit the APK, ZIP, pubspec version and manifest atomically
+        id: commit
+        run: |
+          git fetch --no-tags origin "refs/heads/$GITHUB_REF_NAME"
+          python .github/scripts/prepare_android_publication.py \
+            --source "$GITHUB_SHA" --target FETCH_HEAD \
+            --directory "$RUNNER_TEMP/android-publication"
+          cd "$RUNNER_TEMP/android-publication"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- mobile/pubspec.yaml Inhouse-Photos.apk Inhouse-Photos-Android.zip android-update.json updates/A.json updates/B.json
+          git commit -m "chore(android): publish verified $ANDROID_RELEASE_VERSION channel A APK"
+          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
