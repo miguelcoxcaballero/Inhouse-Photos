@@ -2,7 +2,7 @@
 
 A private photo and video library for your own computer. Browse from Android or the web, back up new files, and manage the Windows server from one clear dashboard.
 
-[Download Inhouse Photos](https://fotos.miguelcoxcaballero.com/descargas/) · [Windows server installer](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.5/Inhouse-Photos-Server-Setup.exe) · [Android 3.1.102 · A](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.102-a/Inhouse-Photos.apk)
+[Download Inhouse Photos](https://fotos.miguelcoxcaballero.com/descargas/) · [Windows server installer](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/server-v1.2.5/Inhouse-Photos-Server-Setup.exe) · [Android 3.1.104 · A y B](https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.104-a/Inhouse-Photos.apk)
 
 ## Get started
 
@@ -34,4 +34,4 @@ Inhouse Photos is an independent fork based on [Immich](https://github.com/immic
 
 ## Inhouse services updater
 
-Android usa el [actualizador común de las cinco apps](https://github.com/miguelcoxcaballero/inhouse-services-updater). En **Ajustes → Actualizaciones** puedes elegir **A: cambios recientes; B: versiones revisadas** y comprobar manualmente. El popup es opcional, muestra versiones y cambios breves y permite aplazarlo 14 días. B solo se publica por petición expresa. A incluye todas las versiones A y B y ofrece la de mayor `versionCode`; B recibe solo versiones B. [Reglas de sincronización](UPDATER.md) · [Compilación, firma, JNI y descarga verificados](https://github.com/miguelcoxcaballero/Inhouse-Photos/actions/runs/38151893484).
+Android usa el [actualizador común de las cinco apps](https://github.com/miguelcoxcaballero/inhouse-services-updater). En **Ajustes → Actualizaciones** puedes elegir **A: cambios recientes; B: versiones revisadas** y comprobar manualmente. El popup es opcional, muestra versiones y cambios breves y permite aplazarlo 14 días. B solo se publica por petición expresa. A incluye todas las versiones A y B y ofrece la de mayor `versionCode`; B recibe solo versiones B. [Reglas de sincronización](UPDATER.md) · [Compilación, firma, JNI y descarga verificados](https://github.com/miguelcoxcaballero/Inhouse-Photos/actions/runs/38175270176).

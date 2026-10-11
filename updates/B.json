@@ -1,6 +1,24 @@
 {
   "schemaVersion": 1,
   "channel": "B",
-  "latest": null,
-  "releases": []
+  "latest": {
+    "version": "3.1.104",
+    "versionCode": 7162,
+    "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.104-a/Inhouse-Photos.apk",
+    "apkSha256": "4324f9df493468cd63996b3a5258db75d4325f9e7107e514206bb3cce6a9bf93",
+    "apkSizeBytes": 75049548,
+    "changelog": "Updated Inhouse services updater.",
+    "releasedAt": "2026-10-11T21:44:19+00:00"
+  },
+  "releases": [
+    {
+      "version": "3.1.104",
+      "versionCode": 7162,
+      "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.104-a/Inhouse-Photos.apk",
+      "apkSha256": "4324f9df493468cd63996b3a5258db75d4325f9e7107e514206bb3cce6a9bf93",
+      "apkSizeBytes": 75049548,
+      "changelog": "Updated Inhouse services updater.",
+      "releasedAt": "2026-10-11T21:44:19+00:00"
+    }
+  ]
 }
