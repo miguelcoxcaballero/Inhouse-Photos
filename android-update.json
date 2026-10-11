@@ -1,8 +1,8 @@
 {
-  "version": "3.1.104",
-  "versionCode": 7162,
+  "version": "3.1.105",
+  "versionCode": 7163,
   "required": true,
-  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.104-a/Inhouse-Photos.apk",
-  "sizeBytes": 75049548,
-  "sha256": "4324f9df493468cd63996b3a5258db75d4325f9e7107e514206bb3cce6a9bf93"
+  "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.105-a/Inhouse-Photos.apk",
+  "sizeBytes": 75049732,
+  "sha256": "8a66451ea71c74abe64ee9904fada4c28f7f12c5edd0d7af3ddca6b309b95cb1"
 }
