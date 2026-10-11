@@ -16,7 +16,9 @@ class InhouseUpdatesSettings extends StatelessWidget {
           try {
             await const MethodChannel('com.inhousesoftware.photos/updates').invokeMethod<void>('openUpdater');
           } on PlatformException {
-            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir el actualizador.')));
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir el actualizador.')));
+            }
           }
         },
         child: const Text('Elegir canal y buscar actualizaciones'),
