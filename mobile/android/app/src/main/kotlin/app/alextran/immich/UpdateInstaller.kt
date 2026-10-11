@@ -7,7 +7,8 @@ import com.inhouse.services.updater.PhotosUpdateInstaller
 import com.inhouse.services.updater.UpdateActivity
 
 // Host adapter only. Canonical updater: github.com/miguelcoxcaballero/inhouse-services-updater.
-// Change it there first and sync ALL five apps. New releases A + tiny changelog; B only on explicit user request.
+// Change it there first and sync ALL five apps. Automatic releases: A + tiny changelog.
+// B publication/promotion requires an explicit user request. A includes A+B, highest global versionCode wins; B includes only B.
 class UpdateInstaller(private val activity: MainActivity, messenger: BinaryMessenger) {
   private val channel = MethodChannel(messenger, "com.inhousesoftware.photos/updates")
   private val installer = PhotosUpdateInstaller(activity, object : PhotosUpdateInstaller.Listener {
