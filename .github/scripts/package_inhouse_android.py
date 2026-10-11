@@ -63,13 +63,15 @@ def updated_pubspec(contents: str, version: str, base_build: int) -> str:
 
 
 def release_feature(tag: str, version: str) -> str:
-    match = re.fullmatch(re.escape(f"v{version}") + r"-(durable-upload|server-update|unified|sync-recovery|backup-menu)", tag)
+    match = re.fullmatch(re.escape(f"v{version}") + r"-(durable-upload|server-update|unified|sync-recovery|backup-menu|a)", tag)
     if not match:
         raise ValueError("Release tag must match the target Android version and a supported release feature")
     return match.group(1)
 
 
 def feature_description(feature: str) -> str:
+    if feature == "a":
+        return "Canales A/B y recordatorio opcional.\n\n"
     if feature == "backup-menu":
         return (
             "Nuevo menú de copia de seguridad: la nube muestra las fotos subiendo, la barra separa "

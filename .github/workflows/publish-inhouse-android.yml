@@ -12,13 +12,13 @@ concurrency:
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/feat/durable-upload-backlog' || github.ref == 'refs/heads/fix/backup-checksum-collision' || github.ref == 'refs/heads/feat/backup-cloud-menu'
+    if: github.ref == 'refs/heads/feat/inhouse-services-updater'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      RELEASE_TAG: v3.1.101-backup-menu
-      ANDROID_RELEASE_VERSION: '3.1.101'
-      ANDROID_RELEASE_BASE_BUILD: '5159'
+      RELEASE_TAG: v3.1.102-a
+      ANDROID_RELEASE_VERSION: '3.1.102'
+      ANDROID_RELEASE_BASE_BUILD: '5160'
     steps:
       - name: Checkout the source to publish
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -74,6 +74,7 @@ jobs:
 
       - name: Test Android publication and upload/authentication regressions
         run: |
+          python vendor/inhouse-services-updater/verify.py .
           python -m unittest discover -s .github/scripts -p 'test_*android*.py'
           cd mobile
           dart analyze --fatal-infos
@@ -130,6 +131,9 @@ jobs:
             --version "$ANDROID_RELEASE_VERSION" --base-build "$ANDROID_RELEASE_BASE_BUILD" \
             --report "$RUNNER_TEMP/android-release-verification.json"
 
+      - name: Prepare channel A catalog (B needs explicit user authorization)
+        run: python vendor/inhouse-services-updater/catalog.py --manifest android-update.json --changelog "Canales A/B y recordatorio opcional."
+
       - name: Test the actual staged updater against the signed APK version
         working-directory: mobile
         run: flutter test test/unit/required_update_gate_test.dart
@@ -156,12 +160,12 @@ jobs:
           cd "$RUNNER_TEMP/android-publication"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- mobile/pubspec.yaml Inhouse-Photos.apk Inhouse-Photos-Android.zip android-update.json
-          git commit -m "chore(android): publish verified $ANDROID_RELEASE_VERSION backup-menu APK"
+          git add -- mobile/pubspec.yaml Inhouse-Photos.apk Inhouse-Photos-Android.zip android-update.json updates/A.json updates/B.json
+          git commit -m "chore(android): publish verified $ANDROID_RELEASE_VERSION channel A APK"
           git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Publish the verified Android release as latest
+      - name: Publish the verified Android release in channel A
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_COMMIT: ${{ steps.commit.outputs.sha }}
@@ -173,7 +177,7 @@ jobs:
           version_code = int(os.environ['ANDROID_RELEASE_BASE_BUILD']) + 2000
           Path(sys.argv[1]).write_text(
               f'Inhouse Photos Android {version} (ARM64, versionCode {version_code}).\n\n'
-              f'Simplifica el menú de copia de seguridad: la barra muestra solo lo respaldado y lo pendiente, sin la etapa «Preparando». Activar o desactivar la copia ahora se anima con suavidad: la nube da un pequeño salto con una onda al encenderla, se encoge al apagarla y los textos cambian sin solaparse.\n\n'
+              'Canales A/B y recordatorio opcional.\n\n'
               'Instala Inhouse-Photos.apk o extráelo de Inhouse-Photos-Android.zip sobre la aplicación existente. Se conserva el certificado permanente de Inhouse Photos. El informe adjunto verifica la versión, el paquete, la firma y los ocho símbolos JNI.\n'
           )
           PY
@@ -181,12 +185,12 @@ jobs:
             python -c 'import json,sys; assert json.load(open(sys.argv[1]))["isDraft"], "Refusing to overwrite an already published Android release"' "$RUNNER_TEMP/existing-android-release.json"
           else
             gh release create "$RELEASE_TAG" --draft --target "$RELEASE_COMMIT" \
-              --title "Inhouse Photos $ANDROID_RELEASE_VERSION — menú de copia de seguridad más simple" \
+              --title "Inhouse Photos $ANDROID_RELEASE_VERSION — A · Inhouse services updater" \
               --notes-file "$RUNNER_TEMP/android-release-notes.md"
           fi
           gh release upload "$RELEASE_TAG" Inhouse-Photos.apk Inhouse-Photos-Android.zip \
             android-update.json "$RUNNER_TEMP/android-release-verification.json" --clobber
-          gh release edit "$RELEASE_TAG" --target "$RELEASE_COMMIT" --draft=false --latest \
+          gh release edit "$RELEASE_TAG" --target "$RELEASE_COMMIT" --draft=false --prerelease --latest=false \
             --notes-file "$RUNNER_TEMP/android-release-notes.md"
 
       - name: Download the public ZIP and verify the published APK

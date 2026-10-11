@@ -29,6 +29,9 @@ import io.flutter.embedding.engine.FlutterEngine
 
 class MainActivity : FlutterFragmentActivity() {
   private var updateInstaller: UpdateInstaller? = null
+  private val servicesUpdates by lazy { com.inhouse.services.updater.NativeUpdates(applicationContext) }
+  override fun onResume() { super.onResume(); servicesUpdates.onResumed(this) }
+  override fun onPause() { servicesUpdates.onPaused(this); super.onPause() }
 
   override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
@@ -42,6 +45,7 @@ class MainActivity : FlutterFragmentActivity() {
   }
 
   override fun onDestroy() {
+    servicesUpdates.onDestroyed(this)
     updateInstaller?.dispose()
     updateInstaller = null
     super.onDestroy()

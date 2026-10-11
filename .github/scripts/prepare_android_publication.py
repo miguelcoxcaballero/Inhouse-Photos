@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 
-ARTIFACTS = ("mobile/pubspec.yaml", "Inhouse-Photos.apk", "Inhouse-Photos-Android.zip", "android-update.json")
+ARTIFACTS = ("mobile/pubspec.yaml", "Inhouse-Photos.apk", "Inhouse-Photos-Android.zip", "android-update.json", "updates/A.json", "updates/B.json")
 PUBLICATION_INPUTS = (
     "mobile",
     "i18n",
@@ -51,6 +51,7 @@ def stage_publication(root: Path, source: str, target: str, directory: Path) -> 
     git(root, "worktree", "add", "--detach", str(directory), target)
     try:
         for artifact in ARTIFACTS:
+            (directory / artifact).parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(root / artifact, directory / artifact)
     except Exception:
         git(root, "worktree", "remove", "--force", str(directory))

@@ -319,7 +319,9 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
           ),
           child: ImmichThemeProvider(
             colorScheme: context.colorScheme,
-            child: RequiredUpdateGate(child: child!),
+            // Android uses the canonical Inhouse services updater host (optional A/B).
+            // Edit inhouse-services-updater first and sync all apps; B needs explicit user request.
+            child: Platform.isAndroid ? child! : RequiredUpdateGate(child: child!),
           ),
         ),
         routerConfig: router.config(

@@ -29,6 +29,7 @@ class ConcurrentPublicationTests(unittest.TestCase):
         (self.root / "AGENTS.md").write_text("Use the permanent Android key.\n")
         for artifact in publication.ARTIFACTS:
             if artifact != "mobile/pubspec.yaml":
+                (self.root / artifact).parent.mkdir(parents=True,exist_ok=True)
                 (self.root / artifact).write_bytes(b"previous published artifact")
         self.source = self.commit("Source to build")
 

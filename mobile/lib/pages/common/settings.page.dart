@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:immich_mobile/widgets/settings/inhouse_updates_settings.dart';
 import 'package:flutter_hooks/flutter_hooks.dart' hide Store;
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
@@ -20,6 +22,7 @@ import 'package:immich_mobile/widgets/settings/settings_card.dart';
 import 'package:immich_mobile/widgets/settings/server_management_settings.dart';
 
 enum SettingSection {
+  updates('Actualizaciones A/B', Icons.system_update_outlined, 'A: cambios recientes. B: versiones revisadas.'),
   health('App Health', Icons.health_and_safety_outlined, 'Connection, backup, storage and diagnostics'),
   server('Server management', Icons.dns_outlined, 'Disks, backups and Windows settings'),
   advanced('advanced', Icons.build_outlined, "advanced_settings_tile_subtitle"),
@@ -38,6 +41,7 @@ enum SettingSection {
   final IconData icon;
 
   Widget get widget => switch (this) {
+    SettingSection.updates => const InhouseUpdatesSettings(),
     SettingSection.health => const AppHealthSettings(),
     SettingSection.server => const ServerManagementSettings(),
     SettingSection.advanced => const AdvancedSettings(),
@@ -74,6 +78,7 @@ class _MobileLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<Widget> settings = SettingSection.values
+        .where((setting) => setting != SettingSection.updates || Platform.isAndroid)
         .expand(
           (setting) => setting == SettingSection.beta
               ? [
@@ -119,7 +124,7 @@ class _TabletLayout extends HookWidget {
           flex: 2,
           child: CustomScrollView(
             slivers: [
-              ...SettingSection.values.map(
+              ...SettingSection.values.where((setting) => setting != SettingSection.updates || Platform.isAndroid).map(
                 (s) => SliverToBoxAdapter(
                   child: ListTile(
                     title: Text(s.title).tr(),
