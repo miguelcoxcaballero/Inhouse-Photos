@@ -2,15 +2,24 @@
   "schemaVersion": 1,
   "channel": "A",
   "latest": {
-    "version": "3.1.105",
-    "versionCode": 7163,
-    "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.105-a/Inhouse-Photos.apk",
-    "apkSha256": "8a66451ea71c74abe64ee9904fada4c28f7f12c5edd0d7af3ddca6b309b95cb1",
-    "apkSizeBytes": 75049732,
-    "changelog": "Neutral updater colors.",
-    "releasedAt": "2026-10-11T22:17:14+00:00"
+    "version": "3.1.106",
+    "versionCode": 7164,
+    "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.106-a/Inhouse-Photos.apk",
+    "apkSha256": "14584499091b855cb383fc972f4adb14ea19f5c2e4911ceff156951449a35e6e",
+    "apkSizeBytes": 75132788,
+    "changelog": "Refined navigation and photo/video editing.",
+    "releasedAt": "2026-10-12T12:19:34+00:00"
   },
   "releases": [
+    {
+      "version": "3.1.106",
+      "versionCode": 7164,
+      "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.106-a/Inhouse-Photos.apk",
+      "apkSha256": "14584499091b855cb383fc972f4adb14ea19f5c2e4911ceff156951449a35e6e",
+      "apkSizeBytes": 75132788,
+      "changelog": "Refined navigation and photo/video editing.",
+      "releasedAt": "2026-10-12T12:19:34+00:00"
+    },
     {
       "version": "3.1.105",
       "versionCode": 7163,
