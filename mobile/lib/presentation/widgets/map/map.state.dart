@@ -163,4 +163,4 @@ final mapMarkerProvider = FutureProvider.family<Map<String, dynamic>, LatLngBoun
   return {'type': 'FeatureCollection', 'features': features};
 }, dependencies: [mapServiceProvider]);
 
-final mapStateProvider = NotifierProvider<MapStateNotifier, MapState>(MapStateNotifier.new);
+final mapStateProvider = NotifierProvider<MapStateNotifier, MapState>(MapStateNotifier.new, dependencies: const []);

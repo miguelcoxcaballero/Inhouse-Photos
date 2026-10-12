@@ -59,6 +59,32 @@ enum SettingSection {
   const SettingSection(this.title, this.icon, this.subtitle);
 }
 
+const _settingGroups = [
+  (title: 'backup', sections: [SettingSection.backup, SettingSection.freeUpSpace, SettingSection.server]),
+  (
+    title: 'preferences_settings_title',
+    sections: [
+      SettingSection.preferences,
+      SettingSection.timeline,
+      SettingSection.assetViewer,
+      SettingSection.notifications,
+      SettingSection.languages,
+    ],
+  ),
+  (
+    title: 'advanced',
+    sections: [
+      SettingSection.updates,
+      SettingSection.health,
+      SettingSection.networking,
+      SettingSection.beta,
+      SettingSection.advanced,
+    ],
+  ),
+];
+
+bool _isSectionAvailable(SettingSection section) => section != SettingSection.updates || Platform.isAndroid;
+
 @RoutePage()
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -67,7 +93,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     context.locale;
     return Scaffold(
-      appBar: AppBar(centerTitle: false, title: const Text('settings').tr()),
+      appBar: AppBar(centerTitle: false, title: context.isMobile ? null : const Text('settings').tr()),
       body: context.isMobile ? const _MobileLayout() : const _TabletLayout(),
     );
   }
@@ -77,37 +103,42 @@ class _MobileLayout extends StatelessWidget {
   const _MobileLayout();
   @override
   Widget build(BuildContext context) {
-    final List<Widget> settings = SettingSection.values
-        .where((setting) => setting != SettingSection.updates || Platform.isAndroid)
-        .expand(
-          (setting) => setting == SettingSection.beta
-              ? [
-                  SettingsCard(
-                    icon: Icons.sync_outlined,
-                    title: 'sync_status'.tr(),
-                    subtitle: 'sync_status_subtitle'.tr(),
-                    settingRoute: const SyncStatusRoute(),
-                  ),
-                ]
-              : [
-                  SettingsCard(
-                    title: setting.title.tr(),
-                    subtitle: setting.subtitle.tr(),
-                    icon: setting.icon,
-                    settingRoute: SettingsSubRoute(section: setting),
-                  ),
-                ],
-        )
-        .toList();
-    settings.add(
-      SettingsCard(
-        icon: Icons.auto_awesome_outlined,
-        title: context.t.whats_new,
-        subtitle: context.t.whats_new_settings_subtitle,
-        settingRoute: const WhatsNewRoute(),
-      ),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 60),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
+          child: Text('settings'.tr(), style: context.textTheme.headlineLarge),
+        ),
+        for (final group in _settingGroups) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 10),
+            child: Text(group.title.tr(), style: context.textTheme.labelLarge?.copyWith(color: context.primaryColor)),
+          ),
+          SettingsGroup(
+            children: [
+              for (final setting in group.sections.where(_isSectionAvailable))
+                SettingsCard(
+                  title: setting.title.tr(),
+                  subtitle: setting.subtitle.tr(),
+                  icon: setting.icon,
+                  settingRoute: setting == SettingSection.beta
+                      ? const SyncStatusRoute()
+                      : SettingsSubRoute(section: setting),
+                ),
+              if (group == _settingGroups.last)
+                SettingsCard(
+                  icon: Icons.auto_awesome_outlined,
+                  title: context.t.whats_new,
+                  subtitle: context.t.whats_new_settings_subtitle,
+                  settingRoute: const WhatsNewRoute(),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+      ],
     );
-    return ListView(padding: const EdgeInsets.only(top: 10.0, bottom: 60), children: [...settings]);
   }
 }
 
@@ -115,7 +146,7 @@ class _TabletLayout extends HookWidget {
   const _TabletLayout();
   @override
   Widget build(BuildContext context) {
-    final selectedSection = useState<SettingSection>(SettingSection.values.first);
+    final selectedSection = useState<SettingSection>(SettingSection.backup);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
@@ -124,18 +155,28 @@ class _TabletLayout extends HookWidget {
           flex: 2,
           child: CustomScrollView(
             slivers: [
-              ...SettingSection.values.where((setting) => setting != SettingSection.updates || Platform.isAndroid).map(
-                (s) => SliverToBoxAdapter(
-                  child: ListTile(
-                    title: Text(s.title).tr(),
-                    leading: Icon(s.icon),
-                    selected: s.index == selectedSection.value.index,
-                    selectedColor: context.primaryColor,
-                    selectedTileColor: context.themeData.highlightColor,
-                    onTap: () => selectedSection.value = s,
+              for (final group in _settingGroups) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 16, 8),
+                    child: Text(group.title.tr(), style: context.textTheme.labelLarge),
                   ),
                 ),
-              ),
+                ...group.sections
+                    .where(_isSectionAvailable)
+                    .map(
+                      (s) => SliverToBoxAdapter(
+                        child: ListTile(
+                          title: Text(s.title).tr(),
+                          leading: Icon(s.icon),
+                          selected: s == selectedSection.value,
+                          selectedColor: context.primaryColor,
+                          selectedTileColor: context.themeData.highlightColor,
+                          onTap: () => selectedSection.value = s,
+                        ),
+                      ),
+                    ),
+              ],
               SliverToBoxAdapter(
                 child: ListTile(
                   title: Text('whats_new'.tr()),

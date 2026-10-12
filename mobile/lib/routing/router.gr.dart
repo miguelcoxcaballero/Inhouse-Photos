@@ -580,6 +580,22 @@ class DriftCreateAlbumRoute extends PageRouteInfo<void> {
 }
 
 /// generated route for
+/// [DriftCreatePage]
+class DriftCreateRoute extends PageRouteInfo<void> {
+  const DriftCreateRoute({List<PageRouteInfo>? children})
+    : super(DriftCreateRoute.name, initialChildren: children);
+
+  static const String name = 'DriftCreateRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const DriftCreatePage();
+    },
+  );
+}
+
+/// generated route for
 /// [DriftEditImagePage]
 class DriftEditImageRoute extends PageRouteInfo<DriftEditImageRouteArgs> {
   DriftEditImageRoute({

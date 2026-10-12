@@ -53,7 +53,7 @@ class LocalAsset extends BaseAsset {
   @override
   String get heroTag => '${id}_${remoteId ?? checksum}';
 
-  bool get hasCoordinates => latitude != null && longitude != null && latitude != 0 && longitude != 0;
+  bool get hasCoordinates => ExifInfo(latitude: latitude, longitude: longitude).hasCoordinates;
 
   @override
   String toString() {

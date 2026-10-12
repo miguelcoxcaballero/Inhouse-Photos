@@ -56,10 +56,10 @@ class ViewerKebabMenu extends ConsumerWidget {
       consumeOutsideTap: true,
       style: MenuStyle(
         backgroundColor: WidgetStatePropertyAll(context.themeData.scaffoldBackgroundColor),
-        surfaceTintColor: const WidgetStatePropertyAll(Colors.grey),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
         elevation: const WidgetStatePropertyAll(4),
         shape: const WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+          RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(20))),
         ),
         padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 6)),
       ),

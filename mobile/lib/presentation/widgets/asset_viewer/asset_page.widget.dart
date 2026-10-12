@@ -440,7 +440,7 @@ class _AssetPageState extends ConsumerState<AssetPage> {
           controller: _scrollController,
           physics: const SnapScrollPhysics(),
           child: ColoredBox(
-            color: _showingDetails ? Colors.black : Colors.transparent,
+            color: _showingDetails ? context.colorScheme.surface : Colors.transparent,
             child: Stack(
               children: [
                 SizedBox(

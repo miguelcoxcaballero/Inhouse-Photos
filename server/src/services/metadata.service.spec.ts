@@ -395,21 +395,52 @@ describe(MetadataService.name, () => {
       });
     });
 
-    it('should discard latitude and longitude on null island', async () => {
+    it.each([
+      [0, 0],
+      [0, 24],
+      [51, 0],
+      [-90, -180],
+      [90, 180],
+    ])('should preserve valid GPS coordinates %s, %s', async (latitude, longitude) => {
       const asset = AssetFactory.create();
       mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+      mocks.map.reverseGeocode.mockResolvedValue({ country: null, state: null, city: null });
       mockReadTags({
-        GPSLatitude: 0,
-        GPSLongitude: 0,
+        GPSLatitude: latitude,
+        GPSLongitude: longitude,
       });
 
       await sut.handleMetadataExtraction({ id: asset.id });
       expect(mocks.assetJob.getForMetadataExtraction).toHaveBeenCalledWith(asset.id);
       expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
         expect.objectContaining({
-          exif: expect.objectContaining({ latitude: null, longitude: null }),
+          exif: expect.objectContaining({ latitude, longitude }),
           lockedPropertiesBehavior: 'skip',
         }),
+      );
+    });
+
+    it.each([
+      {},
+      { GPSLatitude: 0 },
+      { GPSLongitude: 0 },
+      { GPSLatitude: null, GPSLongitude: 10 },
+      { GPSLatitude: 12, GPSLongitude: null },
+      { GPSLatitude: '', GPSLongitude: 10 },
+      { GPSLatitude: 12, GPSLongitude: '   ' },
+      { GPSLatitude: Number.NaN, GPSLongitude: 10 },
+      { GPSLatitude: Number.POSITIVE_INFINITY, GPSLongitude: 10 },
+      { GPSLatitude: 91, GPSLongitude: 10 },
+      { GPSLatitude: 20, GPSLongitude: -181 },
+    ])('should not invent a location for invalid GPS %j', async (tags) => {
+      const asset = AssetFactory.create();
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+      mockReadTags(tags as ImmichTags);
+
+      await sut.handleMetadataExtraction({ id: asset.id });
+
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({ exif: expect.objectContaining({ latitude: null, longitude: null }) }),
       );
     });
 

@@ -6,6 +6,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart
 import 'package:immich_mobile/presentation/widgets/feature_message/feature_message_dialog.widget.dart';
 import 'package:immich_mobile/providers/feature_message.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
+import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 
 @RoutePage()
 class MainTimelinePage extends ConsumerStatefulWidget {
@@ -39,10 +40,14 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
 
   @override
   Widget build(BuildContext context) {
-    final hasMemories = ref.watch(driftMemoryFutureProvider.select((state) => state.value?.isNotEmpty ?? false));
+    final hasMemories = ref.watch(
+      driftMemoryFutureProvider.select((state) => state.value?.any((memory) => memory.assets.isNotEmpty) ?? false),
+    );
     return Timeline(
       topSliverWidget: const SliverToBoxAdapter(child: DriftMemoryLane()),
-      topSliverWidgetHeight: hasMemories ? 200 : 0,
+      topSliverWidgetHeight: hasMemories ? memoryLaneHeightForWidth(MediaQuery.sizeOf(context).width) : 0,
+      appBar: const ImmichSliverAppBar(floating: true, pinned: false, snap: false, toolbarHeight: 72),
+      roundTopGridCorners: true,
       showStorageIndicator: true,
       // Avoid showing the animated logo between the native splash and the grid.
       loadingWidget: const SizedBox.expand(),

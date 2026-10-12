@@ -58,6 +58,8 @@ class MainActivity : FlutterFragmentActivity() {
       flutterEngine.plugins.add(NetworkApiPlugin())
       flutterEngine.plugins.add(com.inhousesoftware.photos.images.ContactSheetPlugin())
       flutterEngine.plugins.add(BackupMediaProcessorPlugin())
+      flutterEngine.plugins.add(MediaEditorPlugin())
+      flutterEngine.plugins.add(MediaLocationPlugin())
 
       val messenger = flutterEngine.dartExecutor.binaryMessenger
       val backgroundEngineLockImpl = BackgroundEngineLock(ctx)

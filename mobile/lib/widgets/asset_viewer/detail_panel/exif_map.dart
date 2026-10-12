@@ -16,6 +16,8 @@ class ExifMap extends StatelessWidget {
   final String? markerId;
   final String? markerAssetThumbhash;
   final MapCreatedCallback? onMapCreated;
+  final VoidCallback? onTap;
+  final double height;
 
   const ExifMap({
     super.key,
@@ -23,11 +25,16 @@ class ExifMap extends StatelessWidget {
     this.markerAssetThumbhash,
     this.markerId = 'marker',
     this.onMapCreated,
+    this.onTap,
+    this.height = 132,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasCoordinates = exifInfo.hasCoordinates;
+    if (!hasCoordinates) {
+      return const SizedBox.shrink();
+    }
     Future<Uri?> createCoordinatesUri() async {
       if (!hasCoordinates) {
         return null;
@@ -66,13 +73,19 @@ class ExifMap extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         return MapThumbnail(
-          centre: LatLng(exifInfo.latitude ?? 0, exifInfo.longitude ?? 0),
-          height: 150,
+          key: ValueKey((exifInfo.latitude, exifInfo.longitude)),
+          centre: LatLng(exifInfo.latitude!, exifInfo.longitude!),
+          height: height,
           width: constraints.maxWidth,
           zoom: 12.0,
           assetMarkerRemoteId: markerId,
           assetThumbhash: markerAssetThumbhash,
+          showMarkerPin: markerId == null || markerAssetThumbhash == null,
           onTap: (tapPosition, latLong) async {
+            if (onTap != null) {
+              onTap!();
+              return;
+            }
             Uri? uri = await createCoordinatesUri();
 
             if (uri == null) {

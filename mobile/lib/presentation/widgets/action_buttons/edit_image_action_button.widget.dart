@@ -1,15 +1,20 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
 import 'package:immich_mobile/domain/models/asset_edit.model.dart';
+import 'package:immich_mobile/domain/models/exif.model.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/pages/edit/editor.provider.dart';
+import 'package:immich_mobile/presentation/pages/edit/media_edit.page.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/base_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/image_provider.dart';
 import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
+import 'package:immich_mobile/providers/background_sync.provider.dart';
+import 'package:logging/logging.dart';
 import 'package:immich_mobile/providers/infrastructure/action.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
@@ -30,7 +35,39 @@ class EditImageActionButton extends ConsumerWidget {
     }
 
     Future<void> onPress() async {
-      if (currentAsset == null || currentAsset.remoteId == null) {
+      if (currentAsset == null) {
+        return;
+      }
+      if (Platform.isAndroid) {
+        final sync = ref.read(backgroundSyncProvider);
+        ExifInfo? metadata;
+        try {
+          metadata = await ref.read(assetServiceProvider).getExif(currentAsset);
+        } catch (error, stack) {
+          Logger('MediaEditor').warning('Could not read library metadata; using embedded metadata', error, stack);
+        }
+        if (!context.mounted) {
+          return;
+        }
+        final saved = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => MediaEditPage(asset: currentAsset, metadata: metadata),
+          ),
+        );
+        if (saved == true) {
+          unawaited(() async {
+            try {
+              await sync.syncLocal();
+              await sync.hashAssets();
+            } catch (error, stack) {
+              // The copy already exists in MediaStore. A later sync can discover it.
+              Logger('MediaEditor').warning('Could not refresh edited copy', error, stack);
+            }
+          }());
+        }
+        return;
+      }
+      if (currentAsset.remoteId == null) {
         return;
       }
 
@@ -51,7 +88,7 @@ class EditImageActionButton extends ConsumerWidget {
     }
 
     return BaseActionButton(
-      iconData: Icons.tune,
+      iconData: Icons.tune_rounded,
       label: "edit".t(context: context),
       onPressed: onPress,
     );

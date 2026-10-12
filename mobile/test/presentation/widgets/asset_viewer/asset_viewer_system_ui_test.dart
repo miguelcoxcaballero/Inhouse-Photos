@@ -40,55 +40,62 @@ void main() {
     context = await PresentationContext.create();
   });
 
-  testWidgets('status bar icons are light while the asset viewer is open in light mode', (tester) async {
-    // Emulate arriving from a light-themed page whose AppBar set dark status
-    // bar icons (the state the viewer is opened from in light mode).
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
+  for (final brightness in Brightness.values) {
+    testWidgets('viewer canvas and system icons follow the effective ${brightness.name} theme', (tester) async {
+      final theme = ThemeData(brightness: brightness);
+      final expectedIcons = brightness == Brightness.dark ? Brightness.light : Brightness.dark;
+      // Use the opposite platform setting to ensure an explicit app theme wins.
+      tester.platformDispatcher.platformBrightnessTestValue = brightness == Brightness.dark
+          ? Brightness.light
+          : Brightness.dark;
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+      SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
 
-    await tester.pumpWidget(
-      EasyLocalization(
-        supportedLocales: locales.values.toList(),
-        path: translationsPath,
-        startLocale: locales.values.first,
-        fallbackLocale: locales.values.first,
-        saveLocale: false,
-        useFallbackTranslations: true,
-        assetLoader: const CodegenLoader(),
-        child: ProviderScope(
-          overrides: [
-            ...context.overrides,
-            timelineServiceProvider.overrideWithValue(_stubTimelineService()),
-            assetViewerProvider.overrideWith(_SeededAssetViewerNotifier.new),
-          ],
-          child: Builder(
-            builder: (context) => MaterialApp(
-              debugShowCheckedModeBanner: false,
-              localizationsDelegates: context.localizationDelegates,
-              supportedLocales: context.supportedLocales,
-              locale: context.locale,
-              home: const Material(child: AssetViewer(initialIndex: 0)),
+      await tester.pumpWidget(
+        EasyLocalization(
+          supportedLocales: locales.values.toList(),
+          path: translationsPath,
+          startLocale: locales.values.first,
+          fallbackLocale: locales.values.first,
+          saveLocale: false,
+          useFallbackTranslations: true,
+          assetLoader: const CodegenLoader(),
+          child: ProviderScope(
+            overrides: [
+              ...context.overrides,
+              timelineServiceProvider.overrideWithValue(_stubTimelineService()),
+              assetViewerProvider.overrideWith(_SeededAssetViewerNotifier.new),
+            ],
+            child: Builder(
+              builder: (context) => MaterialApp(
+                debugShowCheckedModeBanner: false,
+                localizationsDelegates: context.localizationDelegates,
+                supportedLocales: context.supportedLocales,
+                locale: context.locale,
+                theme: theme,
+                home: const Material(child: AssetViewer(initialIndex: 0)),
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    // Let post-frame callbacks and the initial frames run without waiting for
-    // infinite animations (loading spinners) to settle.
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 600));
+      // Let post-frame callbacks and the initial frames run without waiting for
+      // infinite animations (loading spinners) to settle.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
 
-    // Asset thumbnails cannot load in the test environment (no platform
-    // channels / real HTTP). Those image errors are irrelevant to the system
-    // chrome behaviour under test, so drain them.
-    tester.takeException();
+      // Asset thumbnails cannot load in the test environment (no platform
+      // channels / real HTTP). Those image errors are irrelevant to the system
+      // chrome behaviour under test, so drain them.
+      tester.takeException();
 
-    expect(
-      SystemChrome.latestStyle?.statusBarIconBrightness,
-      Brightness.light,
-      reason:
-          'The asset viewer draws over a black background, so status bar '
-          'icons must be light regardless of the app theme',
-    );
-  });
+      final viewerScaffold = tester.widget<Scaffold>(
+        find.descendant(of: find.byType(AssetViewer), matching: find.byType(Scaffold)).first,
+      );
+      expect(viewerScaffold.backgroundColor, theme.colorScheme.surface);
+      expect(SystemChrome.latestStyle?.statusBarIconBrightness, expectedIcons);
+      expect(SystemChrome.latestStyle?.systemNavigationBarIconBrightness, expectedIcons);
+    });
+  }
 }

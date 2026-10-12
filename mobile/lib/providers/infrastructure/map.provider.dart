@@ -8,23 +8,18 @@ import 'package:immich_mobile/providers/user.provider.dart';
 
 final mapRepositoryProvider = Provider<DriftMapRepository>((ref) => DriftMapRepository(ref.watch(driftProvider)));
 
-final mapServiceProvider = Provider<MapService>(
-  (ref) {
-    final user = ref.watch(currentUserProvider);
-    if (user == null) {
-      throw Exception('User must be logged in to access map');
-    }
+final mapServiceProvider = Provider<MapService>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) {
+    throw Exception('User must be logged in to access map');
+  }
 
-    final users = ref.watch(mapStateProvider).withPartners
-        ? ref.watch(timelineUsersProvider).valueOrNull ?? [user.id]
-        : [user.id];
+  final users = ref.watch(mapStateProvider).withPartners
+      ? ref.watch(timelineUsersProvider).valueOrNull ?? [user.id]
+      : [user.id];
 
-    final mapService = ref.watch(mapFactoryProvider).remote(users, ref.watch(mapStateProvider).toOptions());
-    return mapService;
-  },
-  // Empty dependencies to inform the framework that this provider
-  // might be used in a ProviderScope
-  dependencies: const [],
-);
+  final mapService = ref.watch(mapFactoryProvider).remote(users, ref.watch(mapStateProvider).toOptions());
+  return mapService;
+}, dependencies: [mapStateProvider]);
 
 final mapFactoryProvider = Provider<MapFactory>((ref) => MapFactory(mapRepository: ref.watch(mapRepositoryProvider)));

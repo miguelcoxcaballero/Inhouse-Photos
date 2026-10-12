@@ -1,21 +1,19 @@
 import 'package:auto_route/auto_route.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
-import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/images/local_album_thumbnail.widget.dart';
-import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
+import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
+import 'package:immich_mobile/presentation/widgets/people/collection_people_row.widget.dart';
 import 'package:immich_mobile/presentation/widgets/people/partner_user_avatar.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
-import 'package:immich_mobile/utils/image_url_builder.dart';
 import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/map/map_thumbnail.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -30,300 +28,349 @@ class DriftLibraryPage extends ConsumerWidget {
       body: CustomScrollView(
         slivers: [
           ImmichSliverAppBar(snap: false, floating: false, pinned: true, showUploadButton: false),
-          _ActionButtonGrid(),
-          _CollectionCards(),
-          _QuickAccessButtonList(),
+          SliverToBoxAdapter(child: _PlacesCollection()),
+          SliverToBoxAdapter(child: _PeopleCollection()),
+          SliverToBoxAdapter(child: _CollectionShortcuts()),
+          SliverToBoxAdapter(child: _DeviceCollection()),
+          SliverToBoxAdapter(child: _SharingCollection()),
+          SliverToBoxAdapter(child: SizedBox(height: 120)),
         ],
       ),
     );
   }
 }
 
-class _ActionButtonGrid extends ConsumerWidget {
-  const _ActionButtonGrid();
+// Use a real photo's coordinates when available. A world overview is preferable
+// to showing an unrelated place when the library has no geotagged photos yet.
+final _collectionMapCenterProvider = FutureProvider.autoDispose<LatLng?>((ref) async {
+  final places = await ref.watch(placesProvider.future);
+  if (places.isEmpty) {
+    return null;
+  }
+  final exif = await ref.watch(remoteAssetRepositoryProvider).getExif(places.first.$2);
+  if (exif == null || !exif.hasCoordinates) {
+    return null;
+  }
+  return LatLng(exif.latitude!, exif.longitude!);
+});
+
+class _CollectionHeading extends StatelessWidget {
+  const _CollectionHeading({required this.title, this.onViewAll});
+
+  final String title;
+  final VoidCallback? onViewAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 24, right: 16, top: 16, bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(title, style: context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+          ),
+          if (onViewAll != null)
+            TextButton(
+              onPressed: onViewAll,
+              child: Text('view_all'.t(context: context)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlacesCollection extends ConsumerWidget {
+  const _PlacesCollection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isTrashEnable = ref.watch(serverInfoProvider.select((state) => state.serverFeatures.trash));
-
-    return SliverPadding(
-      padding: const EdgeInsets.only(left: 16, top: 16, right: 16, bottom: 12),
-      sliver: SliverToBoxAdapter(
-        child: Column(
-          children: [
-            Row(
-              children: [
-                _ActionButton(
-                  icon: Icons.favorite_outline_rounded,
-                  onTap: () => context.pushRoute(const DriftFavoriteRoute()),
-                  label: 'favorites'.t(context: context),
+    final places = ref.watch(placesProvider).valueOrNull ?? const <(String, String)>[];
+    final centre = ref.watch(_collectionMapCenterProvider).valueOrNull;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _CollectionHeading(
+          title: 'places'.t(context: context),
+          onViewAll: () => context.pushRoute(DriftPlaceRoute(currentLocation: centre)),
+        ),
+        SizedBox(
+          height: 158,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: places.length.clamp(0, 10) + 1,
+            separatorBuilder: (_, _) => const SizedBox(width: 6),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Semantics(
+                  button: true,
+                  label: 'open_in_map_view'.t(context: context),
+                  child: Material(
+                    clipBehavior: Clip.antiAlias,
+                    borderRadius: BorderRadius.circular(24),
+                    color: context.colorScheme.surfaceContainerLow,
+                    child: InkWell(
+                      onTap: () => context.pushRoute(DriftMapRoute(initialLocation: centre)),
+                      child: SizedBox(
+                        width: 216,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            IgnorePointer(
+                              child: MapThumbnail(
+                                key: ValueKey(centre),
+                                width: 216,
+                                height: 158,
+                                centre: centre ?? const LatLng(20, 0),
+                                zoom: centre == null ? 1 : 8,
+                                showAttribution: true,
+                                themeMode: context.isDarkTheme ? ThemeMode.dark : ThemeMode.light,
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 20),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: context.colorScheme.surface.withValues(alpha: 0.92),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text('view_map'.t(context: context), style: context.textTheme.labelLarge),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }
+              final place = places[index - 1];
+              return Material(
+                color: context.colorScheme.surfaceContainerLow,
+                clipBehavior: Clip.antiAlias,
+                borderRadius: BorderRadius.circular(24),
+                child: InkWell(
+                  onTap: () => context.pushRoute(DriftPlaceDetailRoute(place: place.$1)),
+                  child: SizedBox(
+                    width: 110,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: SizedBox.expand(
+                                child: Thumbnail.remote(remoteId: place.$2, thumbhash: ''),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10, bottom: 6),
+                            child: Text(place.$1, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 8),
-                _ActionButton(
-                  icon: Icons.archive_outlined,
-                  onTap: () => context.pushRoute(const DriftArchiveRoute()),
-                  label: 'archived'.t(context: context),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PeopleCollection extends StatelessWidget {
+  const _PeopleCollection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _CollectionHeading(
+          title: 'people'.t(context: context),
+          onViewAll: () => context.pushRoute(const DriftPeopleCollectionRoute()),
+        ),
+        const CollectionPeopleRow(showNames: true),
+      ],
+    );
+  }
+}
+
+typedef _CollectionAction = ({IconData icon, String label, VoidCallback onTap});
+
+class _CollectionShortcuts extends ConsumerWidget {
+  const _CollectionShortcuts();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final trashEnabled = ref.watch(serverInfoProvider.select((state) => state.serverFeatures.trash));
+    final actions = <_CollectionAction>[
+      (icon: Icons.star_border_rounded, label: 'favorites', onTap: () => context.pushRoute(const DriftFavoriteRoute())),
+      (icon: Icons.photo_album_outlined, label: 'albums', onTap: () => context.pushRoute(const DriftAlbumsRoute())),
+      (
+        icon: Icons.schedule_rounded,
+        label: 'recently_added',
+        onTap: () => context.pushRoute(const DriftRecentlyAddedRoute()),
+      ),
+      (
+        icon: Icons.play_circle_outline_rounded,
+        label: 'videos',
+        onTap: () => context.pushRoute(const DriftVideoRoute()),
+      ),
+      (icon: Icons.inventory_2_outlined, label: 'archived', onTap: () => context.pushRoute(const DriftArchiveRoute())),
+      (
+        icon: Icons.lock_outline_rounded,
+        label: 'locked_folder',
+        onTap: () => context.pushRoute(const DriftLockedFolderRoute()),
+      ),
+      (icon: Icons.link_rounded, label: 'shared_links', onTap: () => context.pushRoute(const SharedLinkRoute())),
+      if (trashEnabled)
+        (icon: Icons.delete_outline_rounded, label: 'trash', onTap: () => context.pushRoute(const DriftTrashRoute())),
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 30, bottom: 20),
+            child: Text('other_collections'.t(context: context), style: context.textTheme.titleSmall),
+          ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Column(
+              spacing: 2,
+              children: [
+                for (var i = 0; i < actions.length; i += 2)
+                  IntrinsicHeight(
+                    child: Row(
+                      spacing: 2,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var j = i; j < i + 2 && j < actions.length; j++)
+                          Expanded(child: _CollectionShortcut(action: actions[j])),
+                        if (i + 1 == actions.length) const Expanded(child: SizedBox()),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CollectionShortcut extends StatelessWidget {
+  const _CollectionShortcut({required this.action});
+  final _CollectionAction action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(4),
+      child: InkWell(
+        onTap: action.onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 58),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Row(
+              children: [
+                Icon(action.icon, size: 23, color: context.colorScheme.onSurfaceVariant),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(action.label.t(context: context), style: context.textTheme.bodyMedium),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                _ActionButton(
-                  icon: Icons.link_outlined,
-                  onTap: () => context.pushRoute(const SharedLinkRoute()),
-                  label: 'shared_links'.t(context: context),
-                ),
-                isTrashEnable ? const SizedBox(width: 8) : const SizedBox.shrink(),
-                isTrashEnable
-                    ? _ActionButton(
-                        icon: Icons.delete_outline_rounded,
-                        onTap: () => context.pushRoute(const DriftTrashRoute()),
-                        label: 'trash'.t(context: context),
-                      )
-                    : const SizedBox.shrink(),
-              ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeviceCollection extends ConsumerWidget {
+  const _DeviceCollection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final albums = ref.watch(localAlbumProvider).valueOrNull ?? [];
+    return Column(
+      children: [
+        _CollectionHeading(
+          title: 'on_this_device'.t(context: context),
+          onViewAll: () => context.pushRoute(const DriftLocalAlbumsRoute()),
+        ),
+        if (albums.isNotEmpty)
+          SizedBox(
+            height: 108,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: albums.length.clamp(0, 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final album = albums[index];
+                return SizedBox(
+                  width: 108,
+                  child: Material(
+                    clipBehavior: Clip.antiAlias,
+                    borderRadius: BorderRadius.circular(20),
+                    child: InkWell(
+                      onTap: () => context.pushRoute(LocalTimelineRoute(album: album)),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          LocalAlbumThumbnail(albumId: album.id),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Colors.transparent, Colors.black.withValues(alpha: 0.65)],
+                              ),
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.bottomLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Text(
+                                album.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({required this.icon, required this.onTap, required this.label});
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: FilledButton.icon(
-        onPressed: onTap,
-        label: Padding(
-          padding: const EdgeInsets.only(left: 4.0),
-          child: Text(label, style: TextStyle(color: context.colorScheme.onSurface, fontSize: 15)),
-        ),
-        style: FilledButton.styleFrom(
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          backgroundColor: context.colorScheme.surfaceContainerLow,
-          alignment: Alignment.centerLeft,
-          shape: RoundedRectangleBorder(
-            borderRadius: const BorderRadius.all(Radius.circular(25)),
-            side: BorderSide(color: context.colorScheme.onSurface.withAlpha(10), width: 1),
           ),
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+          leading: const Icon(Icons.folder_outlined),
+          title: Text('folders'.t(context: context)),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => context.pushRoute(FolderRoute()),
         ),
-        icon: Icon(icon, color: context.primaryColor),
-      ),
-    );
-  }
-}
-
-class _CollectionCards extends StatelessWidget {
-  const _CollectionCards();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SliverPadding(
-      padding: EdgeInsets.symmetric(horizontal: 16),
-      sliver: SliverToBoxAdapter(
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [_PeopleCollectionCard(), _PlacesCollectionCard(), _LocalAlbumsCollectionCard()],
-        ),
-      ),
-    );
-  }
-}
-
-class _PeopleCollectionCard extends ConsumerWidget {
-  const _PeopleCollectionCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final people = ref.watch(driftGetAllPeopleProvider);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isTablet = constraints.maxWidth > 600;
-        final widthFactor = isTablet ? 0.25 : 0.5;
-        final size = context.width * widthFactor - 20.0;
-
-        return GestureDetector(
-          onTap: () => context.pushRoute(const DriftPeopleCollectionRoute()),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                height: size,
-                width: size,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(20)),
-                  gradient: LinearGradient(
-                    colors: [context.colorScheme.primary.withAlpha(30), context.colorScheme.primary.withAlpha(25)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-                child: people.widgetWhen(
-                  onLoading: () => const Center(child: CircularProgressIndicator()),
-                  onData: (people) {
-                    return GridView.count(
-                      crossAxisCount: 2,
-                      padding: const EdgeInsets.all(12),
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: people.take(4).map((person) {
-                        return CircleAvatar(backgroundImage: RemoteImageProvider(url: getFaceThumbnailUrl(person.id)));
-                      }).toList(),
-                    );
-                  },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  'people'.t(context: context),
-                  style: context.textTheme.titleSmall?.copyWith(
-                    color: context.colorScheme.onSurface,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _PlacesCollectionCard extends StatelessWidget {
-  const _PlacesCollectionCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isTablet = constraints.maxWidth > 600;
-        final widthFactor = isTablet ? 0.25 : 0.5;
-        final size = context.width * widthFactor - 20.0;
-
-        return GestureDetector(
-          onTap: () => context.pushRoute(DriftPlaceRoute(currentLocation: null)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: size,
-                width: size,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.all(Radius.circular(20)),
-                    color: context.colorScheme.secondaryContainer.withAlpha(100),
-                  ),
-                  child: IgnorePointer(
-                    child: MapThumbnail(
-                      zoom: 8,
-                      centre: const LatLng(21.44950, -157.91959),
-                      showAttribution: false,
-                      themeMode: context.isDarkTheme ? ThemeMode.dark : ThemeMode.light,
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  'places'.t(),
-                  style: context.textTheme.titleSmall?.copyWith(
-                    color: context.colorScheme.onSurface,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _LocalAlbumsCollectionCard extends ConsumerWidget {
-  const _LocalAlbumsCollectionCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final albums = ref.watch(localAlbumProvider);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isTablet = constraints.maxWidth > 600;
-        final widthFactor = isTablet ? 0.25 : 0.5;
-        final size = context.width * widthFactor - 20.0;
-
-        return GestureDetector(
-          onTap: () => context.pushRoute(const DriftLocalAlbumsRoute()),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: size,
-                width: size,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.all(Radius.circular(20)),
-                    gradient: LinearGradient(
-                      colors: [context.colorScheme.primary.withAlpha(30), context.colorScheme.primary.withAlpha(25)],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
-                  child: GridView.count(
-                    crossAxisCount: 2,
-                    padding: const EdgeInsets.all(12),
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: albums.when(
-                      data: (data) {
-                        return data.take(4).map((album) {
-                          return LocalAlbumThumbnail(albumId: album.id);
-                        }).toList();
-                      },
-                      error: (error, _) {
-                        return [
-                          Center(child: Text('error_saving_image'.tr(args: [error.toString()]))),
-                        ];
-                      },
-                      loading: () {
-                        return [const Center(child: CircularProgressIndicator())];
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  'on_this_device'.t(context: context),
-                  style: context.textTheme.titleSmall?.copyWith(
-                    color: context.colorScheme.onSurface,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+      ],
     );
   }
 }
@@ -332,115 +379,34 @@ class _LocalAlbumsCollectionCard extends ConsumerWidget {
 final sharedWithPartnerProvider = StreamProvider.autoDispose<Iterable<Partner>>((ref) {
   final currentUser = ref.watch(currentUserProvider);
   if (currentUser == null) {
-    // TODO: Refactor with a route guard to avoid this check in every provider
     return const .empty();
   }
-
   return ref.watch(partnerServiceProvider).search(currentUser.id, .sharedWith);
 });
 
-class _QuickAccessButtonList extends ConsumerWidget {
-  const _QuickAccessButtonList();
+class _SharingCollection extends ConsumerWidget {
+  const _SharingCollection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final partnerSharedWithAsync = ref.watch(sharedWithPartnerProvider);
-    final partners = partnerSharedWithAsync.valueOrNull ?? [];
-
-    return SliverPadding(
-      padding: const EdgeInsets.only(left: 16, top: 12, right: 16, bottom: 32),
-      sliver: SliverToBoxAdapter(
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: context.colorScheme.onSurface.withAlpha(10), width: 1),
-            borderRadius: const BorderRadius.all(Radius.circular(20)),
-            gradient: LinearGradient(
-              colors: [
-                context.colorScheme.primary.withAlpha(10),
-                context.colorScheme.primary.withAlpha(15),
-                context.colorScheme.primary.withAlpha(20),
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.all(0),
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              ListTile(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(20),
-                    topRight: const Radius.circular(20),
-                    bottomLeft: Radius.circular(partners.isEmpty ? 20 : 0),
-                    bottomRight: Radius.circular(partners.isEmpty ? 20 : 0),
-                  ),
-                ),
-                leading: const Icon(Icons.folder_outlined, size: 26),
-                title: Text(
-                  'folders'.t(context: context),
-                  style: context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
-                ),
-                onTap: () => context.pushRoute(FolderRoute()),
-              ),
-              ListTile(
-                leading: const Icon(Icons.lock_outline_rounded, size: 26),
-                title: Text(
-                  'locked_folder'.t(context: context),
-                  style: context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
-                ),
-                onTap: () => context.pushRoute(const DriftLockedFolderRoute()),
-              ),
-              ListTile(
-                leading: const Icon(Icons.group_outlined, size: 26),
-                title: Text(
-                  'partners'.t(context: context),
-                  style: context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
-                ),
-                onTap: () => context.pushRoute(const PartnerRoute()),
-              ),
-              _PartnerList(partners: partners.toList()),
-            ],
-          ),
+    final partners = ref.watch(sharedWithPartnerProvider).valueOrNull ?? [];
+    return Column(
+      children: [
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+          leading: const Icon(Icons.group_outlined),
+          title: Text('partners'.t(context: context)),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => context.pushRoute(const PartnerRoute()),
         ),
-      ),
-    );
-  }
-}
-
-class _PartnerList extends StatelessWidget {
-  const _PartnerList({required this.partners});
-
-  final List<Partner> partners;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(0),
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: partners.length,
-      shrinkWrap: true,
-      itemBuilder: (context, index) {
-        final partner = partners[index];
-        final isLastItem = index == partners.length - 1;
-        return ListTile(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(isLastItem ? 20 : 0),
-              bottomRight: Radius.circular(isLastItem ? 20 : 0),
-            ),
+        for (final partner in partners)
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+            leading: PartnerUserAvatar(userId: partner.id, name: partner.name),
+            title: const Text('partner_list_user_photos').t(context: context, args: {'user': partner.name}),
+            onTap: () => context.pushRoute(DriftPartnerDetailRoute(partner: partner)),
           ),
-          contentPadding: const EdgeInsets.only(left: 12.0, right: 18.0),
-          leading: PartnerUserAvatar(userId: partner.id, name: partner.name),
-          title: const Text(
-            "partner_list_user_photos",
-            style: TextStyle(fontWeight: FontWeight.w500),
-          ).t(context: context, args: {'user': partner.name}),
-          onTap: () => context.pushRoute(DriftPartnerDetailRoute(partner: partner)),
-        );
-      },
+      ],
     );
   }
 }

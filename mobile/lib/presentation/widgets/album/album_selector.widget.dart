@@ -353,9 +353,13 @@ class _SortButtonState extends ConsumerState<_SortButton> {
                     ? Icon(Icons.keyboard_arrow_down, color: context.colorScheme.onSurface)
                     : Icon(Icons.keyboard_arrow_up_rounded, color: context.colorScheme.onSurface),
               ),
-              Text(
-                albumSortOption.label.t(context: context),
-                style: context.textTheme.labelLarge?.copyWith(color: context.colorScheme.onSurface.withAlpha(225)),
+              Flexible(
+                child: Text(
+                  albumSortOption.label.t(context: context),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.textTheme.labelLarge?.copyWith(color: context.colorScheme.onSurface.withAlpha(225)),
+                ),
               ),
               isSorting
                   ? SizedBox(
@@ -538,11 +542,13 @@ class _QuickSortAndViewMode extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _SortButton(
-              onSortChanged,
-              controller: controller,
-              initialSortMode: currentSortMode,
-              initialIsReverse: currentIsReverse,
+            Expanded(
+              child: _SortButton(
+                onSortChanged,
+                controller: controller,
+                initialSortMode: currentSortMode,
+                initialIsReverse: currentIsReverse,
+              ),
             ),
             IconButton(
               icon: Icon(

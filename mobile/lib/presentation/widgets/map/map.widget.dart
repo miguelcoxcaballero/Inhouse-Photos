@@ -10,6 +10,7 @@ import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/extensions/maplibrecontroller_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/base_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/map_bottom_sheet.widget.dart';
@@ -111,6 +112,10 @@ class _DriftMapState extends ConsumerState<DriftMap> {
       );
     }
 
+    if (widget.initialLocation != null) {
+      await controller.addMarkerAtLatLng(widget.initialLocation!);
+    }
+
     _debouncer.run(() => setBounds(forceReload: true));
     controller.addListener(onMapMoved);
   }
@@ -132,7 +137,9 @@ class _DriftMapState extends ConsumerState<DriftMap> {
     // When the AssetViewer is open, the DriftMap route stays alive in the background.
     // If we continue to update bounds, the map-scoped timeline service gets recreated and the previous one disposed,
     // which can invalidate the TimelineService instance that was passed into AssetViewerRoute (causing "loading forever").
-    if (ref.read(isAssetViewerOpenProvider)) {
+    // The details preview can open a new map above the viewer. Only pause maps
+    // hidden behind that viewer; the newly opened map still needs its markers.
+    if (ref.read(isAssetViewerOpenProvider) && !(ModalRoute.of(context)?.isCurrent ?? false)) {
       return;
     }
 

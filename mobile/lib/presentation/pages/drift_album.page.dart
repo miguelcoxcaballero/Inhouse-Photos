@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
@@ -34,23 +35,32 @@ class _DriftAlbumsPageState extends ConsumerState<DriftAlbumsPage> {
   Widget build(BuildContext context) {
     final albumCount = ref.watch(remoteAlbumProvider.select((state) => state.albums.length));
     final showScrollbar = albumCount > 20;
+    final isStandalone = context.router.canPop();
+    final createAlbumButton = IconButton(
+      tooltip: 'create_album'.tr(),
+      onPressed: () => context.pushRoute(const DriftCreateAlbumRoute()),
+      icon: const Icon(Icons.add_rounded),
+    );
 
     final scrollView = CustomScrollView(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        ImmichSliverAppBar(
-          snap: false,
-          floating: false,
-          pinned: true,
-          actions: [
-            IconButton(
-              onPressed: () => context.pushRoute(const DriftCreateAlbumRoute()),
-              icon: const Icon(Icons.add_rounded),
-            ),
-          ],
-          showUploadButton: false,
-        ),
+        if (isStandalone)
+          SliverAppBar(
+            leading: const BackButton(),
+            title: Text('albums'.tr(), maxLines: 1, overflow: TextOverflow.ellipsis),
+            pinned: true,
+            actions: [createAlbumButton],
+          )
+        else
+          ImmichSliverAppBar(
+            snap: false,
+            floating: false,
+            pinned: true,
+            actions: [createAlbumButton],
+            showUploadButton: false,
+          ),
         AlbumSelector(
           onAlbumSelected: (album) {
             context.router.push(RemoteAlbumRoute(album: album));
@@ -59,23 +69,25 @@ class _DriftAlbumsPageState extends ConsumerState<DriftAlbumsPage> {
       ],
     );
 
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      edgeOffset: 100,
-      child: showScrollbar
-          ? RawScrollbar(
-              controller: _scrollController,
-              interactive: true,
-              thickness: 8,
-              radius: const Radius.circular(4),
-              thumbVisibility: false,
-              thumbColor: context.colorScheme.primary,
-              crossAxisMargin: 4,
-              mainAxisMargin: 60,
-              minThumbLength: 40,
-              child: scrollView,
-            )
-          : scrollView,
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: onRefresh,
+        edgeOffset: 100,
+        child: showScrollbar
+            ? RawScrollbar(
+                controller: _scrollController,
+                interactive: true,
+                thickness: 8,
+                radius: const Radius.circular(4),
+                thumbVisibility: false,
+                thumbColor: context.colorScheme.primary,
+                crossAxisMargin: 4,
+                mainAxisMargin: 60,
+                minThumbLength: 40,
+                child: scrollView,
+              )
+            : scrollView,
+      ),
     );
   }
 }

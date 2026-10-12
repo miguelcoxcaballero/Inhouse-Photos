@@ -12,7 +12,7 @@ class FavoriteAction extends AssetAction<RemoteAsset> {
   FavoriteAction({required super.assets}) : favorite = assets.any((asset) => !asset.isFavorite);
 
   @override
-  IconData get icon => favorite ? Icons.favorite_border_rounded : Icons.favorite_rounded;
+  IconData get icon => favorite ? Icons.star_border_rounded : Icons.star_rounded;
 
   @override
   String label(ActionScope scope) => favorite ? scope.context.t.favorite : scope.context.t.unfavorite;

@@ -9,6 +9,9 @@ import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 
+/// Includes the space between the carousel and the first grid row.
+double memoryLaneHeightForWidth(double width) => (width * 0.58).clamp(224.0, 280.0) + 24;
+
 class DriftMemoryLane extends ConsumerWidget {
   const DriftMemoryLane({super.key});
 
@@ -24,24 +27,33 @@ class DriftMemoryLane extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 200),
-      child: CarouselView(
-        itemExtent: 145.0,
-        shrinkExtent: 1.0,
-        elevation: 2,
-        backgroundColor: Colors.black,
-        overlayColor: WidgetStateProperty.all(Colors.white.withValues(alpha: 0.1)),
-        onTap: (index) {
-          ref.read(hapticFeedbackProvider.notifier).heavyImpact();
-          if (memories[index].assets.isNotEmpty) {
-            DriftMemoryPage.setMemory(ref, memories[index]);
-          }
-          context.pushRoute(DriftMemoryRoute(memories: memories, memoryIndex: index));
+    final width = MediaQuery.sizeOf(context).width;
+    return SizedBox(
+      height: memoryLaneHeightForWidth(width),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        itemCount: memories.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final memory = memories[index];
+          return SizedBox(
+            width: (width * 0.44).clamp(168.0, 224.0),
+            child: Material(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(32),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () {
+                  ref.read(hapticFeedbackProvider.notifier).heavyImpact();
+                  DriftMemoryPage.setMemory(ref, memory);
+                  context.pushRoute(DriftMemoryRoute(memories: memories, memoryIndex: index));
+                },
+                child: DriftMemoryCard(key: Key(memory.id), memory: memory),
+              ),
+            ),
+          );
         },
-        children: memories
-            .map((memory) => DriftMemoryCard(key: Key(memory.id), memory: memory))
-            .toList(growable: false),
       ),
     );
   }
@@ -64,9 +76,7 @@ class DriftMemoryCard extends ConsumerWidget {
           children: [
             ColorFiltered(
               colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.2), BlendMode.darken),
-              child: SizedBox(
-                width: 205,
-                height: 200,
+              child: SizedBox.expand(
                 child: Thumbnail.remote(
                   remoteId: memory.assets[0].id,
                   thumbhash: memory.assets[0].thumbHash ?? "",
@@ -74,15 +84,26 @@ class DriftMemoryCard extends ConsumerWidget {
                 ),
               ),
             ),
-            Positioned(
-              bottom: 16,
-              left: 16,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 114),
-                child: Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 15),
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.center,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black54],
+                  ),
                 ),
+              ),
+            ),
+            Positioned(
+              bottom: 18,
+              left: 16,
+              right: 16,
+              child: Text(
+                title,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.white, fontSize: 19),
               ),
             ),
           ],

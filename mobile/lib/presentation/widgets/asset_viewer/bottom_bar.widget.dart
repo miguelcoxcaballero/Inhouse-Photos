@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
@@ -51,8 +53,13 @@ class ViewerBottomBar extends ConsumerWidget {
       if (!isInLockedView) ...[
         if (!isInTrash) ...[
           if (asset.isLocalOnly) const UploadActionButton(source: ActionSource.viewer),
-          // edit sync was added in 2.6.0
-          if (asset.isEditable && serverInfo.serverVersion >= const SemVer(major: 2, minor: 6, patch: 0))
+          // Android can save an edited copy of photos and videos on the device.
+          // Server-side image edit sync is available from 2.6.0.
+          if ((Platform.isAndroid &&
+                  (asset.isImage || asset.isVideo) &&
+                  !asset.isAnimatedImage &&
+                  !asset.isMotionPhoto) ||
+              (asset.isEditable && serverInfo.serverVersion >= const SemVer(major: 2, minor: 6, patch: 0)))
             const EditImageActionButton(),
           if (asset.hasRemote) AddActionButton(originalTheme: originalTheme),
         ],
@@ -73,21 +80,25 @@ class ViewerBottomBar extends ConsumerWidget {
           ? const SizedBox.shrink()
           : Theme(
               data: context.themeData.copyWith(
-                iconTheme: const IconThemeData(size: 22, color: Colors.white),
+                iconTheme: IconThemeData(size: 24, color: context.colorScheme.onSurface),
                 textTheme: context.themeData.textTheme.copyWith(
-                  labelLarge: context.themeData.textTheme.labelLarge?.copyWith(color: Colors.white),
+                  labelLarge: context.themeData.textTheme.labelLarge?.copyWith(color: context.colorScheme.onSurface),
                 ),
               ),
               child: Stack(
                 children: [
-                  const Positioned.fill(
+                  Positioned.fill(
                     child: IgnorePointer(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.bottomCenter,
                             end: Alignment.topCenter,
-                            colors: [Colors.black45, Colors.black12, Colors.transparent],
+                            colors: [
+                              context.colorScheme.surface,
+                              context.colorScheme.surface.withValues(alpha: 0.94),
+                              context.colorScheme.surface.withValues(alpha: 0),
+                            ],
                             stops: [0.0, 0.7, 1.0],
                           ),
                         ),
@@ -102,7 +113,7 @@ class ViewerBottomBar extends ConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (asset.isImage) OcrToggleButton(asset: asset),
-                          if (asset.isVideo) VideoControls(videoPlayerName: asset.heroTag),
+                          if (asset.isVideo) VideoControls(videoPlayerName: asset.heroTag, useThemeColors: true),
                           if (!isReadonlyModeEnabled)
                             Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: actions),
                         ],

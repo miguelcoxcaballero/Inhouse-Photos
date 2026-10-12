@@ -9,14 +9,16 @@ import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart'
 import 'package:immich_mobile/providers/asset_viewer/video_player_provider.dart';
 import 'package:immich_mobile/providers/cast.provider.dart';
 import 'package:immich_mobile/extensions/duration_extensions.dart';
+import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/widgets/asset_viewer/animated_play_pause.dart';
 
 class VideoControls extends ConsumerStatefulWidget {
   final String videoPlayerName;
+  final bool useThemeColors;
 
   static const List<Shadow> _controlShadows = [Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1))];
 
-  const VideoControls({super.key, required this.videoPlayerName});
+  const VideoControls({super.key, required this.videoPlayerName, this.useThemeColors = false});
 
   @override
   ConsumerState<VideoControls> createState() => _VideoControlsState();
@@ -101,6 +103,8 @@ class _VideoControlsState extends ConsumerState<VideoControls> {
 
     final notifier = ref.read(_provider.notifier);
     final isLoaded = duration != Duration.zero;
+    final foreground = widget.useThemeColors ? context.colorScheme.onSurface : Colors.white;
+    final shadows = widget.useThemeColors ? null : VideoControls._controlShadows;
 
     return Padding(
       padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
@@ -114,23 +118,19 @@ class _VideoControlsState extends ConsumerState<VideoControls> {
                 padding: const EdgeInsets.all(12),
                 constraints: const BoxConstraints(),
                 icon: isFinished
-                    ? const Icon(Icons.replay, color: Colors.white, shadows: VideoControls._controlShadows)
-                    : AnimatedPlayPause(
-                        color: Colors.white,
-                        playing: isPlaying,
-                        shadows: VideoControls._controlShadows,
-                      ),
+                    ? Icon(Icons.replay, color: foreground, shadows: shadows)
+                    : AnimatedPlayPause(color: foreground, playing: isPlaying, shadows: shadows),
                 onPressed: () => _toggle(isCasting),
               ),
               const Spacer(),
               IgnorePointer(
                 child: Text(
                   "${position.format()} / ${duration.format()}",
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: foreground,
                     fontWeight: FontWeight.w500,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                    shadows: VideoControls._controlShadows,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    shadows: shadows,
                   ),
                 ),
               ),
@@ -141,9 +141,9 @@ class _VideoControlsState extends ConsumerState<VideoControls> {
             value: min(position.inMicroseconds.toDouble(), duration.inMicroseconds.toDouble()),
             min: 0,
             max: max(duration.inMicroseconds.toDouble(), 1),
-            thumbColor: Colors.white,
-            activeColor: Colors.white,
-            inactiveColor: whiteOpacity75,
+            thumbColor: widget.useThemeColors ? context.primaryColor : Colors.white,
+            activeColor: widget.useThemeColors ? context.primaryColor : Colors.white,
+            inactiveColor: widget.useThemeColors ? foreground.withValues(alpha: 0.3) : whiteOpacity75,
             padding: EdgeInsets.zero,
             onChangeStart: (_) => notifier.hold(),
             onChangeEnd: (_) => notifier.release(),

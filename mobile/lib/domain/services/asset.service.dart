@@ -14,12 +14,14 @@ class AssetService {
   final RemoteExifRepository _exifRepository;
   final DriftLocalAssetRepository _localRepository;
   final AssetApiRepository _apiRepository;
+  final Future<ExifInfo?> Function(LocalAsset)? _localLocationReader;
 
   const AssetService({
     required this._remoteRepository,
     required this._exifRepository,
     required this._localRepository,
     required this._apiRepository,
+    this._localLocationReader,
   });
 
   Future<BaseAsset?> getAsset(BaseAsset asset) {
@@ -56,6 +58,16 @@ class AssetService {
 
   Future<ExifInfo?> getExif(BaseAsset asset) async {
     if (!asset.hasRemote) {
+      if (asset is LocalAsset) {
+        final location = asset.hasCoordinates ? null : await _localLocationReader?.call(asset);
+        return ExifInfo(
+          latitude: location?.latitude ?? asset.latitude,
+          longitude: location?.longitude ?? asset.longitude,
+          dateTimeOriginal: asset.createdAt,
+          width: asset.width,
+          height: asset.height,
+        );
+      }
       return null;
     }
 

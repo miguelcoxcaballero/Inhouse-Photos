@@ -81,10 +81,14 @@ class ViewerTopAppBar extends ConsumerWidget implements PreferredSizeWidget {
                   decoration: BoxDecoration(
                     gradient: showingDetails
                         ? null
-                        : const LinearGradient(
+                        : LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [Colors.black45, Colors.black12, Colors.transparent],
+                            colors: [
+                              context.colorScheme.surface,
+                              context.colorScheme.surface.withValues(alpha: 0.94),
+                              context.colorScheme.surface.withValues(alpha: 0),
+                            ],
                             stops: [0.0, 0.7, 1.0],
                           ),
                   ),
@@ -96,14 +100,16 @@ class ViewerTopAppBar extends ConsumerWidget implements PreferredSizeWidget {
               child: SizedBox(
                 height: preferredSize.height,
                 child: Theme(
-                  data: context.themeData.copyWith(iconTheme: const IconThemeData(size: 22, color: Colors.white)),
+                  data: context.themeData.copyWith(
+                    iconTheme: IconThemeData(size: 24, color: context.colorScheme.onSurface),
+                  ),
                   child: NavigationToolbar(
                     centerMiddle: true,
                     leading: const _AppBarBackButton(),
                     middle: showingDetails ? null : _AssetInfoTitle(asset: asset),
                     trailing: !showingDetails && !isReadonlyModeEnabled
                         ? ImmichColorOverride(
-                            color: Colors.white,
+                            color: context.colorScheme.onSurface,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: isInLockedView ? lockedViewActions : actions,
@@ -134,8 +140,8 @@ class _AppBarBackButton extends ConsumerWidget {
       style: ElevatedButton.styleFrom(
         backgroundColor: showingDetails ? context.colorScheme.surface : Colors.transparent,
         shape: const CircleBorder(),
-        iconSize: 22,
-        iconColor: showingDetails ? context.colorScheme.onSurface : Colors.white,
+        iconSize: 24,
+        iconColor: context.colorScheme.onSurface,
         padding: const EdgeInsets.all(10.0),
         elevation: showingDetails ? 4 : 0,
       ),
@@ -167,8 +173,11 @@ class _AssetInfoTitle extends ConsumerWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(dateFormatted, style: context.textTheme.labelLarge?.copyWith(color: Colors.white)),
-        Text(timeFormatted, style: context.textTheme.labelMedium?.copyWith(color: Colors.white70)),
+        Text(dateFormatted, style: context.textTheme.labelLarge?.copyWith(color: context.colorScheme.onSurface)),
+        Text(
+          timeFormatted,
+          style: context.textTheme.labelMedium?.copyWith(color: context.colorScheme.onSurfaceVariant),
+        ),
       ],
     );
   }

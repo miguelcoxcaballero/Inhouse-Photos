@@ -47,6 +47,7 @@ import 'package:immich_mobile/presentation/pages/drift_archive.page.dart';
 import 'package:immich_mobile/presentation/pages/drift_asset_selection_timeline.page.dart';
 import 'package:immich_mobile/presentation/pages/drift_asset_troubleshoot.page.dart';
 import 'package:immich_mobile/presentation/pages/drift_create_album.page.dart';
+import 'package:immich_mobile/presentation/pages/drift_create.page.dart';
 import 'package:immich_mobile/presentation/pages/drift_favorite.page.dart';
 import 'package:immich_mobile/presentation/pages/drift_library.page.dart';
 import 'package:immich_mobile/presentation/pages/drift_local_album.page.dart';
@@ -127,6 +128,7 @@ class AppRouter extends RootStackRouter {
         AutoRoute(page: DriftSearchRoute.page, guards: [_authGuard, _duplicateGuard], maintainState: false),
         AutoRoute(page: DriftLibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
         AutoRoute(page: DriftAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
+        AutoRoute(page: DriftCreateRoute.page, guards: [_authGuard, _duplicateGuard]),
       ],
     ),
     AutoRoute(page: ProfilePictureCropRoute.page),
@@ -169,6 +171,8 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: DriftLockedFolderRoute.page, guards: [_authGuard, _lockedGuard, _duplicateGuard]),
     AutoRoute(page: DriftVideoRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: DriftLibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: DriftSearchRoute.page, guards: [_authGuard, _duplicateGuard], maintainState: false),
+    AutoRoute(page: DriftAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: DriftAssetSelectionTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: DriftPartnerDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: DriftRecentlyTakenRoute.page, guards: [_authGuard, _duplicateGuard]),

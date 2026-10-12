@@ -17,7 +17,7 @@ import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.da
 import 'package:immich_mobile/providers/search/search_input_focus.provider.dart';
 import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
-import 'package:immich_mobile/widgets/navigation/ios_liquid_glass_navigation_island.dart';
+import 'package:immich_mobile/widgets/navigation/floating_photo_navigation.dart';
 
 @RoutePage()
 class TabShellPage extends ConsumerStatefulWidget {
@@ -28,34 +28,46 @@ class TabShellPage extends ConsumerStatefulWidget {
 }
 
 class _TabShellPageState extends ConsumerState<TabShellPage> {
+  bool _selectionEnabled = false;
+  StreamSubscription<MultiSelectToggleEvent>? _selectionSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectionSubscription = EventStream.shared.listen<MultiSelectToggleEvent>((event) {
+      if (mounted) {
+        setState(() => _selectionEnabled = event.isEnabled);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _selectionSubscription?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isScreenLandscape = context.orientation == Orientation.landscape;
     final isReadonlyModeEnabled = ref.watch(readonlyModeProvider);
-    final usesIOSLiquidGlass = Theme.of(context).platform == TargetPlatform.iOS;
 
     final navigationDestinations = [
       NavigationDestination(
         label: 'photos'.tr(),
-        icon: const Icon(Icons.photo_library_outlined),
-        selectedIcon: Icon(Icons.photo_library, color: context.primaryColor),
+        icon: const Icon(Icons.photo_outlined),
+        selectedIcon: const Icon(Icons.photo),
       ),
       NavigationDestination(
-        label: 'search'.tr(),
-        icon: const Icon(Icons.search_rounded),
-        selectedIcon: Icon(Icons.search, color: context.primaryColor),
+        label: 'collections'.tr(),
+        icon: const Icon(Icons.collections_bookmark_outlined),
+        selectedIcon: const Icon(Icons.collections_bookmark),
         enabled: !isReadonlyModeEnabled,
       ),
       NavigationDestination(
-        label: 'albums'.tr(),
-        icon: const Icon(Icons.photo_album_outlined),
-        selectedIcon: Icon(Icons.photo_album_rounded, color: context.primaryColor),
-        enabled: !isReadonlyModeEnabled,
-      ),
-      NavigationDestination(
-        label: 'library'.tr(),
-        icon: const Icon(Icons.space_dashboard_outlined),
-        selectedIcon: Icon(Icons.space_dashboard_rounded, color: context.primaryColor),
+        label: 'create'.tr(),
+        icon: const Icon(Icons.add_circle_outline_rounded),
+        selectedIcon: const Icon(Icons.add_circle_rounded),
         enabled: !isReadonlyModeEnabled,
       ),
     ];
@@ -72,26 +84,42 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
               ),
             )
             .toList(),
-        onDestinationSelected: (index) => _onNavigationSelected(tabsRouter, index, ref),
-        selectedIndex: tabsRouter.activeIndex,
+        onDestinationSelected: (index) => _onNavigationSelected(tabsRouter, _visibleTabIndexes[index], ref),
+        selectedIndex: _visibleIndex(tabsRouter.activeIndex),
+        trailing: IconButton(
+          tooltip: 'search'.tr(),
+          onPressed: isReadonlyModeEnabled ? null : () => _openSearch(context, ref),
+          icon: const Icon(Icons.search_rounded),
+        ),
         labelType: NavigationRailLabelType.all,
         groupAlignment: 0.0,
       );
     }
 
     return AutoTabsRouter(
-      routes: const [MainTimelineRoute(), DriftSearchRoute(), DriftAlbumsRoute(), DriftLibraryRoute()],
+      // Keep the legacy indexes for existing links and append the new Create tab.
+      routes: const [
+        MainTimelineRoute(),
+        DriftSearchRoute(),
+        DriftAlbumsRoute(),
+        DriftLibraryRoute(),
+        DriftCreateRoute(),
+      ],
       duration: const Duration(milliseconds: 600),
       transitionBuilder: (context, child, animation) => FadeTransition(opacity: animation, child: child),
       builder: (context, child) {
         final tabsRouter = AutoTabsRouter.of(context);
         return PopScope(
           canPop: tabsRouter.activeIndex == 0,
-          onPopInvokedWithResult: (didPop, _) => !didPop ? tabsRouter.setActiveIndex(0) : null,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) {
+              _onNavigationSelected(tabsRouter, kPhotoTabIndex, ref);
+            }
+          },
           child: Scaffold(
-            extendBody: usesIOSLiquidGlass && !isScreenLandscape,
+            extendBody: !isScreenLandscape,
             resizeToAvoidBottomInset: false,
-            body: isScreenLandscape
+            body: isScreenLandscape && !_selectionEnabled
                 ? Row(
                     children: [
                       navigationRail(tabsRouter),
@@ -106,6 +134,20 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
       },
     );
   }
+}
+
+const _visibleTabIndexes = [kPhotoTabIndex, kLibraryTabIndex, 4];
+
+int _visibleIndex(int tabIndex) => switch (tabIndex) {
+  kLibraryTabIndex || kAlbumTabIndex => 1,
+  4 => 2,
+  _ => 0,
+};
+
+void _openSearch(BuildContext context, WidgetRef ref) {
+  ref.read(searchPreFilterProvider.notifier).clear();
+  ref.read(hapticFeedbackProvider.notifier).selectionClick();
+  unawaited(context.router.root.push(const DriftSearchRoute()));
 }
 
 void _onNavigationSelected(TabsRouter router, int index, WidgetRef ref) {
@@ -183,18 +225,18 @@ class _BottomNavigationBarState extends ConsumerState<_BottomNavigationBar> {
       return const SizedBox.shrink();
     }
 
-    if (Theme.of(context).platform == TargetPlatform.iOS) {
-      return IosLiquidGlassNavigationIsland(
-        selectedIndex: widget.tabsRouter.activeIndex,
-        destinations: widget.destinations,
-        onDestinationSelected: (index) => _onNavigationSelected(widget.tabsRouter, index, ref),
-      );
+    // Legacy deep links can still enter the nested Search route. Search is a
+    // focused destination and does not share the floating tab controls.
+    if (widget.tabsRouter.activeIndex == kSearchTabIndex) {
+      return const SizedBox.shrink();
     }
 
-    return NavigationBar(
-      selectedIndex: widget.tabsRouter.activeIndex,
-      onDestinationSelected: (index) => _onNavigationSelected(widget.tabsRouter, index, ref),
+    return FloatingPhotoNavigation(
+      selectedIndex: _visibleIndex(widget.tabsRouter.activeIndex),
+      onDestinationSelected: (index) => _onNavigationSelected(widget.tabsRouter, _visibleTabIndexes[index], ref),
       destinations: widget.destinations,
+      searchLabel: 'search'.tr(),
+      onSearch: ref.watch(readonlyModeProvider) ? null : () => _openSearch(context, ref),
     );
   }
 }

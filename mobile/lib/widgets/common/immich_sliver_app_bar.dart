@@ -24,22 +24,26 @@ import 'package:immich_mobile/widgets/common/user_circle_avatar.dart';
 
 class ImmichSliverAppBar extends ConsumerWidget {
   final List<Widget>? actions;
+  final Widget? leading;
   final bool showUploadButton;
   final bool floating;
   final bool pinned;
   final bool snap;
   final Widget? title;
   final double? expandedHeight;
+  final double toolbarHeight;
 
   const ImmichSliverAppBar({
     super.key,
     this.actions,
+    this.leading,
     this.showUploadButton = true,
     this.floating = true,
     this.pinned = false,
     this.snap = true,
     this.title,
     this.expandedHeight,
+    this.toolbarHeight = kToolbarHeight,
   });
 
   @override
@@ -62,8 +66,10 @@ class ImmichSliverAppBar extends ConsumerWidget {
           pinned: pinned,
           snap: snap,
           expandedHeight: expandedHeight,
+          toolbarHeight: toolbarHeight,
           shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(bottom: Radius.circular(5))),
           automaticallyImplyLeading: false,
+          leading: leading,
           centerTitle: false,
           title: title ?? const _ImmichLogoWithText(),
           actions: [

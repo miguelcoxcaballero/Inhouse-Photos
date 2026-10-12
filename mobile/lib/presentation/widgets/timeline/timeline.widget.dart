@@ -88,6 +88,7 @@ class Timeline extends ConsumerStatefulWidget {
     this.readOnly = false,
     this.persistentBottomBar = false,
     this.loadingWidget,
+    this.roundTopGridCorners = false,
   });
 
   final Widget? topSliverWidget;
@@ -103,6 +104,7 @@ class Timeline extends ConsumerStatefulWidget {
   final bool readOnly;
   final bool persistentBottomBar;
   final Widget? loadingWidget;
+  final bool roundTopGridCorners;
 
   @override
   ConsumerState<Timeline> createState() => _TimelineState();
@@ -163,6 +165,7 @@ class _TimelineState extends ConsumerState<Timeline> {
             snapToMonth: widget.snapToMonth,
             maxWidth: constraints.maxWidth,
             loadingWidget: widget.loadingWidget,
+            roundTopGridCorners: widget.roundTopGridCorners,
             onInteractiveColumnCountChanged: _setInteractiveColumnCount,
             onInteractiveColumnCountSettled: _persistColumnCount,
           ),
@@ -195,6 +198,7 @@ class _SliverTimeline extends ConsumerStatefulWidget {
     this.snapToMonth = true,
     this.maxWidth,
     this.loadingWidget,
+    this.roundTopGridCorners = false,
     required this.onInteractiveColumnCountChanged,
     required this.onInteractiveColumnCountSettled,
   });
@@ -209,6 +213,7 @@ class _SliverTimeline extends ConsumerStatefulWidget {
   final bool snapToMonth;
   final double? maxWidth;
   final Widget? loadingWidget;
+  final bool roundTopGridCorners;
   final ValueChanged<int> onInteractiveColumnCountChanged;
   final ValueChanged<int> onInteractiveColumnCountSettled;
 
@@ -716,7 +721,10 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                 final double appBarExpandedHeight = widget.appBar != null && widget.appBar is MesmerizingSliverAppBar
                     ? 200
                     : 0;
-                final topPadding = context.padding.top + (widget.appBar == null ? 0 : kToolbarHeight) + 10;
+                final toolbarHeight = widget.appBar is ImmichSliverAppBar
+                    ? (widget.appBar! as ImmichSliverAppBar).toolbarHeight
+                    : kToolbarHeight;
+                final topPadding = context.padding.top + (widget.appBar == null ? 0 : toolbarHeight) + 10;
 
                 const bottomSheetOpenModifier = 120.0;
                 final contentBottomPadding =
@@ -744,7 +752,16 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                           if (segment == null) {
                             return const SizedBox.shrink();
                           }
-                          final child = segment.builder(ctx, index);
+                          Widget child = segment.builder(ctx, index);
+                          // Round only the outside corners of the first asset
+                          // row. The clipping travels with that row, so later
+                          // rows stay square when the memories scroll away.
+                          if (widget.roundTopGridCorners && index == segments.first.gridIndex) {
+                            child = ClipRRect(
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                              child: child,
+                            );
+                          }
                           return denseChildIndexes == null
                               ? child
                               : KeyedSubtree(key: segment.childKey(index), child: child);
@@ -769,7 +786,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline>
                     timelineHeight: maxHeight,
                     topPadding: topPadding,
                     bottomPadding: scrubberBottomPadding,
-                    monthSegmentSnappingOffset: widget.topSliverWidgetHeight ?? 0 + appBarExpandedHeight,
+                    monthSegmentSnappingOffset: (widget.topSliverWidgetHeight ?? 0) + appBarExpandedHeight,
                     hasAppBar: widget.appBar != null,
                     child: grid,
                   );

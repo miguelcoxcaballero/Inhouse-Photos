@@ -18,29 +18,36 @@ class SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Card(
-        elevation: 0,
-        clipBehavior: Clip.antiAlias,
-        color: context.colorScheme.surfaceContainer,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
-        margin: const EdgeInsets.symmetric(vertical: 4.0),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
-          leading: Container(
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.all(Radius.circular(16)),
-              color: context.isDarkTheme ? Colors.black26 : Colors.white.withAlpha(100),
-            ),
-            padding: const EdgeInsets.all(16.0),
-            child: Icon(icon, color: context.primaryColor),
-          ),
-          title: Text(title, style: context.textTheme.titleMedium!.copyWith(color: context.primaryColor)),
-          subtitle: Text(subtitle, style: context.textTheme.bodyMedium),
-          onTap: () => context.pushRoute(settingRoute),
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      minLeadingWidth: 28,
+      horizontalTitleGap: 20,
+      leading: Icon(icon, color: context.primaryColor, size: 26),
+      title: Text(title, style: context.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500)),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 3),
+        child: Text(
+          subtitle,
+          style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.onSurfaceVariant),
         ),
       ),
+      onTap: () => context.pushRoute(settingRoute),
     );
   }
+}
+
+/// A single rounded surface keeps related settings together while every row
+/// retains its own tap target and accessibility label.
+class SettingsGroup extends StatelessWidget {
+  const SettingsGroup({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: context.colorScheme.surfaceContainer,
+    borderRadius: BorderRadius.circular(24),
+    clipBehavior: Clip.antiAlias,
+    child: Column(mainAxisSize: MainAxisSize.min, children: children),
+  );
 }

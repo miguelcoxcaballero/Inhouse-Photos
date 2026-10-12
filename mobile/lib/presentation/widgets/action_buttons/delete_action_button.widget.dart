@@ -90,7 +90,7 @@ class DeleteActionButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return BaseActionButton(
       maxWidth: 110.0,
-      iconData: Icons.delete_sweep_outlined,
+      iconData: Icons.delete_outline_rounded,
       label: "delete".t(context: context),
       iconOnly: iconOnly,
       menuItem: menuItem,

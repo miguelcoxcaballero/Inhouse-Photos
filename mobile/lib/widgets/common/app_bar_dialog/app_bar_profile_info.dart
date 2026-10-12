@@ -36,7 +36,7 @@ class AppBarProfileInfoBox extends HookConsumerWidget {
       final userImage = UserCircleAvatar(size: 44, user: user, hasBorder: true);
 
       if (uploadProfileImageStatus == UploadProfileStatus.loading) {
-        return const SizedBox(height: 40, width: 40, child: ImmichLoadingIndicator(borderRadius: 20));
+        return const SizedBox(height: 40, width: 40, child: ImmichLoadingIndicator());
       }
 
       return userImage;

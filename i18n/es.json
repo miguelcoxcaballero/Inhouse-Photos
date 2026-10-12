@@ -1,4 +1,7 @@
 {
+  "collections": "Colecciones",
+  "other_collections": "Otras colecciones",
+  "view_map": "Ver mapa",
   "backup_retry_sync": "Reintentar copia",
   "backup_switch_off": "Desactivada",
   "backup_switch_on": "Activada",

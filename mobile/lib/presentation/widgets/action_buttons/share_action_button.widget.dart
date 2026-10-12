@@ -179,7 +179,7 @@ class ShareActionButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return BaseActionButton(
-      iconData: Platform.isAndroid ? Icons.share_rounded : Icons.ios_share_rounded,
+      iconData: source == ActionSource.viewer || Platform.isAndroid ? Icons.share_outlined : Icons.ios_share_rounded,
       label: context.t.share,
       iconOnly: iconOnly,
       menuItem: menuItem,

@@ -18,6 +18,7 @@ import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/pages/search/paginated_search.provider.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/general_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/search/quick_date_picker.dart';
+import 'package:immich_mobile/presentation/widgets/people/collection_people_row.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user_metadata.provider.dart';
@@ -25,7 +26,6 @@ import 'package:immich_mobile/providers/search/search_input_focus.provider.dart'
 import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/widgets/common/feature_check.dart';
-import 'package:immich_mobile/widgets/common/search_field.dart';
 import 'package:immich_mobile/widgets/common/tag_picker.dart';
 import 'package:immich_mobile/widgets/search/search_filter/camera_picker.dart';
 import 'package:immich_mobile/widgets/search/search_filter/display_option_picker.dart';
@@ -47,12 +47,11 @@ class DriftSearchPage extends HookConsumerWidget {
     final textSearchType = useState<TextSearchType>(
       serverFeatures.smartSearch ? TextSearchType.context : TextSearchType.filename,
     );
-    final searchHintText = useState<String>(
-      serverFeatures.smartSearch
-          ? 'sunrise_on_the_beach'.t(context: context)
-          : 'file_name_or_extension'.t(context: context),
-    );
+    final searchHintText = useState<String>('search_your_photos'.t(context: context));
     final textSearchController = useTextEditingController();
+    useListenable(textSearchController);
+    final showFilters = useState(false);
+    final recentQueries = useState<List<String>>([]);
     final filter = useState<SearchFilter>(
       SearchFilter(
         people: {},
@@ -473,25 +472,32 @@ class DriftSearchPage extends HookConsumerWidget {
       );
     }
 
-    handleTextSubmitted(String value) => search(switch (textSearchType.value) {
-      TextSearchType.context => filter.value.copyWith(filename: '', context: value, description: '', ocr: ''),
-      TextSearchType.filename => filter.value.copyWith(filename: value, context: '', description: '', ocr: ''),
-      TextSearchType.description => filter.value.copyWith(filename: '', context: '', description: value, ocr: ''),
-      TextSearchType.ocr => filter.value.copyWith(filename: '', context: '', description: '', ocr: value),
-    });
-
-    IconData getSearchPrefixIcon() => switch (textSearchType.value) {
-      TextSearchType.context => Icons.image_search_rounded,
-      TextSearchType.filename => Icons.abc_rounded,
-      TextSearchType.description => Icons.text_snippet_outlined,
-      TextSearchType.ocr => Icons.document_scanner_outlined,
-    };
+    void handleTextSubmitted(String value) {
+      final query = value.trim();
+      if (query.isNotEmpty) {
+        recentQueries.value = [query, ...recentQueries.value.where((previous) => previous != query)].take(5).toList();
+      }
+      ref.read(searchInputFocusProvider).unfocus();
+      search(switch (textSearchType.value) {
+        TextSearchType.context => filter.value.copyWith(filename: '', context: query, description: '', ocr: ''),
+        TextSearchType.filename => filter.value.copyWith(filename: query, context: '', description: '', ocr: ''),
+        TextSearchType.description => filter.value.copyWith(filename: '', context: '', description: query, ocr: ''),
+        TextSearchType.ocr => filter.value.copyWith(filename: '', context: '', description: '', ocr: query),
+      });
+    }
 
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        automaticallyImplyLeading: true,
+        leading: const BackButton(),
+        scrolledUnderElevation: 0,
         actions: [
+          IconButton(
+            tooltip: 'open_the_search_filters'.t(context: context),
+            isSelected: showFilters.value,
+            onPressed: () => showFilters.value = !showFilters.value,
+            icon: const Icon(Icons.tune_rounded),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: MenuAnchor(
@@ -598,106 +604,144 @@ class DriftSearchPage extends HookConsumerWidget {
             ),
           ),
         ],
-        title: Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: context.colorScheme.onSurface.withAlpha(0), width: 0),
-            borderRadius: const BorderRadius.all(Radius.circular(24)),
-            gradient: LinearGradient(
-              colors: [
-                context.colorScheme.primary.withValues(alpha: 0.075),
-                context.colorScheme.primary.withValues(alpha: 0.09),
-                context.colorScheme.primary.withValues(alpha: 0.075),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: CustomScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: [
+                if (showFilters.value || !filter.value.isEmpty)
+                  SliverPadding(
+                    padding: const EdgeInsets.only(top: 12.0, bottom: 4.0),
+                    sliver: SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: 50,
+                        child: ListView(
+                          key: const Key('search_filter_chip_list'),
+                          shrinkWrap: true,
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          children: [
+                            SearchFilterChip(
+                              icon: Icons.people_alt_outlined,
+                              onTap: showPeoplePicker,
+                              label: 'people'.t(context: context),
+                              currentFilter: peopleCurrentFilterWidget.value,
+                            ),
+                            SearchFilterChip(
+                              icon: Icons.location_on_outlined,
+                              onTap: showLocationPicker,
+                              label: 'search_filter_location'.t(context: context),
+                              currentFilter: locationCurrentFilterWidget.value,
+                            ),
+                            if (userPreferences.valueOrNull?.tagsEnabled ?? false)
+                              SearchFilterChip(
+                                icon: Icons.sell_outlined,
+                                onTap: showTagPicker,
+                                label: 'tags'.t(context: context),
+                                currentFilter: tagCurrentFilterWidget.value,
+                              ),
+                            SearchFilterChip(
+                              icon: Icons.camera_alt_outlined,
+                              onTap: showCameraPicker,
+                              label: 'camera'.t(context: context),
+                              currentFilter: cameraCurrentFilterWidget.value,
+                            ),
+                            SearchFilterChip(
+                              icon: Icons.date_range_outlined,
+                              onTap: showQuickDatePicker,
+                              label: 'search_filter_date'.t(context: context),
+                              currentFilter: dateRangeCurrentFilterWidget.value,
+                            ),
+                            SearchFilterChip(
+                              key: const Key('media_type_chip'),
+                              icon: Icons.video_collection_outlined,
+                              onTap: showMediaTypePicker,
+                              label: 'search_filter_media_type'.t(context: context),
+                              currentFilter: mediaTypeCurrentFilterWidget.value,
+                            ),
+                            if (userPreferences.valueOrNull?.ratingsEnabled ?? false)
+                              SearchFilterChip(
+                                icon: Icons.star_outline_rounded,
+                                onTap: showStarRatingPicker,
+                                label: 'search_filter_star_rating'.t(context: context),
+                                currentFilter: ratingCurrentFilterWidget.value,
+                              ),
+                            SearchFilterChip(
+                              icon: Icons.display_settings_outlined,
+                              onTap: showDisplayOptionPicker,
+                              label: 'search_filter_display_options'.t(context: context),
+                              currentFilter: displayOptionCurrentFilterWidget.value,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (filter.value.isEmpty)
+                  _SearchSuggestions(
+                    recentQueries: recentQueries.value,
+                    onSearch: (query) {
+                      textSearchController.text = query;
+                      handleTextSubmitted(query);
+                    },
+                    contextSuggestion: serverFeatures.smartSearch && textSearchType.value == TextSearchType.context
+                        ? 'sunrise_on_the_beach'.t(context: context)
+                        : null,
+                  )
+                else
+                  _SearchResultGrid(onScrollEnd: loadMoreSearchResults),
               ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
             ),
           ),
-          child: SearchField(
-            hintText: searchHintText.value,
-            key: const Key('search_text_field'),
-            controller: textSearchController,
-            contentPadding: filter.value.assetId != null ? const EdgeInsets.only(left: 24) : const EdgeInsets.all(8),
-            prefixIcon: filter.value.assetId != null
-                ? null
-                : Icon(getSearchPrefixIcon(), color: context.colorScheme.primary),
-            onSubmitted: handleTextSubmitted,
-            focusNode: ref.watch(searchInputFocusProvider),
-          ),
-        ),
-      ),
-      body: CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.only(top: 12.0, bottom: 4.0),
-            sliver: SliverToBoxAdapter(
-              child: SizedBox(
-                height: 50,
-                child: ListView(
-                  key: const Key('search_filter_chip_list'),
-                  shrinkWrap: true,
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    SearchFilterChip(
-                      icon: Icons.people_alt_outlined,
-                      onTap: showPeoplePicker,
-                      label: 'people'.t(context: context),
-                      currentFilter: peopleCurrentFilterWidget.value,
-                    ),
-                    SearchFilterChip(
-                      icon: Icons.location_on_outlined,
-                      onTap: showLocationPicker,
-                      label: 'search_filter_location'.t(context: context),
-                      currentFilter: locationCurrentFilterWidget.value,
-                    ),
-                    if (userPreferences.valueOrNull?.tagsEnabled ?? false)
-                      SearchFilterChip(
-                        icon: Icons.sell_outlined,
-                        onTap: showTagPicker,
-                        label: 'tags'.t(context: context),
-                        currentFilter: tagCurrentFilterWidget.value,
+          SafeArea(
+            top: false,
+            minimum: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+            child: Material(
+              color: context.colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(24),
+              child: TextField(
+                key: const Key('search_text_field'),
+                controller: textSearchController,
+                focusNode: ref.watch(searchInputFocusProvider),
+                autofocus: preFilter == null,
+                textInputAction: TextInputAction.search,
+                onSubmitted: handleTextSubmitted,
+                onTapOutside: (_) => ref.read(searchInputFocusProvider).unfocus(),
+                style: context.textTheme.bodyLarge,
+                decoration: InputDecoration(
+                  hintText: searchHintText.value,
+                  hintStyle: context.textTheme.bodyLarge?.copyWith(color: context.colorScheme.onSurfaceVariant),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (textSearchController.text.isNotEmpty)
+                        IconButton(
+                          tooltip: 'clear'.t(context: context),
+                          icon: const Icon(Icons.close_rounded, size: 20),
+                          onPressed: () {
+                            textSearchController.clear();
+                            handleTextSubmitted('');
+                          },
+                        ),
+                      IconButton(
+                        tooltip: 'search'.t(context: context),
+                        icon: Icon(Icons.search_rounded, size: 22, color: context.colorScheme.onSurfaceVariant),
+                        onPressed: () => textSearchController.text.trim().isEmpty
+                            ? ref.read(searchInputFocusProvider).requestFocus()
+                            : handleTextSubmitted(textSearchController.text),
                       ),
-                    SearchFilterChip(
-                      icon: Icons.camera_alt_outlined,
-                      onTap: showCameraPicker,
-                      label: 'camera'.t(context: context),
-                      currentFilter: cameraCurrentFilterWidget.value,
-                    ),
-                    SearchFilterChip(
-                      icon: Icons.date_range_outlined,
-                      onTap: showQuickDatePicker,
-                      label: 'search_filter_date'.t(context: context),
-                      currentFilter: dateRangeCurrentFilterWidget.value,
-                    ),
-                    SearchFilterChip(
-                      key: const Key('media_type_chip'),
-                      icon: Icons.video_collection_outlined,
-                      onTap: showMediaTypePicker,
-                      label: 'search_filter_media_type'.t(context: context),
-                      currentFilter: mediaTypeCurrentFilterWidget.value,
-                    ),
-                    if (userPreferences.valueOrNull?.ratingsEnabled ?? false)
-                      SearchFilterChip(
-                        icon: Icons.star_outline_rounded,
-                        onTap: showStarRatingPicker,
-                        label: 'search_filter_star_rating'.t(context: context),
-                        currentFilter: ratingCurrentFilterWidget.value,
-                      ),
-                    SearchFilterChip(
-                      icon: Icons.display_settings_outlined,
-                      onTap: showDisplayOptionPicker,
-                      label: 'search_filter_display_options'.t(context: context),
-                      currentFilter: displayOptionCurrentFilterWidget.value,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-          if (filter.value.isEmpty)
-            const _SearchSuggestions()
-          else
-            _SearchResultGrid(onScrollEnd: loadMoreSearchResults),
         ],
       ),
     );
@@ -827,27 +871,76 @@ class _SearchNoResults extends StatelessWidget {
 }
 
 class _SearchSuggestions extends StatelessWidget {
-  const _SearchSuggestions();
+  const _SearchSuggestions({required this.recentQueries, required this.onSearch, this.contextSuggestion});
+
+  final List<String> recentQueries;
+  final ValueChanged<String> onSearch;
+  final String? contextSuggestion;
 
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
-      child: ListView(
-        shrinkWrap: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 40),
-          Center(
-            child: Image.asset(
-              context.isDarkTheme ? 'assets/polaroid-dark.png' : 'assets/polaroid-light.png',
-              height: 125,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 16, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text('people'.t(context: context), style: context.textTheme.titleSmall),
+                ),
+                TextButton(
+                  onPressed: () => context.pushRoute(const DriftPeopleCollectionRoute()),
+                  child: Text('view_all'.t(context: context)),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          Center(
-            child: Text('search_page_search_photos_videos'.t(context: context), style: context.textTheme.labelLarge),
+          const Padding(padding: EdgeInsets.only(bottom: 16), child: CollectionPeopleRow(showNames: true)),
+          if (recentQueries.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children: [
+                  for (final query in recentQueries) ...[
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.history_rounded),
+                      title: Text(query, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      onTap: () => onSearch(query),
+                    ),
+                    const Divider(height: 1),
+                  ],
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Text(
+              'suggestions'.t(context: context),
+              textAlign: TextAlign.center,
+              style: context.textTheme.labelMedium?.copyWith(color: context.colorScheme.onSurfaceVariant),
+            ),
           ),
-          const SizedBox(height: 32),
-          const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: _QuickLinkList()),
+          if (contextSuggestion != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.image_search_rounded),
+                    title: Text(contextSuggestion!),
+                    onTap: () => onSearch(contextSuggestion!),
+                  ),
+                  const Divider(height: 1),
+                ],
+              ),
+            ),
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 24), child: _QuickLinkList()),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -859,80 +952,49 @@ class _QuickLinkList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: const BorderRadius.all(Radius.circular(20)),
-        border: Border.all(color: context.colorScheme.outline.withAlpha(10), width: 1),
-        gradient: LinearGradient(
-          colors: [
-            context.colorScheme.primary.withAlpha(10),
-            context.colorScheme.primary.withAlpha(15),
-            context.colorScheme.primary.withAlpha(20),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+    return Column(
+      children: [
+        _QuickLink(
+          title: 'recently_taken'.t(context: context),
+          icon: Icons.history_rounded,
+          onTap: () => context.pushRoute(const DriftRecentlyTakenRoute()),
         ),
-      ),
-      child: ListView(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          _QuickLink(
-            title: 'recently_taken'.t(context: context),
-            icon: Icons.schedule_outlined,
-            isTop: true,
-            onTap: () => context.pushRoute(const DriftRecentlyTakenRoute()),
-          ),
-          _QuickLink(
-            title: context.t.recently_added,
-            icon: Icons.upload_outlined,
-            onTap: () => context.pushRoute(const DriftRecentlyAddedRoute()),
-          ),
-          _QuickLink(
-            title: 'videos'.t(context: context),
-            icon: Icons.play_circle_outline_rounded,
-            onTap: () => context.pushRoute(const DriftVideoRoute()),
-          ),
-          _QuickLink(
-            title: 'favorites'.t(context: context),
-            icon: Icons.favorite_border_rounded,
-            isBottom: true,
-            onTap: () => context.pushRoute(const DriftFavoriteRoute()),
-          ),
-        ],
-      ),
+        const Divider(height: 1),
+        _QuickLink(
+          title: context.t.recently_added,
+          icon: Icons.schedule_rounded,
+          onTap: () => context.pushRoute(const DriftRecentlyAddedRoute()),
+        ),
+        const Divider(height: 1),
+        _QuickLink(
+          title: 'videos'.t(context: context),
+          icon: Icons.play_circle_outline_rounded,
+          onTap: () => context.pushRoute(const DriftVideoRoute()),
+        ),
+        const Divider(height: 1),
+        _QuickLink(
+          title: 'favorites'.t(context: context),
+          icon: Icons.star_border_rounded,
+          onTap: () => context.pushRoute(const DriftFavoriteRoute()),
+        ),
+      ],
     );
   }
 }
 
 class _QuickLink extends StatelessWidget {
+  const _QuickLink({required this.title, required this.icon, required this.onTap});
+
   final String title;
   final IconData icon;
   final VoidCallback onTap;
-  final bool isTop;
-  final bool isBottom;
-
-  const _QuickLink({
-    required this.title,
-    required this.icon,
-    required this.onTap,
-    this.isTop = false,
-    this.isBottom = false,
-  });
 
   @override
   Widget build(BuildContext context) {
-    final borderRadius = BorderRadius.only(
-      topLeft: Radius.circular(isTop ? 20 : 0),
-      topRight: Radius.circular(isTop ? 20 : 0),
-      bottomLeft: Radius.circular(isBottom ? 20 : 0),
-      bottomRight: Radius.circular(isBottom ? 20 : 0),
-    );
-
     return ListTile(
-      shape: RoundedRectangleBorder(borderRadius: borderRadius),
-      leading: Icon(icon, size: 26),
-      title: Text(title, style: context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500)),
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, size: 22, color: context.colorScheme.onSurfaceVariant),
+      title: Text(title, style: context.textTheme.bodyLarge),
       onTap: onTap,
     );
   }

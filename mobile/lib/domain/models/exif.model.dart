@@ -26,7 +26,15 @@ class ExifInfo {
   final int? iso;
   final double? exposureSeconds;
 
-  bool get hasCoordinates => latitude != null && longitude != null && latitude != 0 && longitude != 0;
+  // Zero is a real coordinate on the equator / prime meridian. Missing GPS is
+  // represented by null, never by an arbitrary point on the map.
+  bool get hasCoordinates =>
+      latitude != null &&
+      longitude != null &&
+      latitude!.isFinite &&
+      longitude!.isFinite &&
+      latitude!.abs() <= 90 &&
+      longitude!.abs() <= 180;
 
   String get exposureTime {
     if (exposureSeconds == null || exposureSeconds! <= 0 || exposureSeconds!.isNaN) {

@@ -2,6 +2,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/services/asset.service.dart';
 import 'package:immich_mobile/domain/services/local_thumbhash.service.dart';
 import 'package:immich_mobile/infrastructure/repositories/local_asset.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/local_location.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_exif.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/trashed_local_asset.repository.dart';
@@ -40,6 +41,7 @@ final assetServiceProvider = Provider(
     exifRepository: ref.watch(remoteExifRepositoryProvider),
     localRepository: ref.watch(localAssetRepository),
     apiRepository: ref.watch(assetApiRepositoryProvider),
+    localLocationReader: const LocalLocationRepository().read,
   ),
 );
 

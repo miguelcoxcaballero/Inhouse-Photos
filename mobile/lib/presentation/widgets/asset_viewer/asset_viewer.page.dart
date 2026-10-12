@@ -82,12 +82,6 @@ class AssetViewer extends ConsumerStatefulWidget {
 }
 
 class _AssetViewerState extends ConsumerState<AssetViewer> {
-  static const _viewerOverlayStyle = SystemUiOverlayStyle(
-    statusBarIconBrightness: Brightness.light,
-    statusBarBrightness: Brightness.dark,
-    systemNavigationBarIconBrightness: Brightness.light,
-  );
-
   late final _heroOffset = widget.heroOffset ?? TabsRouterScope.of(context)?.controller.activeIndex ?? 0;
   late final _pageController = PageController(initialPage: widget.initialIndex);
   late final _preloader = AssetPreloader(timelineService: ref.read(timelineServiceProvider), mounted: () => mounted);
@@ -310,7 +304,10 @@ class _AssetViewerState extends ConsumerState<AssetViewer> {
     final isZoomed = ref.watch(assetViewerProvider.select((s) => s.isZoomed));
     final backgroundColor = showingDetails
         ? context.colorScheme.surface
-        : Colors.black.withValues(alpha: ref.watch(assetViewerProvider.select((s) => s.backgroundOpacity)));
+        : context.colorScheme.surface.withValues(
+            alpha: ref.watch(assetViewerProvider.select((s) => s.backgroundOpacity)),
+          );
+    final overlayStyle = context.isDarkTheme ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark;
 
     // Listen for casting changes and send initial asset to the cast provider
     ref.listen(castProvider.select((value) => value.isCasting), (_, isCasting) {
@@ -328,7 +325,11 @@ class _AssetViewerState extends ConsumerState<AssetViewer> {
     });
 
     return AnnotatedRegion(
-      value: _viewerOverlayStyle,
+      value: overlayStyle.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: context.isDarkTheme ? Brightness.light : Brightness.dark,
+      ),
       child: Scaffold(
         backgroundColor: backgroundColor,
         resizeToAvoidBottomInset: false,
@@ -367,7 +368,7 @@ class _AssetViewerState extends ConsumerState<AssetViewer> {
               IgnorePointer(
                 child: AnimatedContainer(
                   duration: Durations.short2,
-                  color: Colors.black.withValues(alpha: showingDetails ? 0.6 : 0.0),
+                  color: context.colorScheme.surface.withValues(alpha: showingDetails ? 1.0 : 0.0),
                   height: context.padding.top,
                 ),
               ),

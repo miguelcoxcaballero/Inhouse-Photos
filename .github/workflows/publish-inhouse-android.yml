@@ -16,9 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      RELEASE_TAG: v3.1.105-a
-      ANDROID_RELEASE_VERSION: '3.1.105'
-      ANDROID_RELEASE_BASE_BUILD: '5163'
+      RELEASE_TAG: v3.1.106-a
+      ANDROID_RELEASE_VERSION: '3.1.106'
+      ANDROID_RELEASE_BASE_BUILD: '5164'
     steps:
       - name: Checkout the source to publish
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -103,6 +103,21 @@ jobs:
             test/services/system_update.service_test.dart \
             test/services/runtime_update.service_test.dart \
             test/services/server_management.service_test.dart \
+            test/domain/models/exif_info_test.dart \
+            test/infrastructure/repositories/local_location_repository_test.dart \
+            test/modules/map/map_route_scope_test.dart \
+            test/unit/services/asset_service_test.dart \
+            test/presentation/widgets/asset_viewer/asset_viewer_system_ui_test.dart \
+            test/widgets/navigation/floating_photo_navigation_test.dart \
+            test/widgets/navigation/standalone_albums_test.dart \
+            test/presentation/pages/search/drift_search_layout_test.dart \
+            test/presentation/widgets/people/collection_people_row_test.dart \
+            test/unit/utils/media_edit_options_test.dart \
+            test/unit/utils/editor_test.dart \
+            test/presentation/pages/edit/media_edit_page_test.dart \
+            test/presentation/widgets/timeline/timeline_scroll_to_top_test.dart \
+            test/presentation/widgets/timeline/timeline_args_test.dart \
+            test/presentation/widgets/timeline/timeline_pinch_commit_test.dart \
             test/widgets/settings/server_management_settings_test.dart
 
       - name: Build the signed ARM64 split APK
@@ -122,6 +137,14 @@ jobs:
             --build-name "$ANDROID_RELEASE_VERSION" --build-number "$ANDROID_RELEASE_BASE_BUILD"
           git diff --exit-code
 
+      - name: Test native photo exports and video edit geometry
+        working-directory: mobile/android
+        run: >-
+          ./gradlew :app:testReleaseUnitTest
+          --tests com.inhousesoftware.photos.MediaEditGeometryTest
+          --tests com.inhousesoftware.photos.MediaEditorPhotoExportTest
+          -Ptarget-platform=android-arm64 -Psplit-per-abi=true --no-daemon
+
       - name: Verify and stage the matching APK, ZIP and updater manifest
         run: |
           python .github/scripts/package_inhouse_android.py \
@@ -132,7 +155,7 @@ jobs:
             --report "$RUNNER_TEMP/android-release-verification.json"
 
       - name: Prepare channel A catalog (B needs explicit user authorization)
-        run: python vendor/inhouse-services-updater/catalog.py --manifest android-update.json --changelog "Neutral updater colors."
+        run: python vendor/inhouse-services-updater/catalog.py --manifest android-update.json --changelog "Refined navigation and photo/video editing."
 
       - name: Test the actual staged updater against the signed APK version
         working-directory: mobile
@@ -162,7 +185,7 @@ jobs:
           version_code = int(os.environ['ANDROID_RELEASE_BASE_BUILD']) + 2000
           Path(sys.argv[1]).write_text(
               f'Inhouse Photos Android {version} (ARM64, versionCode {version_code}).\n\n'
-              'Neutral updater colors.\n\n'
+              'Refined navigation and photo/video editing.\n\n'
               'Instala Inhouse-Photos.apk o extráelo de Inhouse-Photos-Android.zip sobre la aplicación existente. Se conserva el certificado permanente de Inhouse Photos. El informe adjunto verifica la versión, el paquete, la firma y los ocho símbolos JNI.\n'
           )
           PY

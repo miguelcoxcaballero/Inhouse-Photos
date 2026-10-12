@@ -1059,9 +1059,18 @@ export class MetadataService extends BaseService {
   }
 
   private hasGeo(tags: ImmichTags) {
+    // Do not coerce a missing coordinate to zero or discard a genuine zero.
+    if (
+      tags.GPSLatitude == null ||
+      tags.GPSLongitude == null ||
+      String(tags.GPSLatitude).trim() === '' ||
+      String(tags.GPSLongitude).trim() === ''
+    ) {
+      return false;
+    }
     const lat = Number(tags.GPSLatitude);
     const lng = Number(tags.GPSLongitude);
-    return !Number.isNaN(lat) && !Number.isNaN(lng) && (lat !== 0 || lng !== 0);
+    return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
   }
 
   private getAutoStackId(tags: ImmichTags | null): string | null {
