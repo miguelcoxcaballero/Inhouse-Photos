@@ -229,6 +229,7 @@
       </intent-filter>
     </activity>
     <activity android:name="com.inhouse.services.updater.UpdateActivity" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    <receiver android:name="com.inhouse.services.updater.InstallReceiver" android:exported="false" />
     <activity android:name="com.inhouse.services.updater.InstallActivity" android:exported="false" android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
   </application>
 
