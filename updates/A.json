@@ -2,15 +2,24 @@
   "schemaVersion": 1,
   "channel": "A",
   "latest": {
-    "version": "3.1.108",
-    "versionCode": 7166,
-    "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.108-a/Inhouse-Photos.apk",
-    "apkSha256": "23f0798ed400365ea32740871a872adebac4bd64653c771125c19e229bded2df",
-    "apkSizeBytes": 76229058,
-    "changelog": "New Inhouse Photos icon.",
-    "releasedAt": "2026-10-20T15:34:10+00:00"
+    "version": "3.1.109",
+    "versionCode": 7167,
+    "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.109-a/Inhouse-Photos.apk",
+    "apkSha256": "2b767411a95fc6339023001da279af5dcd7b88375548c1b4d8eb97e8fe59be54",
+    "apkSizeBytes": 76542442,
+    "changelog": "In-app logo without the white square.",
+    "releasedAt": "2026-10-20T16:19:55+00:00"
   },
   "releases": [
+    {
+      "version": "3.1.109",
+      "versionCode": 7167,
+      "apkUrl": "https://github.com/miguelcoxcaballero/Inhouse-Photos/releases/download/v3.1.109-a/Inhouse-Photos.apk",
+      "apkSha256": "2b767411a95fc6339023001da279af5dcd7b88375548c1b4d8eb97e8fe59be54",
+      "apkSizeBytes": 76542442,
+      "changelog": "In-app logo without the white square.",
+      "releasedAt": "2026-10-20T16:19:55+00:00"
+    },
     {
       "version": "3.1.108",
       "versionCode": 7166,
