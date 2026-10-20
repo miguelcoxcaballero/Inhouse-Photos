@@ -156,8 +156,10 @@ flutter:
           weight: 700
 flutter_launcher_icons:
   image_path_android: 'assets/inhouse-photos-icon-light.png'
-  adaptive_icon_background: '#F5F5F0'
+  adaptive_icon_background: 'assets/inhouse-photos-icon-background.png'
   adaptive_icon_foreground: 'assets/inhouse-photos-icon-foreground-light.png'
+  adaptive_icon_foreground_inset: 0
+  adaptive_icon_monochrome: 'assets/inhouse-photos-icon-monochrome.png'
   image_path_ios: 'assets/inhouse-photos-icon-light.png'
   android: 'ic_launcher'
   ios: false

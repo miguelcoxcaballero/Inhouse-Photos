@@ -5,11 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/generated/codegen_loader.g.dart';
 
 void main() {
-  test('light and dark runtime SVG logos use the orange brand mark only', () {
+  test('light and dark runtime SVG logos use the app icon palette only', () {
     for (final path in ['assets/inhouse-photos-logo.svg', 'assets/inhouse-photos-logo-light.svg']) {
       final svg = File(path).readAsStringSync();
       final colors = RegExp(r'#[0-9A-Fa-f]{6}').allMatches(svg).map((match) => match.group(0)!.toUpperCase()).toSet();
-      expect(colors, {'#D97736'}, reason: path);
+      expect(colors, {'#F5843F', '#DA5520', '#FFFFFF', '#FFC447'}, reason: path);
     }
   });
 

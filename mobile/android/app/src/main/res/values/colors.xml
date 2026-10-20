@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#F5F5F0</color>
     <!-- Shown behind the Flutter surface: any frame the app has not
          painted yet, and during window resizes. Must match the app's own
          dark surface, not the platform default, or a light system grey
