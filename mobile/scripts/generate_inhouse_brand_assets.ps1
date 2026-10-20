@@ -103,9 +103,11 @@ function Draw-InhousePrint {
   }
 }
 
-# Mode: tile (white rounded icon on transparency, $Fraction of the image), square
-# (opaque visible area), foreground / background / monochrome (adaptive layers
-# on the full 108-unit canvas).
+# Mode: tile (white rounded icon on transparency, $Fraction of the image), print
+# (only the print on transparency, no white tile: its 64-unit box centred on
+# (54, 53.8) is $Fraction of the image; used for splash screens), square (opaque
+# visible area), foreground / background / monochrome (adaptive layers on the
+# full 108-unit canvas).
 function Write-InhousePhotosIcon {
   param(
     [string]$Path,
@@ -127,6 +129,10 @@ function Write-InhousePhotosIcon {
       $scale = $Size / 108.0
       $originX = 0.0
       $originY = 0.0
+    } elseif ($Mode -eq 'print') {
+      $scale = ($Size * $Fraction) / 64.0
+      $originX = ($Size / 2.0) - (54 * $scale)
+      $originY = ($Size / 2.0) - (53.8 * $scale)
     } else {
       $scale = ($Size * $Fraction) / 72.0
       $originX = ($Size / 2.0) - (54 * $scale)
@@ -162,9 +168,9 @@ function Write-InhousePhotosIcon {
   }
 }
 
-# Runtime splash marks: the white tile on transparency, identical in light/dark mode.
-Write-InhousePhotosIcon 'assets\inhouse-photos-splash.png' 768 0.52 'tile'
-Write-InhousePhotosIcon 'assets\inhouse-photos-splash-light.png' 768 0.52 'tile'
+# Runtime splash marks: only the print on transparency (no white tile), identical in light/dark mode.
+Write-InhousePhotosIcon 'assets\inhouse-photos-splash.png' 768 0.62 'print'
+Write-InhousePhotosIcon 'assets\inhouse-photos-splash-light.png' 768 0.62 'print'
 Write-InhousePhotosIcon 'assets\inhouse-photos-icon.png' 1024 0.64 'tile'
 Write-InhousePhotosIcon 'assets\inhouse-photos-icon-light.png' 1024 1 'square'
 Write-InhousePhotosIcon 'assets\inhouse-photos-icon-foreground.png' 1024 1 'foreground'
@@ -177,7 +183,7 @@ Copy-Item `
   -Force
 
 # Android 12 masks splash artwork to a circle. These bounds stay entirely inside its safe circle.
-Write-InhousePhotosIcon 'assets\inhouse-photos-splash-android12.png' 1152 0.43 'tile'
+Write-InhousePhotosIcon 'assets\inhouse-photos-splash-android12.png' 1152 0.48 'print'
 
 # Store metadata and iOS app icons are opaque squares of the visible icon area.
 Write-InhousePhotosIcon 'android\metadata\en-US\images\icon.png' 512 1 'square'

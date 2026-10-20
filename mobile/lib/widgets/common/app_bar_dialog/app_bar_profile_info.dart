@@ -12,6 +12,7 @@ import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.da
 import 'package:immich_mobile/providers/upload_profile_image.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/widgets/common/immich_loading_indicator.dart';
+import 'package:immich_mobile/widgets/common/immich_logo.dart';
 import 'package:immich_mobile/widgets/common/user_circle_avatar.dart';
 
 class AppBarProfileInfoBox extends HookConsumerWidget {
@@ -26,11 +27,7 @@ class AppBarProfileInfoBox extends HookConsumerWidget {
 
     buildUserProfileImage() {
       if (user == null) {
-        return const CircleAvatar(
-          radius: 20,
-          backgroundImage: AssetImage('assets/inhouse-photos-icon-light.png'),
-          backgroundColor: Colors.transparent,
-        );
+        return const SizedBox(width: 40, height: 40, child: ImmichLogo(size: 40));
       }
 
       final userImage = UserCircleAvatar(size: 44, user: user, hasBorder: true);

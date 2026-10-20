@@ -10,6 +10,9 @@ void main() {
       final svg = File(path).readAsStringSync();
       final colors = RegExp(r'#[0-9A-Fa-f]{6}').allMatches(svg).map((match) => match.group(0)!.toUpperCase()).toSet();
       expect(colors, {'#F5843F', '#DA5520', '#FFFFFF', '#FFC447', '#EBDDD2', '#5A3A28'}, reason: path);
+      // Inside the app the logo is only the tilted print, without the icon's white tile.
+      expect(svg, isNot(contains('width="72" height="72"')), reason: path);
+      expect(svg, contains('rotate(-8 54 52)'), reason: path);
     }
   });
 
@@ -22,7 +25,7 @@ void main() {
     final pubspec = File('pubspec.yaml').readAsStringSync();
     final generator = File('scripts/generate_inhouse_brand_assets.ps1').readAsStringSync();
     expect(RegExp('inhouse-photos-splash-android12.png').allMatches(pubspec), hasLength(2));
-    expect(generator, contains("'assets\\inhouse-photos-splash-android12.png' 1152 0.43"));
+    expect(generator, contains("'assets\\inhouse-photos-splash-android12.png' 1152 0.48 'print'"));
   });
 
   test('startup handoff and first timeline load do not render a second logo loader', () {
