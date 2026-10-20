@@ -5,9 +5,12 @@ $gradientTop = [System.Drawing.ColorTranslator]::FromHtml('#F5843F')
 $gradientBottom = [System.Drawing.ColorTranslator]::FromHtml('#DA5520')
 $white = [System.Drawing.Color]::White
 $amber = [System.Drawing.ColorTranslator]::FromHtml('#FFC447')
+$edge = [System.Drawing.ColorTranslator]::FromHtml('#EBDDD2')
 
 # The app icon is designed on the 108dp adaptive canvas. Launchers show the
-# central 72 units (18..90), which is the "tile" drawn below.
+# central 72 units (18..90), which is the "tile" drawn below. The icon is a white
+# tile with an instant-camera print tilted -8 degrees: a copper photo window with
+# the family roof as the white mountain, the small peak and the amber sun.
 function New-RoundedRectanglePath {
   param(
     [float]$X,
@@ -37,61 +40,70 @@ function New-RoundPen {
   return $pen
 }
 
-# Viewfinder corners, mountain roof, small peak and sun in canvas units.
-function Draw-InhouseForeground {
+# Rounded rectangle in canvas units.
+function New-CanvasRect {
+  param([scriptblock]$P, [float]$Scale, [float]$X, [float]$Y, [float]$Width, [float]$Height, [float]$Radius)
+
+  $origin = & $P $X $Y
+  return New-RoundedRectanglePath -X $origin.X -Y $origin.Y -Width ($Width * $Scale) -Height ($Height * $Scale) -Radius ($Radius * $Scale)
+}
+
+# The print: 46 x 52 frame (4 at the sides and top, 11 at the bottom), a 38 x 37
+# photo window and the scene, tilted -8 degrees around (54, 52). Monochrome draws
+# the frame with its window cut out and the scene in one colour.
+function Draw-InhousePrint {
   param(
     [System.Drawing.Graphics]$Graphics,
     [scriptblock]$P,
     [float]$Scale,
-    [System.Drawing.Color]$Ink,
-    [System.Drawing.Color]$Sun
+    [bool]$Monochrome
   )
 
-  $cornerPen = New-RoundPen $Ink (4.2 * $Scale)
-  $peakPen = New-RoundPen $Ink (3.8 * $Scale)
-  $mountainPen = New-RoundPen $Ink (5.2 * $Scale)
-  $sunBrush = [System.Drawing.SolidBrush]::new($Sun)
+  $state = $Graphics.Save()
+  $pivot = & $P 54 52
+  $Graphics.TranslateTransform($pivot.X, $pivot.Y)
+  $Graphics.RotateTransform(-8)
+  $Graphics.TranslateTransform(-$pivot.X, -$pivot.Y)
+  $peakPen = New-RoundPen $white (3.8 * $Scale)
+  $mountainPen = New-RoundPen $white (5.2 * $Scale)
+  $sunBrush = [System.Drawing.SolidBrush]::new($(if ($Monochrome) { $white } else { $amber }))
   try {
-    # Corners: box 31..77, arm 11, radius 6.
-    foreach ($corner in @(
-        @(31, 42, 31, 37, 180, 37, 31, 42, 31),
-        @(66, 31, 71, 31, 270, 77, 37, 77, 42),
-        @(77, 66, 77, 71, 0, 71, 77, 66, 77),
-        @(42, 77, 37, 77, 90, 31, 71, 31, 66))) {
-      $path = [System.Drawing.Drawing2D.GraphicsPath]::new()
-      try {
-        $a = & $P $corner[0] $corner[1]
-        $b = & $P $corner[2] $corner[3]
-        $path.AddLine($a, $b)
-        $arcOrigin = switch ($corner[4]) {
-          180 { & $P 31 31 }
-          270 { & $P 65 31 }
-          0 { & $P 65 65 }
-          90 { & $P 31 65 }
-        }
-        $path.AddArc($arcOrigin.X, $arcOrigin.Y, 12 * $Scale, 12 * $Scale, $corner[4], 90)
-        $c = & $P $corner[5] $corner[6]
-        $d = & $P $corner[7] $corner[8]
-        $path.AddLine($c, $d)
-        $Graphics.DrawPath($cornerPen, $path)
-      } finally {
-        $path.Dispose()
+    if ($Monochrome) {
+      $ring = New-CanvasRect $P $Scale 31 26 46 52 0
+      $ring.AddPath((New-CanvasRect $P $Scale 35 30 38 37 0), $false)
+      $ring.FillMode = [System.Drawing.Drawing2D.FillMode]::Alternate
+      $whiteBrush = [System.Drawing.SolidBrush]::new($white)
+      try { $Graphics.FillPath($whiteBrush, $ring) } finally { $whiteBrush.Dispose(); $ring.Dispose() }
+    } else {
+      # Two soft offset copies stand in for the print's drop shadow.
+      foreach ($layer in @(@(1.4, 2.2, 18), @(0.6, 1.0, 31))) {
+        $grow = $layer[0]
+        $shadow = New-CanvasRect $P $Scale (31 - $grow) (26 - $grow + $layer[1]) (46 + 2 * $grow) (52 + 2 * $grow) (2.8 + $grow)
+        $shadowBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb($layer[2], 90, 58, 40))
+        try { $Graphics.FillPath($shadowBrush, $shadow) } finally { $shadowBrush.Dispose(); $shadow.Dispose() }
       }
+      $frame = New-CanvasRect $P $Scale 31 26 46 52 2.8
+      $whiteBrush = [System.Drawing.SolidBrush]::new($white)
+      $edgePen = [System.Drawing.Pen]::new($edge, 0.6 * $Scale)
+      try { $Graphics.FillPath($whiteBrush, $frame); $Graphics.DrawPath($edgePen, $frame) }
+      finally { $whiteBrush.Dispose(); $edgePen.Dispose(); $frame.Dispose() }
+      $window = New-CanvasRect $P $Scale 35 30 38 37 1.2
+      $windowBrush = [System.Drawing.Drawing2D.LinearGradientBrush]::new((& $P 0 30), (& $P 0 67), $gradientTop, $gradientBottom)
+      try { $Graphics.FillPath($windowBrush, $window) } finally { $windowBrush.Dispose(); $window.Dispose() }
     }
-
-    $Graphics.DrawLines($peakPen, [System.Drawing.PointF[]]@((& $P 58.4 55.3), (& $P 61.9 51.8), (& $P 68.4 58.3)))
-    $Graphics.DrawLines($mountainPen, [System.Drawing.PointF[]]@((& $P 41.4 64.8), (& $P 50.4 55.8), (& $P 59.4 64.8)))
-    $sunCentre = & $P 41.9 44.8
+    $Graphics.DrawLines($peakPen, [System.Drawing.PointF[]]@((& $P 57.85 50.15), (& $P 61.35 46.65), (& $P 67.85 53.15)))
+    $Graphics.DrawLines($mountainPen, [System.Drawing.PointF[]]@((& $P 40.85 59.65), (& $P 49.85 50.65), (& $P 58.85 59.65)))
+    $sunCentre = & $P 41.35 39.65
     $Graphics.FillEllipse($sunBrush, $sunCentre.X - 3.9 * $Scale, $sunCentre.Y - 3.9 * $Scale, 7.8 * $Scale, 7.8 * $Scale)
   } finally {
-    $cornerPen.Dispose()
     $peakPen.Dispose()
     $mountainPen.Dispose()
     $sunBrush.Dispose()
+    $Graphics.Restore($state)
   }
 }
 
-# Mode: tile (rounded icon on transparency, $Fraction of the image), square
+# Mode: tile (white rounded icon on transparency, $Fraction of the image), square
 # (opaque visible area), foreground / background / monochrome (adaptive layers
 # on the full 108-unit canvas).
 function Write-InhousePhotosIcon {
@@ -122,34 +134,20 @@ function Write-InhousePhotosIcon {
     }
     $P = { param($x, $y) [System.Drawing.PointF]::new($originX + $x * $scale, $originY + $y * $scale) }.GetNewClosure()
 
-    if ($Mode -ne 'foreground' -and $Mode -ne 'monochrome') {
-      # The launcher background spans the whole 108-unit canvas; the rounded
-      # tile carries the full gradient on its own 72 units.
+    $whiteBrush = [System.Drawing.SolidBrush]::new($white)
+    try {
       if ($Mode -eq 'tile') {
-        $top = & $P 0 18
-        $bottom = & $P 0 90
-      } else {
-        $top = & $P 0 0
-        $bottom = & $P 0 108
+        $tile = New-CanvasRect $P $scale 18 18 72 72 17
+        try { $graphics.FillPath($whiteBrush, $tile) } finally { $tile.Dispose() }
+      } elseif ($Mode -in @('square', 'background')) {
+        $graphics.FillRectangle($whiteBrush, 0, 0, $Size, $Size)
       }
-      $brush = [System.Drawing.Drawing2D.LinearGradientBrush]::new($top, $bottom, $gradientTop, $gradientBottom)
-      try {
-        if ($Mode -eq 'tile') {
-          $tile = & $P 18 18
-          $tilePath = New-RoundedRectanglePath -X $tile.X -Y $tile.Y -Width (72 * $scale) -Height (72 * $scale) -Radius (17 * $scale)
-          try { $graphics.FillPath($brush, $tilePath) } finally { $tilePath.Dispose() }
-        } else {
-          $graphics.FillRectangle($brush, 0, 0, $Size, $Size)
-        }
-      } finally {
-        $brush.Dispose()
-      }
+    } finally {
+      $whiteBrush.Dispose()
     }
 
-    if ($Mode -eq 'monochrome') {
-      Draw-InhouseForeground $graphics $P $scale $white $white
-    } elseif ($Mode -ne 'background') {
-      Draw-InhouseForeground $graphics $P $scale $white $amber
+    if ($Mode -ne 'background') {
+      Draw-InhousePrint $graphics $P $scale ($Mode -eq 'monochrome')
     }
 
     $absolutePath = Join-Path $mobileRoot $Path
@@ -164,7 +162,7 @@ function Write-InhousePhotosIcon {
   }
 }
 
-# Runtime splash marks are transparent and identical in light/dark mode.
+# Runtime splash marks: the white tile on transparency, identical in light/dark mode.
 Write-InhousePhotosIcon 'assets\inhouse-photos-splash.png' 768 0.52 'tile'
 Write-InhousePhotosIcon 'assets\inhouse-photos-splash-light.png' 768 0.52 'tile'
 Write-InhousePhotosIcon 'assets\inhouse-photos-icon.png' 1024 0.64 'tile'

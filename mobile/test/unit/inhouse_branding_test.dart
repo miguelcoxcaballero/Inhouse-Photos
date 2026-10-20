@@ -9,7 +9,7 @@ void main() {
     for (final path in ['assets/inhouse-photos-logo.svg', 'assets/inhouse-photos-logo-light.svg']) {
       final svg = File(path).readAsStringSync();
       final colors = RegExp(r'#[0-9A-Fa-f]{6}').allMatches(svg).map((match) => match.group(0)!.toUpperCase()).toSet();
-      expect(colors, {'#F5843F', '#DA5520', '#FFFFFF', '#FFC447'}, reason: path);
+      expect(colors, {'#F5843F', '#DA5520', '#FFFFFF', '#FFC447', '#EBDDD2', '#5A3A28'}, reason: path);
     }
   });
 

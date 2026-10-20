@@ -1,28 +1,44 @@
 <DrawingImage xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
   <DrawingImage.Drawing>
-    <!-- Inhouse Photos app icon: the visible 72dp of the 108dp adaptive canvas (18..90). -->
+    <!-- Inhouse Photos app icon: the visible 72dp of the 108dp adaptive canvas (18..90).
+         A white tile with an instant-camera print tilted -8 degrees: copper photo window,
+         the family roof as the white mountain, the small peak and the amber sun. -->
     <DrawingGroup>
-      <GeometryDrawing>
-        <GeometryDrawing.Brush>
-          <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#F5843F" Offset="0"/>
-            <GradientStop Color="#DA5520" Offset="1"/>
-          </LinearGradientBrush>
-        </GeometryDrawing.Brush>
+      <GeometryDrawing Brush="#FFFFFF">
         <GeometryDrawing.Geometry><RectangleGeometry Rect="18,18,72,72" RadiusX="17" RadiusY="17"/></GeometryDrawing.Geometry>
       </GeometryDrawing>
-      <GeometryDrawing Geometry="M31,42 V37 A6,6 0 0 1 37,31 H42 M66,31 H71 A6,6 0 0 1 77,37 V42 M77,66 V71 A6,6 0 0 1 71,77 H66 M42,77 H37 A6,6 0 0 1 31,71 V66">
-        <GeometryDrawing.Pen><Pen Brush="#FFFFFF" Thickness="4.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen>
-      </GeometryDrawing>
-      <GeometryDrawing Geometry="M58.4,55.3 L61.9,51.8 68.4,58.3">
-        <GeometryDrawing.Pen><Pen Brush="#FFFFFF" Thickness="3.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen>
-      </GeometryDrawing>
-      <GeometryDrawing Geometry="M41.4,64.8 L50.4,55.8 59.4,64.8">
-        <GeometryDrawing.Pen><Pen Brush="#FFFFFF" Thickness="5.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen>
-      </GeometryDrawing>
-      <GeometryDrawing Brush="#FFC447">
-        <GeometryDrawing.Geometry><EllipseGeometry Center="41.9,44.8" RadiusX="3.9" RadiusY="3.9"/></GeometryDrawing.Geometry>
-      </GeometryDrawing>
+      <DrawingGroup>
+        <DrawingGroup.Transform><RotateTransform Angle="-8" CenterX="54" CenterY="52"/></DrawingGroup.Transform>
+        <!-- Two soft offset copies stand in for the print's drop shadow. -->
+        <GeometryDrawing Brush="#125A3A28">
+          <GeometryDrawing.Geometry><RectangleGeometry Rect="29.6,26.8,48.8,54.8" RadiusX="4.2" RadiusY="4.2"/></GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#1F5A3A28">
+          <GeometryDrawing.Geometry><RectangleGeometry Rect="30.4,26.4,47.2,53.2" RadiusX="3.4" RadiusY="3.4"/></GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#FFFFFF">
+          <GeometryDrawing.Pen><Pen Brush="#EBDDD2" Thickness="0.6"/></GeometryDrawing.Pen>
+          <GeometryDrawing.Geometry><RectangleGeometry Rect="31,26,46,52" RadiusX="2.8" RadiusY="2.8"/></GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing>
+          <GeometryDrawing.Brush>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+              <GradientStop Color="#F5843F" Offset="0"/>
+              <GradientStop Color="#DA5520" Offset="1"/>
+            </LinearGradientBrush>
+          </GeometryDrawing.Brush>
+          <GeometryDrawing.Geometry><RectangleGeometry Rect="35,30,38,37" RadiusX="1.2" RadiusY="1.2"/></GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Geometry="M57.85,50.15 L61.35,46.65 67.85,53.15">
+          <GeometryDrawing.Pen><Pen Brush="#FFFFFF" Thickness="3.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Geometry="M40.85,59.65 L49.85,50.65 58.85,59.65">
+          <GeometryDrawing.Pen><Pen Brush="#FFFFFF" Thickness="5.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#FFC447">
+          <GeometryDrawing.Geometry><EllipseGeometry Center="41.35,39.65" RadiusX="3.9" RadiusY="3.9"/></GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
     </DrawingGroup>
   </DrawingImage.Drawing>
 </DrawingImage>
