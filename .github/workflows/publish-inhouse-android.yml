@@ -16,9 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      RELEASE_TAG: v3.1.109-a
-      ANDROID_RELEASE_VERSION: '3.1.109'
-      ANDROID_RELEASE_BASE_BUILD: '5167'
+      RELEASE_TAG: v3.1.110-a
+      ANDROID_RELEASE_VERSION: '3.1.110'
+      ANDROID_RELEASE_BASE_BUILD: '5168'
     steps:
       - name: Checkout the source to publish
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -155,7 +155,7 @@ jobs:
             --report "$RUNNER_TEMP/android-release-verification.json"
 
       - name: Prepare channel A catalog (B needs explicit user authorization)
-        run: python vendor/inhouse-services-updater/catalog.py --manifest android-update.json --changelog "In-app logo without the white square."
+        run: python vendor/inhouse-services-updater/catalog.py --manifest android-update.json --changelog "Flat orange logo, no gradient."
 
       - name: Test the actual staged updater against the signed APK version
         working-directory: mobile
@@ -185,7 +185,7 @@ jobs:
           version_code = int(os.environ['ANDROID_RELEASE_BASE_BUILD']) + 2000
           Path(sys.argv[1]).write_text(
               f'Inhouse Photos Android {version} (ARM64, versionCode {version_code}).\n\n'
-              'In-app logo without the white square.\n\n'
+              'Flat orange logo, no gradient.\n\n'
               'Instala Inhouse-Photos.apk o extráelo de Inhouse-Photos-Android.zip sobre la aplicación existente. Se conserva el certificado permanente de Inhouse Photos. El informe adjunto verifica la versión, el paquete, la firma y los ocho símbolos JNI.\n'
           )
           PY

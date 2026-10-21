@@ -1,7 +1,7 @@
 <DrawingImage xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
   <DrawingImage.Drawing>
     <!-- Inhouse Photos app icon: the visible 72dp of the 108dp adaptive canvas (18..90).
-         A white tile with an instant-camera print tilted -8 degrees: copper photo window,
+         A white tile with an instant-camera print tilted -8 degrees: flat orange photo window,
          the family roof as the white mountain, the small peak and the amber sun. -->
     <DrawingGroup>
       <GeometryDrawing Brush="#FFFFFF">
@@ -20,13 +20,7 @@
           <GeometryDrawing.Pen><Pen Brush="#EBDDD2" Thickness="0.6"/></GeometryDrawing.Pen>
           <GeometryDrawing.Geometry><RectangleGeometry Rect="31,26,46,52" RadiusX="2.8" RadiusY="2.8"/></GeometryDrawing.Geometry>
         </GeometryDrawing>
-        <GeometryDrawing>
-          <GeometryDrawing.Brush>
-            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-              <GradientStop Color="#F5843F" Offset="0"/>
-              <GradientStop Color="#DA5520" Offset="1"/>
-            </LinearGradientBrush>
-          </GeometryDrawing.Brush>
+        <GeometryDrawing Brush="#FF7F1F">
           <GeometryDrawing.Geometry><RectangleGeometry Rect="35,30,38,37" RadiusX="1.2" RadiusY="1.2"/></GeometryDrawing.Geometry>
         </GeometryDrawing>
         <GeometryDrawing Geometry="M57.85,50.15 L61.35,46.65 67.85,53.15">
