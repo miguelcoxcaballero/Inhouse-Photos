@@ -1,15 +1,14 @@
 Add-Type -AssemblyName System.Drawing
 
 $mobileRoot = Split-Path -Parent $PSScriptRoot
-$gradientTop = [System.Drawing.ColorTranslator]::FromHtml('#F5843F')
-$gradientBottom = [System.Drawing.ColorTranslator]::FromHtml('#DA5520')
+$photoOrange = [System.Drawing.ColorTranslator]::FromHtml('#FF7F1F')
 $white = [System.Drawing.Color]::White
 $amber = [System.Drawing.ColorTranslator]::FromHtml('#FFC447')
 $edge = [System.Drawing.ColorTranslator]::FromHtml('#EBDDD2')
 
 # The app icon is designed on the 108dp adaptive canvas. Launchers show the
 # central 72 units (18..90), which is the "tile" drawn below. The icon is a white
-# tile with an instant-camera print tilted -8 degrees: a copper photo window with
+# tile with an instant-camera print tilted -8 degrees: a flat orange photo window with
 # the family roof as the white mountain, the small peak and the amber sun.
 function New-RoundedRectanglePath {
   param(
@@ -88,7 +87,7 @@ function Draw-InhousePrint {
       try { $Graphics.FillPath($whiteBrush, $frame); $Graphics.DrawPath($edgePen, $frame) }
       finally { $whiteBrush.Dispose(); $edgePen.Dispose(); $frame.Dispose() }
       $window = New-CanvasRect $P $Scale 35 30 38 37 1.2
-      $windowBrush = [System.Drawing.Drawing2D.LinearGradientBrush]::new((& $P 0 30), (& $P 0 67), $gradientTop, $gradientBottom)
+      $windowBrush = [System.Drawing.SolidBrush]::new($photoOrange)
       try { $Graphics.FillPath($windowBrush, $window) } finally { $windowBrush.Dispose(); $window.Dispose() }
     }
     $Graphics.DrawLines($peakPen, [System.Drawing.PointF[]]@((& $P 57.85 50.15), (& $P 61.35 46.65), (& $P 67.85 53.15)))
