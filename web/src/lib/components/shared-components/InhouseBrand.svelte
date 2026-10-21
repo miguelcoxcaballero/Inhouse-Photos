@@ -8,7 +8,7 @@
 </script>
 
 <span class="inhouse-brand {className}" aria-label="Inhouse Photos">
-  <img src="/inhouse-photos-mark.svg?v=8" alt="" />
+  <img src="/inhouse-photos-mark.svg?v=9" alt="" />
   {#if !compact}
     <span>inhouse photos</span>
   {/if}
